@@ -653,6 +653,33 @@ canvas#pdfCanvas{display:block}
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
+// ── SUPABASE CONFIG ──
+var SUPA_URL='https://qbsjrccrgkbevncvxbio.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+var SUPA_BUCKET='drawings';
+
+async function uploadPdfToSupabase(file, drawingId){
+  var ext='pdf';
+  var path='drawings/'+drawingId+'-'+Date.now()+'.'+ext;
+  var res=await fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET+'/'+path,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/pdf','x-upsert':'true'},
+    body:file
+  });
+  if(!res.ok){var e=await res.text();throw new Error('Upload failed: '+e);}
+  return SUPA_URL+'/storage/v1/object/public/'+SUPA_BUCKET+'/'+path;
+}
+
+async function deletePdfFromSupabase(url){
+  if(!url||!url.includes(SUPA_URL))return;
+  var path=url.split('/object/public/'+SUPA_BUCKET+'/')[1];
+  if(!path)return;
+  await fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET+'/'+path,{
+    method:'DELETE',
+    headers:{'Authorization':'Bearer '+SUPA_KEY}
+  });
+}
+
 // ── SIDEBAR ──
 var SBK='hvacnexus_sb_collapsed';
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
@@ -668,21 +695,12 @@ var _uid=100;
 function nid(){return ++_uid;}
 function save(){
   try{
-    // Strip pdfData from superseded drawings to save space
+    // Never store pdfData in localStorage — always use Supabase pdfUrl
     var toStore=drawings.map(function(d){
-      if(d.superseded){
-        var c=Object.assign({},d);delete c.pdfData;return c;
-      }return d;
+      var c=Object.assign({},d);delete c.pdfData;return c;
     });
     localStorage.setItem(DK,JSON.stringify(toStore));
-  }catch(e){
-    // If still too large, strip ALL pdf data and warn
-    try{
-      var stripped=drawings.map(function(d){var c=Object.assign({},d);delete c.pdfData;return c;});
-      localStorage.setItem(DK,JSON.stringify(stripped));
-      alert('Storage almost full — PDF data could not be saved. Consider moving to cloud storage.');
-    }catch(e2){console.error('localStorage full:',e2);}
-  }
+  }catch(e){console.error('Save error:',e);}
 }
 function load(){try{var s=localStorage.getItem(DK);if(s){var p=JSON.parse(s);drawings=Array.isArray(p)?p:[];}}catch(e){drawings=[];}}
 load();
@@ -725,6 +743,7 @@ function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 
 // ── ADD DRAWING MODAL ──
 var _pendingPdfData=null;
+var _pendingPdfFile=null;
 function openAddModal(){
   _pendingPdfData=null;
   ['f-num','f-name','f-rev'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
@@ -741,11 +760,10 @@ function handleModalPdf(inp){
   var files=inp.files||inp.target&&inp.target.files;
   if(!files||!files[0]) return;
   var file=files[0];
-  var lbl=document.getElementById('fileLabel');if(lbl)lbl.textContent=file.name;
+  var lbl=document.getElementById('fileLabel');if(lbl)lbl.textContent=file.name+' (uploading...)';
   var dz=document.getElementById('addDropZone');if(dz)dz.classList.add('has-file');
-  var reader=new FileReader();
-  reader.onload=function(e){_pendingPdfData=e.target.result;};
-  reader.readAsDataURL(file);
+  _pendingPdfData=null;_pendingPdfFile=file;
+  if(lbl)lbl.textContent=file.name+' ✓ ready';
 }
 function saveDrawing(){
   var num=document.getElementById('f-num').value.trim();
@@ -757,13 +775,25 @@ function saveDrawing(){
   var approval=(document.getElementById('f-approval')||{value:'Pending'}).value;
   var subDate=(document.getElementById('f-subdate')||{value:''}).value;
   var apprDate=(document.getElementById('f-apprdate')||{value:''}).value;
-  drawings.push({id:'d'+nid(),num:num,name:name,rev:rev,
+  var newId='d'+nid();
+  var drwObj={id:newId,num:num,name:name,rev:rev,
     cat:document.getElementById('f-cat').value,
     subcat:(document.getElementById('f-subcat')||{value:'General'}).value,
-    status:status,approval:approval,subDate:subDate,apprDate:apprDate,superseded:false,
-    history:[{rev:rev,status:status,approval:approval,subDate:subDate,apprDate:apprDate,recorded:today}],
-    pins:[],pdfData:_pendingPdfData});
+    status:status,approval:approval,subDate:subDate,apprDate:'',superseded:false,
+    history:[{rev:rev,status:status,approval:approval,subDate:subDate,apprDate:'',recorded:today}],
+    pins:[],pdfData:null,pdfUrl:null};
+  drawings.push(drwObj);
   save();closeAddModal();renderList();
+  if(_pendingPdfFile){
+    var btn=document.getElementById('addModalSaveBtn');
+    uploadPdfToSupabase(_pendingPdfFile,newId).then(function(url){
+      drwObj.pdfUrl=url;drwObj.pdfData=null;save();renderList();
+      showToast('✓ PDF uploaded successfully');
+    }).catch(function(err){
+      showToast('PDF upload failed — '+err.message);
+    });
+    _pendingPdfFile=null;
+  }
 }
 
 // ── LIST VIEW ──
@@ -833,14 +863,18 @@ function openDrawing(id){
   pdfScale=1;pdfBaseScale=1;_prevScale=1;
   var stage=document.getElementById('pdfStage');
   stage.style.transform='scale(1)';
-  var hasPdf=!!d.pdfData;
+  var hasPdf=!!(d.pdfData||d.pdfUrl);
   document.getElementById('pdfCanvas').style.display=hasPdf?'block':'none';
   document.getElementById('noPdfMsg').style.display=hasPdf?'none':'flex';
   document.getElementById('pinOverlay').innerHTML='';
   if(hasPdf){
     var loader=document.getElementById('pdfLoading');
     if(loader)loader.style.display='flex';
-    renderPdfData(d.pdfData,d.id);
+    if(d.pdfUrl&&!d.pdfData){
+      renderPdfFromUrl(d.pdfUrl,d.id);
+    } else {
+      renderPdfData(d.pdfData,d.id);
+    }
   }
   renderPins();
   document.getElementById('pinsPanel').classList.remove('collapsed');
@@ -873,15 +907,17 @@ var _pdfCache={};       // cache pdfDoc by drawing id to skip re-parse
 function triggerUpload(){document.getElementById('pdfFileInput').click();}
 function loadPdfFile(e){
   var file=e.target.files[0];if(!file)return;
-  var reader=new FileReader();
-  reader.onload=function(ev){
-    var d=drawings.find(function(x){return x.id===curId;});
-    if(d){d.pdfData=ev.target.result;save();}
-    document.getElementById('pdfCanvas').style.display='block';
-    document.getElementById('noPdfMsg').style.display='none';
-    renderPdfData(ev.target.result);
-  };
-  reader.readAsDataURL(file);
+  var d=drawings.find(function(x){return x.id===curId;});if(!d)return;
+  document.getElementById('pdfCanvas').style.display='block';
+  document.getElementById('noPdfMsg').style.display='none';
+  showToast('Uploading PDF...');
+  uploadPdfToSupabase(file,curId).then(function(url){
+    d.pdfUrl=url;d.pdfData=null;save();
+    renderPdfFromUrl(url,curId);
+    showToast('✓ PDF uploaded');
+  }).catch(function(err){
+    showToast('Upload failed: '+err.message);
+  });
 }
 
 function renderPdfData(dataUrl, drawingId){
@@ -965,6 +1001,56 @@ function renderPdfData(dataUrl, drawingId){
   }
 }
 
+function renderPdfFromUrl(url, drawingId){
+  if(_renderTask){try{_renderTask.cancel();}catch(e){}_renderTask=null;}
+  var loader=document.getElementById('pdfLoading');
+  if(loader)loader.style.display='flex';
+  pdfjsLib.getDocument(url).promise.then(function(pdf){
+    pdfDoc=pdf;
+    if(_pdfCache)_pdfCache[drawingId]=pdf;
+    pdf.getPage(1).then(function(page){
+      var vpFast=page.getViewport({scale:PDF_FAST_RES});
+      var fast=document.createElement('canvas');
+      fast.width=vpFast.width;fast.height=vpFast.height;
+      page.render({canvasContext:fast.getContext('2d'),viewport:vpFast}).promise.then(function(){
+        var canvas=document.getElementById('pdfCanvas');
+        canvas.width=fast.width;canvas.height=fast.height;
+        canvas.getContext('2d').drawImage(fast,0,0);
+        canvas.style.display='block';
+        canvas.onclick=onCanvasClick;
+        if(loader)loader.style.display='none';
+        requestAnimationFrame(function(){
+          var wrap=document.getElementById('pdfWrap');
+          var fitScale=Math.min(wrap.clientWidth/vpFast.width,wrap.clientHeight/vpFast.height)*0.95;
+          pdfScale=Math.max(0.05,fitScale);
+          pdfBaseScale=pdfScale;_prevScale=pdfScale;
+          applyZoom();renderPinOverlay();
+        });
+        // Hi-res pass
+        var vpHi=page.getViewport({scale:PDF_BASE_RES});
+        var hi=document.createElement('canvas');
+        hi.width=vpHi.width;hi.height=vpHi.height;
+        _renderTask=page.render({canvasContext:hi.getContext('2d'),viewport:vpHi});
+        _renderTask.promise.then(function(){
+          _renderTask=null;
+          if(drawingId&&curId!==drawingId)return;
+          canvas.width=vpHi.width;canvas.height=vpHi.height;
+          canvas.getContext('2d').drawImage(hi,0,0);
+          requestAnimationFrame(function(){
+            var wrap=document.getElementById('pdfWrap');
+            var fitScale=Math.min(wrap.clientWidth/vpHi.width,wrap.clientHeight/vpHi.height)*0.95;
+            pdfScale=Math.max(0.05,fitScale);pdfBaseScale=pdfScale;_prevScale=pdfScale;
+            applyZoom();renderPinOverlay();
+          });
+        }).catch(function(){});
+      });
+    });
+  }).catch(function(err){
+    if(loader)loader.style.display='none';
+    console.error('PDF URL load error:',err);
+    showToast('Could not load PDF from storage');
+  });
+}
 // applyZoom: instantly move stage via CSS transform — NO PDF re-render
 function applyZoom(){
   var stage=document.getElementById('pdfStage');
@@ -1440,6 +1526,7 @@ function showToast(msg){
 // -- SUPERSEDE WORKFLOW --
 var _supersedeId=null;
 var _supersedePdfData=null;
+var _supersedePdfFile=null;
 function openSupersedeConfirm(id){
   var d=drawings.find(function(x){return x.id===id;});if(!d)return;
   _supersedeId=id;_supersedePdfData=null;
@@ -1470,11 +1557,9 @@ function handleSupersedePdf(inp){
   var files=inp.files||inp.target&&inp.target.files;
   if(!files||!files[0])return;
   var file=files[0];
-  var lbl=document.getElementById('supFileLabel');if(lbl)lbl.textContent=file.name;
+  var lbl=document.getElementById('supFileLabel');if(lbl)lbl.textContent=file.name+' ✓ ready';
   var dz=document.getElementById('supDropZone');if(dz)dz.classList.add('has-file');
-  var reader=new FileReader();
-  reader.onload=function(e){_supersedePdfData=e.target.result;};
-  reader.readAsDataURL(file);
+  _supersedePdfData=null;_supersedePdfFile=file;
 }
 function confirmSupersede(){
   var newRev=document.getElementById('sup-rev').value.trim();
@@ -1513,6 +1598,13 @@ function confirmSupersede(){
   drawings.push(newDrw);
   save();closeSupersedeModal();renderList();
   showToast('Superseded. New revision '+newRev+' created.');
+  if(_supersedePdfFile){
+    uploadPdfToSupabase(_supersedePdfFile,newDrw.id).then(function(url){
+      newDrw.pdfUrl=url;save();renderList();
+      showToast('✓ PDF uploaded for new revision');
+    }).catch(function(err){showToast('PDF upload failed: '+err.message);});
+    _supersedePdfFile=null;
+  }
 }
 
 // -- DRAG AND DROP HELPERS --
