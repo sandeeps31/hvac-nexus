@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Procurement Schedule — HVAC NEXUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;--border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.10);--green:#00e5a0;--green-dim:rgba(0,229,160,.10);--warn:#ffb830;--warn-dim:rgba(255,184,48,.10);--danger:#ff4d6d;--danger-dim:rgba(255,77,109,.10);--purple:#a78bfa;--purple-dim:rgba(167,139,250,.10);--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a;--radius:10px;--sb:230px;--sb-sm:52px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type=number]{-moz-appearance:textfield}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.7;cursor:pointer}
+.sb{width:var(--sb);position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden}
+.sb.sm{width:var(--sb-sm)}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px}.sb-icon{font-size:20px}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;position:relative;white-space:nowrap;overflow:hidden}
+.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis}
+.sb-tooltip{position:absolute;left:100%;top:50%;transform:translateY(-50%);background:var(--surface2);color:var(--text);font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:400;margin-left:8px}
+.sb.sm .sb-item:hover .sb-tooltip{opacity:1}
+.sb-group{}.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}
+.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}
+.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-group-hdr{display:none}.sb.sm .sb-group-items{display:block !important}.sb.sm .sb-group-items .sb-item{padding:9px 14px;justify-content:center;border-left:none}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}
+.sb-user-name{font-size:12.5px;color:var(--text2);white-space:nowrap}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb.sm .sb-top{padding:14px 12px 10px;justify-content:center}.sb.sm .sb-footer{justify-content:center}
+.main{margin-left:var(--sb);transition:margin-left .25s}.main.sm{margin-left:var(--sb-sm)}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px}.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted);background:var(--surface2)}
+.bsm{padding:5px 12px;font-size:12px}
+.bdanger{background:transparent;color:var(--danger);border:1px solid rgba(255,77,109,.3)}.bdanger:hover{background:var(--danger-dim)}
+
+/* SUMMARY BAR */
+.sum-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:stretch;overflow-x:auto;flex-shrink:0}
+.sc{padding:11px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:3px;flex-shrink:0}
+.sc-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.sc-val{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;line-height:1}
+.sc-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.cb .sc-val{color:var(--accent)}.cg .sc-val{color:var(--green)}.cw .sc-val{color:var(--warn)}.cd .sc-val{color:var(--danger)}
+
+/* TOOLBAR */
+.toolbar{padding:10px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--surface)}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px;width:260px;transition:border-color .15s}
+.search-box:focus-within{border-color:var(--accent)}
+.search-box input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%}
+.search-box input::placeholder{color:var(--muted)}
+.fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;cursor:pointer}
+.fsel:focus{border-color:var(--accent);color:var(--text)}.fsel option{background:var(--surface2)}
+
+/* SYNC BANNER */
+.sync-banner{margin:16px 24px 0;padding:12px 16px;background:var(--warn-dim);border:1px solid rgba(255,184,48,.25);border-radius:8px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--warn)}
+.sync-banner-text{flex:1}
+.sync-btn{padding:5px 14px;border-radius:6px;border:1px solid rgba(255,184,48,.3);background:transparent;color:var(--warn);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all .13s}
+.sync-btn:hover{background:rgba(255,184,48,.15)}
+
+/* TABLE WRAP */
+.tbl-wrap{padding:16px 24px 60px;}
+.proc-tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);min-width:1100px}
+.proc-tbl thead tr{background:var(--surface2)}
+.proc-tbl th{position:sticky;top:0;padding:9px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface2);z-index:10}
+.proc-tbl th.r,.proc-tbl td.r{text-align:right}
+.proc-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:12.5px;vertical-align:middle}
+.proc-tbl tbody tr:last-child td{border-bottom:none}
+.proc-tbl tbody tr{cursor:default;transition:background .13s}
+.proc-tbl tbody tr:hover td{background:var(--surface2)}
+.proc-tbl tbody tr.overdue td{background:rgba(255,77,109,.04)}
+.asset-id{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:600}
+.equip-type{font-size:11px;color:var(--text2)}
+.st-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.st-delivered{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.st-ordered{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.2)}
+.st-ready{background:var(--purple-dim);color:var(--purple);border:1px solid rgba(167,139,250,.2)}
+.st-notordered{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
+.st-byfire{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
+.eta-ok{color:var(--green);font-family:'DM Mono',monospace;font-size:11px}
+.eta-warn{color:var(--warn);font-family:'DM Mono',monospace;font-size:11px}
+.eta-over{color:var(--danger);font-family:'DM Mono',monospace;font-size:11px}
+.eta-none{color:var(--muted);font-family:'DM Mono',monospace;font-size:11px}
+.lead-time{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)}
+.inline-edit{background:transparent;border:none;outline:none;color:inherit;font-family:inherit;font-size:inherit;width:100%;min-width:60px;cursor:pointer;padding:0}
+.inline-edit:focus{background:var(--surface3);border-radius:4px;padding:2px 6px;cursor:text}
+.no-data{text-align:center;padding:60px;color:var(--muted);font-size:13px}
+
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.mo.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:560px;max-width:96vw;transform:translateY(10px);transition:transform .2s;max-height:90vh;overflow-y:auto}
+.mo.open .modal{transform:translateY(0)}
+.modal h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px;color:var(--text)}
+.msub{color:var(--text2);font-size:12.5px;margin-bottom:16px}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;margin-top:12px}
+.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;transition:border-color .2s}
+.mi:focus{border-color:var(--accent);background:var(--surface2)}.mi::placeholder{color:var(--muted)}
+.mi.ro{color:var(--accent);font-family:'DM Mono',monospace}
+.ms{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;cursor:pointer}
+.ms:focus{border-color:var(--accent)}.ms option{background:var(--surface2)}
+.mta{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;resize:vertical;min-height:60px}
+.mta:focus{border-color:var(--accent)}.mta::placeholder{color:var(--muted)}
+.mac{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
+.mgrid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.mgrid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 12px}
+.eta-preview{background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:8px 12px;margin-top:6px;font-family:'DM Mono',monospace;font-size:12px;color:var(--accent)}
+
+/* NOTE banner */
+.note-banner{margin:16px 24px 0;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.6}
+.note-banner strong{color:var(--text)}
+
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sb" id="sidebar">
+  <div class="sb-top">
+    <div class="sb-brand"><span class="sb-icon">❄️</span><span class="sb-name">HVAC NEXUS</span></div>
+    <button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">«</button>
+  </div>
+  <div class="sb-proj-block">
+    <div class="sb-proj-lbl">Current Project</div>
+    <div class="sb-proj-name">Greenfield Commercial Tower</div>
+    <div class="sb-proj-num">PRJ-2025-001</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-item" onclick="navTo('hvac-login.html')" style="border-bottom:1px solid var(--border);margin-bottom:4px"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Overview</span><span class="sb-tooltip">Overview</span></div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('financials')" id="ghdr-financials"><span class="sb-group-chev" id="gchev-financials">▸</span><span class="sb-group-name">Financials</span></div>
+      <div class="sb-group-items" id="gitems-financials" style="display:none">
+        <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span><span class="sb-tooltip">Budget</span></div>
+        <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span><span class="sb-tooltip">Progress claims</span></div>
+        <div class="sb-item" onclick="navTo('hvac-vendor-invoices.html')"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span><span class="sb-tooltip">Vendor invoices</span></div>
+        <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span><span class="sb-tooltip">Variations</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span><span class="sb-tooltip">Subbie variations</span></div>
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('procurement')" id="ghdr-procurement"><span class="sb-group-chev" id="gchev-procurement">▾</span><span class="sb-group-name">Procurement</span></div>
+      <div class="sb-group-items" id="gitems-procurement" style="display:block">
+        <div class="sb-item active"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span><span class="sb-tooltip">Procurement schedule</span></div>
+        <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span><span class="sb-tooltip">Purchase orders</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span><span class="sb-tooltip">Subcontractor agreements</span></div>
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('technical')" id="ghdr-technical"><span class="sb-group-chev" id="gchev-technical">▸</span><span class="sb-group-name">Technical</span></div>
+      <div class="sb-group-items" id="gitems-technical" style="display:none">
+        <div class="sb-item" onclick="navTo('hvac-rfi.html')"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span><span class="sb-tooltip">RFI</span></div>
+        <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span><span class="sb-tooltip">Tech submissions</span></div>
+        <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span><span class="sb-tooltip">Drawings</span></div>
+        <div class="sb-item" onclick="navTo('hvac-specifications.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span><span class="sb-tooltip">Specifications</span></div>
+        <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span><span class="sb-tooltip">Equipment schedules</span></div>
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('commissioning')" id="ghdr-commissioning"><span class="sb-group-chev" id="gchev-commissioning">▸</span><span class="sb-group-name">Commissioning</span></div>
+      <div class="sb-group-items" id="gitems-commissioning" style="display:none">
+        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning plan</span><span class="sb-tooltip">Commissioning plan</span></div>
+        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span><span class="sb-tooltip">Pre-commissioning</span></div>
+        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span><span class="sb-tooltip">Commissioning tracker</span></div>
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▸</span><span class="sb-group-name">Quality</span></div>
+      <div class="sb-group-items" id="gitems-quality" style="display:none">
+        <div class="sb-item" onclick="navTo('hvac-internal-itps.html')"><span class="sb-item-icon">🔍</span><span class="sb-item-label">Internal ITPs</span><span class="sb-tooltip">Internal ITPs</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-itps.html')"><span class="sb-item-icon">🔍</span><span class="sb-item-label">Subcontractor ITPs</span><span class="sb-tooltip">Subcontractor ITPs</span></div>
+        <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span><span class="sb-tooltip">Defects</span></div>
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▸</span><span class="sb-group-name">Settings</span></div>
+      <div class="sb-group-items" id="gitems-settings" style="display:none">
+        <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span><span class="sb-tooltip">Company settings</span></div>
+      </div>
+    </div>
+  </nav>
+  <div class="sb-footer"><div class="sb-av">👷</div><span class="sb-user-name">Sandeep S</span></div>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="mainWrap">
+
+<div class="topbar">
+  <div class="bc">
+    <span class="bcl" onclick="navTo('hvac-login.html')">My Projects</span><span class="bcs">›</span>
+    <span class="bcl" onclick="navTo('hvac-login.html')">Greenfield Commercial Tower</span><span class="bcs">›</span>
+    <span class="bcc">Procurement Schedule</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="bg bsm btn" onclick="syncFromEquipment()">⟳ Sync from Equipment Schedule</button>
+    <button class="bg bsm btn" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="resetAndResync()">↺ Reset &amp; Resync</button>
+    <button class="bp bsm btn" onclick="openAddModal()">＋ Add Item</button>
+  </div>
+</div>
+
+<!-- SUMMARY BAR -->
+<div class="sum-bar">
+  <div class="sc cb"><div class="sc-lbl">Total items</div><div class="sc-val" id="sumTotal">0</div><div class="sc-sub">in schedule</div></div>
+  <div class="sc cg"><div class="sc-lbl">Delivered</div><div class="sc-val" id="sumDelivered">0</div><div class="sc-sub">on site</div></div>
+  <div class="sc cw"><div class="sc-lbl">Ordered</div><div class="sc-val" id="sumOrdered">0</div><div class="sc-sub">awaiting delivery</div></div>
+  <div class="sc cd"><div class="sc-lbl">Not ordered</div><div class="sc-val" id="sumNotOrdered">0</div><div class="sc-sub">action required</div></div>
+  <div class="sc"><div class="sc-lbl">Overdue ETA</div><div class="sc-val" id="sumOverdue" style="color:var(--danger)">0</div><div class="sc-sub">past ETA date</div></div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="searchInput" placeholder="Search asset ID, location, manufacturer…" oninput="renderTable()"></div>
+  <select class="fsel" id="stFilter" onchange="renderTable()">
+    <option value="">All Statuses</option>
+    <option value="Not ordered">Not ordered</option>
+    <option value="Ordered">Ordered</option>
+    <option value="Ready">Ready</option>
+    <option value="Delivered">Delivered</option>
+    <option value="Supplied by others">Supplied by others</option>
+  </select>
+  <select class="fsel" id="typeFilter" onchange="renderTable()"><option value="">All Equipment Types</option></select>
+  <select class="fsel" id="locFilter" onchange="renderTable()"><option value="">All Locations</option></select>
+  <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="rowCount"></span>
+</div>
+
+<div id="syncBanner" style="display:none" class="sync-banner">
+  <span style="font-size:18px">⚠</span>
+  <span class="sync-banner-text" id="syncBannerText">Equipment schedule has new items not yet in the procurement schedule.</span>
+  <button class="sync-btn" onclick="syncFromEquipment()">⟳ Sync Now</button>
+</div>
+
+<div style="padding:16px 24px 60px"><div style="overflow-x:auto;border-radius:var(--radius)"><table class="proc-tbl" id="procTable">
+    <thead>
+      <tr>
+        <th style="width:40px">#</th>
+        <th>Asset ID</th>
+        <th>Location</th>
+        <th>Sub area</th>
+        <th>Manufacturer</th>
+        <th>Model</th>
+        <th>Equipment type</th>
+        <th>Submission approval</th>
+        <th style="width:140px">Order status</th>
+        <th style="width:110px">Order date</th>
+        <th style="width:110px">Lead time (weeks)</th>
+        <th style="width:100px">ETA</th>
+        <th>Comments</th>
+      </tr>
+    </thead>
+    <tbody id="procTbody"></tbody>
+  </table>
+</div>
+</div>
+
+<!-- ADD / EDIT MODAL -->
+<div class="mo" id="addModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3 id="modalTitle">Add Procurement Item</h3>
+    <p class="msub">Enter item details. ETA auto-calculates from order date + lead time.</p>
+    <label class="ml">Asset ID</label>
+    <input class="mi" id="f-assetid" placeholder="e.g. GCT001/FCU/L01/0001"/>
+    <div class="mgrid2">
+      <div><label class="ml">Location</label><input class="mi" id="f-location" placeholder="e.g. Level 3"/></div>
+      <div><label class="ml">Sub area</label><input class="mi" id="f-subarea" placeholder="e.g. Zone A"/></div>
+    </div>
+    <div class="mgrid2">
+      <div><label class="ml">Manufacturer</label><input class="mi" id="f-maker" placeholder="e.g. Daikin"/></div>
+      <div><label class="ml">Model</label><input class="mi" id="f-model" placeholder="e.g. FTXS35"/></div>
+    </div>
+    <label class="ml">Equipment Type</label>
+    <input class="mi" id="f-type" placeholder="e.g. Fan coil unit"/>
+    <div class="mgrid2">
+      <div><label class="ml">Qty ordered</label><input class="mi" id="f-qty" type="number" placeholder="e.g. 24"/></div>
+      <div><label class="ml">Qty delivered</label><input class="mi" id="f-qtydelivered" type="number" placeholder="0"/></div>
+    </div>
+    <div class="mgrid2">
+      <div><label class="ml">Submission approval date</label><input class="mi" id="f-subapproval" type="date"/></div>
+      <div><label class="ml">Order status</label>
+        <select class="ms" id="f-status" onchange="recalcETA()">
+          <option value="Not ordered">Not ordered</option>
+          <option value="Ordered">Ordered</option>
+          <option value="Ready">Ready</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Supplied by others">Supplied by others</option>
+        </select>
+      </div>
+    </div>
+    <div class="mgrid3">
+      <div><label class="ml">Order date</label><input class="mi" id="f-orderdate" type="date" oninput="recalcETA()"/></div>
+      <div><label class="ml">Lead time (weeks)</label><input class="mi" id="f-leadtime" type="number" placeholder="e.g. 8" oninput="recalcETA()"/></div>
+      <div><label class="ml">ETA (auto-calculated)</label><div class="eta-preview" id="etaPreview">—</div></div>
+    </div>
+    <label class="ml">Comments</label>
+    <textarea class="mta" id="f-comments" placeholder="Any notes or caveats…"></textarea>
+    <div class="mac">
+      <button class="bdanger bsm btn" id="deleteBtn" style="display:none;margin-right:auto" onclick="deleteItem()">Delete</button>
+      <button class="bg bsm btn" onclick="closeModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="saveItem()">Save Item</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var SK='hvacnexus_procsched_GCT001';
+var EQ_SK='hvacnexus_equip_GCT001';
+var SBK='hvacnexus_sb_collapsed';
+var items=[];
+var editingId=null;
+var _uid=100;
+function nid(){return ++_uid;}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function today(){return new Date().toISOString().split('T')[0];}
+function fmtD(d){if(!d)return '—';try{var p=d.split('-');var dt=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));return dt.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
+function addWeeks(ds,w){
+  if(!ds||!w) return null;
+  var p=ds.split('-');
+  var d=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
+  d.setDate(d.getDate()+parseInt(w)*7);
+  var yr=d.getFullYear();
+  var mo=String(d.getMonth()+1).padStart(2,'0');
+  var dy=String(d.getDate()).padStart(2,'0');
+  return yr+'-'+mo+'-'+dy;
+}
+function isPast(ds){if(!ds)return false;return ds<today();}
+
+// SIDEBAR
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){document.getElementById('sidebar').classList.toggle('sm',c);document.getElementById('mainWrap').classList.toggle('sm',c);document.getElementById('sbToggleBtn').textContent=c?'»':'«';}
+(function(){applySB(localStorage.getItem(SBK)==='1');})();
+function toggleGroup(id){
+  var el=document.getElementById('gitems-'+id),ch=document.getElementById('gchev-'+id);
+  var open=el.style.display!=='none';
+  el.style.display=open?'none':'block';ch.textContent=open?'▸':'▾';
+  try{var s=JSON.parse(localStorage.getItem('hvacnexus_sb_groups')||'{}');s[id]=!open;localStorage.setItem('hvacnexus_sb_groups',JSON.stringify(s));}catch(e){}
+}
+
+// DATA
+function save(){try{localStorage.setItem(SK,JSON.stringify(items));}catch(e){}}
+function load(){try{var s=localStorage.getItem(SK);if(s){var p=JSON.parse(s);items=Array.isArray(p)?p:[];}}catch(e){items=[];}}
+load();
+
+// ETA RECALC
+function calcETA(orderDate,leadWeeks){return addWeeks(orderDate,leadWeeks);}
+function recalcETA(){
+  var od=document.getElementById('f-orderdate').value;
+  var lw=document.getElementById('f-leadtime').value;
+  var eta=od&&lw?calcETA(od,lw):null;
+  document.getElementById('etaPreview').textContent=eta?fmtD(eta):'—';
+}
+
+// SYNC FROM EQUIPMENT SCHEDULE
+var TYPE_LABELS={'fcu':'FCU','mssb':'MSSB','dcp':'DCP','ahu':'AHU','chillers':'Chillers','ct':'Cooling Tower','fans':'Fans','pumps':'Pumps','vav':'VAV','pac':'PAC Units','pu':'Package Units','grilles':'Grilles','dampers':'Dampers','vsds':'VSDs','crac':'CRAC','hex':'Heat Ex','hum':'HUM','hepa':'HEPA','reheat':'Reheat Coils','acu':'ACU','edh':'EDH','harmonic':'Harmonic Filters'};
+function getTypeLabel(tab){return TYPE_LABELS[tab.type]||tab.type||tab.name||'Equipment';}
+
+function resetAndResync(){
+  if(!confirm('Clear all procurement schedule data and re-sync from Equipment Schedule?\nThis will keep your order dates, lead times and statuses if you cancel — only do this to fix labels.')) return;
+  items=[];
+  save();
+  syncFromEquipment();
+}
+
+function syncFromEquipment(){
+  var raw=null;
+  try{raw=localStorage.getItem(EQ_SK);if(raw)raw=JSON.parse(raw);}catch(e){}
+  if(!raw||!raw.tabs||!raw.tabs.length){
+    alert('No equipment schedule data found. Open the Equipment Schedule and add equipment first.');return;
+  }
+  var existing=new Set(items.map(function(i){return i.assetId;}));
+  var added=0;
+  raw.tabs.forEach(function(tab){
+    if(!Array.isArray(tab.rows)) return;
+    var typeLabel=getTypeLabel(tab);
+    tab.rows.forEach(function(row){
+      var id=(row.tag||'').trim();
+      if(!id||existing.has(id)) return;
+      items.push({
+        id:'ps'+nid(),
+        assetId:id,
+        location:row.location||'',
+        subarea:row.sublocation||row.subarea||'',
+        manufacturer:row.manufacturer||row.make||row.maker||'',
+        model:row.model||'',
+        equipType:typeLabel,
+        subApproval:'',
+        status:'Not ordered',
+        orderDate:'',
+        leadWeeks:'',
+        qty:1,
+        qtyDelivered:0,
+        eta:'',
+        comments:''
+      });
+      existing.add(id);
+      added++;
+    });
+  });
+  if(added===0){
+    document.getElementById('syncBanner').style.display='none';
+    alert('All equipment IDs are already in the procurement schedule.');
+    return;
+  }
+  save();
+  document.getElementById('syncBanner').style.display='none';
+  renderTable();
+  alert(added+' item'+(added!==1?'s':'')+' synced from Equipment Schedule.');
+}
+
+// CHECK for new equipment not in schedule
+function checkSyncNeeded(){
+  var raw=null;
+  try{raw=localStorage.getItem(EQ_SK);if(raw)raw=JSON.parse(raw);}catch(e){}
+  if(!raw||!raw.tabs)return;
+  var existing=new Set(items.map(function(i){return i.assetId;}));
+  var newCount=0;
+  raw.tabs.forEach(function(tab){
+    if(!Array.isArray(tab.rows)) return;
+    tab.rows.forEach(function(row){
+      var id=(row.tag||'').trim();
+      if(id&&!existing.has(id)) newCount++;
+    });
+  });
+  var banner=document.getElementById('syncBanner');
+  if(newCount>0){
+    document.getElementById('syncBannerText').textContent=newCount+' equipment item'+(newCount!==1?'s':'')+' in the Equipment Schedule are not yet in the procurement schedule.';
+    banner.style.display='flex';
+  } else {
+    banner.style.display='none';
+  }
+}
+
+// UPDATE SUMMARY
+function updateSummary(filtered){
+  var all=filtered||items;
+  var delivered=all.filter(function(i){return i.status==='Delivered';}).length;
+  var ordered=all.filter(function(i){return i.status==='Ordered'||i.status==='Ready';}).length;
+  var notOrdered=all.filter(function(i){return i.status==='Not ordered';}).length;
+  var td=today();
+  var overdue=all.filter(function(i){return i.eta&&i.eta<td&&i.status!=='Delivered';}).length;
+  document.getElementById('sumTotal').textContent=items.length;
+  document.getElementById('sumDelivered').textContent=delivered;
+  document.getElementById('sumOrdered').textContent=ordered;
+  document.getElementById('sumNotOrdered').textContent=notOrdered;
+  document.getElementById('sumOverdue').textContent=overdue;
+}
+
+// FILTERS
+function getFilteredItems(){
+  var q=(document.getElementById('searchInput').value||'').toLowerCase();
+  var sf=document.getElementById('stFilter').value;
+  var tf=document.getElementById('typeFilter').value;
+  var lf=document.getElementById('locFilter').value;
+  return items.filter(function(i){
+    return(!q||(i.assetId||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
+      &&(!sf||i.status===sf)
+      &&(!tf||i.equipType===tf)
+      &&(!lf||i.location===lf);
+  });
+}
+
+// POPULATE FILTER DROPDOWNS
+function populateFilters(){
+  var types=new Set(),locs=new Set();
+  items.forEach(function(i){if(i.equipType)types.add(i.equipType);if(i.location)locs.add(i.location);});
+  var tSel=document.getElementById('typeFilter'),tv=tSel.value;
+  tSel.innerHTML='<option value="">All Equipment Types</option>';
+  Array.from(types).sort().forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;if(t===tv)o.selected=true;tSel.appendChild(o);});
+  var lSel=document.getElementById('locFilter'),lv=lSel.value;
+  lSel.innerHTML='<option value="">All Locations</option>';
+  Array.from(locs).sort().forEach(function(l){var o=document.createElement('option');o.value=l;o.textContent=l;if(l===lv)o.selected=true;lSel.appendChild(o);});
+}
+
+// RENDER TABLE
+
+function getRequiredQty(item){
+  try{
+    var raw=localStorage.getItem(EQ_SK);
+    if(!raw) return 0;
+    var eq=JSON.parse(raw);
+    if(!eq||!eq.tabs) return 0;
+    var count=0;
+    eq.tabs.forEach(function(tab){
+      if(!Array.isArray(tab.rows)) return;
+      var tabLabel=getTypeLabel(tab);
+      var typeMatch=item.equipType&&tabLabel.toLowerCase()===item.equipType.toLowerCase();
+      if(!typeMatch) return;
+      tab.rows.forEach(function(row){
+        var locMatch=!item.location||(row.location||'').toLowerCase()===item.location.toLowerCase();
+        if(locMatch) count++;
+      });
+    });
+    return count;
+  }catch(e){return 0;}
+}
+function eqSchedLink(equipType,location){
+  return 'hvac-equipment-schedule.html?type='+encodeURIComponent(equipType||'')+'&loc='+encodeURIComponent(location||'');
+}
+
+
+function inlineUpdate(id,field,value){
+  var item=items.find(function(i){return i.id===id;});
+  if(!item) return;
+  if(field==='leadWeeks') value=parseInt(value)||'';
+  if(field==='leadWeeks') value=parseInt(value)||'';
+  item[field]=value;
+  // Always recalc ETA
+  item.eta=(item.orderDate&&item.leadWeeks)?calcETA(item.orderDate,item.leadWeeks):'';
+  save();
+  updateSummary();
+  // Update ETA cell and lead label in place without losing focus
+  var row=document.querySelector('[data-item-id="'+id+'"]');
+  if(row){
+    var etaCell=row.querySelector('.eta-cell');
+    if(etaCell){
+      var td=today();
+      var etaCls='eta-none';
+      var etaDisplay=item.eta?fmtD(item.eta):'—';
+      if(item.eta&&item.status!=='Delivered'){etaCls=item.eta<td?'eta-over':item.eta<=addWeeks(td,2)?'eta-warn':'eta-ok';}
+      if(item.status==='Delivered') etaCls='eta-ok';
+      var isOv=item.eta&&item.eta<td&&item.status!=='Delivered';
+      etaCell.className='eta-cell '+etaCls;
+      etaCell.textContent=etaDisplay+(isOv?' ⚠':'');
+    }
+    var wkLabel=row.querySelector('.wk-label');
+    if(wkLabel) wkLabel.textContent=item.leadWeeks?(item.leadWeeks==1?' week':' weeks'):'';
+  }
+}
+
+function renderTable(){
+  populateFilters();
+  var filtered=getFilteredItems();
+  updateSummary(filtered);
+  document.getElementById('rowCount').textContent=filtered.length+' item'+(filtered.length!==1?'s':'');
+  var tbody=document.getElementById('procTbody');
+  tbody.innerHTML='';
+  if(!filtered.length){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td colspan="12" class="no-data">'+(items.length?'No items match your filters.':'No items yet. Click <strong>⟳ Sync from Equipment Schedule</strong> or <strong>＋ Add Item</strong> to get started.')+'</td>';
+    tbody.appendChild(tr);
+    return;
+  }
+  var td=today();
+  var stMap={
+    'Delivered':'st-delivered','Ordered':'st-ordered','Ready':'st-ready',
+    'Not ordered':'st-notordered','Supplied by others':'st-byfire'
+  };
+  filtered.forEach(function(item,idx){
+    // Always recalc ETA from stored orderDate + leadWeeks
+    if(item.orderDate&&item.leadWeeks){
+      item.eta=calcETA(item.orderDate,item.leadWeeks);
+    }
+    var tr=document.createElement('tr');
+    var etaCls='eta-none';
+    var etaDisplay=item.eta?fmtD(item.eta):'—';
+    if(item.eta&&item.status!=='Delivered'){
+      etaCls=item.eta<td?'eta-over':item.eta<=addWeeks(td,2)?'eta-warn':'eta-ok';
+    }
+    if(item.status==='Delivered') etaCls='eta-ok';
+    var isOverdue=item.eta&&item.eta<td&&item.status!=='Delivered';
+    if(isOverdue) tr.className='overdue';
+    // Inline status dropdown
+        var stColor=item.status==='Not ordered'?'var(--danger)':'var(--text)';
+    var stHex=item.status==='Not ordered'?'#ff4d6d':'#ddeeff';
+    var statusSel='<select onchange="inlineUpdate(\''+item.id+'\',\'status\',this.value);this.style.color=this.value===\'Not ordered\'?\'#ff4d6d\':\'#ddeeff\'" style="background:#1a2640;border:1px solid #1e3050;border-radius:5px;color:'+stHex+';font-family:DM Mono,monospace;font-size:11px;padding:4px 6px;outline:none;cursor:pointer;width:140px">'
+      +['Not ordered','Ordered','Ready','Delivered','Supplied by others'].map(function(s){return '<option value="'+s+'"'+(item.status===s?' selected':'')+'>'+s+'</option>';}).join('')
+      +'</select>';
+    // Inline order date input
+    var dateInput='<input type="date" value="'+(item.orderDate||'')+'" onchange="inlineUpdate(\''+item.id+'\',\'orderDate\',this.value)" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:DM Mono,monospace;font-size:11px;padding:3px 5px;outline:none;width:130px" />';
+    // Inline lead time input
+    var lw=item.leadWeeks?parseInt(item.leadWeeks):null;
+    var lwLabel=!lw?'':lw===1?' week':' weeks';
+    var leadInput='<div style="display:flex;align-items:center;gap:5px">'
+      +'<input type="number" value="'+(lw||'')+'" min="1" placeholder="—" '
+      +'onchange="inlineUpdate(\''+item.id+'\',\'leadWeeks\',this.value)" '
+      +'style="background:#1a2640;border:1px solid #1e3050;border-radius:5px;color:#ddeeff;font-family:DM Mono,monospace;font-size:11px;padding:4px 6px;outline:none;width:50px;text-align:right" />'
+
+      +'</div>';
+    tr.style.cursor='default';
+    tr.setAttribute('data-item-id',item.id);
+    tr.innerHTML='<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">'+(idx+1)+'</td>'
+      +'<td class="asset-id">'+escH(item.assetId||'—')+'</td>'
+      +'<td style="color:var(--text2)">'+escH(item.location||'—')+'</td>'
+      +'<td style="color:var(--muted);font-size:12px">'+escH(item.subarea||'—')+'</td>'
+      +'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>'
+      +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(item.model||'—')+'</td>'
+      +'<td class="equip-type">'+escH(item.equipType||'—')+'</td>'
+      +'<td style="font-size:12px;color:var(--text2)">'+fmtD(item.subApproval)+'</td>'
+      +'<td>'+statusSel+'</td>'
+      +'<td>'+dateInput+'</td>'
+      +'<td style="white-space:nowrap">'+leadInput+'</td>'
+      +'<td class="eta-cell '+etaCls+'">'+etaDisplay+(isOverdue?' ⚠':'')+'</td>'
+      +'<td style="font-size:12px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(item.comments||'')+'">'+escH(item.comments||'')+'</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// ADD MODAL
+function openAddModal(){
+  editingId=null;
+  document.getElementById('modalTitle').textContent='Add Procurement Item';
+  document.getElementById('f-assetid').value='';
+  document.getElementById('f-location').value='';
+  document.getElementById('f-subarea').value='';
+  document.getElementById('f-maker').value='';
+  document.getElementById('f-model').value='';
+  document.getElementById('f-type').value='';
+  document.getElementById('f-qty').value='';
+  document.getElementById('f-qtydelivered').value='';
+  document.getElementById('f-subapproval').value='';
+  document.getElementById('f-status').value='Not ordered';
+  document.getElementById('f-orderdate').value='';
+  document.getElementById('f-leadtime').value='';
+  document.getElementById('f-comments').value='';
+  document.getElementById('etaPreview').textContent='—';
+  document.getElementById('deleteBtn').style.display='none';
+  document.getElementById('addModal').classList.add('open');
+  setTimeout(function(){document.getElementById('f-assetid').focus();},80);
+}
+function openEditModal(id){
+  var item=items.find(function(i){return i.id===id;});if(!item)return;
+  editingId=id;
+  document.getElementById('modalTitle').textContent='Edit Item';
+  document.getElementById('f-assetid').value=item.assetId||'';
+  document.getElementById('f-location').value=item.location||'';
+  document.getElementById('f-subarea').value=item.subarea||'';
+  document.getElementById('f-maker').value=item.manufacturer||'';
+  document.getElementById('f-model').value=item.model||'';
+  document.getElementById('f-type').value=item.equipType||'';
+  document.getElementById('f-qty').value=item.qty||'';
+  document.getElementById('f-qtydelivered').value=item.qtyDelivered||'';
+  document.getElementById('f-subapproval').value=item.subApproval||'';
+  document.getElementById('f-status').value=item.status||'Not ordered';
+  document.getElementById('f-orderdate').value=item.orderDate||'';
+  document.getElementById('f-leadtime').value=item.leadWeeks||'';
+  document.getElementById('f-comments').value=item.comments||'';
+  document.getElementById('etaPreview').textContent=item.eta?fmtD(item.eta):'—';
+  document.getElementById('deleteBtn').style.display='';
+  document.getElementById('addModal').classList.add('open');
+}
+function closeModal(){document.getElementById('addModal').classList.remove('open');}
+function saveItem(){
+  var assetId=document.getElementById('f-assetid').value.trim();
+  if(!assetId){alert('Asset ID is required.');return;}
+  var od=document.getElementById('f-orderdate').value;
+  var lw=document.getElementById('f-leadtime').value;
+  var eta=od&&lw?calcETA(od,lw):'';
+  var item={
+    id:editingId||('ps'+nid()),
+    assetId:assetId,
+    location:document.getElementById('f-location').value.trim(),
+    subarea:document.getElementById('f-subarea').value.trim(),
+    manufacturer:document.getElementById('f-maker').value.trim(),
+    model:document.getElementById('f-model').value.trim(),
+    equipType:document.getElementById('f-type').value.trim(),
+    qty:parseInt(document.getElementById('f-qty').value)||0,
+    qtyDelivered:parseInt(document.getElementById('f-qtydelivered').value)||0,
+    subApproval:document.getElementById('f-subapproval').value,
+    status:document.getElementById('f-status').value,
+    orderDate:od,
+    leadWeeks:lw?parseInt(lw):'',
+    eta:eta,
+    comments:document.getElementById('f-comments').value.trim()
+  };
+  if(editingId){var idx=items.findIndex(function(i){return i.id===editingId;});if(idx>=0)items[idx]=item;else items.push(item);}
+  else items.push(item);
+  save();closeModal();renderTable();
+}
+function deleteItem(){
+  if(!editingId||!confirm('Delete this item?'))return;
+  items=items.filter(function(i){return i.id!==editingId;});
+  save();closeModal();renderTable();
+}
+
+// EXPORT CSV
+function exportCSV(){
+  var headers=['Asset ID','Location','Sub area','Manufacturer','Model','Equipment type','Submission approval date','Order status','Order date','Normal lead time (weeks)','ETA','Comments'];
+  var rows=[headers.join(',')];
+  var filtered=getFilteredItems();
+  filtered.forEach(function(item){
+    var row=[item.assetId,item.location,item.subarea,item.manufacturer,item.model,item.equipType,item.subApproval,item.status,item.orderDate,item.leadWeeks,item.eta,item.comments];
+    rows.push(row.map(function(v){return '"'+(String(v||'').replace(/"/g,'""'))+'"';}).join(','));
+  });
+  var blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='procurement-schedule-GCT001.csv';a.click();
+}
+
+checkSyncNeeded();
+renderTable();
+</script>
+</body>
+</html>

@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vendor Invoices — HVAC NEXUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;--border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.10);--green:#00e5a0;--green-dim:rgba(0,229,160,.10);--warn:#ffb830;--warn-dim:rgba(255,184,48,.10);--danger:#ff4d6d;--danger-dim:rgba(255,77,109,.10);--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a;--radius:10px;--sb:230px;--sb-sm:52px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type=number]{-moz-appearance:textfield}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.sb{width:var(--sb);position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden}
+.sb.sm{width:var(--sb-sm)}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px}.sb-icon{font-size:20px}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;position:relative;white-space:nowrap;overflow:hidden}
+.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis}
+.sb-tooltip{position:absolute;left:100%;top:50%;transform:translateY(-50%);background:var(--surface2);color:var(--text);font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:400;margin-left:8px}
+.sb.sm .sb-item:hover .sb-tooltip{opacity:1}
+.sb-group{}.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}
+.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}
+.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-group-hdr{display:none}.sb.sm .sb-group-items{display:block !important}.sb.sm .sb-group-items .sb-item{padding:9px 14px;justify-content:center;border-left:none}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}
+.sb-user-name{font-size:12.5px;color:var(--text2);white-space:nowrap}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb.sm .sb-top{padding:14px 12px 10px;justify-content:center}.sb.sm .sb-footer{justify-content:center}
+.main{margin-left:var(--sb);transition:margin-left .25s}.main.sm{margin-left:var(--sb-sm)}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px}.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted);background:var(--surface2)}
+.bsm{padding:5px 12px;font-size:12px}
+.bdanger{background:transparent;color:var(--danger);border:1px solid rgba(255,77,109,.3)}.bdanger:hover{background:var(--danger-dim)}
+.sum-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:stretch;overflow-x:auto;flex-shrink:0}
+.sc{padding:11px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:3px;flex-shrink:0}
+.sc-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.sc-val{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;line-height:1}
+.sc-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.cb .sc-val{color:var(--accent)}.cg .sc-val{color:var(--green)}.cw .sc-val{color:var(--warn)}.cd .sc-val{color:var(--danger)}
+.toolbar{padding:10px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px;width:260px;transition:border-color .15s}
+.search-box:focus-within{border-color:var(--accent)}
+.search-box input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%}
+.search-box input::placeholder{color:var(--muted)}
+.fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;cursor:pointer}
+.fsel:focus{border-color:var(--accent);color:var(--text)}.fsel option{background:var(--surface2)}
+.page{padding:16px 24px 60px}
+.month-group{margin-bottom:14px}
+.month-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;user-select:none;transition:background .13s}
+.month-hdr:hover{background:var(--surface3)}
+.month-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1}
+.month-stats{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.month-pill{font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid var(--border);color:var(--muted)}
+.month-pill.all-good{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.month-pill.has-pending{background:var(--warn-dim);border-color:var(--warn);color:var(--warn)}
+.month-pill.has-rejected{background:var(--danger-dim);border-color:var(--danger);color:var(--danger)}
+.month-total{font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:600}
+.month-chev{font-size:11px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.month-group.collapsed .month-chev{transform:rotate(-90deg)}
+.month-group.collapsed .month-body{display:none}
+.month-group.collapsed .month-hdr{border-radius:var(--radius)}
+.inv-tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-top:none;overflow:hidden}
+.inv-tbl thead tr{background:var(--surface2)}
+.inv-tbl th{padding:8px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)}
+.inv-tbl th.r,.inv-tbl td.r{text-align:right}
+.inv-tbl td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.inv-tbl tbody tr:last-child td{border-bottom:none}
+.inv-tbl tbody tr.data-row{cursor:pointer;transition:background .13s}.inv-tbl tbody tr.data-row:hover td{background:var(--surface2)}
+.inv-num{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:600}
+.inv-po{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)}
+.sb-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.st-draft{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.st-approved{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.st-rejected{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
+.st-pending{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
+.days-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.d-ok{color:var(--green)}.d-warn{color:var(--warn)}.d-over{color:var(--danger)}
+.tot-row td{background:var(--surface2) !important;font-weight:600}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;gap:14px;color:var(--muted)}
+.empty-icon{font-size:40px;opacity:.4}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.mo.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:500px;max-width:96vw;transform:translateY(10px);transition:transform .2s;max-height:90vh;overflow-y:auto}
+.mo.open .modal{transform:translateY(0)}
+.modal h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px;color:var(--text)}
+.msub{color:var(--text2);font-size:12.5px;margin-bottom:14px}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;margin-top:12px}
+.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;transition:border-color .2s}
+.mi:focus{border-color:var(--accent);background:var(--surface2)}.mi::placeholder{color:var(--muted)}
+.ms{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;cursor:pointer}
+.ms:focus{border-color:var(--accent)}.ms option{background:var(--surface2)}
+.mta{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;resize:vertical;min-height:70px;transition:border-color .2s}
+.mta:focus{border-color:var(--accent)}.mta::placeholder{color:var(--muted)}
+.mac{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.reject-block{background:var(--danger-dim);border:1px solid rgba(255,77,109,.2);border-radius:8px;padding:12px 14px;margin-top:12px;display:none}
+.reject-block.show{display:block}
+.reject-block .ml{color:var(--danger);margin-top:0}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="sb" id="sidebar">
+  <div class="sb-top">
+    <div class="sb-brand"><span class="sb-icon">❄️</span><span class="sb-name">HVAC NEXUS</span></div>
+    <button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">«</button>
+  </div>
+  <div class="sb-proj-block">
+    <div class="sb-proj-lbl">Current Project</div>
+    <div class="sb-proj-name">Greenfield Commercial Tower</div>
+    <div class="sb-proj-num">PRJ-2025-001</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-item" onclick="navTo('hvac-login.html')" style="border-bottom:1px solid var(--border);margin-bottom:4px"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Overview</span><span class="sb-tooltip">Overview</span></div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('financials')" id="ghdr-financials"><span class="sb-group-chev" id="gchev-financials">▾</span><span class="sb-group-name">Financials</span></div>
+      <div class="sb-group-items" id="gitems-financials" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span><span class="sb-tooltip">Budget</span></div>
+        <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span><span class="sb-tooltip">Progress claims</span></div>
+        <div class="sb-item active"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span><span class="sb-tooltip">Vendor invoices</span></div>
+        <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span><span class="sb-tooltip">Variations</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span><span class="sb-tooltip">Subbie variations</span></div>
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('procurement')" id="ghdr-procurement"><span class="sb-group-chev" id="gchev-procurement">▸</span><span class="sb-group-name">Procurement</span></div>
+      <div class="sb-group-items" id="gitems-procurement" style="display:none">
+        <div class="sb-item" onclick="navTo('hvac-procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span><span class="sb-tooltip">Procurement schedule</span></div>
+        <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span><span class="sb-tooltip">Purchase orders</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span><span class="sb-tooltip">Subcontractor agreements</span></div>
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('technical')" id="ghdr-technical"><span class="sb-group-chev" id="gchev-technical">▸</span><span class="sb-group-name">Technical</span></div>
+      <div class="sb-group-items" id="gitems-technical" style="display:none">
+        <div class="sb-item" onclick="navTo('hvac-rfi.html')"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span><span class="sb-tooltip">RFI</span></div>
+        <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span><span class="sb-tooltip">Tech submissions</span></div>
+        <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span><span class="sb-tooltip">Drawings</span></div>
+        <div class="sb-item" onclick="navTo('hvac-specifications.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span><span class="sb-tooltip">Specifications</span></div>
+        <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span><span class="sb-tooltip">Equipment schedules</span></div>
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('commissioning')" id="ghdr-commissioning"><span class="sb-group-chev" id="gchev-commissioning">▸</span><span class="sb-group-name">Commissioning</span></div>
+      <div class="sb-group-items" id="gitems-commissioning" style="display:none">
+        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning plan</span><span class="sb-tooltip">Commissioning plan</span></div>
+        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span><span class="sb-tooltip">Pre-commissioning</span></div>
+        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span><span class="sb-tooltip">Commissioning tracker</span></div>
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▸</span><span class="sb-group-name">Quality</span></div>
+      <div class="sb-group-items" id="gitems-quality" style="display:none">
+        <div class="sb-item" onclick="navTo('hvac-internal-itps.html')"><span class="sb-item-icon">🔍</span><span class="sb-item-label">Internal ITPs</span><span class="sb-tooltip">Internal ITPs</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-itps.html')"><span class="sb-item-icon">🔍</span><span class="sb-item-label">Subcontractor ITPs</span><span class="sb-tooltip">Subcontractor ITPs</span></div>
+        <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span><span class="sb-tooltip">Defects</span></div>
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▸</span><span class="sb-group-name">Settings</span></div>
+      <div class="sb-group-items" id="gitems-settings" style="display:none">
+        <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span><span class="sb-tooltip">Company settings</span></div>
+      </div>
+    </div>
+  </nav>
+  <div class="sb-footer"><div class="sb-av">👷</div><span class="sb-user-name">Sandeep S</span></div>
+</div>
+
+<div class="main" id="mainWrap">
+
+<div class="topbar">
+  <div class="bc">
+    <span class="bcl" onclick="navTo('hvac-login.html')">My Projects</span><span class="bcs">›</span>
+    <span class="bcl" onclick="navTo('hvac-login.html')">Greenfield Commercial Tower</span><span class="bcs">›</span>
+    <span class="bcc">Vendor Invoices</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="bg bsm btn" onclick="openRequestModal()">📨 Request Invoices</button>
+    <button class="bp bsm btn" onclick="openAddModal()">＋ Add Invoice</button>
+  </div>
+</div>
+
+<div class="sum-bar">
+  <div class="sc cb"><div class="sc-lbl">This month approved</div><div class="sc-val" id="sumMonthAmt">—</div><div class="sc-sub" id="sumMonthLbl">ex GST</div></div>
+  <div class="sc cw"><div class="sc-lbl">Pending review</div><div class="sc-val" id="sumPending">0</div><div class="sc-sub">awaiting decision</div></div>
+  <div class="sc cd"><div class="sc-lbl">Rejected</div><div class="sc-val" id="sumRejected">0</div><div class="sc-sub">awaiting resubmit</div></div>
+  <div class="sc"><div class="sc-lbl">Total invoices</div><div class="sc-val" id="sumTotal">0</div><div class="sc-sub">all time</div></div>
+  <div class="sc"><div class="sc-lbl">Review deadline</div><div class="sc-val" id="sumDeadline">—</div><div class="sc-sub" id="sumDeadlineSub">10 days from request</div></div>
+</div>
+
+<div class="toolbar">
+  <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="searchInput" placeholder="Search vendor, invoice no, PO ref…" oninput="renderAll()"></div>
+  <select class="fsel" id="stFilter" onchange="renderAll()">
+    <option value="">All Statuses</option>
+    <option value="Draft">Draft</option>
+    <option value="Pending">Pending review</option>
+    <option value="Approved">Approved</option>
+    <option value="Rejected">Rejected</option>
+  </select>
+  <select class="fsel" id="monthFilter" onchange="renderAll()"><option value="">All Months</option></select>
+  <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="invCount"></span>
+</div>
+
+<div class="page" id="pageContent"></div>
+</div>
+
+<!-- ADD / EDIT MODAL -->
+<div class="mo" id="addModal" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal">
+    <h3 id="modalTitle">Add Invoice</h3>
+    <p class="msub">Enter vendor invoice details.</p>
+    <div class="mgrid">
+      <div><label class="ml">Invoice Number <span id="invnum-req">*</span></label><input class="mi" id="f-num" placeholder="e.g. INV-2025-001"/></div>
+      <div><label class="ml">Invoice Date <span id="invdate-req">*</span></label><input class="mi" id="f-date" type="date"/></div>
+    </div>
+    <label class="ml">Vendor Name *</label>
+    <input class="mi" id="f-vendor" placeholder="e.g. Acme HVAC Supplies"/>
+    <div class="mgrid">
+      <div><label class="ml">PO Reference</label><input class="mi" id="f-po" placeholder="e.g. PO-001"/></div>
+      <div><label class="ml">Amount (ex GST) *</label><input class="mi" id="f-amount" type="number" placeholder="0.00"/></div>
+    </div>
+    <label class="ml">Billing Month</label>
+    <input class="mi" id="f-month" type="month"/>
+    <label class="ml">Status</label>
+    <select class="ms" id="f-status" onchange="onStatusChange()">
+      <option value="Draft">Draft</option>
+      <option value="Pending">Pending review</option>
+      <option value="Approved">Approved</option>
+      <option value="Rejected">Rejected</option>
+    </select>
+    <div class="reject-block" id="rejectBlock">
+      <label class="ml">Rejection Reason *</label>
+      <textarea class="mta" id="f-reject" placeholder="Explain why this invoice is rejected…"></textarea>
+    </div>
+    <label class="ml">Notes</label>
+    <textarea class="mta" id="f-notes" placeholder="Any additional notes…" style="min-height:56px"></textarea>
+    <div class="mac">
+      <button class="bdanger bsm btn" id="deleteBtn" style="display:none;margin-right:auto" onclick="deleteInv()">Delete</button>
+      <button class="bg bsm btn" onclick="closeAddModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="saveInv()">Save Invoice</button>
+    </div>
+  </div>
+</div>
+
+<!-- REQUEST MODAL -->
+<div class="mo" id="requestModal" onclick="if(event.target===this)closeRequestModal()">
+  <div class="modal">
+    <h3>Request Draft Invoices</h3>
+    <p class="msub">Log a monthly invoice request to all vendors. Sets a 10-day review deadline.</p>
+    <label class="ml">Billing Month</label>
+    <input class="mi" id="r-month" type="month"/>
+    <label class="ml">Request Date</label>
+    <input class="mi" id="r-date" type="date" onchange="updateDeadline()"/>
+    <label class="ml">10-Day Review Deadline</label>
+    <input class="mi" id="r-deadline" type="date" readonly style="color:var(--accent);font-family:'DM Mono',monospace"/>
+    <label class="ml">Notes (optional)</label>
+    <textarea class="mta" id="r-notes" placeholder="e.g. Sent to all active vendors…"></textarea>
+    <div class="mac">
+      <button class="bg bsm btn" onclick="closeRequestModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="saveRequest()">Log Request</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var SK='hvacnexus_vendor_invoices_GCT001';
+var SBK='hvacnexus_sb_collapsed';
+var invoices=[],requests=[];
+var editingId=null,_uid=100;
+function nid(){return ++_uid;}
+function num(v){return parseFloat(v)||0;}
+function fmt(n){var v=num(n);return v===0?'—':'$'+Math.round(v).toLocaleString('en-AU');}
+function fmtFull(n){var v=num(n);if(v===0)return '—';return '$'+v.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtD(d){if(!d)return '—';try{var dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
+function fmtM(m){if(!m)return 'No month';try{var p=m.split('-');var dt=new Date(parseInt(p[0]),parseInt(p[1])-1,1);return dt.toLocaleDateString('en-AU',{month:'long',year:'numeric'});}catch(e){return m;}}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function today(){return new Date().toISOString().split('T')[0];}
+function currentMonth(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function addDays(ds,n){var d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
+function daysDiff(a,b){return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/(86400000));}
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){document.getElementById('sidebar').classList.toggle('sm',c);document.getElementById('mainWrap').classList.toggle('sm',c);document.getElementById('sbToggleBtn').textContent=c?'»':'«';}
+(function(){applySB(localStorage.getItem(SBK)==='1');})();
+function toggleGroup(id){
+  var el=document.getElementById('gitems-'+id),ch=document.getElementById('gchev-'+id);
+  var open=el.style.display!=='none';
+  el.style.display=open?'none':'block';ch.textContent=open?'▸':'▾';
+  try{var s=JSON.parse(localStorage.getItem('hvacnexus_sb_groups')||'{}');s[id]=!open;localStorage.setItem('hvacnexus_sb_groups',JSON.stringify(s));}catch(e){}
+}
+
+function save(){try{localStorage.setItem(SK,JSON.stringify({invoices:invoices,requests:requests}));}catch(e){}}
+function load(){
+  try{
+    var s=localStorage.getItem(SK);
+    if(s){var p=JSON.parse(s);invoices=Array.isArray(p.invoices)?p.invoices:[];requests=Array.isArray(p.requests)?p.requests:[];}
+  }catch(e){invoices=[];requests=[];}
+}
+load();
+
+function updateSummary(){
+  var cm=currentMonth();
+  var thisAmt=invoices.filter(function(i){return i.month===cm&&i.status==='Approved';}).reduce(function(a,i){return a+num(i.amount);},0);
+  var pending=invoices.filter(function(i){return i.status==='Pending';}).length;
+  var rejected=invoices.filter(function(i){return i.status==='Rejected';}).length;
+  document.getElementById('sumMonthAmt').textContent=fmt(thisAmt);
+  document.getElementById('sumMonthLbl').textContent=fmtM(cm)+' · ex GST';
+  document.getElementById('sumPending').textContent=pending;
+  document.getElementById('sumRejected').textContent=rejected;
+  document.getElementById('sumTotal').textContent=invoices.length;
+  var latestReq=requests.filter(function(r){return r.month===cm;}).sort(function(a,b){return a.date<b.date?1:-1;})[0];
+  if(latestReq&&latestReq.deadline){
+    var d=daysDiff(today(),latestReq.deadline);
+    var dEl=document.getElementById('sumDeadline');
+    var dSub=document.getElementById('sumDeadlineSub');
+    if(d<0){dEl.textContent='Overdue';dEl.style.color='var(--danger)';dSub.textContent=Math.abs(d)+' days past';}
+    else if(d===0){dEl.textContent='Today';dEl.style.color='var(--danger)';dSub.textContent='deadline is today';}
+    else{dEl.textContent=d+'d';dEl.style.color=d<=3?'var(--danger)':d<=5?'var(--warn)':'var(--green)';dSub.textContent='days remaining';}
+  } else {
+    document.getElementById('sumDeadline').textContent='—';
+    document.getElementById('sumDeadlineSub').textContent='no request logged';
+  }
+}
+
+function renderAll(){
+  var q=(document.getElementById('searchInput').value||'').toLowerCase();
+  var sf=document.getElementById('stFilter').value;
+  var mf=document.getElementById('monthFilter').value;
+  // Rebuild month filter
+  var ms={};invoices.forEach(function(i){if(i.month)ms[i.month]=true;});
+  var mSel=document.getElementById('monthFilter'),mv=mSel.value;
+  mSel.innerHTML='<option value="">All Months</option>';
+  Object.keys(ms).sort().reverse().forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=fmtM(m);if(m===mv)o.selected=true;mSel.appendChild(o);});
+  var filtered=invoices.filter(function(i){
+    return(!q||(i.invnum||'').toLowerCase().includes(q)||(i.vendor||'').toLowerCase().includes(q)||(i.po||'').toLowerCase().includes(q))
+      &&(!sf||i.status===sf)&&(!mf||i.month===mf);
+  });
+  document.getElementById('invCount').textContent=filtered.length+' invoice'+(filtered.length!==1?'s':'');
+  updateSummary();
+  var page=document.getElementById('pageContent');page.innerHTML='';
+  if(!filtered.length){
+    page.innerHTML='<div class="empty-state"><div class="empty-icon">🧾</div><div>'+(invoices.length?'No invoices match filters.':'No invoices yet. Click <strong>＋ Add Invoice</strong> to get started.')+'</div></div>';
+    return;
+  }
+  var groups={};
+  filtered.forEach(function(i){var k=i.month||'zz-no-month';if(!groups[k])groups[k]=[];groups[k].push(i);});
+  Object.keys(groups).sort().reverse().forEach(function(m){
+    var items=groups[m];
+    var approvedAmt=items.filter(function(i){return i.status==='Approved';}).reduce(function(a,i){return a+num(i.amount);},0);
+    var pendingCt=items.filter(function(i){return i.status==='Pending';}).length;
+    var rejCt=items.filter(function(i){return i.status==='Rejected';}).length;
+    var allApproved=items.length>0&&items.every(function(i){return i.status==='Approved';});
+    var pillCls=allApproved?'month-pill all-good':pendingCt>0?'month-pill has-pending':rejCt>0?'month-pill has-rejected':'month-pill';
+    var pillTxt=allApproved?'All approved':pendingCt>0?pendingCt+' pending':rejCt>0?rejCt+' rejected':items.length+' invoices';
+    var grp=document.createElement('div');grp.className='month-group';
+    var hdr=document.createElement('div');hdr.className='month-hdr';
+    hdr.innerHTML='<span class="month-name">'+(m==='zz-no-month'?'No month assigned':fmtM(m))+'</span>'
+      +'<div class="month-stats">'
+      +'<span class="'+pillCls+'">'+pillTxt+'</span>'
+      +'<span style="font-size:11px;color:var(--text2)">Approved ex GST</span>'
+      +'<span class="month-total">'+fmt(approvedAmt)+'</span>'
+      +'<span class="month-chev">▾</span></div>';
+    hdr.addEventListener('click',function(){grp.classList.toggle('collapsed');});
+    var body=document.createElement('div');body.className='month-body';
+    var tbl=document.createElement('table');tbl.className='inv-tbl';
+    tbl.innerHTML='<thead><tr><th>Invoice No.</th><th>Vendor</th><th>Date</th><th>PO Ref</th><th class="r">Amount (ex GST)</th><th class="r">GST</th><th class="r">Total (incl GST)</th><th>Status</th><th>Age</th></tr></thead>';
+    var tbody=document.createElement('tbody');
+    items.sort(function(a,b){return (b.invdate||'')<(a.invdate||'')?-1:1;}).forEach(function(inv){
+      var tr=document.createElement('tr');tr.className='data-row';
+      var stMap={Draft:'st-draft',Pending:'st-pending',Approved:'st-approved',Rejected:'st-rejected'};
+      var gst=num(inv.amount)*0.1;var total=num(inv.amount)+gst;
+      var ageBadge='';
+      if((inv.status==='Pending'||inv.status==='Draft')&&inv.invdate){
+        var age=daysDiff(inv.invdate,today());
+        var acls=age<=7?'d-ok':age<=10?'d-warn':'d-over';
+        ageBadge='<span class="days-badge '+acls+'">'+age+'d</span>';
+      }
+      tr.innerHTML='<td class="inv-num">'+escH(inv.invnum||'—')+'</td>'
+        +'<td style="font-weight:500;color:var(--text)">'+escH(inv.vendor||'—')+'</td>'
+        +'<td style="color:var(--text2);font-size:12px">'+fmtD(inv.invdate)+'</td>'
+        +'<td class="inv-po">'+escH(inv.po||'—')+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmtFull(inv.amount)+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmtFull(gst)+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:600">'+fmtFull(total)+'</td>'
+        +'<td><span class="sb-badge '+(stMap[inv.status]||'st-draft')+'">'+escH(inv.status)+'</span>'
+        +(inv.rejectReason?'<div style="font-size:10px;color:var(--danger);margin-top:3px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(inv.rejectReason)+'">'+escH(inv.rejectReason)+'</div>':'')
+        +'</td>'
+        +'<td>'+ageBadge+'</td>';
+      (function(id){tr.addEventListener('click',function(){openEditModal(id);});})(inv.id);
+      tbody.appendChild(tr);
+    });
+    // Subtotal row
+    var sub=document.createElement('tr');sub.className='tot-row';
+    sub.innerHTML='<td colspan="4" style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Monthly approved total</td>'
+      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--green)">'+fmtFull(approvedAmt)+'</td>'
+      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmtFull(approvedAmt*0.1)+'</td>'
+      +'<td class="r" style="font-family:DM Mono,monospace;font-size:13px;color:var(--green)">'+fmtFull(approvedAmt*1.1)+'</td>'
+      +'<td colspan="2"></td>';
+    tbody.appendChild(sub);
+    tbl.appendChild(tbody);body.appendChild(tbl);grp.appendChild(hdr);grp.appendChild(body);page.appendChild(grp);
+  });
+}
+
+// ADD MODAL
+function openAddModal(){
+  editingId=null;
+  document.getElementById('modalTitle').textContent='Add Invoice';
+  document.getElementById('f-num').value='';
+  document.getElementById('f-date').value=today();
+  document.getElementById('f-vendor').value='';
+  document.getElementById('f-po').value='';
+  document.getElementById('f-amount').value='';
+  document.getElementById('f-month').value=currentMonth();
+  document.getElementById('f-status').value='Draft';
+  onStatusChange();
+  document.getElementById('f-reject').value='';
+  document.getElementById('f-notes').value='';
+  document.getElementById('rejectBlock').classList.remove('show');
+  document.getElementById('deleteBtn').style.display='none';
+  document.getElementById('addModal').classList.add('open');
+  setTimeout(function(){document.getElementById('f-num').focus();},80);
+}
+function openEditModal(id){
+  var inv=invoices.find(function(i){return i.id===id;});if(!inv)return;
+  editingId=id;
+  document.getElementById('modalTitle').textContent='Edit Invoice';
+  document.getElementById('f-num').value=inv.invnum||'';
+  document.getElementById('f-date').value=inv.invdate||'';
+  document.getElementById('f-vendor').value=inv.vendor||'';
+  document.getElementById('f-po').value=inv.po||'';
+  document.getElementById('f-amount').value=inv.amount||'';
+  document.getElementById('f-month').value=inv.month||currentMonth();
+  document.getElementById('f-status').value=inv.status||'Draft';
+  onStatusChange();
+  document.getElementById('f-reject').value=inv.rejectReason||'';
+  document.getElementById('f-notes').value=inv.notes||'';
+  document.getElementById('rejectBlock').classList.toggle('show',inv.status==='Rejected');
+  document.getElementById('deleteBtn').style.display='';
+  document.getElementById('addModal').classList.add('open');
+}
+function onStatusChange(){
+  var st=document.getElementById('f-status').value;
+  var isDraft=st==='Draft';
+  document.getElementById('rejectBlock').classList.toggle('show',st==='Rejected');
+  var rn=document.getElementById('invnum-req'),rd=document.getElementById('invdate-req');
+  if(rn){rn.style.color=isDraft?'var(--muted)':'var(--danger)';}
+  if(rd){rd.style.color=isDraft?'var(--muted)':'var(--danger)';}
+  document.getElementById('f-num').style.opacity=isDraft?'0.4':'1';
+  document.getElementById('f-date').style.opacity=isDraft?'0.4':'1';
+}
+function closeAddModal(){document.getElementById('addModal').classList.remove('open');}
+function saveInv(){
+  var num_val=document.getElementById('f-num').value.trim();
+  var vendor=document.getElementById('f-vendor').value.trim();
+  var amount=document.getElementById('f-amount').value;
+  var status=document.getElementById('f-status').value;
+  if(!vendor){alert('Vendor name is required.');return;}
+  if(!amount){alert('Amount is required.');return;}
+  if(!document.getElementById('f-month').value){alert('Billing month is required.');return;}
+  if(status!=='Draft'&&!num_val){alert('Invoice number is required for '+status+' status.');return;}
+  if(status==='Rejected'&&!document.getElementById('f-reject').value.trim()){alert('Please provide a rejection reason.');return;}
+  var inv={id:editingId||('inv'+nid()),invnum:num_val,invdate:document.getElementById('f-date').value,vendor:vendor,po:document.getElementById('f-po').value.trim(),amount:num(amount),month:document.getElementById('f-month').value,status:status,rejectReason:document.getElementById('f-reject').value.trim(),notes:document.getElementById('f-notes').value.trim()};
+  if(editingId){var idx=invoices.findIndex(function(i){return i.id===editingId;});if(idx>=0)invoices[idx]=inv;else invoices.push(inv);}
+  else invoices.push(inv);
+  save();closeAddModal();renderAll();
+}
+function deleteInv(){
+  if(!editingId||!confirm('Delete this invoice?'))return;
+  invoices=invoices.filter(function(i){return i.id!==editingId;});
+  save();closeAddModal();renderAll();
+}
+
+// REQUEST MODAL
+function openRequestModal(){
+  var t=today();
+  document.getElementById('r-month').value=currentMonth();
+  document.getElementById('r-date').value=t;
+  document.getElementById('r-deadline').value=addDays(t,10);
+  document.getElementById('r-notes').value='';
+  document.getElementById('requestModal').classList.add('open');
+}
+function updateDeadline(){
+  var d=document.getElementById('r-date').value;
+  if(d) document.getElementById('r-deadline').value=addDays(d,10);
+}
+function closeRequestModal(){document.getElementById('requestModal').classList.remove('open');}
+function saveRequest(){
+  var r={id:'req'+nid(),month:document.getElementById('r-month').value,date:document.getElementById('r-date').value,deadline:document.getElementById('r-deadline').value,notes:document.getElementById('r-notes').value.trim()};
+  requests.push(r);save();closeRequestModal();updateSummary();
+  alert('Invoice request logged. 10-day deadline: '+fmtD(r.deadline));
+}
+
+renderAll();
+</script>
+</body>
+</html>
