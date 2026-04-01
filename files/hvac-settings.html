@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Company Settings — HVAC NEXUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;--border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.10);--green:#00e5a0;--green-dim:rgba(0,229,160,.10);--warn:#ffb830;--warn-dim:rgba(255,184,48,.10);--danger:#ff4d6d;--danger-dim:rgba(255,77,109,.10);--purple:#a78bfa;--purple-dim:rgba(167,139,250,.10);--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a;--radius:10px;--sb:230px;--sb-sm:52px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;font-size:13.5px}
+/* SIDEBAR */
+.sb{width:var(--sb);position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden}
+.sb.sm{width:var(--sb-sm)}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px;overflow:hidden}
+.sb-icon{font-size:20px;flex-shrink:0}
+.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;transition:all .13s}
+.sb-toggle:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;overflow:hidden}
+.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-section-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:10px 16px 4px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;transition:all .13s}
+.sb-item:hover{background:var(--surface2);color:var(--text)}
+.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}
+.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px;overflow:hidden}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.sb-user-name{font-size:12.5px;color:var(--text2);white-space:nowrap}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-section-lbl,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb.sm .sb-item{padding:9px 14px;justify-content:center;border-left:none}
+.sb-group{}
+.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}
+.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}
+.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-group-hdr{display:none}
+.sb.sm .sb-group-items{display:block !important}
+.sb.sm .sb-group-items .sb-item{padding:9px 14px;justify-content:center;border-left:none}
+
+.sb.sm .sb-item.active{background:var(--accent-dim)}
+.sb.sm .sb-item-icon{width:auto}
+.sb.sm .sb-top{padding:14px 12px 10px;justify-content:center}
+.sb.sm .sb-footer{justify-content:center}
+#sb-tip{position:fixed;background:#1a2640;color:#ddeeff;font-size:12px;font-weight:500;padding:6px 12px;border-radius:6px;border:1px solid #1e3050;white-space:nowrap;pointer-events:none;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.6);opacity:0;transition:opacity .15s}
+#sb-tip::before{content:'';position:absolute;right:100%;top:50%;transform:translateY(-50%);border:5px solid transparent;border-right-color:#1e3050}
+#sb-tip::after{content:'';position:absolute;right:100%;top:50%;transform:translateY(-50%);border:4px solid transparent;border-right-color:#1a2640;margin-right:-1px}
+/* MAIN */
+.main{margin-left:var(--sb);transition:margin-left .25s;min-height:100vh}
+.main.sm{margin-left:var(--sb-sm)}
+/* TOPBAR */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px}
+.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}
+.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted);background:var(--surface2)}
+.bsm{padding:5px 12px;font-size:12px}
+/* PAGE */
+.page{padding:28px 32px 80px;max-width:860px}
+/* CARDS */
+.settings-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+.card-hdr{padding:14px 20px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.card-hdr-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--text)}
+.card-hdr-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.card-body{padding:20px}
+/* FORM */
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.field-grid.single{grid-template-columns:1fr}
+.field{display:flex;flex-direction:column;gap:6px}
+.field-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.field-input{background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;outline:none;transition:border-color .2s}
+.field-input:focus{border-color:var(--accent);background:var(--surface2)}
+.field-input:hover{border-color:var(--muted)}
+.field-input::placeholder{color:var(--muted)}
+.field-hint{font-size:11px;color:var(--muted)}
+/* TEMPLATE UPLOAD */
+.upload-zone{border:2px dashed var(--border);border-radius:8px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-dim)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.upload-icon{font-size:28px;margin-bottom:8px}
+.upload-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+.upload-sub{font-size:12px;color:var(--muted)}
+/* TEMPLATE STATUS */
+.template-status{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;margin-top:14px}
+.template-status.loaded{border-color:rgba(0,229,160,.3);background:var(--green-dim)}
+.ts-icon{font-size:20px;flex-shrink:0}
+.ts-info{flex:1}
+.ts-name{font-size:13px;font-weight:600;color:var(--text)}
+.ts-meta{font-size:11px;color:var(--muted);margin-top:2px}
+/* CATEGORY PREVIEW */
+.cat-preview{margin-top:14px;max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px}
+.cat-row{display:flex;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);font-size:13px}
+.cat-row:last-child{border-bottom:none}
+.cat-row.is-cat{background:var(--surface2);font-weight:600;color:var(--accent);font-size:12px;letter-spacing:.5px}
+.cat-row.is-li{padding-left:28px;color:var(--text2);font-size:12px}
+.cat-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-left:auto}
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:20px 0}
+/* SAVE BAR */
+.save-bar{position:fixed;bottom:0;left:var(--sb);right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 32px;display:flex;align-items:center;justify-content:space-between;z-index:100;transition:left .25s}
+.save-bar.sm{left:var(--sb-sm)}
+.save-status{font-family:'DM Mono',monospace;font-size:11px;color:var(--green);opacity:0;transition:opacity .3s}
+.save-status.show{opacity:1}
+/* TOAST */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--green);color:var(--green);font-family:'DM Mono',monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none}
+input[type="file"]{display:none}
+input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.6}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sb" id="sidebar">
+  <div class="sb-top">
+    <div class="sb-brand"><span class="sb-icon">❄️</span><span class="sb-name">HVAC NEXUS</span></div>
+    <button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">«</button>
+  </div>
+  <div class="sb-proj-block">
+    <div class="sb-proj-lbl">Current Project</div>
+    <div class="sb-proj-name" id="sb-proj-name">—</div>
+    <div class="sb-proj-num" id="sb-proj-num">—</div>
+  </div>
+      <nav class="sb-nav" id="sbNav">
+      <div class="sb-item" onclick="navTo('hvac-login.html')" style="border-bottom:1px solid var(--border);margin-bottom:4px"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Overview</span><span class="sb-tooltip">Overview</span></div>
+      <div class="sb-group">
+        <div class="sb-group-hdr" onclick="toggleGroup('financials')" id="ghdr-financials">
+          <span class="sb-group-chev" id="gchev-financials">▸</span>
+          <span class="sb-group-name">Financials</span>
+        </div>
+        <div class="sb-group-items" id="gitems-financials" style="display:none">
+          <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span><span class="sb-tooltip">Budget</span></div>
+          <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span><span class="sb-tooltip">Progress claims</span></div>
+          <div class="sb-item" onclick="navTo('hvac-vendor-invoices.html')"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span><span class="sb-tooltip">Vendor invoices</span></div>
+          <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span><span class="sb-tooltip">Variations</span></div>
+          <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span><span class="sb-tooltip">Subbie variations</span></div>
+        </div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-hdr" onclick="toggleGroup('procurement')" id="ghdr-procurement">
+          <span class="sb-group-chev" id="gchev-procurement">▸</span>
+          <span class="sb-group-name">Procurement</span>
+        </div>
+        <div class="sb-group-items" id="gitems-procurement" style="display:none">
+          <div class="sb-item" onclick="navTo('hvac-procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span><span class="sb-tooltip">Procurement schedule</span></div>
+          <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span><span class="sb-tooltip">Purchase orders</span></div>
+          <div class="sb-item" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span><span class="sb-tooltip">Subcontractor agreements</span></div>
+        </div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-hdr" onclick="toggleGroup('technical')" id="ghdr-technical">
+          <span class="sb-group-chev" id="gchev-technical">▸</span>
+          <span class="sb-group-name">Technical</span>
+        </div>
+        <div class="sb-group-items" id="gitems-technical" style="display:none">
+          <div class="sb-item" onclick="navTo('hvac-rfi.html')"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span><span class="sb-tooltip">RFI</span></div>
+          <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span><span class="sb-tooltip">Tech submissions</span></div>
+          <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span><span class="sb-tooltip">Drawings</span></div>
+          <div class="sb-item" onclick="navTo('hvac-specifications.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span><span class="sb-tooltip">Specifications</span></div>
+          <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span><span class="sb-tooltip">Equipment schedules</span></div>
+        </div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-hdr" onclick="toggleGroup('commissioning')" id="ghdr-commissioning">
+          <span class="sb-group-chev" id="gchev-commissioning">▸</span>
+          <span class="sb-group-name">Commissioning</span>
+        </div>
+        <div class="sb-group-items" id="gitems-commissioning" style="display:none">
+          <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning plan</span><span class="sb-tooltip">Commissioning plan</span></div>
+          <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span><span class="sb-tooltip">Pre-commissioning</span></div>
+          <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span><span class="sb-tooltip">Commissioning tracker</span></div>
+        </div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality">
+          <span class="sb-group-chev" id="gchev-quality">▸</span>
+          <span class="sb-group-name">Quality</span>
+        </div>
+        <div class="sb-group-items" id="gitems-quality" style="display:none">
+          <div class="sb-item" onclick="navTo('hvac-internal-itps.html')"><span class="sb-item-icon">🔍</span><span class="sb-item-label">Internal ITPs</span><span class="sb-tooltip">Internal ITPs</span></div>
+          <div class="sb-item" onclick="navTo('hvac-subcontractor-itps.html')"><span class="sb-item-icon">🔍</span><span class="sb-item-label">Subcontractor ITPs</span><span class="sb-tooltip">Subcontractor ITPs</span></div>
+          <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span><span class="sb-tooltip">Defects</span></div>
+        </div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings">
+          <span class="sb-group-chev" id="gchev-settings">▾</span>
+          <span class="sb-group-name">Settings</span>
+        </div>
+        <div class="sb-group-items" id="gitems-settings" style="display:block">
+          <div class="sb-item active"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span><span class="sb-tooltip">Company settings</span></div>
+        </div>
+      </div>
+    </nav>
+  <div class="sb-footer">
+    <div class="sb-av" id="sb-av">👷</div>
+    <span class="sb-user-name" id="sb-user">—</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="mainWrap">
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl" onclick="navTo('hvac-login.html')">My Projects</span>
+      <span class="bcs">›</span>
+      <span class="bcc">Company Settings</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="save-status" id="saveStatus">✓ Saved</span>
+      <button class="bp bsm btn" onclick="saveAll()">Save Settings</button>
+    </div>
+  </div>
+
+  <div class="page">
+<div class="settings-card" style="margin-bottom:20px">
+  <div class="card-hdr"><div class="card-hdr-title">ITP Templates</div><div class="card-hdr-sub">Manage company-level ITP templates used across all projects</div></div>
+  <div class="card-body" style="display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:13px;color:var(--text2)">Create and manage reusable ITP checklists for FCUs, AHUs, fans and other equipment types.</div>
+    <button class="btn bp bsm" onclick="navTo('hvac-itp-templates.html')" style="flex-shrink:0;margin-left:16px">📋 Open ITP Templates →</button>
+  </div>
+</div>
+
+    <!-- COMPANY INFO -->
+    <div class="settings-card">
+      <div class="card-hdr">
+        <div class="card-hdr-title">Company Information</div>
+        <div class="card-hdr-sub">Appears across all modules — invoices, POs, emails</div>
+      </div>
+      <div class="card-body">
+        <div class="field-grid">
+          <div class="field">
+            <span class="field-label">Company Name</span>
+            <input class="field-input" id="co-name" placeholder="e.g. Acme HVAC Pty Ltd"/>
+          </div>
+          <div class="field">
+            <span class="field-label">ABN</span>
+            <input class="field-input" id="co-abn" placeholder="e.g. 12 345 678 901"/>
+          </div>
+          <div class="field">
+            <span class="field-label">Phone</span>
+            <input class="field-input" id="co-phone" placeholder="e.g. 02 9000 0000"/>
+          </div>
+          <div class="field">
+            <span class="field-label">Email</span>
+            <input class="field-input" id="co-email" placeholder="e.g. admin@acmehvac.com.au"/>
+          </div>
+          <div class="field field-grid single">
+            <span class="field-label">Address</span>
+            <input class="field-input" id="co-address" placeholder="e.g. 1 Example St, Sydney NSW 2000"/>
+          </div>
+          <div class="field">
+            <span class="field-label">Website</span>
+            <input class="field-input" id="co-website" placeholder="e.g. www.acmehvac.com.au"/>
+          </div>
+          <div class="field">
+            <span class="field-label">Licence Number</span>
+            <input class="field-input" id="co-licence" placeholder="e.g. 123456C"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USER -->
+    <div class="settings-card">
+      <div class="card-hdr">
+        <div class="card-hdr-title">User Profile</div>
+        <div class="card-hdr-sub">Your name and role shown in the sidebar and on documents</div>
+      </div>
+      <div class="card-body">
+        <div class="field-grid">
+          <div class="field">
+            <span class="field-label">Your Name</span>
+            <input class="field-input" id="user-name" placeholder="e.g. Sandeep S"/>
+          </div>
+          <div class="field">
+            <span class="field-label">Role / Title</span>
+            <input class="field-input" id="user-role" placeholder="e.g. Project Manager"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BUDGET TEMPLATE -->
+    <div class="settings-card">
+      <div class="card-hdr">
+        <div class="card-hdr-title">Budget Template</div>
+        <div class="card-hdr-sub">Company-level category & line item structure — applied to all new projects and procurement suggestions</div>
+      </div>
+      <div class="card-body">
+        <div class="upload-zone" id="uploadZone"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event)">
+          <input type="file" id="templateFile" accept=".xlsx" onchange="handleTemplateUpload(this)">
+          <div class="upload-icon">📂</div>
+          <div class="upload-title">Upload Budget Template (.xlsx)</div>
+          <div class="upload-sub">Drag & drop or click to browse · Must have a "Template" sheet with TYPE and NAME columns</div>
+        </div>
+
+        <div class="template-status" id="templateStatus" style="display:none">
+          <span class="ts-icon" id="tsIcon">📋</span>
+          <div class="ts-info">
+            <div class="ts-name" id="tsName">—</div>
+            <div class="ts-meta" id="tsMeta">—</div>
+          </div>
+          <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="clearTemplate()">Remove</button>
+        </div>
+
+        <div id="catPreview" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Template Preview</span>
+            <span id="previewCount" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)"></span>
+          </div>
+          <div class="cat-preview" id="catPreviewList"></div>
+        </div>
+
+        <div class="divider"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:12px;color:var(--muted)">Don't have a template yet?</span>
+          <button class="bg bsm btn" onclick="navTo('hvac-budget.html')">📊 Download from Budget</button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- PRE-CX CHECKLIST TEMPLATE -->
+    <div class="settings-card">
+      <div class="card-hdr">
+        <div class="card-hdr-title">Pre-Commissioning Checklist Template</div>
+        <div class="card-hdr-sub">Uploaded separately from the budget template — defines sections and items loaded when creating area checklists</div>
+      </div>
+      <div class="card-body">
+        <div class="upload-zone" id="precxUploadZone"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handlePrecxDrop(event)">
+          <input type="file" id="precxTemplateFile" accept=".xlsx" onchange="handlePrecxUpload(this)">
+          <div class="upload-icon">✅</div>
+          <div class="upload-title">Upload Pre-Cx Checklist Template (.xlsx)</div>
+          <div class="upload-sub">Must have a "Template" sheet · Columns: TYPE (SECTION or ITEM) and NAME</div>
+        </div>
+
+        <div class="template-status" id="precxTemplateStatus" style="display:none">
+          <span class="ts-icon" id="precxTsIcon">📋</span>
+          <div class="ts-info">
+            <div class="ts-name" id="precxTsName">—</div>
+            <div class="ts-meta" id="precxTsMeta">—</div>
+          </div>
+          <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="clearPrecxTemplate()">Remove</button>
+        </div>
+
+        <div id="precxCatPreview" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Template Preview</span>
+            <span id="precxPreviewCount" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)"></span>
+          </div>
+          <div class="cat-preview" id="precxPreviewList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEFAULT MARGIN -->
+    <div class="settings-card">
+      <div class="card-hdr">
+        <div class="card-hdr-title">Default Margin</div>
+        <div class="card-hdr-sub">Applied automatically to all new projects</div>
+      </div>
+      <div class="card-body">
+        <div class="field-grid">
+          <div class="field">
+            <span class="field-label">Margin %</span>
+            <input class="field-input" id="default-margin" type="number" min="0" max="100" step="0.5" placeholder="e.g. 15"/>
+            <span class="field-hint">Used as the starting margin on the Budget module for new projects</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /page -->
+</div><!-- /main -->
+
+<div class="save-bar" id="saveBar">
+  <span style="font-size:12px;color:var(--muted)">Changes apply across all modules immediately</span>
+  <button class="bp btn" onclick="saveAll()">Save Settings</button>
+</div>
+
+<script>
+const SETTINGS_KEY    = 'hvacnexus_company_settings';
+const TEMPLATE_KEY    = 'hvacnexus_company_template';
+const SB_KEY          = 'hvacnexus_sb_collapsed';
+
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+
+// ── SIDEBAR ──
+function initSB(){applySB(localStorage.getItem(SB_KEY)==='1');}
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SB_KEY,c?'1':'0');applySB(c);}
+function applySB(c){
+  document.getElementById('sidebar').classList.toggle('sm',c);
+  document.getElementById('mainWrap').classList.toggle('sm',c);
+  document.getElementById('saveBar').classList.toggle('sm',c);
+  document.getElementById('sbToggleBtn').textContent=c?'»':'«';
+}
+initSB();
+
+// Tooltips
+var sbTip=document.createElement('div');sbTip.id='sb-tip';document.body.appendChild(sbTip);
+document.querySelectorAll('.sb-item[data-tip]').forEach(function(el){
+  el.addEventListener('mouseenter',function(){
+    if(!document.getElementById('sidebar').classList.contains('sm'))return;
+    var r=el.getBoundingClientRect();
+    sbTip.textContent=el.getAttribute('data-tip');
+    sbTip.style.top=(r.top+r.height/2)+'px';
+    sbTip.style.left=(r.right+8)+'px';
+    sbTip.style.transform='translateY(-50%)';
+    sbTip.style.opacity='1';
+  });
+  el.addEventListener('mouseleave',function(){sbTip.style.opacity='0';});
+});
+
+// ── LOAD SETTINGS ──
+function loadSettings(){
+  try{
+    var s=localStorage.getItem(SETTINGS_KEY);
+    if(s) return JSON.parse(s);
+  }catch(e){}
+  return {};
+}
+
+function applySettings(s){
+  document.getElementById('co-name').value    = s.coName    || '';
+  document.getElementById('co-abn').value     = s.coAbn     || '';
+  document.getElementById('co-phone').value   = s.coPhone   || '';
+  document.getElementById('co-email').value   = s.coEmail   || '';
+  document.getElementById('co-address').value = s.coAddress || '';
+  document.getElementById('co-website').value = s.coWebsite || '';
+  document.getElementById('co-licence').value = s.coLicence || '';
+  document.getElementById('user-name').value  = s.userName  || '';
+  document.getElementById('user-role').value  = s.userRole  || '';
+  document.getElementById('default-margin').value = s.defaultMargin != null ? s.defaultMargin : 15;
+  // Sidebar
+  if(s.coName)  document.getElementById('sb-proj-name').textContent = s.coName;
+  if(s.userName)document.getElementById('sb-user').textContent = s.userName;
+}
+
+// ── SAVE ──
+function saveAll(){
+  var s = {
+    coName:      document.getElementById('co-name').value.trim(),
+    coAbn:       document.getElementById('co-abn').value.trim(),
+    coPhone:     document.getElementById('co-phone').value.trim(),
+    coEmail:     document.getElementById('co-email').value.trim(),
+    coAddress:   document.getElementById('co-address').value.trim(),
+    coWebsite:   document.getElementById('co-website').value.trim(),
+    coLicence:   document.getElementById('co-licence').value.trim(),
+    userName:    document.getElementById('user-name').value.trim(),
+    userRole:    document.getElementById('user-role').value.trim(),
+    defaultMargin: parseFloat(document.getElementById('default-margin').value)||15,
+    savedAt:     new Date().toISOString()
+  };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  // Update sidebar live
+  if(s.coName)  document.getElementById('sb-proj-name').textContent = s.coName;
+  if(s.userName)document.getElementById('sb-user').textContent = s.userName;
+  // Flash saved
+  var el=document.getElementById('saveStatus');
+  el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},2500);
+  showToast('✓ Settings saved — changes apply across all modules');
+}
+
+// ── TEMPLATE UPLOAD ──
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag');
+  var file=e.dataTransfer.files[0];
+  if(file && file.name.endsWith('.xlsx')) processFile(file);
+  else showToast('⚠ Please upload an .xlsx file');
+}
+
+function handleTemplateUpload(input){
+  var file=input.files[0];
+  if(!file) return;
+  processFile(file);
+  input.value='';
+}
+
+function processFile(file){
+  var reader=new FileReader();
+  reader.onload=function(e){
+    if(typeof XLSX==='undefined'){
+      var script=document.createElement('script');
+      script.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.onload=function(){parseXLSX(e.target.result,file.name);};
+      document.head.appendChild(script);
+    } else {
+      parseXLSX(e.target.result,file.name);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseXLSX(buffer, fileName){
+  try{
+    var wb=XLSX.read(buffer,{type:'array'});
+    var sheetName=wb.SheetNames.indexOf('Template')>=0?'Template':wb.SheetNames[0];
+    var ws=wb.Sheets[sheetName];
+    var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+
+    // Find header row
+    var headerRow=-1;
+    for(var i=0;i<Math.min(5,rows.length);i++){
+      var r=rows[i].map(function(c){return String(c).trim().toUpperCase();});
+      if(r.indexOf('TYPE')>=0&&r.indexOf('NAME')>=0){headerRow=i;break;}
+    }
+    if(headerRow<0){showToast('⚠ Could not find TYPE and NAME columns in the Template sheet');return;}
+
+    var hdrs=rows[headerRow].map(function(c){return String(c).trim().toUpperCase();});
+    var iType=hdrs.indexOf('TYPE');
+    var iNo=hdrs.indexOf('NO.');
+    var iName=hdrs.indexOf('NAME');
+    var iBudget=hdrs.indexOf('BUDGET (EX GST)');
+    if(iBudget<0)iBudget=hdrs.indexOf('BUDGET');
+
+    var grouped={},catOrder=[],currentCat=null,totalLI=0;
+
+    for(var i=headerRow+1;i<rows.length;i++){
+      var row=rows[i];
+      var type=String(row[iType]||'').trim().toUpperCase();
+      var no=iNo>=0?String(row[iNo]||'').trim():'';
+      var name=String(row[iName]||'').trim();
+      var budget=iBudget>=0?(parseFloat(String(row[iBudget]||'').replace(/[$,]/g,''))||0):0;
+      if(!name)continue;
+      var displayName=no?no+'. '+name:name;
+      if(type==='CATEGORY'){
+        currentCat=displayName;
+        grouped[currentCat]=[];
+        catOrder.push(currentCat);
+      } else if(type==='LINE_ITEM'&&currentCat){
+        grouped[currentCat].push({parent:name,children:[name],budget:budget||''});
+        totalLI++;
+      }
+    }
+
+    if(!catOrder.length){showToast('⚠ No CATEGORY rows found — check the TYPE column');return;}
+
+    var templateData={
+      grouped:grouped,
+      catOrder:catOrder,
+      fileName:fileName,
+      savedAt:new Date().toISOString(),
+      stats:{categories:catOrder.length,lineItems:totalLI}
+    };
+    localStorage.setItem(TEMPLATE_KEY,JSON.stringify(templateData));
+    renderTemplateStatus(templateData);
+    showToast('✓ Template loaded — '+catOrder.length+' categories, '+totalLI+' line items');
+  }catch(err){
+    showToast('⚠ Error parsing file: '+err.message);
+    console.error(err);
+  }
+}
+
+function renderTemplateStatus(td){
+  if(!td){
+    document.getElementById('templateStatus').style.display='none';
+    document.getElementById('catPreview').style.display='none';
+    return;
+  }
+  document.getElementById('templateStatus').style.display='flex';
+  document.getElementById('templateStatus').classList.add('loaded');
+  document.getElementById('tsIcon').textContent='✅';
+  document.getElementById('tsName').textContent=td.fileName||'Custom Template';
+  var d=td.savedAt?new Date(td.savedAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'Unknown';
+  document.getElementById('tsMeta').textContent=(td.stats?td.stats.categories+' categories · '+td.stats.lineItems+' line items':'—')+' · Uploaded '+d;
+
+  // Preview
+  document.getElementById('catPreview').style.display='block';
+  document.getElementById('previewCount').textContent=td.catOrder.length+' categories';
+  var html='';
+  td.catOrder.forEach(function(cat){
+    var items=td.grouped[cat]||[];
+    html+='<div class="cat-row is-cat">'+cat+'<span class="cat-count">'+items.length+' items</span></div>';
+    items.forEach(function(item){
+      html+='<div class="cat-row is-li">'+item.parent+'</div>';
+    });
+  });
+  document.getElementById('catPreviewList').innerHTML=html;
+}
+
+function clearTemplate(){
+  if(!confirm('Remove the company template? All modules will revert to the default HVAC NEXUS structure.'))return;
+  localStorage.removeItem(TEMPLATE_KEY);
+  document.getElementById('templateStatus').style.display='none';
+  document.getElementById('templateStatus').classList.remove('loaded');
+  document.getElementById('catPreview').style.display='none';
+  showToast('✓ Template removed — default structure restored');
+}
+
+function showToast(msg){
+  var t=document.createElement('div');
+  t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .5s';setTimeout(function(){t.remove();},500);},3000);
+}
+
+
+// ── PRE-CX TEMPLATE ──
+var PRECX_TEMPLATE_KEY = 'hvacnexus_precx_template';
+
+function handlePrecxDrop(e){
+  e.preventDefault();
+  document.getElementById('precxUploadZone').classList.remove('drag');
+  var file=e.dataTransfer.files[0];
+  if(file&&file.name.endsWith('.xlsx')) processPrecxFile(file);
+  else showToast('⚠ Please upload an .xlsx file');
+}
+function handlePrecxUpload(input){
+  var file=input.files[0]; if(!file) return;
+  processPrecxFile(file); input.value='';
+}
+function processPrecxFile(file){
+  var reader=new FileReader();
+  reader.onload=function(e){
+    if(typeof XLSX==='undefined'){
+      var script=document.createElement('script');
+      script.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.onload=function(){parsePrecxXLSX(e.target.result,file.name);};
+      document.head.appendChild(script);
+    } else { parsePrecxXLSX(e.target.result,file.name); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function parsePrecxXLSX(buffer,fileName){
+  try{
+    var wb=XLSX.read(buffer,{type:'array'});
+    var sheetName=wb.SheetNames.indexOf('Template')>=0?'Template':wb.SheetNames[0];
+    var ws=wb.Sheets[sheetName];
+    var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    // Find header
+    var headerRow=-1;
+    for(var i=0;i<Math.min(5,rows.length);i++){
+      var r=rows[i].map(function(c){return String(c).trim().toUpperCase();});
+      if(r.indexOf('TYPE')>=0&&r.indexOf('NAME')>=0){headerRow=i;break;}
+    }
+    if(headerRow<0){showToast('⚠ Could not find TYPE and NAME columns');return;}
+    var hdrs=rows[headerRow].map(function(c){return String(c).trim().toUpperCase();});
+    var iType=hdrs.indexOf('TYPE'), iName=hdrs.indexOf('NAME');
+    // Parse into sections
+    var sections=[],currentSec=null,totalItems=0;
+    for(var i=headerRow+1;i<rows.length;i++){
+      var type=String(rows[i][iType]||'').trim().toUpperCase();
+      var name=String(rows[i][iName]||'').trim();
+      if(!name) continue;
+      if(type==='SECTION'){
+        currentSec={title:name,items:[]};
+        sections.push(currentSec);
+      } else if(type==='ITEM'&&currentSec){
+        currentSec.items.push(name);
+        totalItems++;
+      }
+    }
+    if(!sections.length){showToast('⚠ No SECTION rows found — check the TYPE column');return;}
+    var td={sections:sections,fileName:fileName,savedAt:new Date().toISOString(),stats:{sections:sections.length,items:totalItems}};
+    localStorage.setItem(PRECX_TEMPLATE_KEY,JSON.stringify(td));
+    renderPrecxTemplateStatus(td);
+    showToast('✓ Pre-Cx template loaded — '+sections.length+' sections, '+totalItems+' items');
+  }catch(err){showToast('⚠ Error: '+err.message);console.error(err);}
+}
+function renderPrecxTemplateStatus(td){
+  if(!td){
+    document.getElementById('precxTemplateStatus').style.display='none';
+    document.getElementById('precxCatPreview').style.display='none';
+    return;
+  }
+  document.getElementById('precxTemplateStatus').style.display='flex';
+  document.getElementById('precxTemplateStatus').classList.add('loaded');
+  document.getElementById('precxTsIcon').textContent='✅';
+  document.getElementById('precxTsName').textContent=td.fileName||'Pre-Cx Template';
+  var d=td.savedAt?new Date(td.savedAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'Unknown';
+  document.getElementById('precxTsMeta').textContent=(td.stats?td.stats.sections+' sections · '+td.stats.items+' items':'')+'· Uploaded '+d;
+  document.getElementById('precxCatPreview').style.display='block';
+  document.getElementById('precxPreviewCount').textContent=td.sections.length+' sections';
+  var html='';
+  td.sections.forEach(function(sec){
+    html+='<div class="cat-row is-cat">'+sec.title+'<span class="cat-count">'+sec.items.length+' items</span></div>';
+    sec.items.forEach(function(item){html+='<div class="cat-row is-li">'+item+'</div>';});
+  });
+  document.getElementById('precxPreviewList').innerHTML=html;
+}
+function clearPrecxTemplate(){
+  if(!confirm('Remove the Pre-Cx checklist template?')) return;
+  localStorage.removeItem(PRECX_TEMPLATE_KEY);
+  document.getElementById('precxTemplateStatus').style.display='none';
+  document.getElementById('precxTemplateStatus').classList.remove('loaded');
+  document.getElementById('precxCatPreview').style.display='none';
+  showToast('✓ Pre-Cx template removed');
+}
+// Load existing precx template on startup
+try{
+  var pt=localStorage.getItem(PRECX_TEMPLATE_KEY);
+  if(pt) renderPrecxTemplateStatus(JSON.parse(pt));
+}catch(e){}
+
+// ── INIT ──
+var settings=loadSettings();
+applySettings(settings);
+
+// Load existing template if any
+try{
+  var tmpl=localStorage.getItem(TEMPLATE_KEY);
+  if(tmpl) renderTemplateStatus(JSON.parse(tmpl));
+}catch(e){}
+</script>
+</body>
+</html>

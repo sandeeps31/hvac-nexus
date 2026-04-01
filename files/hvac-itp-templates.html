@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITP Templates — HVAC NEXUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;--border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.10);--green:#00e5a0;--green-dim:rgba(0,229,160,.10);--warn:#ffb830;--warn-dim:rgba(255,184,48,.10);--danger:#ff4d6d;--danger-dim:rgba(255,77,109,.10);--purple:#a78bfa;--purple-dim:rgba(167,139,250,.10);--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a;--radius:10px;--sb:230px;--sb-sm:52px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* SIDEBAR */
+.sb{width:var(--sb);position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden}
+.sb.sm{width:var(--sb-sm)}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px;overflow:hidden}.sb-icon{font-size:20px;flex-shrink:0}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;position:relative;white-space:nowrap;overflow:hidden}
+.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis}
+.sb-tooltip{position:absolute;left:100%;top:50%;transform:translateY(-50%);background:var(--surface2);color:var(--text);font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:400;margin-left:8px;display:none}
+.sb.sm .sb-tooltip{display:block}.sb.sm .sb-item:hover .sb-tooltip{opacity:1}
+.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}
+.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}
+.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-group-hdr{display:none}.sb.sm .sb-group-items{display:block !important}.sb.sm .sb-group-items .sb-item{padding:9px 14px;justify-content:center;border-left:none}
+.sb.sm .sb-top{padding:14px 12px 10px;justify-content:center}.sb.sm .sb-footer{justify-content:center}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}
+.sb-user-name{font-size:12.5px;color:var(--text2);white-space:nowrap}
+
+/* MAIN */
+.main{margin-left:var(--sb);transition:margin-left .25s}.main.sm{margin-left:var(--sb-sm)}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px}.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted);background:var(--surface2)}
+.bsm{padding:5px 12px;font-size:12px}
+.bdanger{background:transparent;color:var(--danger);border:1px solid rgba(255,77,109,.3)}.bdanger:hover{background:var(--danger-dim)}
+
+/* VIEWS */
+.view{display:none}.view.active{display:block}
+
+/* ─── REGISTER VIEW ─── */
+.reg-toolbar{padding:12px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px;width:280px}
+.search-box:focus-within{border-color:var(--accent)}
+.search-box input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%}
+.search-box input::placeholder{color:var(--muted)}
+.fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;cursor:pointer}
+.fsel:focus{border-color:var(--accent);color:var(--text)}.fsel option{background:var(--surface2)}
+.reg-page{padding:16px 24px 60px}
+.reg-tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.reg-tbl thead tr{background:var(--surface2)}
+.reg-tbl th{padding:9px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.reg-tbl td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.reg-tbl tbody tr:last-child td{border-bottom:none}
+.reg-tbl tbody tr:hover td{background:var(--surface2)}
+.itp-name{font-weight:600;color:var(--text)}
+.itp-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent)}
+.itp-ver{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--muted)}
+.itp-ver.current{background:var(--green-dim);border-color:rgba(0,229,160,.2);color:var(--green)}
+.itp-ver.draft{background:var(--warn-dim);border-color:rgba(255,184,48,.2);color:var(--warn)}
+.status-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.sb-current{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.sb-draft{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
+.sb-superseded{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+
+/* Action icon buttons (like the screenshot) */
+.act-btns{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.act-btn{width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .13s;position:relative}
+.act-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.act-btn.danger:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-dim)}
+.act-btn.warn:hover{border-color:var(--warn);color:var(--warn);background:var(--warn-dim)}
+.act-btn .tip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface2);color:var(--text);font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:500}
+.act-btn:hover .tip{opacity:1}
+.act-btns-grid{display:grid;grid-template-columns:repeat(3,28px);gap:4px}
+
+/* Empty state */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;gap:16px;color:var(--muted)}
+.empty-icon{font-size:48px;opacity:.3}
+.empty-title{font-family:'Syne',sans-serif;font-size:16px;color:var(--text2)}
+.empty-sub{font-size:13px;color:var(--muted);text-align:center;max-width:360px;line-height:1.6}
+
+/* ─── EDITOR VIEW ─── */
+.editor-topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.editor-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text);flex:1}
+.editor-meta-bar{padding:14px 24px;background:var(--surface2);border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.emf{display:flex;flex-direction:column;gap:4px}
+.emf-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.emf-val{font-size:13px;color:var(--text)}
+.emf-val.mono{font-family:'DM Mono',monospace;color:var(--accent)}
+.emf-input{background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 10px;outline:none;transition:border-color .2s;width:100%}
+.emf-input:focus{border-color:var(--accent)}.emf-input::placeholder{color:var(--muted)}
+.editor-body{padding:20px 24px 80px}
+
+/* TABLE SET (section) */
+.tset{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px}
+.tset-hdr{padding:11px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.tset-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;flex-shrink:0;min-width:60px}
+.tset-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1}
+.tset-pct{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);padding:2px 8px;background:var(--surface3);border-radius:4px;border:1px solid var(--border)}
+.tset-collapse{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px;transition:color .13s;flex-shrink:0}
+.tset-collapse:hover{color:var(--accent)}
+.tset-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px;transition:color .13s;flex-shrink:0}
+.tset-del:hover{color:var(--danger)}
+.tset-body{overflow:hidden}
+.tset-body.collapsed{display:none}
+
+/* ROWS table */
+.rows-tbl{width:100%;border-collapse:collapse}
+.rows-tbl th{padding:7px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)}
+.rows-tbl td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+.rows-tbl tr:last-child td{border-bottom:none}
+.step-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-align:center}
+.step-input{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:5px 8px;outline:none;width:100%;transition:border-color .2s}
+.step-input:focus{border-color:var(--accent);background:var(--surface2)}.step-input::placeholder{color:var(--muted)}
+.type-sel{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 8px;outline:none;cursor:pointer;width:100%;min-width:130px}
+.type-sel:focus{border-color:var(--accent)}.type-sel option{background:var(--surface2)}
+
+/* Flag colour boxes */
+.flags{display:flex;gap:4px;align-items:center;flex-shrink:0}
+.flag-box{width:18px;height:18px;border-radius:3px;cursor:pointer;transition:all .13s;border:2px solid transparent;position:relative;display:flex;align-items:center;justify-content:center}
+.flag-box.active{border-color:rgba(255,255,255,.5)}
+.flag-box .ftip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface2);color:var(--text);font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:600}
+.flag-box:hover .ftip{opacity:1}
+.fb-red{background:#ff4d6d;opacity:.7}.fb-red.active{opacity:1}
+.fb-lock{background:var(--surface3);border:2px solid var(--muted) !important;color:var(--muted);font-size:10px}.fb-lock.active{border-color:var(--accent) !important;color:var(--accent)}
+.fb-blue{background:#3b82f6;opacity:.7}.fb-blue.active{opacity:1}
+.fb-yellow{background:#eab308;opacity:.7}.fb-yellow.active{opacity:1}
+
+.step-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 5px;transition:color .13s;flex-shrink:0}
+.drag-handle{color:var(--muted);cursor:grab;padding:0 6px;font-size:14px;user-select:none;flex-shrink:0;line-height:1}
+.drag-handle:active{cursor:grabbing}
+.rows-tbl tr.drag-over td{border-top:2px solid var(--accent)}
+.rows-tbl tr.dragging{opacity:0.4}
+.step-del:hover{color:var(--danger)}
+.add-step-btn{display:flex;align-items:center;gap:7px;padding:9px 14px;color:var(--muted);font-size:12.5px;cursor:pointer;transition:color .13s;background:none;border:none;font-family:'DM Sans',sans-serif;width:100%;border-top:1px solid var(--border)}
+.add-step-btn:hover{color:var(--accent);background:var(--accent-dim)}
+.add-tset-btn{display:flex;align-items:center;gap:8px;padding:11px 16px;color:var(--accent);font-size:13px;cursor:pointer;transition:all .13s;background:var(--accent-dim);border:1px dashed rgba(0,200,255,.3);border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-weight:600;width:100%;justify-content:center}
+.add-tset-btn:hover{background:rgba(0,200,255,.15)}
+
+/* Special first row (PLANT) */
+.plant-row{background:var(--surface2)}
+.plant-row td{padding:8px 10px}
+
+/* MODALS */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.mo.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;max-width:96vw;transform:translateY(10px);transition:transform .2s;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.mo.open .modal{transform:translateY(0)}
+.modal-hdr{padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-hdr h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text)}
+.modal-hdr p{color:var(--text2);font-size:12.5px;margin-top:3px}
+.modal-body{padding:18px 22px;overflow-y:auto;flex:1}
+.modal-footer{padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;margin-top:12px;display:block}
+.ml:first-child{margin-top:0}
+.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none}
+.mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
+.mi.mono{font-family:'DM Mono',monospace;color:var(--accent)}
+
+/* Revision history table */
+.rev-tbl{width:100%;border-collapse:collapse}
+.rev-tbl th{padding:8px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)}
+.rev-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:12.5px}
+.rev-tbl tr:last-child td{border-bottom:none}
+.rev-tbl tbody tr:hover td{background:var(--surface2)}
+.rev-dl-btn{background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;padding:2px 6px;transition:color .13s}
+.rev-dl-btn:hover{color:#33d4ff}
+.rev-status-curr{color:var(--green);font-family:'DM Mono',monospace;font-size:10px}
+.rev-status-sup{color:var(--muted);font-family:'DM Mono',monospace;font-size:10px}
+.rev-status-draft{color:var(--warn);font-family:'DM Mono',monospace;font-size:10px}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sb" id="sidebar">
+  <div class="sb-top">
+    <div class="sb-brand"><span class="sb-icon">❄️</span><span class="sb-name">HVAC NEXUS</span></div>
+    <button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">«</button>
+  </div>
+  <div class="sb-proj-block">
+    <div class="sb-proj-lbl">Company Level</div>
+    <div class="sb-proj-name" id="sbCompanyName">ITP Templates</div>
+    <div class="sb-proj-num">Company Settings</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span><span class="sb-tooltip">Company settings</span></div>
+    <div class="sb-item active"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Templates</span><span class="sb-tooltip">ITP Templates</span></div>
+    <div style="height:1px;background:var(--border);margin:8px 0"></div>
+    <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Back to Project</span><span class="sb-tooltip">Back to Project</span></div>
+  </nav>
+  <div class="sb-footer"><div class="sb-av">👷</div><span class="sb-user-name" id="sbUserName">Sandeep S</span></div>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="mainWrap">
+
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl" onclick="navTo('hvac-settings.html')">Company Settings</span><span class="bcs">›</span>
+      <span class="bcc" id="bcCurr">ITP Templates</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="bg bsm btn" id="backToRegBtn" style="display:none" onclick="showRegister()">← Back to Templates</button>
+      <button class="bg bsm btn" id="publishBtn" style="display:none" onclick="publishTemplate()">↑ Publish Revision</button>
+      <button class="bp bsm btn" id="newItpBtn" onclick="openNewItpModal()">＋ New ITP Template</button>
+    </div>
+  </div>
+
+  <!-- REGISTER VIEW -->
+  <div class="view active" id="view-register">
+    <div class="reg-toolbar">
+      <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search ITP templates…" oninput="renderRegister()"></div>
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="itpCount"></span>
+    </div>
+    <div class="reg-page">
+      <table class="reg-tbl" id="regTbl">
+        <thead>
+          <tr>
+            <th style="width:100px">ITP No.</th>
+            <th>ITP Type / Name</th>
+            <th style="width:70px">Version</th>
+            <th style="width:90px">Status</th>
+            <th style="width:110px">Created</th>
+            <th style="width:110px">Last Modified</th>
+            <th style="width:110px">Last Used</th>
+            <th style="width:130px;text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="regBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- EDITOR VIEW -->
+  <div class="view" id="view-editor">
+    <div class="editor-topbar">
+      <div class="editor-title" id="editorTitle">ITP Template</div>
+      <div id="editorStatusBadge"></div>
+    </div>
+    <!-- Meta bar -->
+    <div class="editor-meta-bar">
+      <div class="emf"><span class="emf-lbl">ITP No.</span><div class="emf-val mono" id="ed-itpno"></div></div>
+      <div class="emf"><span class="emf-lbl">ITP Type</span><div class="emf-val" id="ed-itptype"></div></div>
+      <div class="emf"><span class="emf-lbl">Version</span><div class="emf-val mono" id="ed-version"></div></div>
+      <div class="emf"><span class="emf-lbl">Creator</span><div class="emf-val" id="ed-creator"></div></div>
+      <div class="emf"><span class="emf-lbl">Date Created</span><div class="emf-val" id="ed-created"></div></div>
+      <div class="emf"><span class="emf-lbl">Last Modified</span><div class="emf-val" id="ed-modified"></div></div>
+    </div>
+    <!-- Flag legend -->
+    <div style="padding:8px 24px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Flag Legend:</span>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:#ff4d6d"></div>Mandatory</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:var(--surface3);border:1.5px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--accent)">🔒</div>Login Check</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:#3b82f6"></div>Export Timestamp</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:#eab308"></div>Export Username</div>
+    </div>
+    <!-- Editor body -->
+    <div class="editor-body" id="editorBody"></div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- NEW ITP MODAL -->
+<div class="mo" id="newItpModal" onclick="if(event.target===this)closeNewItpModal()">
+  <div class="modal" style="width:480px">
+    <div class="modal-hdr">
+      <h3>New ITP Template</h3>
+      <p>Create a new company-level ITP template</p>
+    </div>
+    <div class="modal-body">
+      <label class="ml">ITP Type Name *</label>
+      <input class="mi" id="new-itptype" placeholder="e.g. FCU — Water Cooled"/>
+      <label class="ml">ITP No. (auto-generated if blank)</label>
+      <input class="mi mono" id="new-itpno" placeholder="e.g. ITP-001"/>
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closeNewItpModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="confirmNewItp()">Create Template →</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVISION HISTORY MODAL -->
+<div class="mo" id="revHistModal" onclick="if(event.target===this)closeRevHist()">
+  <div class="modal" style="width:780px">
+    <div class="modal-hdr">
+      <h3>Revision History</h3>
+      <p id="revHistSub"></p>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <table class="rev-tbl">
+        <thead>
+          <tr>
+            <th style="width:36px"></th>
+            <th>ITP Type / Name</th>
+            <th style="width:80px">Version</th>
+            <th style="width:90px">Creator</th>
+            <th style="width:100px">Date Created</th>
+            <th style="width:100px">Last Modified</th>
+            <th style="width:80px">Status</th>
+            <th style="width:100px">Date Last Used</th>
+          </tr>
+        </thead>
+        <tbody id="revHistBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closeRevHist()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- PUBLISH MODAL -->
+<div class="mo" id="publishModal" onclick="if(event.target===this)closePublishModal()">
+  <div class="modal" style="width:440px">
+    <div class="modal-hdr">
+      <h3>Publish Revision</h3>
+      <p>Freeze the current draft as an official revision</p>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--warn-dim);border:1px solid rgba(255,184,48,.25);border-radius:8px;padding:11px 14px;font-size:12.5px;color:var(--warn);display:flex;gap:9px;margin-bottom:12px"><span>⚠️</span><span>Once published, this revision is locked. A new draft can be started for further edits.</span></div>
+      <label class="ml">Revision Notes (optional)</label>
+      <input class="mi" id="pub-note" placeholder="e.g. Updated installation checklist items"/>
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closePublishModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="confirmPublish()">Publish →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// ITP TEMPLATES — HVAC NEXUS
+// Storage: hvacnexus_itp_templates (company-level)
+// ═══════════════════════════════════════════════════
+var SK = 'hvacnexus_itp_templates';
+var SBK = 'hvacnexus_sb_collapsed';
+var templates = []; // array of ITP master records
+var activeItpId = null;
+var _uid = 0;
+function nid(){return 'itp'+(++_uid)+Date.now();}
+function navTo(u){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+u;}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+
+// Sidebar
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){document.getElementById('sidebar').classList.toggle('sm',c);document.getElementById('mainWrap').classList.toggle('sm',c);document.getElementById('sbToggleBtn').textContent=c?'»':'«';}
+(function(){applySB(localStorage.getItem(SBK)==='1');})();
+
+// User name
+(function(){try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');var n=cs.userName||cs.contactName||'';if(n)document.getElementById('sbUserName').textContent=n.split(' ')[0];}catch(e){}})();
+
+// Storage
+function save(){try{localStorage.setItem(SK,JSON.stringify(templates));}catch(e){}}
+function load(){try{var s=localStorage.getItem(SK);if(s)templates=JSON.parse(s);}catch(e){templates=[];}}
+load();
+
+// Auto-generate ITP number
+function genItpNum(){
+  var max=0;
+  templates.forEach(function(t){var m=(t.itpNo||'').match(/ITP-(\d+)/);if(m){var n=parseInt(m[1]);if(n>max)max=n;}});
+  return 'ITP-'+String(max+1).padStart(3,'0');
+}
+
+// Status helpers
+function currentRev(itp){return itp.revisions[itp.revisions.length-1];}
+function isDraft(itp){return currentRev(itp).status==='draft';}
+
+// ── DEFAULT FCU WATER COOLED TEMPLATE ──
+var FCU_WC_TEMPLATE = {
+  sections:[
+    {id:'s1',ref:'01',name:'PLANT',type:'details',rows:[
+      {id:'r1',step:'',desc:'Plant reference:',checkType:'input',flags:{mandatory:false,login:false,timestamp:false,username:false}},
+      {id:'r2',step:'',desc:'Manufacturer:',checkType:'input',flags:{mandatory:false,login:false,timestamp:false,username:false}},
+      {id:'r3',step:'',desc:'Model:',checkType:'input',flags:{mandatory:false,login:false,timestamp:false,username:false}},
+      {id:'r4',step:'',desc:'Serial no:',checkType:'input',flags:{mandatory:false,login:false,timestamp:false,username:false}},
+      {id:'r5',step:'',desc:'Photo',checkType:'photo',flags:{mandatory:false,login:false,timestamp:false,username:false}}
+    ]},
+    {id:'s2',ref:'02',name:'DELIVERY',type:'checklist',rows:[
+      {id:'r6',step:'1',desc:'Piping connections sealed and protected',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r7',step:'2',desc:'Equipment thoroughly inspected for physical damage',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r8',step:'3',desc:'Equipment matches the approved technical data and sample submission',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r9',step:'4',desc:'Photo / attachment',checkType:'photo',flags:{mandatory:false,login:false,timestamp:false,username:false}},
+      {id:'r10',step:'5',desc:'Comments',checkType:'input',flags:{mandatory:false,login:false,timestamp:false,username:false}}
+    ]},
+    {id:'s3',ref:'03',name:'INSTALLATION',type:'checklist',rows:[
+      {id:'r11',step:'1',desc:'FCU is installed in the correct location as per current workshop drawings',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r12',step:'2',desc:'Confirm FCU meets approved equipment details',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r13',step:'3',desc:'Equipment is not damaged in any way, ensure no concealed damage',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r14',step:'4',desc:'Photo log',checkType:'photo',flags:{mandatory:false,login:false,timestamp:false,username:false}},
+      {id:'r15',step:'5',desc:'FCU is correctly mounted on vibration isolation as per project requirements',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r16',step:'6',desc:'FCU is labelled clearly',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r17',step:'7',desc:'Adequate access provided to all components',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r18',step:'8',desc:'Ductwork connections and associated hardware complete',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r19',step:'9',desc:'Motorized dampers and damper actuators installed',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r20',step:'10',desc:'Pipework connections complete',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r21',step:'11',desc:'Condensate drainage complete',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r22',step:'12',desc:'Filters have been installed',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r23',step:'13',desc:'BMS – QA received',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r24',step:'14',desc:'Mechanical electrical – QA received',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r25',step:'15',desc:'Comments',checkType:'input',flags:{mandatory:false,login:false,timestamp:false,username:false}}
+    ]},
+    {id:'s4',ref:'04 PRE-CX',name:'PRE COMMISSIONING',type:'checklist',cx_link:'precx',rows:[
+      {id:'r26',step:'1',desc:'Piping system flushed and signed off',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r27',step:'2',desc:'Water treatment completed',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r28',step:'3',desc:'Air venting completed',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r29',step:'4',desc:'Balancing valves set',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r30',step:'5',desc:'Controls interlocks verified',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r31',step:'6',desc:'Comments',checkType:'input',flags:{mandatory:false,login:false,timestamp:false,username:false}}
+    ]},
+    {id:'s5',ref:'04',name:'COMMISSIONING',type:'checklist',cx_link:'commissioning',rows:[
+      {id:'r32',step:'1',desc:"'Air on' coil temperature in cooling mode",checkType:'input',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r33',step:'2',desc:"'Air off' coil temperature in cooling mode",checkType:'input',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r34',step:'3',desc:'BMS control & monitoring completed',checkType:'input',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r35',step:'4',desc:'Run & fault light at panel is operating',checkType:'yesno',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r36',step:'5',desc:'Drain has been checked with water',checkType:'passfail',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r37',step:'6',desc:'CHW entering coil temperature',checkType:'input',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r38',step:'7',desc:'CHW leaving coil temperature',checkType:'input',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r39',step:'8',desc:'HW entering coil temperature',checkType:'input',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r40',step:'9',desc:'HW leaving coil temperature',checkType:'input',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r41',step:'10',desc:'Observe for noise levels',checkType:'passfail',flags:{mandatory:true,login:false,timestamp:false,username:false}},
+      {id:'r42',step:'11',desc:'Comments',checkType:'input',flags:{mandatory:false,login:false,timestamp:false,username:false}}
+    ]},
+    {id:'s6',ref:'05',name:'QA SIGN-OFF',type:'signoff',rows:[
+      {id:'r43',step:'',desc:'Photo Log',checkType:'photo',flags:{mandatory:false,login:false,timestamp:false,username:false}},
+      {id:'r44',step:'',desc:'Sign-off (Assignee → Review → Sign)',checkType:'signoff',flags:{mandatory:true,login:true,timestamp:true,username:true}},
+      {id:'r45',step:'',desc:'QA Sign-off (Assignee / 3rd Party)',checkType:'signoff',flags:{mandatory:true,login:true,timestamp:true,username:true}}
+    ]}
+  ]
+};
+
+// ── INIT: seed default template if none exists ──
+(function(){
+  if(!templates.length){
+    var me='Sandeep';
+    try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+    var tmpl={
+      id:nid(),
+      itpNo:'ITP-001',
+      itpType:'FCU — Water Cooled',
+      createdBy:me,
+      createdDate:todayStr(),
+      revisions:[{
+        version:1,
+        status:'current',
+        sections:JSON.parse(JSON.stringify(FCU_WC_TEMPLATE.sections)),
+        modifiedDate:todayStr(),
+        modifiedBy:me,
+        note:'Initial revision',
+        lastUsed:''
+      }]
+    };
+    templates.push(tmpl);
+    save();
+  }
+})();
+
+// ── VIEW MANAGEMENT ──
+function showView(id){
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  document.getElementById('view-'+id).classList.add('active');
+}
+function showRegister(){
+  showView('register');
+  document.getElementById('backToRegBtn').style.display='none';
+  document.getElementById('publishBtn').style.display='none';
+  document.getElementById('newItpBtn').style.display='';
+  document.getElementById('bcCurr').textContent='ITP Templates';
+  activeItpId=null;
+  renderRegister();
+}
+function editItp(itpId){
+  var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
+  var rev=currentRev(itp);
+  // If current/superseded, auto-start a draft before opening
+  if(rev.status!=='draft') startDraft(itp);
+  openEditor(itpId);
+}
+
+function openEditor(itpId){
+  activeItpId=itpId;
+  showView('editor');
+  document.getElementById('backToRegBtn').style.display='';
+  document.getElementById('newItpBtn').style.display='none';
+  renderEditor();
+}
+
+// ── REGISTER ──
+function renderRegister(){
+  var q=(document.getElementById('srch').value||'').toLowerCase();
+  var list=templates.filter(function(t){
+    return !q||(t.itpNo||'').toLowerCase().includes(q)||(t.itpType||'').toLowerCase().includes(q);
+  });
+  document.getElementById('itpCount').textContent=list.length+' template'+(list.length!==1?'s':'');
+  if(!list.length){
+    document.getElementById('regBody').innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No ITP templates yet</div><div class="empty-sub">Create your first company-level ITP template to get started.</div></div></td></tr>';
+    return;
+  }
+  var rows='';
+  list.forEach(function(itp){
+    var rev=currentRev(itp);
+    var verClass=rev.status==='current'?'current':rev.status==='draft'?'draft':'';
+    var stBadge=rev.status==='current'?'<span class="status-badge sb-current">Current</span>':rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>':'<span class="status-badge sb-superseded">Superseded</span>';
+    rows+='<tr style="cursor:pointer" onclick="editItp(\''+itp.id+'\')">'
+      +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
+      +'<td><span class="itp-name">'+escH(itp.itpType)+'</span></td>'
+      +'<td><span class="itp-ver '+verClass+'">v'+rev.version+'</span></td>'
+      +'<td>'+stBadge+'</td>'
+      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(itp.createdDate)+'</td>'
+      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.modifiedDate)+'</td>'
+      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.lastUsed)+'</td>'
+      +'<td onclick="event.stopPropagation()">'
+        +'<div class="act-btns-grid">'
+          +'<button class="act-btn" onclick="editItp(\''+itp.id+'\')" title="Edit"><span class="tip">Edit</span>✏️</button>'
+          +'<button class="act-btn" onclick="exportItpPDF(\''+itp.id+'\')" title="Export PDF"><span class="tip">Export PDF</span>📄</button>'
+          +'<button class="act-btn warn" onclick="duplicateItp(\''+itp.id+'\')" title="Duplicate"><span class="tip">Duplicate</span>⧉</button>'
+          +'<button class="act-btn" onclick="openRevHist(\''+itp.id+'\')" title="Revision history"><span class="tip">Revision history</span>🕐</button>'
+          +'<button class="act-btn" onclick="copyItp(\''+itp.id+'\')" title="Copy"><span class="tip">Copy</span>📋</button>'
+          +'<button class="act-btn danger" onclick="deleteItp(\''+itp.id+'\')" title="Delete"><span class="tip">Delete</span>🗑</button>'
+        +'</div>'
+      +'</td>'
+      +'</tr>';
+  });
+  document.getElementById('regBody').innerHTML=rows;
+}
+
+// ── EDITOR ──
+function renderEditor(){
+  var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
+  var rev=currentRev(itp);
+  document.getElementById('editorTitle').textContent=itp.itpType;
+  document.getElementById('bcCurr').textContent=itp.itpNo+' — '+itp.itpType;
+  document.getElementById('ed-itpno').textContent=itp.itpNo;
+  document.getElementById('ed-itptype').textContent=itp.itpType;
+  document.getElementById('ed-version').textContent='v'+rev.version+(rev.status==='draft'?' (Draft)':rev.status==='current'?' (Current)':'');
+  document.getElementById('ed-creator').textContent=itp.createdBy||'—';
+  document.getElementById('ed-created').textContent=fmtDate(itp.createdDate);
+  document.getElementById('ed-modified').textContent=fmtDate(rev.modifiedDate)||'—';
+
+  var stBadge=rev.status==='current'?'<span class="status-badge sb-current">Current</span>':rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>':'<span class="status-badge sb-superseded">Superseded</span>';
+  document.getElementById('editorStatusBadge').innerHTML=stBadge;
+
+  var canEdit=rev.status==='draft';
+  document.getElementById('publishBtn').style.display=canEdit?'':'none';
+
+  renderEditorBody(itp, rev, canEdit);
+}
+
+function renderEditorBody(itp, rev, canEdit){
+  var body=document.getElementById('editorBody');
+  body.innerHTML='';
+
+  var sections=rev.sections||[];
+  sections.forEach(function(sec,si){
+    var wrap=document.createElement('div');wrap.className='tset';wrap.id='sec-'+sec.id;
+    // Header
+    var hdr=document.createElement('div');hdr.className='tset-hdr';
+    var numSpan=document.createElement('span');numSpan.className='tset-num';
+    if(canEdit){
+      var refInp=document.createElement('input');refInp.className='step-input';refInp.value=sec.ref;
+      refInp.style.cssText='width:60px;font-family:DM Mono,monospace;font-size:11px;color:var(--accent);font-weight:700;background:transparent;border-color:transparent;text-align:center';
+      refInp.title='Section number';
+      refInp.onchange=(function(s){return function(){s.ref=this.value;autosave(itp);};})(sec);
+      numSpan.appendChild(refInp);
+    } else {
+      numSpan.textContent=sec.ref;
+    }
+    var nameSpan=document.createElement('span');nameSpan.className='tset-name';
+    if(canEdit){
+      var nameInp=document.createElement('input');nameInp.className='step-input';nameInp.value=sec.name;nameInp.style.cssText='width:auto;min-width:160px;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:transparent;border-color:transparent';
+      nameInp.onchange=(function(s){return function(){s.name=this.value;autosave(itp);};})(sec);
+      nameSpan.appendChild(nameInp);
+    } else {
+      nameSpan.textContent=sec.name;
+    }
+    if(sec.cx_link){
+      var cxTag=document.createElement('span');cxTag.style.cssText='font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:4px;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.2);margin-left:8px';
+      cxTag.textContent=sec.cx_link==='precx'?'→ Pre-Cx Tracker':'→ Commissioning Tracker';
+      nameSpan.appendChild(cxTag);
+    }
+    var colBtn=document.createElement('button');colBtn.className='tset-collapse';colBtn.textContent='▾';colBtn.title='Collapse/Expand';
+    colBtn.onclick=(function(s,w){return function(){w.querySelector('.tset-body').classList.toggle('collapsed');this.textContent=w.querySelector('.tset-body').classList.contains('collapsed')?'▸':'▾';};})(sec,wrap);
+
+    hdr.appendChild(numSpan);hdr.appendChild(nameSpan);
+    if(canEdit){
+      var delSecBtn=document.createElement('button');delSecBtn.className='tset-del';delSecBtn.textContent='✕';delSecBtn.title='Delete section';
+      delSecBtn.onclick=(function(s){return function(){if(!confirm('Delete section "'+s.name+'"?'))return;rev.sections=rev.sections.filter(function(x){return x.id!==s.id;});autosave(itp);renderEditor();};})(sec);
+      hdr.appendChild(delSecBtn);
+    }
+    hdr.appendChild(colBtn);
+    wrap.appendChild(hdr);
+
+    // Body
+    var secBody=document.createElement('div');secBody.className='tset-body';
+    var tbl=document.createElement('table');tbl.className='rows-tbl';
+
+    // Thead
+    var thead=document.createElement('thead');
+    var headRow=document.createElement('tr');
+    if(canEdit){
+      var thDrag=document.createElement('th');thDrag.style.width='28px';headRow.appendChild(thDrag);
+    }
+    var thCols=canEdit?['Step','Description','Check Type','Flags','']:['Step','Description','Check Type','Flags'];
+    var thWidths=canEdit?['40px','','160px','100px','30px']:['55px','','160px','100px'];
+    thCols.forEach(function(h,hi){var th=document.createElement('th');th.textContent=h;if(thWidths[hi])th.style.width=thWidths[hi];headRow.appendChild(th);});
+    thead.appendChild(headRow);tbl.appendChild(thead);
+
+    var tbody=document.createElement('tbody');
+    // Auto-number steps based on order
+    var stepCounter=0;
+    sec.rows.forEach(function(row){
+      if(row.checkType!=='signoff'&&row.step!==''){stepCounter++;row.step=String(stepCounter);}
+    });
+    sec.rows.forEach(function(row,ri){
+      var tr=document.createElement('tr');
+      tr.dataset.secId=sec.id;tr.dataset.rowId=row.id;
+      // Drag handle
+      if(canEdit){
+        var tdDrag=document.createElement('td');
+        var handle=document.createElement('span');handle.className='drag-handle';handle.textContent='⠿';handle.title='Drag to reorder';
+        handle.draggable=true;
+        (function(s,r,tbdy){
+          handle.addEventListener('dragstart',function(e){
+            e.dataTransfer.effectAllowed='move';
+            e.dataTransfer.setData('text/plain',r.id);
+            tr.classList.add('dragging');
+          });
+          handle.addEventListener('dragend',function(){tr.classList.remove('dragging');tbdy.querySelectorAll('tr').forEach(function(t){t.classList.remove('drag-over');});});
+          tr.addEventListener('dragover',function(e){e.preventDefault();e.dataTransfer.dropEffect='move';tbdy.querySelectorAll('tr').forEach(function(t){t.classList.remove('drag-over');});tr.classList.add('drag-over');});
+          tr.addEventListener('drop',function(e){
+            e.preventDefault();tr.classList.remove('drag-over');
+            var fromId=e.dataTransfer.getData('text/plain');
+            var fromIdx=s.rows.findIndex(function(x){return x.id===fromId;});
+            var toIdx=s.rows.findIndex(function(x){return x.id===r.id;});
+            if(fromIdx<0||toIdx<0||fromIdx===toIdx)return;
+            var moved=s.rows.splice(fromIdx,1)[0];
+            s.rows.splice(toIdx,0,moved);
+            autosave(itp);renderEditor();
+          });
+        })(sec,row,tbody);
+        tdDrag.appendChild(handle);tr.appendChild(tdDrag);
+      }
+      // Step (auto-numbered, read-only display)
+      var tdStep=document.createElement('td');tdStep.className='step-num';
+      tdStep.textContent=row.step||'';
+      // Description
+      var tdDesc=document.createElement('td');
+      if(canEdit){
+        var descInp=document.createElement('input');descInp.className='step-input';descInp.value=row.desc||'';descInp.placeholder='Step description…';
+        descInp.onchange=(function(r){return function(){r.desc=this.value;autosave(itp);};})(row);
+        tdDesc.appendChild(descInp);
+      } else {
+        tdDesc.textContent=row.desc||'';tdDesc.style.color='var(--text2)';
+      }
+      // Check Type
+      var tdType=document.createElement('td');
+      if(canEdit){
+        var typeSelect=document.createElement('select');typeSelect.className='type-sel';
+        [
+          {v:'',l:'— Select type —'},
+          {v:'yesno',l:'YES / NO / N.A.'},
+          {v:'passfail',l:'PASS / FAIL'},
+          {v:'input',l:'Input Value'},
+          {v:'photo',l:'Photo / Attachment'},
+          {v:'signoff',l:'Sign-off'}
+        ].forEach(function(opt){
+          var o=document.createElement('option');o.value=opt.v;o.textContent=opt.l;if(row.checkType===opt.v)o.selected=true;
+          typeSelect.appendChild(o);
+        });
+        typeSelect.onchange=(function(r){return function(){r.checkType=this.value;autosave(itp);};})(row);
+        tdType.appendChild(typeSelect);
+      } else {
+        var typeLabels={yesno:'YES / NO / N.A.',passfail:'PASS / FAIL',input:'Input Value',photo:'Photo / Attachment',signoff:'Sign-off'};
+        var chip=document.createElement('span');chip.style.cssText='font-family:DM Mono,monospace;font-size:10px;padding:2px 8px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text2)';
+        chip.textContent=typeLabels[row.checkType]||row.checkType;
+        tdType.appendChild(chip);
+      }
+      // Flags
+      var tdFlags=document.createElement('td');
+      var flagsWrap=document.createElement('div');flagsWrap.className='flags';
+      var flagDefs=[
+        {key:'mandatory',cls:'fb-red',tip:'Mandatory'},
+        {key:'login',cls:'fb-lock',tip:'Login Check',icon:'🔒'},
+        {key:'timestamp',cls:'fb-blue',tip:'Export Timestamp'},
+        {key:'username',cls:'fb-yellow',tip:'Export Username'}
+      ];
+      flagDefs.forEach(function(fd){
+        var fb=document.createElement('div');fb.className='flag-box '+fd.cls+(row.flags[fd.key]?' active':'');
+        if(fd.icon)fb.textContent=fd.icon;
+        var tip=document.createElement('span');tip.className='ftip';tip.textContent=fd.tip;
+        fb.appendChild(tip);
+        if(canEdit){
+          fb.onclick=(function(r,k,el){return function(){r.flags[k]=!r.flags[k];el.classList.toggle('active',r.flags[k]);autosave(itp);};})(row,fd.key,fb);
+          fb.style.cursor='pointer';
+        } else {
+          fb.style.cursor='default';fb.style.opacity=row.flags[fd.key]?'1':'0.3';
+        }
+        flagsWrap.appendChild(fb);
+      });
+      tdFlags.appendChild(flagsWrap);
+      // Delete
+      var tdDel=document.createElement('td');
+      if(canEdit){
+        var delBtn=document.createElement('button');delBtn.className='step-del';delBtn.textContent='✕';delBtn.title='Delete row';
+        delBtn.onclick=(function(s,r){return function(){s.rows=s.rows.filter(function(x){return x.id!==r.id;});autosave(itp);renderEditor();};})(sec,row);
+        tdDel.appendChild(delBtn);
+      }
+      tr.appendChild(tdStep);tr.appendChild(tdDesc);tr.appendChild(tdType);tr.appendChild(tdFlags);tr.appendChild(tdDel);
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    secBody.appendChild(tbl);
+
+    // Add step button
+    if(canEdit){
+      var addBtn=document.createElement('button');addBtn.className='add-step-btn';
+      addBtn.innerHTML='<span style="font-size:16px;font-weight:300">＋</span> Add Step';
+      addBtn.onclick=(function(s){return function(){
+        var nextStep=s.rows.filter(function(r){return r.step;}).length+1;
+        s.rows.push({id:nid(),step:String(nextStep),desc:'',checkType:'yesno',flags:{mandatory:false,login:false,timestamp:false,username:false}});
+        autosave(itp);renderEditor();
+      };})(sec);
+      secBody.appendChild(addBtn);
+    }
+    wrap.appendChild(secBody);
+    body.appendChild(wrap);
+  });
+
+  // Add section button
+  if(canEdit){
+    var addSecBtn=document.createElement('button');addSecBtn.className='add-tset-btn';
+    addSecBtn.innerHTML='＋ Add Table Set / Section';
+    addSecBtn.onclick=function(){
+      var nextNum=sections.length+1;
+      rev.sections.push({id:nid(),ref:String(nextNum).padStart(2,'0'),name:'New Section',type:'checklist',rows:[]});
+      autosave(itp);renderEditor();
+    };
+    body.appendChild(addSecBtn);
+  } else if(rev.status==='current'||rev.status==='superseded'){
+    // Show "Start Draft" if current
+    if(rev.status==='current'){
+      var draftBtn=document.createElement('button');draftBtn.className='btn bp';draftBtn.style.marginTop='16px';
+      draftBtn.innerHTML='✏ Start New Draft';
+      draftBtn.onclick=function(){startDraft(itp);renderEditor();};
+      body.appendChild(draftBtn);
+    }
+  }
+}
+
+// ── DRAFT / PUBLISH ──
+function startDraft(itp){
+  var me='Sandeep';
+  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  var latestRev=currentRev(itp);
+  var newRev={
+    version:latestRev.version+1,
+    status:'draft',
+    sections:JSON.parse(JSON.stringify(latestRev.sections)),
+    modifiedDate:todayStr(),
+    modifiedBy:me,
+    note:'',
+    lastUsed:''
+  };
+  itp.revisions.push(newRev);
+  save();renderEditor();
+}
+
+function autosave(itp){
+  var me='Sandeep';
+  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  var rev=currentRev(itp);
+  rev.modifiedDate=todayStr();
+  rev.modifiedBy=me;
+  save();
+}
+
+function publishTemplate(){
+  var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
+  var rev=currentRev(itp);
+  if(rev.status!=='draft'){alert('No draft to publish.');return;}
+  document.getElementById('pub-note').value=rev.note||'';
+  document.getElementById('publishModal').classList.add('open');
+}
+function closePublishModal(){document.getElementById('publishModal').classList.remove('open');}
+function confirmPublish(){
+  var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
+  var rev=currentRev(itp);
+  // Mark previous current as superseded
+  itp.revisions.forEach(function(r,i){if(i<itp.revisions.length-1&&r.status==='current')r.status='superseded';});
+  rev.status='current';
+  rev.note=document.getElementById('pub-note').value.trim();
+  save();closePublishModal();renderEditor();
+  showToast('✓ v'+rev.version+' published');
+}
+
+// ── REVISION HISTORY ──
+function openRevHist(itpId){
+  var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
+  document.getElementById('revHistSub').textContent=itp.itpNo+' — '+itp.itpType;
+  var body=document.getElementById('revHistBody');
+  var html='';
+  itp.revisions.slice().reverse().forEach(function(rev){
+    var stCls=rev.status==='current'?'rev-status-curr':rev.status==='draft'?'rev-status-draft':'rev-status-sup';
+    var stLbl=rev.status==='current'?'Current':rev.status==='draft'?'Draft':'Superseded';
+    html+='<tr>'
+      +'<td><button class="rev-dl-btn" onclick="exportRevAtVer(\''+itpId+'\','+rev.version+')" title="Download">⬇</button></td>'
+      +'<td style="font-weight:500;color:var(--text)">'+escH(itp.itpType)+'</td>'
+      +'<td><span class="itp-ver '+(rev.status==='current'?'current':rev.status==='draft'?'draft':'')+'">v'+rev.version+'</span></td>'
+      +'<td style="color:var(--text2)">'+escH(rev.modifiedBy||itp.createdBy||'—')+'</td>'
+      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.version===1?itp.createdDate:rev.modifiedDate)+'</td>'
+      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.modifiedDate)+'</td>'
+      +'<td><span class="'+stCls+'">'+stLbl+'</span></td>'
+      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.lastUsed)+'</td>'
+      +'</tr>';
+  });
+  body.innerHTML=html;
+  document.getElementById('revHistModal').classList.add('open');
+}
+function closeRevHist(){document.getElementById('revHistModal').classList.remove('open');}
+function exportRevAtVer(itpId,ver){
+  var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
+  var rev=itp.revisions.find(function(r){return r.version===ver;});if(!rev)return;
+  exportRevData(itp,rev);
+  closeRevHist();
+}
+
+// ── EXPORT PDF ──
+function exportItpPDF(itpId){
+  var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
+  exportRevData(itp,currentRev(itp));
+}
+function exportRevData(itp,rev){
+  var co={};try{co=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');}catch(e){}
+  var typeLabels={yesno:'YES / NO / N.A.',passfail:'PASS / FAIL',input:'Input Value',photo:'Photo / Attachment',signoff:'Sign-off'};
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+itp.itpNo+' v'+rev.version+'</title>'
+    +'<style>body{font-family:Arial,sans-serif;font-size:10px;color:#111;padding:20px}'
+    +'h1{font-size:15px;margin:0 0 2px}h2{font-size:11px;font-weight:normal;color:#555;margin:0 0 12px}'
+    +'.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #ddd}'
+    +'.mf{display:flex;flex-direction:column;gap:2px}.ml{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:bold}.mv{font-size:11px;font-weight:600}'
+    +'.sec{margin-bottom:16px;break-inside:avoid}'
+    +'.sec-hdr{background:#0e1520;color:#fff;padding:7px 10px;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;display:flex;justify-content:space-between}'
+    +'table{width:100%;border-collapse:collapse;font-size:9.5px}'
+    +'th{background:#e8ecf0;padding:5px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #ccc}'
+    +'td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:middle}'
+    +'.flag-r{display:inline-block;width:10px;height:10px;border-radius:2px;background:#ff4d6d;margin:0 1px}'
+    +'.flag-b{display:inline-block;width:10px;height:10px;border-radius:2px;background:#3b82f6;margin:0 1px}'
+    +'.flag-y{display:inline-block;width:10px;height:10px;border-radius:2px;background:#eab308;margin:0 1px}'
+    +'.flag-k{display:inline-block;width:10px;height:10px;border-radius:2px;border:1.5px solid #0ea5e9;margin:0 1px;font-size:7px;text-align:center;line-height:10px}'
+    +'.legend{display:flex;gap:16px;margin-bottom:12px;font-size:9px;align-items:center}'
+    +'.ls{display:flex;align-items:center;gap:4px}'
+    +'</style></head><body>';
+  if(co.companyName)html+='<div style="font-weight:bold;font-size:13px;margin-bottom:4px">'+co.companyName+'</div>';
+  html+='<h1>'+itp.itpType+' — Quality Assurance ITP</h1>';
+  html+='<div class="meta">'
+    +'<div class="mf"><div class="ml">ITP No.</div><div class="mv">'+itp.itpNo+'</div></div>'
+    +'<div class="mf"><div class="ml">Version</div><div class="mv">v'+rev.version+'</div></div>'
+    +'<div class="mf"><div class="ml">Creator</div><div class="mv">'+escH(itp.createdBy||'—')+'</div></div>'
+    +'<div class="mf"><div class="ml">Date</div><div class="mv">'+fmtDate(itp.createdDate)+'</div></div>'
+    +'</div>';
+  html+='<div class="legend">'
+    +'<strong>Key:</strong>'
+    +'<div class="ls"><div class="flag-r"></div>Mandatory</div>'
+    +'<div class="ls"><div class="flag-k">🔒</div>Login Check</div>'
+    +'<div class="ls"><div class="flag-b"></div>Export Timestamp</div>'
+    +'<div class="ls"><div class="flag-y"></div>Export Username</div>'
+    +'</div>';
+  (rev.sections||[]).forEach(function(sec){
+    html+='<div class="sec"><div class="sec-hdr"><span>'+escH(sec.ref)+' '+escH(sec.name)+'</span>';
+    if(sec.cx_link)html+='<span style="font-size:8px;opacity:.7">'+(sec.cx_link==='precx'?'→ Pre-Cx Tracker':'→ Commissioning Tracker')+'</span>';
+    html+='</div>';
+    html+='<table><thead><tr><th style="width:50px">Step</th><th>Description</th><th style="width:130px">Check Type</th><th style="width:70px">Flags</th></tr></thead><tbody>';
+    sec.rows.forEach(function(row){
+      var flags='';
+      if(row.flags.mandatory)flags+='<div class="flag-r"></div>';
+      if(row.flags.login)flags+='<div class="flag-k">🔒</div>';
+      if(row.flags.timestamp)flags+='<div class="flag-b"></div>';
+      if(row.flags.username)flags+='<div class="flag-y"></div>';
+      html+='<tr><td style="color:#888">'+escH(row.step||'')+'</td><td>'+escH(row.desc||'')+'</td><td style="font-size:8.5px;color:#555">'+escH(typeLabels[row.checkType]||row.checkType)+'</td><td>'+flags+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+  });
+  html+='</body></html>';
+  var w=window.open('','_blank','width=900,height:700');w.document.write(html);w.document.close();w.focus();setTimeout(function(){w.print();},600);
+}
+
+// ── DUPLICATE / COPY ──
+function duplicateItp(itpId){
+  var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
+  var me='Sandeep';
+  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  var clone=JSON.parse(JSON.stringify(itp));
+  clone.id=nid();
+  clone.itpNo=genItpNum();
+  clone.itpType=itp.itpType+' (Copy)';
+  clone.createdBy=me;
+  clone.createdDate=todayStr();
+  clone.revisions=[{version:1,status:'draft',sections:JSON.parse(JSON.stringify(currentRev(itp).sections)),modifiedDate:todayStr(),modifiedBy:me,note:'Duplicated from '+itp.itpNo,lastUsed:''}];
+  templates.push(clone);
+  save();renderRegister();
+  showToast('Duplicated as '+clone.itpNo);
+}
+function copyItp(itpId){duplicateItp(itpId);}
+
+// ── DELETE ──
+function deleteItp(itpId){
+  var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
+  if(!confirm('Delete ITP template "'+itp.itpType+'" and all its revisions?\n\nThis cannot be undone.'))return;
+  templates=templates.filter(function(t){return t.id!==itpId;});
+  save();renderRegister();
+}
+
+// ── NEW ITP MODAL ──
+function openNewItpModal(){
+  document.getElementById('new-itptype').value='';
+  document.getElementById('new-itpno').value='';
+  document.getElementById('newItpModal').classList.add('open');
+  setTimeout(function(){document.getElementById('new-itptype').focus();},80);
+}
+function closeNewItpModal(){document.getElementById('newItpModal').classList.remove('open');}
+function confirmNewItp(){
+  var typeName=document.getElementById('new-itptype').value.trim();
+  if(!typeName){document.getElementById('new-itptype').focus();return;}
+  var itpNo=document.getElementById('new-itpno').value.trim()||genItpNum();
+  var me='Sandeep';
+  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  var newItp={
+    id:nid(),itpNo:itpNo,itpType:typeName,
+    createdBy:me,createdDate:todayStr(),
+    revisions:[{version:1,status:'draft',sections:[
+      {id:nid(),ref:'01',name:'PLANT',type:'details',rows:[]},
+      {id:nid(),ref:'02',name:'DELIVERY',type:'checklist',rows:[]},
+      {id:nid(),ref:'03',name:'INSTALLATION',type:'checklist',rows:[]},
+      {id:nid(),ref:'04 PRE-CX',name:'PRE COMMISSIONING',type:'checklist',cx_link:'precx',rows:[]},
+      {id:nid(),ref:'04',name:'COMMISSIONING',type:'checklist',cx_link:'commissioning',rows:[]},
+      {id:nid(),ref:'05',name:'QA SIGN-OFF',type:'signoff',rows:[]}
+    ],modifiedDate:todayStr(),modifiedBy:me,note:'New template',lastUsed:''}]
+  };
+  templates.push(newItp);
+  save();closeNewItpModal();openEditor(newItp.id);
+}
+
+// ── TOAST ──
+function showToast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .5s';setTimeout(function(){t.remove();},500);},2500);
+}
+
+// ── MODAL CLOSE HANDLERS ──
+['newItpModal','revHistModal','publishModal'].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el)el.addEventListener('click',function(e){if(e.target===this){if(id==='newItpModal')closeNewItpModal();else if(id==='revHistModal')closeRevHist();else if(id==='publishModal')closePublishModal();}});
+});
+
+// Init
+renderRegister();
+</script>
+</body>
+</html>
