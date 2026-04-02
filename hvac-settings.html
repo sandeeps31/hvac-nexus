@@ -114,9 +114,34 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 input[type="file"]{display:none}
 input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.6}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.stab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent;transition:all .15s;font-family:'DM Sans',sans-serif}
+.stab:hover{color:var(--text)}
+.stab.active{color:var(--accent);border-bottom-color:var(--accent)}
 </style>
 </head>
 <body>
+
+<script>
+// Access check - only Admins
+(function(){
+  try {
+    var users = JSON.parse(localStorage.getItem('hvacnexus_users') || '[]');
+    var settings = JSON.parse(localStorage.getItem('hvacnexus_company_settings') || '{}');
+    var currentName = settings.userName || settings['user-name'] || '';
+    var currentUser = users.find(function(u){ return u.name === currentName; });
+    if(users.length > 0 && currentUser && currentUser.role !== 'Admin') {
+      document.body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px;background:#080c12;color:#ddeeff;font-family:DM Sans,sans-serif">'
+        + '<div style="font-size:48px">&#128274;</div>'
+        + '<div style="font-family:Syne,sans-serif;font-size:20px;font-weight:800">Access Denied</div>'
+        + '<div style="color:#7a9bbf;font-size:14px;text-align:center;max-width:300px">Company Settings is restricted to Admins only. Contact your administrator.</div>'
+        + '<a href="project.html" style="margin-top:8px;padding:9px 18px;background:#00c8ff;color:#080c12;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px">&#8592; Go Back</a>'
+        + '</div>';
+    }
+  } catch(e) {}
+})();
+</script>
+
 
 <!-- SIDEBAR -->
 <div class="sb" id="sidebar">
@@ -221,169 +246,300 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
   </div>
 
   <div class="page">
-<div class="settings-card" style="margin-bottom:20px">
-  <div class="card-hdr"><div class="card-hdr-title">ITP Templates</div><div class="card-hdr-sub">Manage company-level ITP templates used across all projects</div></div>
-  <div class="card-body" style="display:flex;align-items:center;justify-content:space-between">
-    <div style="font-size:13px;color:var(--text2)">Create and manage reusable ITP checklists for FCUs, AHUs, fans and other equipment types.</div>
-    <button class="btn bp bsm" onclick="navTo('hvac-itp-templates.html')" style="flex-shrink:0;margin-left:16px">📋 Open ITP Templates →</button>
-  </div>
-</div>
 
-    <!-- COMPANY INFO -->
-    <div class="settings-card">
-      <div class="card-hdr">
-        <div class="card-hdr-title">Company Information</div>
-        <div class="card-hdr-sub">Appears across all modules — invoices, POs, emails</div>
-      </div>
-      <div class="card-body">
-        <div class="field-grid">
-          <div class="field">
-            <span class="field-label">Company Name</span>
-            <input class="field-input" id="co-name" placeholder="e.g. Acme HVAC Pty Ltd"/>
-          </div>
-          <div class="field">
-            <span class="field-label">ABN</span>
-            <input class="field-input" id="co-abn" placeholder="e.g. 12 345 678 901"/>
-          </div>
-          <div class="field">
-            <span class="field-label">Phone</span>
-            <input class="field-input" id="co-phone" placeholder="e.g. 02 9000 0000"/>
-          </div>
-          <div class="field">
-            <span class="field-label">Email</span>
-            <input class="field-input" id="co-email" placeholder="e.g. admin@acmehvac.com.au"/>
-          </div>
-          <div class="field field-grid single">
-            <span class="field-label">Address</span>
-            <input class="field-input" id="co-address" placeholder="e.g. 1 Example St, Sydney NSW 2000"/>
-          </div>
-          <div class="field">
-            <span class="field-label">Website</span>
-            <input class="field-input" id="co-website" placeholder="e.g. www.acmehvac.com.au"/>
-          </div>
-          <div class="field">
-            <span class="field-label">Licence Number</span>
-            <input class="field-input" id="co-licence" placeholder="e.g. 123456C"/>
-          </div>
-        </div>
-      </div>
+    <!-- TABS -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:24px;flex-wrap:wrap">
+      <button class="stab active" id="stab-info" onclick="switchTab('info')">&#127970; Company Info</button>
+      <button class="stab" id="stab-templates" onclick="switchTab('templates')">&#128196; Templates</button>
+      <button class="stab" id="stab-contacts" onclick="switchTab('contacts')">&#128222; Contacts</button>
+      <button class="stab" id="stab-notifications" onclick="switchTab('notifications')">&#128276; Notifications</button>
+      <button class="stab" id="stab-permissions" onclick="switchTab('permissions')">&#128101; Permissions</button>
     </div>
 
-    <!-- USER -->
-    <div class="settings-card">
-      <div class="card-hdr">
-        <div class="card-hdr-title">User Profile</div>
-        <div class="card-hdr-sub">Your name and role shown in the sidebar and on documents</div>
-      </div>
-      <div class="card-body">
-        <div class="field-grid">
-          <div class="field">
-            <span class="field-label">Your Name</span>
-            <input class="field-input" id="user-name" placeholder="e.g. Sandeep S"/>
+    <!-- ── COMPANY INFO TAB ── -->
+    <div id="tab-info">
+
+      <!-- COMPANY INFO -->
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">Company Information</div>
+          <div class="card-hdr-sub">Appears across all modules - invoices, POs, emails and documents</div>
+        </div>
+        <div class="card-body">
+          <!-- LOGO -->
+          <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border)">
+            <div id="logoPreview" style="width:80px;height:80px;border-radius:10px;background:var(--surface3);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;overflow:hidden">
+              &#127970;
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Company Logo</div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Shown in the sidebar and on exported documents</div>
+              <label class="bg bsm btn" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                &#128247; Upload Logo
+                <input type="file" accept="image/*" style="display:none" onchange="handleLogoUpload(this)">
+              </label>
+              <button class="bg bsm btn" style="margin-left:8px;color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="clearLogo()">Remove</button>
+            </div>
           </div>
-          <div class="field">
-            <span class="field-label">Role / Title</span>
-            <input class="field-input" id="user-role" placeholder="e.g. Project Manager"/>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- BUDGET TEMPLATE -->
-    <div class="settings-card">
-      <div class="card-hdr">
-        <div class="card-hdr-title">Budget Template</div>
-        <div class="card-hdr-sub">Company-level category & line item structure — applied to all new projects and procurement suggestions</div>
-      </div>
-      <div class="card-body">
-        <div class="upload-zone" id="uploadZone"
-          ondragover="event.preventDefault();this.classList.add('drag')"
-          ondragleave="this.classList.remove('drag')"
-          ondrop="handleDrop(event)">
-          <input type="file" id="templateFile" accept=".xlsx" onchange="handleTemplateUpload(this)">
-          <div class="upload-icon">📂</div>
-          <div class="upload-title">Upload Budget Template (.xlsx)</div>
-          <div class="upload-sub">Drag & drop or click to browse · Must have a "Template" sheet with TYPE and NAME columns</div>
-        </div>
-
-        <div class="template-status" id="templateStatus" style="display:none">
-          <span class="ts-icon" id="tsIcon">📋</span>
-          <div class="ts-info">
-            <div class="ts-name" id="tsName">—</div>
-            <div class="ts-meta" id="tsMeta">—</div>
-          </div>
-          <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="clearTemplate()">Remove</button>
-        </div>
-
-        <div id="catPreview" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Template Preview</span>
-            <span id="previewCount" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)"></span>
-          </div>
-          <div class="cat-preview" id="catPreviewList"></div>
-        </div>
-
-        <div class="divider"></div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:12px;color:var(--muted)">Don't have a template yet?</span>
-          <button class="bg bsm btn" onclick="navTo('hvac-budget.html')">📊 Download from Budget</button>
-        </div>
-      </div>
-    </div>
-
-
-    <!-- PRE-CX CHECKLIST TEMPLATE -->
-    <div class="settings-card">
-      <div class="card-hdr">
-        <div class="card-hdr-title">Pre-Commissioning Checklist Template</div>
-        <div class="card-hdr-sub">Uploaded separately from the budget template — defines sections and items loaded when creating area checklists</div>
-      </div>
-      <div class="card-body">
-        <div class="upload-zone" id="precxUploadZone"
-          ondragover="event.preventDefault();this.classList.add('drag')"
-          ondragleave="this.classList.remove('drag')"
-          ondrop="handlePrecxDrop(event)">
-          <input type="file" id="precxTemplateFile" accept=".xlsx" onchange="handlePrecxUpload(this)">
-          <div class="upload-icon">✅</div>
-          <div class="upload-title">Upload Pre-Cx Checklist Template (.xlsx)</div>
-          <div class="upload-sub">Must have a "Template" sheet · Columns: TYPE (SECTION or ITEM) and NAME</div>
-        </div>
-
-        <div class="template-status" id="precxTemplateStatus" style="display:none">
-          <span class="ts-icon" id="precxTsIcon">📋</span>
-          <div class="ts-info">
-            <div class="ts-name" id="precxTsName">—</div>
-            <div class="ts-meta" id="precxTsMeta">—</div>
-          </div>
-          <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="clearPrecxTemplate()">Remove</button>
-        </div>
-
-        <div id="precxCatPreview" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Template Preview</span>
-            <span id="precxPreviewCount" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)"></span>
-          </div>
-          <div class="cat-preview" id="precxPreviewList"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- DEFAULT MARGIN -->
-    <div class="settings-card">
-      <div class="card-hdr">
-        <div class="card-hdr-title">Default Margin</div>
-        <div class="card-hdr-sub">Applied automatically to all new projects</div>
-      </div>
-      <div class="card-body">
-        <div class="field-grid">
-          <div class="field">
-            <span class="field-label">Margin %</span>
-            <input class="field-input" id="default-margin" type="number" min="0" max="100" step="0.5" placeholder="e.g. 15"/>
-            <span class="field-hint">Used as the starting margin on the Budget module for new projects</span>
+          <div class="field-grid">
+            <div class="field">
+              <span class="field-label">Company Name</span>
+              <input class="field-input" id="co-name" placeholder="e.g. Acme HVAC Pty Ltd"/>
+            </div>
+            <div class="field">
+              <span class="field-label">ABN</span>
+              <input class="field-input" id="co-abn" placeholder="e.g. 12 345 678 901"/>
+            </div>
+            <div class="field">
+              <span class="field-label">Phone</span>
+              <input class="field-input" id="co-phone" placeholder="e.g. 02 9000 0000"/>
+            </div>
+            <div class="field">
+              <span class="field-label">Email</span>
+              <input class="field-input" id="co-email" placeholder="e.g. admin@acmehvac.com.au"/>
+            </div>
+            <div class="field field-grid single">
+              <span class="field-label">Address</span>
+              <input class="field-input" id="co-address" placeholder="e.g. 1 Example St, Sydney NSW 2000"/>
+            </div>
+            <div class="field">
+              <span class="field-label">Website</span>
+              <input class="field-input" id="co-website" placeholder="e.g. www.acmehvac.com.au"/>
+            </div>
+            <div class="field">
+              <span class="field-label">Licence Number</span>
+              <input class="field-input" id="co-licence" placeholder="e.g. 123456C"/>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      <!-- USER PROFILE -->
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">User Profile</div>
+          <div class="card-hdr-sub">Your name and role shown in the sidebar and on documents</div>
+        </div>
+        <div class="card-body">
+          <div class="field-grid">
+            <div class="field">
+              <span class="field-label">Your Name</span>
+              <input class="field-input" id="user-name" placeholder="e.g. Sandeep S"/>
+            </div>
+            <div class="field">
+              <span class="field-label">Role / Title</span>
+              <input class="field-input" id="user-role" placeholder="e.g. Project Manager"/>
+            </div>
+            <div class="field">
+              <span class="field-label">Mobile</span>
+              <input class="field-input" id="user-mobile" placeholder="e.g. 0400 000 000"/>
+            </div>
+            <div class="field">
+              <span class="field-label">Direct Email</span>
+              <input class="field-input" id="user-email" placeholder="e.g. sandeep@acmehvac.com.au"/>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DEFAULT MARGIN -->
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">Project Defaults</div>
+          <div class="card-hdr-sub">Applied automatically to all new projects</div>
+        </div>
+        <div class="card-body">
+          <div class="field-grid">
+            <div class="field">
+              <span class="field-label">Default Margin %</span>
+              <input class="field-input" id="default-margin" type="number" min="0" max="100" step="0.5" placeholder="e.g. 15"/>
+              <span class="field-hint">Starting margin on the Budget module for new projects</span>
+            </div>
+            <div class="field">
+              <span class="field-label">Default Retention %</span>
+              <input class="field-input" id="default-retention" type="number" min="0" max="20" step="0.5" placeholder="e.g. 5"/>
+              <span class="field-hint">Default retention held on progress claims</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-info -->
+
+    <!-- ── TEMPLATES TAB ── -->
+    <div id="tab-templates" style="display:none">
+
+      <!-- ITP TEMPLATES -->
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">ITP Templates</div>
+          <div class="card-hdr-sub">Manage company-level ITP templates used across all projects</div>
+        </div>
+        <div class="card-body" style="display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:13px;color:var(--text2)">Create and manage reusable ITP checklists for FCUs, AHUs, fans and other equipment types.</div>
+          <button class="btn bp bsm" onclick="navTo('hvac-itp-templates.html')" style="flex-shrink:0;margin-left:16px">Open ITP Templates</button>
+        </div>
+      </div>
+
+      <!-- BUDGET TEMPLATE -->
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">Budget Template</div>
+          <div class="card-hdr-sub">Company-level category and line item structure applied to all new projects</div>
+        </div>
+        <div class="card-body">
+          <div class="upload-zone" id="uploadZone"
+            ondragover="event.preventDefault();this.classList.add('drag')"
+            ondragleave="this.classList.remove('drag')"
+            ondrop="handleDrop(event)">
+            <input type="file" id="templateFile" accept=".xlsx" onchange="handleTemplateUpload(this)">
+            <div class="upload-icon">&#128194;</div>
+            <div class="upload-title">Upload Budget Template (.xlsx)</div>
+            <div class="upload-sub">Drag and drop or click to browse - Must have a "Template" sheet with TYPE and NAME columns</div>
+          </div>
+          <div class="template-status" id="templateStatus" style="display:none">
+            <span class="ts-icon" id="tsIcon">&#128203;</span>
+            <div class="ts-info">
+              <div class="ts-name" id="tsName">-</div>
+              <div class="ts-meta" id="tsMeta">-</div>
+            </div>
+            <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="clearTemplate()">Remove</button>
+          </div>
+          <div id="catPreview" style="display:none">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">
+              <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Template Preview</span>
+              <span id="previewCount" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)"></span>
+            </div>
+            <div class="cat-preview" id="catPreviewList"></div>
+          </div>
+          <div class="divider"></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:12px;color:var(--muted)">Don't have a template yet?</span>
+            <button class="bg bsm btn" onclick="navTo('hvac-budget.html')">Download from Budget</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRE-CX TEMPLATE -->
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">Pre-Commissioning Checklist Template</div>
+          <div class="card-hdr-sub">Defines sections and items loaded when creating area checklists</div>
+        </div>
+        <div class="card-body">
+          <div class="upload-zone" id="precxUploadZone"
+            ondragover="event.preventDefault();this.classList.add('drag')"
+            ondragleave="this.classList.remove('drag')"
+            ondrop="handlePrecxDrop(event)">
+            <input type="file" id="precxTemplateFile" accept=".xlsx" onchange="handlePrecxUpload(this)">
+            <div class="upload-icon">&#9989;</div>
+            <div class="upload-title">Upload Pre-Cx Checklist Template (.xlsx)</div>
+            <div class="upload-sub">Must have a "Template" sheet - Columns: TYPE (SECTION or ITEM) and NAME</div>
+          </div>
+          <div class="template-status" id="precxTemplateStatus" style="display:none">
+            <span class="ts-icon" id="precxTsIcon">&#128203;</span>
+            <div class="ts-info">
+              <div class="ts-name" id="precxTsName">-</div>
+              <div class="ts-meta" id="precxTsMeta">-</div>
+            </div>
+            <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="clearPrecxTemplate()">Remove</button>
+          </div>
+          <div id="precxCatPreview" style="display:none">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">
+              <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Template Preview</span>
+              <span id="precxPreviewCount" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)"></span>
+            </div>
+            <div class="cat-preview" id="precxPreviewList"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-templates -->
+
+
+    <!-- ── CONTACTS TAB ── -->
+    <div id="tab-contacts" style="display:none">
+      <div class="settings-card">
+        <div class="card-hdr" style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div class="card-hdr-title">Contacts</div>
+            <div class="card-hdr-sub">Subcontractors, suppliers and consultants across all projects</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="contactTypeFilter" onchange="renderContacts()" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none">
+              <option value="">All Types</option>
+              <option value="Subcontractor">Subcontractor</option>
+              <option value="Supplier">Supplier</option>
+              <option value="Consultant">Consultant</option>
+              <option value="Client">Client</option>
+              <option value="Authority">Authority</option>
+            </select>
+            <button class="bp bsm btn" onclick="openAddContactModal()">+ Add Contact</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div id="contactList"></div>
+        </div>
+      </div>
+    </div><!-- /tab-contacts -->
+
+    <!-- ── NOTIFICATIONS TAB ── -->
+    <div id="tab-notifications" style="display:none">
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">Notification Preferences</div>
+          <div class="card-hdr-sub">Choose what alerts you receive - email notifications require Supabase setup</div>
+        </div>
+        <div class="card-body">
+          <div style="background:var(--warn-dim);border:1px solid rgba(255,184,48,.2);border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--warn);margin-bottom:20px">
+            Email notifications will be active once Supabase backend is connected. Settings saved here will apply automatically.
+          </div>
+          <div id="notifList"></div>
+        </div>
+      </div>
+    </div><!-- /tab-notifications -->
+
+    <!-- ── PERMISSIONS TAB ── -->
+    <div id="tab-permissions" style="display:none">
+
+      <!-- TEAM MEMBERS -->
+      <div class="settings-card">
+        <div class="card-hdr" style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div class="card-hdr-title">Team Members</div>
+            <div class="card-hdr-sub">People who have access to HVAC NEXUS</div>
+          </div>
+          <button class="bp bsm btn" onclick="openAddUserModal()">+ Add Member</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div id="userList"></div>
+        </div>
+      </div>
+
+      <!-- ROLES -->
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">Role Permissions</div>
+          <div class="card-hdr-sub">What each role can see and do</div>
+        </div>
+        <div class="card-body">
+          <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border)">
+                <th style="text-align:left;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Permission</th>
+                <th style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent)">Admin</th>
+                <th style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--green)">PM</th>
+                <th style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn)">Engineer</th>
+                <th style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2)">Subcontractor</th>
+                <th style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2)">Witness</th>
+              </tr>
+            </thead>
+            <tbody id="permTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /tab-permissions -->
 
   </div><!-- /page -->
 </div><!-- /main -->
@@ -718,6 +874,322 @@ try{
   var tmpl=localStorage.getItem(TEMPLATE_KEY);
   if(tmpl) renderTemplateStatus(JSON.parse(tmpl));
 }catch(e){}
+
+// -- TABS --
+function switchTab(tab) {
+  ['info','templates','contacts','notifications','permissions'].forEach(function(t) {
+    document.getElementById('tab-'+t).style.display = t===tab ? '' : 'none';
+    document.getElementById('stab-'+t).classList.toggle('active', t===tab);
+  });
+}
+
+// -- LOGO --
+function handleLogoUpload(inp) {
+  var file = inp.files[0]; if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var prev = document.getElementById('logoPreview');
+    prev.innerHTML = '<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:contain;border-radius:8px">';
+    var s = loadSettings(); s.logo = e.target.result; saveSettings(s);
+  };
+  reader.readAsDataURL(file);
+}
+function clearLogo() {
+  document.getElementById('logoPreview').innerHTML = '&#127970;';
+  var s = loadSettings(); delete s.logo; saveSettings(s);
+}
+
+// -- USERS --
+var users = [];
+function loadUsers() {
+  try { var d = localStorage.getItem('hvacnexus_users'); if(d) users = JSON.parse(d); } catch(e) { users = []; }
+  if(!users.length) users = [
+    {id:'u1', name:'Sandeep Sethu', role:'Admin', email:'sandeep@hvacnexus.com.au', active:true}
+  ];
+}
+function saveUsers() { localStorage.setItem('hvacnexus_users', JSON.stringify(users)); }
+function renderUsers() {
+  loadUsers();
+  var list = document.getElementById('userList'); if(!list) return;
+  var roleColors = {Admin:'var(--accent)',PM:'var(--green)',Engineer:'var(--warn)',Subcontractor:'var(--text2)',Witness:'var(--muted)'};
+  list.innerHTML = users.map(function(u,i) {
+    return '<div style="display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)">'
+      +'<div style="width:36px;height:36px;border-radius:50%;background:var(--surface3);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">'+u.name.charAt(0).toUpperCase()+'</div>'
+      +'<div style="flex:1">'
+        +'<div style="font-size:13px;font-weight:600;color:var(--text)">'+escH(u.name)+'</div>'
+        +'<div style="font-size:12px;color:var(--muted)">'+escH(u.email||'')+'</div>'
+      +'</div>'
+      +'<span style="font-family:DM Mono,monospace;font-size:10px;padding:2px 10px;border-radius:20px;background:var(--surface3);color:'+(roleColors[u.role]||'var(--muted)')+'">'+escH(u.role)+'</span>'
+      +'<select style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:4px 8px;outline:none" onchange="changeRole('+i+',this.value)">'
+        +['Admin','PM','Engineer','Subcontractor','Witness'].map(function(r){return'<option'+(r===u.role?' selected':'')+'>'+r+'</option>';}).join('')
+      +'</select>'
+      +(i>0?'<button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;padding:0 4px" onclick="removeUser('+i+')" title="Remove">&times;</button>':'')
+    +'</div>';
+  }).join('');
+}
+function changeRole(i, role) { users[i].role = role; saveUsers(); }
+function removeUser(i) {
+  if(!confirm('Remove '+users[i].name+'?')) return;
+  users.splice(i,1); saveUsers(); renderUsers();
+}
+function openAddUserModal() {
+  var name = prompt('Full name:'); if(!name) return;
+  var email = prompt('Email:') || '';
+  var role = prompt('Role (Admin, PM, Engineer, Subcontractor, Witness):') || 'Engineer';
+  users.push({id:'u'+Date.now(), name:name.trim(), email:email.trim(), role:role, active:true});
+  saveUsers(); renderUsers();
+}
+
+// -- PERMISSIONS TABLE --
+function renderPermissions() {
+  var perms = [
+    {label:'View all modules', admin:true, pm:true, eng:true, sub:false, wit:false},
+    {label:'Create / edit variations', admin:true, pm:true, eng:false, sub:false, wit:false},
+    {label:'Approve variations', admin:true, pm:true, eng:false, sub:false, wit:false},
+    {label:'Upload drawings', admin:true, pm:true, eng:true, sub:false, wit:false},
+    {label:'Add drawing pins', admin:true, pm:true, eng:true, sub:true, wit:false},
+    {label:'Create / complete ITPs', admin:true, pm:true, eng:true, sub:true, wit:false},
+    {label:'Witness ITPs', admin:true, pm:true, eng:false, sub:false, wit:true},
+    {label:'Edit equipment schedule', admin:true, pm:true, eng:true, sub:false, wit:false},
+    {label:'View commissioning tracker', admin:true, pm:true, eng:true, sub:true, wit:true},
+    {label:'Edit commissioning tracker', admin:true, pm:true, eng:true, sub:false, wit:false},
+    {label:'Access company settings', admin:true, pm:false, eng:false, sub:false, wit:false},
+    {label:'Manage users', admin:true, pm:false, eng:false, sub:false, wit:false},
+  ];
+  var tbody = document.getElementById('permTable'); if(!tbody) return;
+  var tick = '<span style="color:var(--green);font-size:14px">&#10003;</span>';
+  var cross = '<span style="color:var(--border);font-size:14px">&#8722;</span>';
+  tbody.innerHTML = perms.map(function(p,i) {
+    return '<tr style="border-bottom:1px solid var(--border)'+(i%2===0?';background:rgba(255,255,255,.01)':'')+'">'
+      +'<td style="padding:10px 12px;color:var(--text2)">'+p.label+'</td>'
+      +'<td style="text-align:center;padding:10px 12px">'+(p.admin?tick:cross)+'</td>'
+      +'<td style="text-align:center;padding:10px 12px">'+(p.pm?tick:cross)+'</td>'
+      +'<td style="text-align:center;padding:10px 12px">'+(p.eng?tick:cross)+'</td>'
+      +'<td style="text-align:center;padding:10px 12px">'+(p.sub?tick:cross)+'</td>'
+      +'<td style="text-align:center;padding:10px 12px">'+(p.wit?tick:cross)+'</td>'
+    +'</tr>';
+  }).join('');
+}
+
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// Init permissions tab on load
+renderUsers();
+renderPermissions();
+
+// Load logo if saved
+(function(){
+  var s = loadSettings();
+  if(s && s.logo) {
+    var prev = document.getElementById('logoPreview');
+    if(prev) prev.innerHTML = '<img src="'+s.logo+'" style="width:100%;height:100%;object-fit:contain;border-radius:8px">';
+  }
+  if(s && s['user-mobile']) { var el=document.getElementById('user-mobile'); if(el) el.value=s['user-mobile']; }
+  if(s && s['user-email']) { var el=document.getElementById('user-email'); if(el) el.value=s['user-email']; }
+  if(s && s['default-retention']) { var el=document.getElementById('default-retention'); if(el) el.value=s['default-retention']; }
+})();
+
+
+// -- CONTACTS --
+var contacts = [];
+var CONTACT_SK = 'hvacnexus_contacts';
+function loadContacts() {
+  try { var d=localStorage.getItem(CONTACT_SK); if(d) contacts=JSON.parse(d); } catch(e) { contacts=[]; }
+}
+function saveContacts() { localStorage.setItem(CONTACT_SK, JSON.stringify(contacts)); }
+
+var TYPE_COLORS = {
+  Subcontractor:'var(--accent)', Supplier:'var(--green)',
+  Consultant:'var(--purple)', Client:'var(--warn)', Authority:'var(--muted)'
+};
+
+function renderContacts() {
+  loadContacts();
+  var filter = (document.getElementById('contactTypeFilter')||{value:''}).value;
+  var list = document.getElementById('contactList'); if(!list) return;
+  var filtered = filter ? contacts.filter(function(c){return c.type===filter;}) : contacts;
+  if(!filtered.length) {
+    list.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">'+(contacts.length?'No contacts match filter':'No contacts yet - click + Add Contact to get started')+'</div>';
+    return;
+  }
+  list.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+    +'<thead><tr style="background:var(--surface2)">'
+    +'<th style="padding:9px 14px;text-align:left;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Company</th>'
+    +'<th style="padding:9px 14px;text-align:left;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Type</th>'
+    +'<th style="padding:9px 14px;text-align:left;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Contact Person</th>'
+    +'<th style="padding:9px 14px;text-align:left;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Phone</th>'
+    +'<th style="padding:9px 14px;text-align:left;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Email</th>'
+    +'<th style="padding:9px 14px;text-align:left;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Trade / Discipline</th>'
+    +'<th style="padding:9px 14px;border-bottom:1px solid var(--border);width:60px"></th>'
+    +'</tr></thead><tbody>'
+    + filtered.map(function(c,i) {
+      var tc = TYPE_COLORS[c.type]||'var(--muted)';
+      return '<tr style="border-bottom:1px solid var(--border)" id="crow-'+c.id+'">'
+        +'<td style="padding:10px 14px;font-weight:600;color:var(--text)">'+escH(c.company||'')+'</td>'
+        +'<td style="padding:10px 14px"><span style="font-family:DM Mono,monospace;font-size:10px;padding:2px 9px;border-radius:20px;background:var(--surface3);color:'+tc+'">'+escH(c.type||'')+'</span></td>'
+        +'<td style="padding:10px 14px;color:var(--text2)">'+escH(c.contact||'')+'</td>'
+        +'<td style="padding:10px 14px;font-family:DM Mono,monospace;font-size:11.5px;color:var(--text2)">'+escH(c.phone||'')+'</td>'
+        +'<td style="padding:10px 14px;font-size:12px;color:var(--accent)">'+escH(c.email||'')+'</td>'
+        +'<td style="padding:10px 14px;font-size:12px;color:var(--muted)">'+escH(c.trade||'')+'</td>'
+        +'<td style="padding:10px 14px;text-align:center">'
+          +'<button style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:13px;margin-right:6px" onclick="openEditContactModal(\'' + c.id + '\')" title="Edit">&#9998;</button>'
+          +'<button style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px" onclick="deleteContact(\'' + c.id + '\')" title="Delete">&times;</button>'
+        +'</td>'
+      +'</tr>';
+    }).join('')
+    +'</tbody></table>';
+}
+
+var _editContactId = null;
+function openAddContactModal() {
+  _editContactId = null;
+  showContactModal({});
+}
+function openEditContactModal(id) {
+  var c = contacts.find(function(x){return x.id===id;}); if(!c) return;
+  _editContactId = id;
+  showContactModal(c);
+}
+function showContactModal(c) {
+  var html = '<div style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:700;display:flex;align-items:center;justify-content:center" id="contactMo" onclick="if(event.target===this)closeContactModal()">'
+    +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:520px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">'
+      +'<div style="padding:18px 22px 14px;border-bottom:1px solid var(--border)">'
+        +'<div style="font-family:Syne,sans-serif;font-size:16px;font-weight:800">'+(_editContactId?'Edit Contact':'Add Contact')+'</div>'
+      +'</div>'
+      +'<div style="padding:18px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:12px">'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+          +'<div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Company Name *</label>'
+            +'<input class="field-input" id="c-company" value="'+escH(c.company||'')+'" placeholder="e.g. Austral Air" style="width:100%"/></div>'
+          +'<div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Type</label>'
+            +'<select class="field-input" id="c-type" style="width:100%">'
+              +['Subcontractor','Supplier','Consultant','Client','Authority'].map(function(t){return'<option'+(t===(c.type||'Subcontractor')?' selected':'')+'>'+t+'</option>';}).join('')
+            +'</select></div>'
+        +'</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+          +'<div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Contact Person</label>'
+            +'<input class="field-input" id="c-contact" value="'+escH(c.contact||'')+'" placeholder="e.g. John Smith" style="width:100%"/></div>'
+          +'<div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Trade / Discipline</label>'
+            +'<input class="field-input" id="c-trade" value="'+escH(c.trade||'')+'" placeholder="e.g. Mechanical, Electrical" style="width:100%"/></div>'
+        +'</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+          +'<div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Phone</label>'
+            +'<input class="field-input" id="c-phone" value="'+escH(c.phone||'')+'" placeholder="e.g. 02 9000 0000" style="width:100%"/></div>'
+          +'<div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Email</label>'
+            +'<input class="field-input" id="c-email" value="'+escH(c.email||'')+'" placeholder="e.g. john@austral.com.au" style="width:100%"/></div>'
+        +'</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+          +'<div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">ABN</label>'
+            +'<input class="field-input" id="c-abn" value="'+escH(c.abn||'')+'" placeholder="e.g. 12 345 678 901" style="width:100%"/></div>'
+          +'<div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Website</label>'
+            +'<input class="field-input" id="c-website" value="'+escH(c.website||'')+'" placeholder="e.g. www.austral.com.au" style="width:100%"/></div>'
+        +'</div>'
+        +'<div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Notes</label>'
+          +'<textarea class="field-input" id="c-notes" rows="2" placeholder="Any notes..." style="width:100%;resize:vertical">'+escH(c.notes||'')+'</textarea></div>'
+      +'</div>'
+      +'<div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">'
+        +'<button class="bg bsm btn" onclick="closeContactModal()">Cancel</button>'
+        +'<button class="bp bsm btn" onclick="saveContact()">'+(_editContactId?'Save Changes':'Add Contact')+'</button>'
+      +'</div>'
+    +'</div>'
+  +'</div>';
+  var div = document.createElement('div'); div.id='contactMoWrap'; div.innerHTML=html;
+  document.body.appendChild(div);
+  setTimeout(function(){document.getElementById('c-company').focus();},80);
+}
+function closeContactModal() {
+  var el=document.getElementById('contactMoWrap'); if(el) el.remove();
+}
+function saveContact() {
+  var company = (document.getElementById('c-company').value||'').trim();
+  if(!company){alert('Company Name is required.');return;}
+  var data = {
+    company:company,
+    type:document.getElementById('c-type').value,
+    contact:(document.getElementById('c-contact').value||'').trim(),
+    trade:(document.getElementById('c-trade').value||'').trim(),
+    phone:(document.getElementById('c-phone').value||'').trim(),
+    email:(document.getElementById('c-email').value||'').trim(),
+    abn:(document.getElementById('c-abn').value||'').trim(),
+    website:(document.getElementById('c-website').value||'').trim(),
+    notes:(document.getElementById('c-notes').value||'').trim(),
+  };
+  if(_editContactId) {
+    var c=contacts.find(function(x){return x.id===_editContactId;}); if(c) Object.assign(c,data);
+  } else {
+    data.id='ct'+Date.now();
+    contacts.push(data);
+  }
+  saveContacts(); closeContactModal(); renderContacts();
+}
+function deleteContact(id) {
+  var c=contacts.find(function(x){return x.id===id;}); if(!c) return;
+  if(!confirm('Delete "'+c.company+'"?')) return;
+  contacts=contacts.filter(function(x){return x.id!==id;}); saveContacts(); renderContacts();
+}
+
+// -- NOTIFICATIONS --
+var NOTIF_SK = 'hvacnexus_notifications';
+var NOTIF_DEFAULTS = [
+  {id:'n1', group:'Variations', label:'New variation created', email:true, inapp:true},
+  {id:'n2', group:'Variations', label:'Variation approved or rejected', email:true, inapp:true},
+  {id:'n3', group:'Variations', label:'Variation overdue for approval (7+ days)', email:true, inapp:true},
+  {id:'n4', group:'Drawings', label:'New drawings uploaded', email:false, inapp:true},
+  {id:'n5', group:'Drawings', label:'Drawing superseded', email:false, inapp:true},
+  {id:'n6', group:'ITPs', label:'ITP signed off by site team', email:true, inapp:true},
+  {id:'n7', group:'ITPs', label:'ITP action required', email:true, inapp:true},
+  {id:'n8', group:'Commissioning', label:'Equipment ready for commissioning', email:false, inapp:true},
+  {id:'n9', group:'Commissioning', label:'Commissioning item completed', email:false, inapp:true},
+  {id:'n10', group:'Commissioning', label:'Dependencies cleared', email:false, inapp:true},
+  {id:'n11', group:'Defects', label:'New defect raised', email:true, inapp:true},
+  {id:'n12', group:'Defects', label:'Defect closed', email:false, inapp:true},
+  {id:'n13', group:'RFI', label:'New RFI submitted', email:true, inapp:true},
+  {id:'n14', group:'RFI', label:'RFI response received', email:true, inapp:true},
+  {id:'n15', group:'RFI', label:'RFI overdue (no response in 7 days)', email:true, inapp:true},
+];
+var notifPrefs = {};
+function loadNotifs() {
+  try { var d=localStorage.getItem(NOTIF_SK); if(d) notifPrefs=JSON.parse(d); } catch(e) { notifPrefs={}; }
+  NOTIF_DEFAULTS.forEach(function(n){ if(!notifPrefs[n.id]) notifPrefs[n.id]={email:n.email,inapp:n.inapp}; });
+}
+function saveNotifs() { localStorage.setItem(NOTIF_SK, JSON.stringify(notifPrefs)); }
+function renderNotifications() {
+  loadNotifs();
+  var list=document.getElementById('notifList'); if(!list) return;
+  var groups={};
+  NOTIF_DEFAULTS.forEach(function(n){ if(!groups[n.group]) groups[n.group]=[]; groups[n.group].push(n); });
+  list.innerHTML='';
+  Object.keys(groups).forEach(function(grp){
+    var grpDiv=document.createElement('div'); grpDiv.style.marginBottom='20px';
+    var grpHdr=document.createElement('div');
+    grpHdr.style.cssText='font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)';
+    grpHdr.textContent=grp; grpDiv.appendChild(grpHdr);
+    groups[grp].forEach(function(n){
+      var pref=notifPrefs[n.id]||{email:n.email,inapp:n.inapp};
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04)';
+      var lbl=document.createElement('div'); lbl.style.cssText='flex:1;font-size:13px;color:var(--text2)'; lbl.textContent=n.label;
+      row.appendChild(lbl);
+      ['email','inapp'].forEach(function(type){
+        var lab=document.createElement('label'); lab.style.cssText='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--muted);white-space:nowrap';
+        var chk=document.createElement('input'); chk.type='checkbox'; chk.checked=!!pref[type]; chk.style.accentColor='var(--accent)';
+        (function(nid,t){chk.onchange=function(){toggleNotif(nid,t,this.checked);};})(n.id,type);
+        lab.appendChild(chk); lab.appendChild(document.createTextNode(type==='email'?' Email':' In-app'));
+        row.appendChild(lab);
+      });
+      grpDiv.appendChild(row);
+    });
+    list.appendChild(grpDiv);
+  });
+}
+function toggleNotif(id, type, val) {
+  if(!notifPrefs[id]) notifPrefs[id]={};
+  notifPrefs[id][type]=val; saveNotifs();
+}
+
+// Init new tabs on load
+loadContacts(); renderContacts();
+renderNotifications();
+
 </script>
 </body>
 </html>
