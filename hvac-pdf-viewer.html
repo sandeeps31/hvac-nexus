@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Drawing Viewer — HVAC NEXUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;
+  --border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.12);
+  --green:#00e5a0;--green-dim:rgba(0,229,160,.12);
+  --warn:#ffb830;--warn-dim:rgba(255,184,48,.12);
+  --danger:#ff4d6d;--danger-dim:rgba(255,77,109,.12);
+  --purple:#a78bfa;--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* TOPBAR */
+.topbar{height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:20}
+.drw-info{display:flex;flex-direction:column;flex:1;min-width:0}
+.drw-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;line-height:1.2}
+.drw-name{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2}
+.tb-sep{width:1px;height:28px;background:var(--border);flex-shrink:0}
+.tb-btn{height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:all .13s}
+.tb-btn:hover{color:var(--text);border-color:var(--text2)}
+.tb-btn.active{color:#080c12;background:var(--accent);border-color:var(--accent)}
+.tb-btn.add-itp{color:var(--accent);border-color:rgba(0,200,255,.35)}.tb-btn.add-itp:hover{background:var(--accent-dim)}
+.tb-btn.add-itp.placing{background:var(--accent);color:#080c12;animation:pulse .8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+.z-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .13s}
+.z-btn:hover{color:var(--accent);border-color:var(--accent)}
+
+/* FILTER BAR */
+.filter-bar{height:38px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:8px;flex-shrink:0;overflow-x:auto}
+.filter-bar::-webkit-scrollbar{height:0}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .13s;white-space:nowrap;user-select:none}
+.chip-all{background:var(--surface3);color:var(--text2);border-color:var(--border)}.chip-all.on{background:var(--surface);color:var(--text);border-color:var(--text2)}
+.chip-ns{background:transparent;color:var(--muted);border-color:var(--border)}.chip-ns.on{background:var(--surface3);color:var(--text2);border-color:var(--muted)}
+.chip-ip{background:transparent;color:var(--warn);border-color:rgba(255,184,48,.3)}.chip-ip.on{background:var(--warn-dim);border-color:var(--warn)}
+.chip-act{background:transparent;color:var(--danger);border-color:rgba(255,77,109,.3)}.chip-act.on{background:var(--danger-dim);border-color:var(--danger)}
+.chip-cl{background:transparent;color:var(--green);border-color:rgba(0,229,160,.3)}.chip-cl.on{background:var(--green-dim);border-color:var(--green)}
+.filter-sep{width:1px;height:18px;background:var(--border);flex-shrink:0;margin:0 4px}
+.layer-chip{background:transparent;color:var(--purple);border-color:rgba(167,139,250,.3)}.layer-chip.on{background:rgba(167,139,250,.1);border-color:var(--purple)}
+
+/* VIEWER */
+.viewer{flex:1;overflow:hidden;position:relative}
+.viewer.grab{cursor:grab}.viewer.grabbing{cursor:crosshair}
+#pdfStage{position:absolute;transform-origin:top left}
+#pdfCanvas{display:block}
+
+/* ITP PINS */
+.itp-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:30;transition:transform .1s}
+.itp-pin:hover{transform:translate(-50%,-50%) scale(1.2)}
+.pin-dot{width:22px;height:22px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 0 3px rgba(0,0,0,.3);transition:all .13s}
+.pin-dot.ns{background:#3d5a7a;border-color:#5a7a9a}
+.pin-dot.ip{background:#cc8800;border-color:var(--warn)}
+.pin-dot.act{background:#cc2244;border-color:var(--danger)}
+.pin-dot.cl{background:#00aa70;border-color:var(--green)}
+.pin-dot.placing-preview{background:var(--accent);border-color:#fff;animation:pulse .6s infinite}
+.pin-label{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:3px;background:rgba(8,12,18,.9);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);white-space:nowrap;pointer-events:none;display:none}
+.itp-pin:hover .pin-label{display:block}
+
+/* PLACE HINT */
+.place-hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,200,255,.15);border:1.5px solid var(--accent);color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;padding:8px 18px;border-radius:8px;z-index:100;display:none;pointer-events:none;backdrop-filter:blur(4px)}
+
+/* PIN MODAL */
+.mo{position:fixed;inset:0;background:rgba(4,8,16,.82);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.mo.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;width:360px;max-width:96vw;max-height:90vh}
+.modal-hdr{padding:16px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-hdr h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:800}
+.modal-body{overflow-y:auto;flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:7px;justify-content:flex-end;flex-shrink:0}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
+.mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
+.ms{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer}
+.ms:focus{border-color:var(--accent)}.ms option,.ms optgroup{background:var(--surface2)}
+.sugg-wrap{position:relative}
+.sugg-list{position:absolute;top:calc(100%+3px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border);border-radius:7px;max-height:160px;overflow-y:auto;display:none;box-shadow:0 8px 20px rgba(0,0,0,.5)}
+.sugg-item{padding:7px 11px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}.sugg-item:last-child{border-bottom:none}.sugg-item:hover{background:var(--surface3);color:var(--accent)}
+.mbtn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.mbp{background:var(--accent);color:#080c12}.mbp:hover{background:#33d4ff}
+.mbg{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}.mbg:hover{color:var(--text);border-color:var(--text2)}
+
+/* STATUS ROW in modal */
+.st-row{display:flex;gap:6px}
+.st-opt{flex:1;padding:6px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;text-align:center;transition:all .13s}
+.st-opt:hover{border-color:var(--text2);color:var(--text2)}
+.st-opt.sel-ns{border-color:var(--muted);background:var(--surface3);color:var(--text2)}
+.st-opt.sel-ip{border-color:var(--warn);background:var(--warn-dim);color:var(--warn)}
+.st-opt.sel-act{border-color:var(--danger);background:var(--danger-dim);color:var(--danger)}
+.st-opt.sel-cl{border-color:var(--green);background:var(--green-dim);color:var(--green)}
+
+/* LOADING */
+.loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--text2);font-size:13px;background:var(--bg);z-index:5}
+.spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-state,.no-pdf{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="drw-info">
+    <div class="drw-num" id="topNum">—</div>
+    <div class="drw-name" id="topName">Loading…</div>
+  </div>
+  <div class="tb-sep"></div>
+  <button class="tb-btn add-itp" id="addItpBtn" onclick="togglePlaceMode()">📍 Add ITP</button>
+  <div class="tb-sep"></div>
+  <button class="z-btn" onclick="zoom(1.25)" title="Zoom in">+</button>
+  <button class="z-btn" onclick="zoom(0.8)" title="Zoom out">−</button>
+  <button class="z-btn" onclick="fitToScreen()" title="Fit to screen">⊡</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="window.close()">✕ Close</button>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar" id="filterBar">
+  <span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0">Status</span>
+  <div class="chip chip-all on" id="chip-all" onclick="toggleStatusChip('all')">All</div>
+  <div class="chip chip-ns" id="chip-ns" onclick="toggleStatusChip('not-started')">● Not Started</div>
+  <div class="chip chip-ip" id="chip-ip" onclick="toggleStatusChip('in-progress')">● In Progress</div>
+  <div class="chip chip-act" id="chip-act" onclick="toggleStatusChip('action')">● Action Req.</div>
+  <div class="chip chip-cl" id="chip-cl" onclick="toggleStatusChip('closed')">● Closed</div>
+  <div class="filter-sep"></div>
+  <span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0">Layers</span>
+  <div id="layerChips" style="display:flex;gap:6px"></div>
+</div>
+
+<!-- VIEWER -->
+<div class="viewer grab" id="viewer">
+  <div id="pdfStage"><canvas id="pdfCanvas"></canvas></div>
+  <div id="pinLayer" style="position:absolute;inset:0;pointer-events:none;z-index:30"></div>
+  <div class="loading" id="loading"><div class="spin"></div><span>Loading drawing…</span></div>
+  <div class="error-state" id="errorState"><div style="font-size:36px">⚠️</div><div id="errorMsg">Could not load PDF</div></div>
+  <div class="no-pdf" id="noPdf"><div style="font-size:48px">📄</div><div>No PDF attached to this drawing</div><div style="font-size:11px">Upload a PDF in the Drawings module first</div></div>
+</div>
+
+<!-- PLACE HINT -->
+<div class="place-hint" id="placeHint">📍 Click on drawing to place ITP pin — Esc to cancel</div>
+
+<!-- PIN MODAL -->
+<div class="mo" id="pinMo" onclick="if(event.target===this)closePinMo()">
+  <div class="modal">
+    <div class="modal-hdr"><h3 id="pinMoTitle">New ITP Pin</h3></div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">ITP Type *</label>
+        <div class="sugg-wrap">
+          <input class="mi" id="pinItpType" placeholder="Select or type ITP type…" oninput="showTypeSugg()" autocomplete="off">
+          <div class="sugg-list" id="typeSugg"></div>
+        </div>
+      </div>
+      <div id="pinEquipField">
+        <label class="ml" id="pinEquipLabel">Equipment Tag</label>
+        <div class="sugg-wrap">
+          <input class="mi" id="pinEquipTag" placeholder="e.g. FCU-L02-001" oninput="showEquipSugg()" autocomplete="off">
+          <div class="sugg-list" id="equipSugg"></div>
+        </div>
+      </div>
+      <div>
+        <label class="ml">Ref No.</label>
+        <input class="mi" id="pinRef" placeholder="Auto-generated if left blank">
+      </div>
+      <div>
+        <label class="ml">Status</label>
+        <div class="st-row">
+          <div class="st-opt sel-ns" id="st-not-started" onclick="setStatus('not-started')">Not Started</div>
+          <div class="st-opt" id="st-in-progress" onclick="setStatus('in-progress')">In Progress</div>
+          <div class="st-opt" id="st-action" onclick="setStatus('action')">Action Req.</div>
+          <div class="st-opt" id="st-closed" onclick="setStatus('closed')">Closed</div>
+        </div>
+      </div>
+      <div>
+        <label class="ml">Notes</label>
+        <textarea class="mi" id="pinNotes" rows="2" placeholder="Optional…" style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbg mbtn" onclick="closePinMo()">Cancel</button>
+      <button class="mbg mbtn" id="deletePinBtn" onclick="deletePin()" style="color:var(--danger);border-color:rgba(255,77,109,.3);display:none">Delete Pin</button>
+      <button class="mbp mbtn" onclick="savePin()">Save Pin</button>
+    </div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+// ── DATA KEYS ──
+var params=new URLSearchParams(window.location.search);
+var drawingId=params.get('drawingId')||'';
+var itpTypeFilter=params.get('itpType')||''; // optional pre-filter
+var proj=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');
+var pKey=proj.num||'GCT001';
+var DKD='hvacnexus_drawings_'+pKey;
+var DKS='hvacnexus_itp_structure_'+pKey;
+var DKR='hvacnexus_itp_responses_'+pKey;
+var DKE='hvacnexus_equip_'+pKey;
+var CUK='hvacnexus_current_user';
+
+// ITP MASTER LIST (same as itp register)
+var ITP_MASTER=['AC Single Head - Split','AC Multi Head - Split','AC Multi Head CU - Split','AHU CHW and HHW','Attenuator','Boiler','CRAC Unit','Chiller - Water Cooled','Chiller - Air Cooled','Electric Duct Heater','Expansion Tank','FCU - Water Cooled','Fans','Humidifier','Hot Water Heater','MSSB/DCP','BMS Panel','Plate Heat Exchanger','Pump','VAV','VRF - BP Box','VRF - Indoor Unit','VRF - Outdoor Unit','Auto Refill Unit','Chemical Dosing Pot - Cooling Tower','Side Stream Filtration - Cooling Tower','PAC Unit - Air Cooled','PAC Unit - Water Cooled','Chilled Beams','Energy Recovery Ventilator','Security Grilles','DAHU','Pressure Relief Damper','VSD','Duct Installation Riser','Pipework Pressure Test','Refrigeration Pressure Test & Vacuum','Seismic Install','Flushing','Duct Installation','Duct Pressure Testing','Refrigeration Pipework Install','Mechanical Services Seals','Water Pipework Installation','Fire Seals','Fire Dampers','Penetration ITP'];
+var EQUIP_TYPES=['AC Single Head - Split','AC Multi Head - Split','AC Multi Head CU - Split','AHU CHW and HHW','Attenuator','Boiler','CRAC Unit','Chiller - Water Cooled','Chiller - Air Cooled','Electric Duct Heater','Expansion Tank','FCU - Water Cooled','Fans','Humidifier','Hot Water Heater','MSSB/DCP','BMS Panel','Plate Heat Exchanger','Pump','VAV','VRF - BP Box','VRF - Indoor Unit','VRF - Outdoor Unit','Auto Refill Unit','Chemical Dosing Pot - Cooling Tower','Side Stream Filtration - Cooling Tower','PAC Unit - Air Cooled','PAC Unit - Water Cooled','Chilled Beams','Energy Recovery Ventilator','Security Grilles','DAHU','Pressure Relief Damper','VSD'];
+
+// STATE
+var PDF_BASE_RES=3.0,PDF_FAST_RES=1.5;
+var _scale=1,_offsetX=0,_offsetY=0;
+var _dragging=false,_lastX=0,_lastY=0;
+var _canvasW=0,_canvasH=0;
+var _renderTask=null;
+var _placing=false;
+var _pendingX=0,_pendingY=0; // canvas % position for new pin
+var _editPinId=null;
+var _pinStatus='not-started';
+
+// FILTERS
+var _activeStatuses=new Set(); // empty = all
+var _activeLayers=new Set();   // empty = all
+
+// DATA
+var drawings=[];
+var structure={buildings:[]};
+var responses={};
+var equipData=null;
+var curDrawing=null;
+
+function loadData(){
+  try{drawings=JSON.parse(localStorage.getItem(DKD)||'[]');}catch(e){}
+  try{structure=JSON.parse(localStorage.getItem(DKS)||'{"buildings":[]}')||{buildings:[]};}catch(e){}
+  try{responses=JSON.parse(localStorage.getItem(DKR)||'{}');}catch(e){}
+  try{equipData=JSON.parse(localStorage.getItem(DKE)||'null');}catch(e){}
+  curDrawing=drawings.find(function(d){return d.id===drawingId;})||null;
+}
+function saveDrawings(){try{localStorage.setItem(DKD,JSON.stringify(drawings));}catch(e){}}
+function saveResponses(){try{localStorage.setItem(DKR,JSON.stringify(responses));}catch(e){}}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function nid(){return'pin_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);}
+
+// ── INIT ──
+loadData();
+(function(){
+  if(!drawingId){showError('No drawing ID provided');return;}
+  if(!curDrawing){showError('Drawing not found');return;}
+  document.title=(curDrawing.num||'Drawing')+' — HVAC NEXUS';
+  document.getElementById('topNum').textContent=curDrawing.num||'—';
+  document.getElementById('topName').textContent=curDrawing.name||'Untitled Drawing';
+  buildLayerChips();
+  if(curDrawing.pdfUrl&&!curDrawing.pdfData){loadFromUrl(curDrawing.pdfUrl);}
+  else if(curDrawing.pdfData){loadFromData(curDrawing.pdfData);}
+  else{showNoPdf();}
+})();
+
+// ── LAYER CHIPS ──
+function getLinkedItpTypes(){
+  // Get all ITP types linked to this drawing from structure
+  var types=new Set();
+  (structure.buildings||[]).forEach(function(b){
+    (b.locations||[]).forEach(function(l){
+      (l.itpTypes||[]).forEach(function(t){
+        var linked=(t.drawings||[]).find(function(d){return d.id===drawingId;});
+        if(linked)types.add(t.name);
+      });
+    });
+  });
+  // Also add any types already pinned on this drawing
+  (curDrawing&&curDrawing.pins||[]).forEach(function(p){if(p.itpTypeLabel)types.add(p.itpTypeLabel);});
+  return[...types].sort();
+}
+function buildLayerChips(){
+  var types=getLinkedItpTypes();
+  var container=document.getElementById('layerChips');
+  if(!types.length){container.innerHTML='<span style="font-size:11px;color:var(--muted)">No ITP types linked</span>';return;}
+  container.innerHTML=types.map(function(t){
+    return'<div class="chip layer-chip on" id="layer-'+escH(t.replace(/[^a-zA-Z0-9]/g,'_'))+'" onclick="toggleLayer(\''+escH(t)+'\')" data-type="'+escH(t)+'">'+escH(t)+'</div>';
+  }).join('');
+}
+function toggleLayer(type){
+  if(_activeLayers.has(type)){_activeLayers.delete(type);}else{_activeLayers.add(type);}
+  // Update chip UI
+  var id='layer-'+type.replace(/[^a-zA-Z0-9]/g,'_');
+  var el=document.getElementById(id);
+  if(el)el.classList.toggle('on',!_activeLayers.has(type));
+  // If nothing deselected, show all
+  renderPins();
+}
+function toggleStatusChip(status){
+  if(status==='all'){
+    _activeStatuses.clear();
+    ['all','ns','ip','act','cl'].forEach(function(s){document.getElementById('chip-'+s).classList.remove('on');});
+    document.getElementById('chip-all').classList.add('on');
+  } else {
+    document.getElementById('chip-all').classList.remove('on');
+    var map={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
+    var chipId='chip-'+map[status];
+    if(_activeStatuses.has(status)){_activeStatuses.delete(status);document.getElementById(chipId).classList.remove('on');}
+    else{_activeStatuses.add(status);document.getElementById(chipId).classList.add('on');}
+    if(!_activeStatuses.size)document.getElementById('chip-all').classList.add('on');
+  }
+  renderPins();
+}
+
+// ── PIN STATUS ──
+function getPinStatus(pin){
+  var r=responses[pin.id];
+  return(r&&r.status)||pin.itpStatus||'not-started';
+}
+function pinVisible(pin){
+  var st=getPinStatus(pin);
+  var type=pin.itpTypeLabel||'';
+  if(_activeStatuses.size&&!_activeStatuses.has(st))return false;
+  if(_activeLayers.size&&!_activeLayers.has(type))return false; // hidden = deselected
+  return pin.type==='itp';
+}
+
+// ── RENDER PINS ──
+var ST_COLOR={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
+function renderPins(){
+  if(!curDrawing||!_canvasW)return;
+  var layer=document.getElementById('pinLayer');
+  layer.innerHTML='';
+  layer.style.pointerEvents='none';
+  var stage=document.getElementById('pdfStage');
+  var sr=stage.getBoundingClientRect();
+  var vr=document.getElementById('viewer').getBoundingClientRect();
+  (curDrawing.pins||[]).filter(function(p){return p.type==='itp';}).forEach(function(pin){
+    if(!pinVisible(pin))return;
+    var st=getPinStatus(pin);
+    var el=document.createElement('div');
+    el.className='itp-pin';
+    el.style.left=(sr.left-vr.left+pin.x/100*sr.width)+'px';
+    el.style.top=(sr.top-vr.top+pin.y/100*sr.height)+'px';
+    el.style.pointerEvents='all';
+    var label=pin.equip||pin.ref||pin.itpTypeLabel||'ITP';
+    el.innerHTML='<div class="pin-dot '+(ST_COLOR[st]||'ns')+'">'+escH((label||'').slice(0,2).toUpperCase())+'</div>'
+      +'<div class="pin-label">'+escH(label)+(pin.itpTypeLabel?' · '+escH(pin.itpTypeLabel):'')+'</div>';
+    el.addEventListener('click',function(e){e.stopPropagation();openEditPin(pin.id);});
+    layer.appendChild(el);
+  });
+}
+
+// ── PLACE MODE ──
+function togglePlaceMode(){
+  _placing=!_placing;
+  var btn=document.getElementById('addItpBtn');
+  var hint=document.getElementById('placeHint');
+  var viewer=document.getElementById('viewer');
+  btn.classList.toggle('placing',_placing);
+  btn.textContent=_placing?'✕ Cancel':'📍 Add ITP';
+  hint.style.display=_placing?'block':'none';
+  viewer.classList.toggle('grabbing',_placing);
+  viewer.style.cursor=_placing?'crosshair':'grab';
+}
+function cancelPlaceMode(){
+  if(!_placing)return;
+  _placing=false;
+  var btn=document.getElementById('addItpBtn');
+  btn.classList.remove('placing');
+  btn.textContent='📍 Add ITP';
+  document.getElementById('placeHint').style.display='none';
+  document.getElementById('viewer').style.cursor='grab';
+}
+
+// ── PIN MODAL ──
+function openNewPin(xPct,yPct){
+  _editPinId=null;_pendingX=xPct;_pendingY=yPct;_pinStatus='not-started';
+  document.getElementById('pinMoTitle').textContent='New ITP Pin';
+  document.getElementById('pinItpType').value='';
+  document.getElementById('pinEquipTag').value='';
+  document.getElementById('pinRef').value='';
+  document.getElementById('pinNotes').value='';
+  document.getElementById('deletePinBtn').style.display='none';
+  document.getElementById('pinEquipField').style.display='';
+  setStatus('not-started');
+  renderTypeSugg('');
+  document.getElementById('pinMo').classList.add('open');
+  setTimeout(function(){document.getElementById('pinItpType').focus();},80);
+}
+function openEditPin(pinId){
+  var pin=(curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===pinId;});if(!pin)return;
+  _editPinId=pinId;_pinStatus=getPinStatus(pin);
+  document.getElementById('pinMoTitle').textContent='Edit ITP Pin';
+  document.getElementById('pinItpType').value=pin.itpTypeLabel||'';
+  document.getElementById('pinEquipTag').value=pin.equip||'';
+  document.getElementById('pinRef').value=pin.ref||'';
+  document.getElementById('pinNotes').value=pin.notes||'';
+  document.getElementById('deletePinBtn').style.display='';
+  onPinTypeInput();
+  setStatus(_pinStatus);
+  document.getElementById('pinMo').classList.add('open');
+}
+function closePinMo(){document.getElementById('pinMo').classList.remove('open');_editPinId=null;}
+
+function setStatus(st){
+  _pinStatus=st;
+  ['not-started','in-progress','action','closed'].forEach(function(s){
+    var el=document.getElementById('st-'+s);
+    var map={'not-started':'sel-ns','in-progress':'sel-ip','action':'sel-act','closed':'sel-cl'};
+    el.className='st-opt'+(s===st?' '+map[s]:'');
+  });
+}
+
+function savePin(){
+  var type=document.getElementById('pinItpType').value.trim();
+  if(!type){alert('Please enter an ITP type');return;}
+  var equip=document.getElementById('pinEquipTag').value.trim();
+  var ref=document.getElementById('pinRef').value.trim();
+  var notes=document.getElementById('pinNotes').value.trim();
+  if(!ref){
+    // Auto-generate ref
+    var existing=(curDrawing.pins||[]).filter(function(p){return p.itpTypeLabel===type;});
+    var seq=existing.length+((_editPinId&&existing.find(function(p){return p.id===_editPinId;}))?0:1);
+    var prefix=type.split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,3);
+    ref=prefix+'-'+String(seq).padStart(3,'0');
+  }
+  if(_editPinId){
+    var pin=(curDrawing.pins||[]).find(function(p){return p.id===_editPinId;});
+    if(pin){pin.itpTypeLabel=type;pin.equip=equip;pin.ref=ref;pin.notes=notes;pin.itpStatus=_pinStatus;}
+    // Update response status
+    if(!responses[_editPinId])responses[_editPinId]={rows:{},signoffs:{}};
+    responses[_editPinId].status=_pinStatus;
+    saveResponses();
+  } else {
+    var pinId=nid();
+    if(!curDrawing.pins)curDrawing.pins=[];
+    curDrawing.pins.push({id:pinId,type:'itp',itpTypeLabel:type,equip:equip,ref:ref,notes:notes,itpStatus:_pinStatus,x:_pendingX,y:_pendingY});
+    responses[pinId]={status:_pinStatus,rows:{},signoffs:{}};
+    saveResponses();
+    // Update layer chips
+    buildLayerChips();
+  }
+  saveDrawings();
+  closePinMo();
+  renderPins();
+  toast('Pin saved ✓');
+}
+
+function deletePin(){
+  if(!_editPinId)return;
+  if(!confirm('Delete this ITP pin?'))return;
+  curDrawing.pins=(curDrawing.pins||[]).filter(function(p){return p.id!==_editPinId;});
+  delete responses[_editPinId];
+  saveDrawings();saveResponses();
+  closePinMo();renderPins();buildLayerChips();
+  toast('Pin deleted');
+}
+
+// ── TYPE SUGGESTIONS ──
+function showTypeSugg(){
+  var v=document.getElementById('pinItpType').value;
+  renderTypeSugg(v);
+  onPinTypeInput();
+}
+function renderTypeSugg(v){
+  var items=v?ITP_MASTER.filter(function(x){return x.toLowerCase().includes(v.toLowerCase());}):ITP_MASTER.slice(0,8);
+  // Also add linked types at top
+  var linked=getLinkedItpTypes();
+  if(linked.length){items=[...new Set([...linked.filter(function(t){return!v||t.toLowerCase().includes(v.toLowerCase());}), ...items])];}
+  var list=document.getElementById('typeSugg');
+  if(!items.length){list.style.display='none';return;}
+  list.innerHTML=items.slice(0,10).map(function(x){
+    var isLinked=linked.includes(x);
+    return'<div class="sugg-item" onmousedown="pickType(\''+escH(x)+'\')">'+escH(x)+(isLinked?'<span style="float:right;font-family:DM Mono,monospace;font-size:9px;color:var(--accent)">linked</span>':'')+'</div>';
+  }).join('');
+  list.style.display='';
+}
+function pickType(t){document.getElementById('pinItpType').value=t;document.getElementById('typeSugg').style.display='none';onPinTypeInput();}
+function onPinTypeInput(){
+  var t=document.getElementById('pinItpType').value;
+  var isEquip=EQUIP_TYPES.includes(t);
+  document.getElementById('pinEquipField').style.display=isEquip?'':'none';
+  if(t==='Penetration ITP'){document.getElementById('pinEquipLabel').textContent='Penetration ID *';document.getElementById('pinEquipField').style.display='';}
+  else{document.getElementById('pinEquipLabel').textContent='Equipment Tag';}
+}
+
+// ── EQUIP SUGGESTIONS ──
+function showEquipSugg(){
+  var v=document.getElementById('pinEquipTag').value.trim().toLowerCase();
+  var list=document.getElementById('equipSugg');
+  if(!v||!equipData||!equipData.tabs){list.style.display='none';return;}
+  var matches=[];
+  equipData.tabs.forEach(function(tab){(tab.rows||[]).forEach(function(r){var tag=(r.tag||r.equipId||'');if(tag.toLowerCase().includes(v))matches.push(r);});});
+  if(!matches.length){list.style.display='none';return;}
+  list.innerHTML=matches.slice(0,8).map(function(r){var t=escH(r.tag||r.equipId||''),n=escH(r.description||r.name||'');return'<div class="sugg-item" onmousedown="document.getElementById(\'pinEquipTag\').value=\''+t+'\';document.getElementById(\'equipSugg\').style.display=\'none\'"><span style="font-family:DM Mono,monospace;color:var(--accent)">'+t+'</span>'+(n?'<span style="color:var(--muted);margin-left:8px;font-size:11px">'+n+'</span>':'')+'</div>';}).join('');
+  list.style.display='';
+}
+
+// ── PDF LOAD ──
+function loadFromUrl(url){pdfjsLib.getDocument(url).promise.then(renderPdf).catch(function(e){showError('Could not load PDF: '+e.message);});}
+function loadFromData(dataUrl){
+  try{
+    var b64=dataUrl.split(',')[1];var bin=atob(b64);var arr=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+    pdfjsLib.getDocument({data:arr}).promise.then(renderPdf).catch(function(e){showError('PDF render error: '+e.message);});
+  }catch(e){showError('Invalid PDF data');}
+}
+function renderPdf(pdf){
+  pdf.getPage(1).then(function(page){
+    var vpFast=page.getViewport({scale:PDF_FAST_RES});
+    var fast=document.createElement('canvas');fast.width=vpFast.width;fast.height=vpFast.height;
+    page.render({canvasContext:fast.getContext('2d'),viewport:vpFast}).promise.then(function(){
+      var canvas=document.getElementById('pdfCanvas');
+      canvas.width=fast.width;canvas.height=fast.height;
+      canvas.getContext('2d').drawImage(fast,0,0);
+      _canvasW=fast.width;_canvasH=fast.height;
+      document.getElementById('loading').style.display='none';
+      fitToScreen();
+      renderPins();
+      var vpHi=page.getViewport({scale:PDF_BASE_RES});
+      var hi=document.createElement('canvas');hi.width=vpHi.width;hi.height=vpHi.height;
+      if(_renderTask){try{_renderTask.cancel();}catch(e){}}
+      _renderTask=page.render({canvasContext:hi.getContext('2d'),viewport:vpHi});
+      _renderTask.promise.then(function(){
+        canvas.width=vpHi.width;canvas.height=vpHi.height;
+        canvas.getContext('2d').drawImage(hi,0,0);
+        _canvasW=vpHi.width;_canvasH=vpHi.height;
+        applyTransform();renderPins();
+      }).catch(function(){});
+    });
+  });
+}
+
+// ── TRANSFORM ──
+function applyTransform(){
+  document.getElementById('pdfStage').style.transform='translate('+_offsetX+'px,'+_offsetY+'px) scale('+_scale+')';
+  renderPins();
+}
+function fitToScreen(){
+  var v=document.getElementById('viewer');
+  if(!_canvasW||!_canvasH)return;
+  var sx=v.clientWidth/_canvasW,sy=v.clientHeight/_canvasH;
+  _scale=Math.min(sx,sy)*0.96;
+  _offsetX=(v.clientWidth-_canvasW*_scale)/2;
+  _offsetY=(v.clientHeight-_canvasH*_scale)/2;
+  applyTransform();
+}
+function zoom(f){
+  var v=document.getElementById('viewer');
+  var cx=v.clientWidth/2,cy=v.clientHeight/2;
+  _offsetX=cx-(cx-_offsetX)*f;_offsetY=cy-(cy-_offsetY)*f;_scale*=f;
+  applyTransform();
+}
+
+// ── VIEWER INTERACTIONS ──
+var viewer=document.getElementById('viewer');
+viewer.addEventListener('mousedown',function(e){
+  if(_placing)return;
+  _dragging=true;_lastX=e.clientX;_lastY=e.clientY;viewer.classList.add('grabbing');viewer.style.cursor='grabbing';
+});
+viewer.addEventListener('mousemove',function(e){
+  if(!_dragging)return;
+  _offsetX+=e.clientX-_lastX;_offsetY+=e.clientY-_lastY;_lastX=e.clientX;_lastY=e.clientY;applyTransform();
+});
+viewer.addEventListener('mouseup',function(){if(_dragging){_dragging=false;viewer.classList.remove('grabbing');viewer.style.cursor=_placing?'crosshair':'grab';}});
+viewer.addEventListener('mouseleave',function(){if(_dragging){_dragging=false;viewer.classList.remove('grabbing');}});
+viewer.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var f=e.deltaY<0?1.1:0.9;
+  var r=viewer.getBoundingClientRect();
+  var cx=e.clientX-r.left,cy=e.clientY-r.top;
+  _offsetX=cx-(cx-_offsetX)*f;_offsetY=cy-(cy-_offsetY)*f;_scale*=f;
+  applyTransform();
+},{passive:false});
+
+viewer.addEventListener('click',function(e){
+  if(!_placing)return;
+  // Convert click to canvas-relative percentage
+  var stage=document.getElementById('pdfStage');
+  var sr=stage.getBoundingClientRect();
+  var xPct=((e.clientX-sr.left)/sr.width)*100;
+  var yPct=((e.clientY-sr.top)/sr.height)*100;
+  xPct=Math.max(0,Math.min(100,xPct));
+  yPct=Math.max(0,Math.min(100,yPct));
+  cancelPlaceMode();
+  openNewPin(xPct,yPct);
+});
+
+// Touch
+var _touches={};
+viewer.addEventListener('touchstart',function(e){e.preventDefault();Array.from(e.changedTouches).forEach(function(t){_touches[t.identifier]={x:t.clientX,y:t.clientY};});},{passive:false});
+viewer.addEventListener('touchmove',function(e){e.preventDefault();
+  var tArr=Array.from(e.touches);
+  if(tArr.length===1&&!_placing){
+    var t=tArr[0],prev=_touches[t.identifier];
+    if(prev){_offsetX+=t.clientX-prev.x;_offsetY+=t.clientY-prev.y;applyTransform();}
+    _touches[t.identifier]={x:t.clientX,y:t.clientY};
+  } else if(tArr.length===2){
+    var t1=tArr[0],t2=tArr[1],p1=_touches[t1.identifier],p2=_touches[t2.identifier];
+    if(p1&&p2){
+      var od=Math.hypot(p1.x-p2.x,p1.y-p2.y),nd=Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
+      var f=nd/od;var cx=(t1.clientX+t2.clientX)/2,cy=(t1.clientY+t2.clientY)/2;
+      var r=viewer.getBoundingClientRect();cx-=r.left;cy-=r.top;
+      _offsetX=cx-(cx-_offsetX)*f;_offsetY=cy-(cy-_offsetY)*f;_scale*=f;applyTransform();
+    }
+    _touches[t1.identifier]={x:t1.clientX,y:t1.clientY};
+    _touches[t2.identifier]={x:t2.clientX,y:t2.clientY};
+  }
+},{passive:false});
+viewer.addEventListener('touchend',function(e){
+  if(_placing&&e.changedTouches.length===1){
+    var t=e.changedTouches[0];
+    var stage=document.getElementById('pdfStage');var sr=stage.getBoundingClientRect();
+    var xPct=((t.clientX-sr.left)/sr.width)*100,yPct=((t.clientY-sr.top)/sr.height)*100;
+    cancelPlaceMode();openNewPin(Math.max(0,Math.min(100,xPct)),Math.max(0,Math.min(100,yPct)));
+  }
+  Array.from(e.changedTouches).forEach(function(t){delete _touches[t.identifier];});
+});
+
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){cancelPlaceMode();closePinMo();}});
+
+document.addEventListener('click',function(e){
+  ['typeSugg','equipSugg'].forEach(function(id){var el=document.getElementById(id);if(el&&!e.target.closest('#'+id))el.style.display='none';});
+});
+
+window.addEventListener('resize',function(){fitToScreen();});
+
+function showError(msg){document.getElementById('loading').style.display='none';var el=document.getElementById('errorState');el.style.display='flex';el.querySelector('#errorMsg').textContent=msg;}
+function showNoPdf(){document.getElementById('loading').style.display='none';document.getElementById('noPdf').style.display='flex';}
+
+function toast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:9px 18px;border-radius:8px;z-index:9999;white-space:nowrap;pointer-events:none';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .4s';setTimeout(function(){t.remove();},400);},2200);
+}
+</script>
+</body>
+</html>

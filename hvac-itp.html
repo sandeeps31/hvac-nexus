@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ITP Register — HVAC NEXUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;--border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.10);--green:#00e5a0;--green-dim:rgba(0,229,160,.10);--warn:#ffb830;--warn-dim:rgba(255,184,48,.10);--danger:#ff4d6d;--danger-dim:rgba(255,77,109,.10);--purple:#a78bfa;--purple-dim:rgba(167,139,250,.10);--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a;--radius:10px;--sb:230px;--sb-sm:52px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;height:100vh;overflow:hidden;display:flex}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sb{width:var(--sb);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s;overflow:hidden}
+.sb.sm{width:var(--sb-sm)}
+.sb-top{padding:14px 14px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px}
+.sb-icon{font-size:20px}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:12px 16px 4px;white-space:nowrap}
+.sb-item{display:flex;align-items:center;gap:9px;padding:7px 16px;color:var(--text2);cursor:pointer;border-left:2px solid transparent;transition:all .13s;white-space:nowrap;text-decoration:none}
+.sb-item:hover{background:var(--surface2);color:var(--text)}
+.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:14px;flex-shrink:0;width:18px;text-align:center}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-lbl,.sb.sm .sb-item-label{display:none}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:14px;flex-shrink:0;background:var(--surface)}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px;flex:1}
+.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--text2)}
+.bsm{padding:5px 12px;font-size:12px}
+
+/* STATS */
+.stats-row{display:flex;gap:10px;padding:12px 22px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.stat-num{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;line-height:1}
+.stat-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:12px}
+
+/* EMPTY STATE */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:14px;color:var(--muted);padding:60px}
+.empty-icon{font-size:48px}
+.empty-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text2)}
+.empty-sub{font-size:13px;text-align:center;max-width:380px;line-height:1.6}
+
+/* BUILDING BLOCK */
+.bld-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.bld-hdr{display:flex;align-items:center;gap:12px;padding:13px 18px;background:var(--surface2);cursor:pointer;user-select:none;transition:background .13s}
+.bld-hdr:hover{background:var(--surface3)}
+.bld-chev{font-size:12px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.bld-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);flex:1}
+.bld-body{display:flex;flex-direction:column}
+.bld-block.collapsed .bld-chev{transform:rotate(-90deg)}
+.bld-block.collapsed .bld-body{display:none}
+.bld-actions{display:flex;gap:6px;flex-shrink:0}
+
+/* LOCATION BLOCK */
+.loc-wrap{border-top:1px solid var(--border)}
+.loc-hdr{display:flex;align-items:center;gap:10px;padding:9px 18px 9px 28px;cursor:pointer;user-select:none;transition:background .13s}
+.loc-hdr:hover{background:rgba(255,255,255,.02)}
+.loc-chev{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.loc-name{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text2);flex:1}
+.loc-body{padding:0 18px 10px 44px;display:flex;flex-direction:column;gap:8px}
+.loc-wrap.collapsed .loc-chev{transform:rotate(-90deg)}
+.loc-wrap.collapsed .loc-body{display:none}
+
+/* ITP TYPE CARD */
+.itype-card{background:var(--surface2);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.itype-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none;transition:background .13s}
+.itype-hdr:hover{background:var(--surface3)}
+.itype-chev{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.itype-name{font-size:13px;font-weight:600;color:var(--text);flex:1}
+.itype-body{border-top:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.itype-card.collapsed .itype-chev{transform:rotate(-90deg)}
+.itype-card.collapsed .itype-body{display:none}
+
+/* STATUS PILLS on itp type */
+.status-pills{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.spill{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:10px;white-space:nowrap}
+.spill-total{background:var(--surface3);color:var(--text2);border:1px solid var(--border)}
+.spill-ns{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.spill-ip{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.25)}
+.spill-act{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.25)}
+.spill-cl{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.25)}
+
+/* DRAWING ROW */
+.drw-row{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:9px 12px}
+.drw-num{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:700;flex-shrink:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(0,200,255,.3)}
+.drw-num:hover{text-decoration-color:var(--accent)}
+.drw-name-input{flex:1;background:transparent;border:none;border-bottom:1px solid transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;padding:1px 4px;transition:border-color .15s;min-width:0}
+.drw-name-input:hover{border-bottom-color:var(--border)}
+.drw-name-input:focus{border-bottom-color:var(--accent);color:var(--text)}
+.no-drawings{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;border:1.5px dashed var(--border);border-radius:8px;color:var(--muted);font-size:12px}
+
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(4,8,16,.85);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.mo.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;max-width:96vw;max-height:92vh}
+.modal-hdr{padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-body{overflow-y:auto;flex:1;padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+.modal-footer{padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color .15s}
+.mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
+.ms{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer}
+.ms:focus{border-color:var(--accent)}.ms option,.ms optgroup{background:var(--surface2)}
+.sugg-wrap{position:relative}
+.sugg-list{position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border);border-radius:7px;max-height:180px;overflow-y:auto;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.sugg-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
+.sugg-item:last-child{border-bottom:none}
+.sugg-item:hover{background:var(--surface3);color:var(--accent)}
+
+/* PICKER */
+.picker-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.picker-tbl th{position:sticky;top:0;padding:8px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);background:var(--surface2)}
+.picker-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.picker-tbl tr:last-child td{border-bottom:none}
+.picker-tbl tr:hover td{background:rgba(255,255,255,.02)}
+.add-btn{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.add-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.add-btn.on{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.add-btn.on:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-dim)}
+
+/* CHIPS */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);border-radius:6px;padding:3px 8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--accent)}
+.chip-x{cursor:pointer;color:var(--muted);font-size:11px;line-height:1}.chip-x:hover{color:var(--danger)}
+
+/* ICON BTN */
+.icon-btn{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;transition:all .13s;display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;white-space:nowrap}
+.icon-btn:hover{color:var(--text);border-color:var(--text2)}
+.icon-btn.accent{color:var(--accent);border-color:rgba(0,200,255,.3)}.icon-btn.accent:hover{background:var(--accent-dim)}
+.icon-btn.danger{color:var(--danger);border-color:rgba(255,77,109,.3)}.icon-btn.danger:hover{background:var(--danger-dim)}
+/* Edit mode — hide all structure edit buttons when not in edit mode */
+body:not(.edit-mode) .struct-edit-btn{display:none!important}
+body.edit-mode #editStructBtn{display:none!important}
+body:not(.edit-mode) #saveStructBtn{display:none!important}
+body.edit-mode #saveStructBtn{display:inline-flex!important}
+body:not(.edit-mode) .no-drawings .icon-btn{display:none!important}
+/* In edit mode, highlight the active state */
+body.edit-mode .topbar{border-bottom-color:rgba(0,200,255,.4)}
+body.edit-mode #saveStructBtn{background:var(--green);color:#080c12}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sb" id="sidebar">
+  <div class="sb-top">
+    <div class="sb-brand"><span class="sb-icon">🌀</span><span class="sb-name">HVAC NEXUS</span></div>
+    <button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">«</button>
+  </div>
+  <div class="sb-proj-block">
+    <div class="sb-proj-lbl">Current Project</div>
+    <div class="sb-proj-name" id="sb-proj-name">—</div>
+    <div class="sb-proj-num" id="sb-proj-num">—</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-lbl">Quality</div>
+    <a class="sb-item active" href="hvac-itp.html"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Register</span></a>
+    <a class="sb-item" href="hvac-itp-templates.html"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></a>
+    <div class="sb-lbl">Technical</div>
+    <a class="sb-item" href="hvac-drawings.html"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></a>
+  </nav>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl" onclick="goProject()">My Projects</span><span class="bcs">›</span>
+      <span class="bcl" id="bc-proj">Project</span><span class="bcs">›</span>
+      <span class="bcc">ITP Register</span>
+    </div>
+    <div id="userIndicator" style="display:flex;align-items:center;gap:6px;flex-shrink:0;cursor:pointer" onclick="window.location.href='hvac-settings.html'" title="Manage users in Settings"></div>
+    <button class="bp bsm btn struct-edit-btn" id="addAreaBtn" onclick="openAddArea(null)">＋ Add Area</button>
+    <button class="bg bsm btn" id="editStructBtn" onclick="toggleEditMode()" style="gap:6px">✎ Edit Structure</button>
+    <button class="bp bsm btn" id="saveStructBtn" onclick="saveStructureMode()" style="display:none;gap:6px">✓ Save Changes</button>
+  </div>
+
+  <div class="stats-row" id="statsRow"></div>
+
+  <div class="content" id="content"></div>
+</div>
+
+<!-- ADD / EDIT AREA MODAL (Building + Location in one) -->
+<div class="mo" id="areaMo" onclick="if(event.target===this)closeAreaMo()">
+  <div class="modal" style="width:500px">
+    <div class="modal-hdr">
+      <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800" id="areaMoTitle">Add Area</h3>
+      <p style="font-size:12px;color:var(--text2);margin-top:3px">At least one of Building or Location is required</p>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">Building <span style="color:var(--muted)">(optional)</span></label>
+        <div class="sugg-wrap">
+          <input class="mi" id="areaBld" placeholder="e.g. Tower B, Podium, Main Building" oninput="showAreaBldSugg()" autocomplete="off">
+          <div class="sugg-list" id="areaBldSugg"></div>
+        </div>
+      </div>
+      <div>
+        <label class="ml">Location / Level <span style="color:var(--muted)">(optional)</span></label>
+        <div class="sugg-wrap">
+          <input class="mi" id="areaLoc" placeholder="e.g. Level 2, Zone A, Plant Room" oninput="showAreaLocSugg()" autocomplete="off">
+          <div class="sugg-list" id="areaLocSugg"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px">Leave blank if not applicable — e.g. a single-floor building</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closeAreaMo()">Cancel</button>
+      <button class="bp bsm btn" onclick="saveArea()">Save Area</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD ITP TYPE MODAL -->
+<div class="mo" id="itypeMo" onclick="if(event.target===this)closeItypeMo()">
+  <div class="modal" style="width:520px">
+    <div class="modal-hdr">
+      <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800" id="itypeMoTitle">Add ITP Type</h3>
+      <p style="font-size:12px;color:var(--text2);margin-top:3px" id="itypeMoSub"></p>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">ITP Type *</label>
+        <div class="sugg-wrap">
+          <input class="mi" id="itypeName" placeholder="Select from list or type custom…" oninput="showItypeSugg()" autocomplete="off">
+          <div class="sugg-list" id="itypeSugg"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px">Start typing to search, or enter a custom ITP type</div>
+      </div>
+      <div>
+        <label class="ml">Category Tag</label>
+        <select class="ms" id="itypeCat">
+          <option value="">— Optional —</option>
+          <option value="equipment">Equipment ITP</option>
+          <option value="installation">Installation ITP</option>
+          <option value="testing">Testing & Commissioning</option>
+          <option value="fire">Fire & Safety</option>
+          <option value="civil">Civil / Builder Works</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closeItypeMo()">Cancel</button>
+      <button class="bp bsm btn" onclick="saveItype()">Add ITP Type</button>
+    </div>
+  </div>
+</div>
+
+<!-- DRAWING PICKER MODAL -->
+<div class="mo" id="pickerMo" onclick="if(event.target===this)closePicker()">
+  <div class="modal" style="width:740px">
+    <div class="modal-hdr">
+      <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800">Link Drawings</h3>
+      <p style="font-size:12px;color:var(--text2);margin-top:3px" id="pickerSub">Filter and select drawings to link to this ITP type</p>
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;align-items:center">
+      <select id="pDisc" onchange="renderPicker()" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 10px;outline:none;cursor:pointer;flex:1;min-width:140px">
+        <option value="">All Disciplines</option>
+      </select>
+      <select id="pCat" onchange="renderPicker()" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 10px;outline:none;cursor:pointer;flex:1;min-width:150px">
+        <option value="">All Categories</option>
+      </select>
+      <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:5px 10px;flex:2;min-width:180px">
+        <span style="color:var(--muted)">🔍</span>
+        <input type="text" id="pSrch" placeholder="Search drawing no. or name…" oninput="renderPicker()" style="background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%">
+      </div>
+    </div>
+    <div style="overflow-y:auto;flex:1;max-height:400px">
+      <table class="picker-tbl" id="pickerTbl">
+        <thead><tr><th>Drawing No.</th><th>Drawing Name</th><th>Rev</th><th>Category</th><th style="width:50px;text-align:center">Add</th></tr></thead>
+        <tbody id="pickerBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <span style="flex:1;font-size:12px;color:var(--muted)" id="pickerCount"></span>
+      <button class="bg bsm btn" onclick="closePicker()">Cancel</button>
+      <button class="bp bsm btn" onclick="confirmPicker()">Done — Link Drawings</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// ITP REGISTER — HVAC NEXUS
+// Structure: Buildings → Locations → ITP Types → Linked Drawings → Pins
+// ═══════════════════════════════════════════
+
+var SBK='hvacnexus_sb_collapsed';
+var CUK='hvacnexus_current_user';
+
+// ── CURRENT USER & PERMISSIONS ──
+var currentUser=null;
+function loadCurrentUser(){
+  try{currentUser=JSON.parse(localStorage.getItem(CUK)||'null');}catch(e){currentUser=null;}
+  // Fallback: match against settings userName
+  if(!currentUser){
+    try{
+      var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');
+      var users=JSON.parse(localStorage.getItem('hvacnexus_users')||'[]');
+      var matched=users.find(function(u){return u.name===(cs.userName||'');});
+      if(matched)currentUser={id:matched.id,name:matched.name,role:matched.role};
+      else if(cs.userName)currentUser={id:'cs_user',name:cs.userName,role:cs.userRole||'Admin'};
+    }catch(e){}
+  }
+}
+function can(perm){
+  var role=(currentUser&&currentUser.role)||'Subcontractor';
+  var perms={
+    'Admin':       {editStructure:true,  editITPs:true,  fillForms:true,  manageUsers:true},
+    'PM':          {editStructure:true,  editITPs:true,  fillForms:true,  manageUsers:false},
+    'Engineer':    {editStructure:false, editITPs:true,  fillForms:true,  manageUsers:false},
+    'Subcontractor':{editStructure:false,editITPs:false, fillForms:true,  manageUsers:false},
+    'Witness':     {editStructure:false, editITPs:false, fillForms:false, manageUsers:false},
+    // legacy keys
+    'admin':       {editStructure:true,  editITPs:true,  fillForms:true,  manageUsers:true},
+    'manager':     {editStructure:false, editITPs:true,  fillForms:true,  manageUsers:false},
+    'subcontractor':{editStructure:false,editITPs:false, fillForms:true,  manageUsers:false}
+  };
+  return !!(perms[role]&&perms[role][perm]);
+}
+
+// ITP MASTER LIST
+var ITP_MASTER=[
+  // Equipment
+  'AC Single Head - Split','AC Multi Head - Split','AC Multi Head CU - Split',
+  'AHU CHW and HHW','Attenuator','Boiler','CRAC Unit',
+  'Chiller - Water Cooled','Chiller - Air Cooled','Electric Duct Heater',
+  'Expansion Tank','FCU - Water Cooled','Fans','Humidifier','Hot Water Heater',
+  'MSSB/DCP','BMS Panel','Plate Heat Exchanger','Pump','VAV',
+  'VRF - BP Box','VRF - Indoor Unit','VRF - Outdoor Unit','Auto Refill Unit',
+  'Chemical Dosing Pot - Cooling Tower','Side Stream Filtration - Cooling Tower',
+  'PAC Unit - Air Cooled','PAC Unit - Water Cooled','Chilled Beams',
+  'Energy Recovery Ventilator','Security Grilles','DAHU','Pressure Relief Damper','VSD',
+  // Installation & Testing
+  'Duct Installation Riser','Pipework Pressure Test','Refrigeration Pressure Test & Vacuum',
+  'Seismic Install','Flushing','Duct Installation','Duct Pressure Testing',
+  'Refrigeration Pipework Install','Mechanical Services Seals','Water Pipework Installation',
+  // Fire & Safety
+  'Fire Seals','Fire Dampers','Penetration ITP',
+  // Civil
+  'Builder Works Inspection','Structural Penetration'
+];
+
+// DATA
+var proj=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');
+var pKey=proj.num||'GCT001';
+var DK='hvacnexus_itp_structure_'+pKey;   // {buildings:[{id,name,desc,locations:[{id,name,desc,itpTypes:[{id,name,cat,drawings:[{id,num,name,rev}]}]}]}]}
+var DKD='hvacnexus_drawings_'+pKey;
+var DKR='hvacnexus_itp_responses_'+pKey;
+
+var structure={buildings:[]};
+var drawings=[];
+
+function loadAll(){
+  try{structure=JSON.parse(localStorage.getItem(DK)||'{"buildings":[]}')||{buildings:[]};}catch(e){structure={buildings:[]};}
+  try{drawings=JSON.parse(localStorage.getItem(DKD)||'[]');}catch(e){drawings=[];}
+}
+function saveStructure(){try{localStorage.setItem(DK,JSON.stringify(structure));}catch(e){}}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function nid(){return'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);}
+loadAll();
+loadCurrentUser();
+
+// INIT
+(function(){
+  if(proj.name){document.getElementById('sb-proj-name').textContent=proj.name;document.getElementById('bc-proj').textContent=proj.name;}
+  if(proj.number)document.getElementById('sb-proj-num').textContent=proj.number;
+  applySB(localStorage.getItem(SBK)==='1');
+  applyRoleUI();
+  renderStats();render();
+})();
+
+function goProject(){window.location.href='project.html?id='+(proj.id||'gct001');}
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){document.getElementById('sidebar').classList.toggle('sm',c);document.getElementById('sbToggleBtn').textContent=c?'»':'«';}
+
+// ── APPLY ROLE UI ──
+function applyRoleUI(){
+  var role=(currentUser&&currentUser.role)||'subcontractor';
+  var name=currentUser?currentUser.name:'Unknown';
+  var roleLabel={'Admin':'Admin','PM':'PM','Engineer':'Engineer','Subcontractor':'Subcontractor','Witness':'Witness','admin':'Admin','manager':'PM','subcontractor':'Subcontractor'}[role]||role;
+  var roleColor={'Admin':'var(--accent)','PM':'var(--green)','Engineer':'var(--warn)','Subcontractor':'var(--purple)','Witness':'var(--muted)'}[role]||'var(--muted)';
+  // Show current user in topbar
+  var userIndicator=document.getElementById('userIndicator');
+  if(userIndicator){
+    userIndicator.innerHTML='<span style="font-size:11px;color:var(--muted)">Logged in as</span> '
+      +'<span style="font-family:DM Mono,monospace;font-size:11px;font-weight:600;color:'+roleColor+'">'+escH(name)+'</span> '
+      +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 6px;border-radius:5px;border:1px solid '+roleColor+';color:'+roleColor+';opacity:.8">'+escH(roleLabel)+'</span>';
+    userIndicator.title='Manage users in Company Settings';
+    userIndicator.onclick=function(){window.location.href='hvac-settings.html';};
+  }
+  // Hide Edit Structure button for non-admins
+  var editBtn=document.getElementById('editStructBtn');
+  if(editBtn)editBtn.style.display=can('editStructure')?'':'none';
+  // Hide save button always on load
+  var saveBtn=document.getElementById('saveStructBtn');
+  if(saveBtn)saveBtn.style.display='none';
+}
+
+// ── ITP STATUS COUNTS (from pin responses) ──
+function getItpCounts(itype){
+  // Count pins from linked drawings that belong to this ITP type
+  var total=0,ns=0,ip=0,act=0,cl=0;
+  var resp={};try{resp=JSON.parse(localStorage.getItem(DKR)||'{}');}catch(e){}
+  (itype.drawings||[]).forEach(function(ld){
+    var drw=drawings.find(function(d){return d.id===ld.id;});
+    if(!drw||!drw.pins)return;
+    drw.pins.filter(function(p){return p.type==='itp'&&p.itpTypeLabel===itype.name;}).forEach(function(p){
+      total++;
+      var st=(resp[p.id]&&resp[p.id].status)||'not-started';
+      if(st==='not-started')ns++;else if(st==='in-progress')ip++;else if(st==='action')act++;else if(st==='closed')cl++;
+    });
+  });
+  return{total:total,ns:ns,ip:ip,act:act,cl:cl};
+}
+
+// ── STATS ──
+function renderStats(){
+  var totalBlds=structure.buildings.length;
+  var totalLocs=0,totalITypes=0,totalItps=0;
+  structure.buildings.forEach(function(b){
+    (b.locations||[]).forEach(function(l){
+      totalLocs++;
+      (l.itpTypes||[]).forEach(function(t){
+        totalITypes++;
+        totalItps+=getItpCounts(t).total;
+      });
+    });
+  });
+  document.getElementById('statsRow').innerHTML=[
+    {n:totalBlds,l:'Buildings',c:'var(--accent)'},
+    {n:totalLocs,l:'Locations',c:'var(--text2)'},
+    {n:totalITypes,l:'ITP Types',c:'var(--purple)'},
+    {n:totalItps,l:'Total ITPs',c:'var(--green)'},
+  ].map(function(s){return'<div class="stat-card"><div class="stat-num" style="color:'+s.c+'">'+s.n+'</div><div class="stat-lbl">'+s.l+'</div></div>';}).join('');
+}
+
+// ── MAIN RENDER ──
+function render(){
+  var content=document.getElementById('content');
+  content.innerHTML='';
+  if(!structure.buildings.length){
+    content.innerHTML='<div class="empty-state">'
+      +'<div class="empty-icon">🏗️</div>'
+      +'<div class="empty-title">No ITP structure yet</div>'
+      +'<div class="empty-sub">Click <strong>✎ Edit Structure</strong> to set up your buildings, locations and ITP types.</div>'
+      +'<button class="bp btn struct-edit-btn" onclick="openAddArea(null)" style="margin-top:8px">＋ Add Area</button>'
+      +'</div>';
+    return;
+  }
+  structure.buildings.forEach(function(bld){
+    if(bld.id==='_toplevel'){
+      // Render locations directly — no building wrapper
+      (bld.locations||[]).forEach(function(loc){
+        content.appendChild(buildTopLevelLocBlock(loc));
+      });
+    } else {
+      content.appendChild(buildBldBlock(bld));
+    }
+  });
+}
+
+// Top-level location block (no building parent) — styled like a building header
+function buildTopLevelLocBlock(loc){
+  var el=document.createElement('div');el.className='bld-block';el.id='loc-top-'+loc.id;
+
+  var hdr=document.createElement('div');hdr.className='bld-hdr';
+  hdr.innerHTML='<span class="bld-chev">▾</span>'
+    +'<span class="bld-name">'+escH(loc.name)+'</span>'
+    +(loc.desc?'<span class="bld-desc">'+escH(loc.desc)+'</span>':'')
+    +'<div class="bld-actions" onclick="event.stopPropagation()">'
+      +'<button class="icon-btn accent struct-edit-btn" onclick="openAddItype(\'_toplevel\',\''+loc.id+'\')">＋ ITP Type</button>'
+      +'<button class="icon-btn struct-edit-btn" onclick="openEditLoc(\'_toplevel\',\''+loc.id+'\')">✎</button>'
+      +'<button class="icon-btn danger struct-edit-btn" onclick="delLoc(\'_toplevel\',\''+loc.id+'\')">✕</button>'
+    +'</div>';
+  hdr.addEventListener('click',function(e){if(e.target.closest('.bld-actions'))return;el.classList.toggle('collapsed');});
+  el.appendChild(hdr);
+
+  var body=document.createElement('div');body.className='bld-body';
+  if((loc.itpTypes||[]).length){
+    // Render ITP types directly — no location sub-header needed
+    var inner=document.createElement('div');inner.style.cssText='padding:10px 16px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--border)';
+    var fake={id:'_toplevel'};
+    (loc.itpTypes||[]).forEach(function(itype){inner.appendChild(buildItypeCard(fake,loc,itype));});
+    body.appendChild(inner);
+  } else {
+    var empty=document.createElement('div');
+    empty.style.cssText='padding:16px 20px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)';
+    empty.innerHTML='No ITP types yet — click <strong>＋ ITP Type</strong> to add one';
+    body.appendChild(empty);
+  }
+  el.appendChild(body);
+  return el;
+}
+
+
+function buildBldBlock(bld){
+  var el=document.createElement('div');el.className='bld-block';el.id='bld-'+bld.id;
+
+  // Header
+  var hdr=document.createElement('div');hdr.className='bld-hdr';
+  hdr.innerHTML='<span class="bld-chev">▾</span>'
+    +'<span class="bld-name">'+escH(bld.name)+'</span>'
+    +(bld.desc?'<span class="bld-desc">'+escH(bld.desc)+'</span>':'')
+    +'<div class="bld-actions" onclick="event.stopPropagation()">'
+      +'<button class="icon-btn accent struct-edit-btn" onclick="openAddArea(\''+bld.id+'\')">＋ Add Area</button>'
+      +'<button class="icon-btn struct-edit-btn" onclick="openEditBld(\''+bld.id+'\')">✎</button>'
+      +'<button class="icon-btn danger struct-edit-btn" onclick="delBld(\''+bld.id+'\')">✕</button>'
+    +'</div>';
+  hdr.addEventListener('click',function(e){if(e.target.closest('.bld-actions'))return;el.classList.toggle('collapsed');});
+  el.appendChild(hdr);
+
+  // Body
+  var body=document.createElement('div');body.className='bld-body';
+  (bld.locations||[]).forEach(function(loc){body.appendChild(buildLocBlock(bld,loc));});
+  if(!(bld.locations||[]).length){
+    var empty=document.createElement('div');
+    empty.style.cssText='padding:16px 28px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)';
+    empty.innerHTML='No locations yet — click <strong>＋ Location</strong> to add one';
+    body.appendChild(empty);
+  }
+  el.appendChild(body);
+  return el;
+}
+
+function buildLocBlock(bld,loc){
+  var el=document.createElement('div');el.className='loc-wrap';el.id='loc-'+loc.id;
+
+  var hdr=document.createElement('div');hdr.className='loc-hdr';
+  hdr.innerHTML='<span class="loc-chev">▾</span>'
+    +'<span class="loc-name">'+escH(loc.name)+(loc.desc?' — <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted)">'+escH(loc.desc)+'</span>':'')+'</span>'
+    +'<div style="display:flex;gap:6px;flex-shrink:0" onclick="event.stopPropagation()">'
+      +'<button class="icon-btn accent struct-edit-btn" onclick="openAddItype(\''+bld.id+'\',\''+loc.id+'\')">＋ ITP Type</button>'
+      +'<button class="icon-btn struct-edit-btn" onclick="openEditLoc(\''+bld.id+'\',\''+loc.id+'\')">✎</button>'
+      +'<button class="icon-btn danger struct-edit-btn" onclick="delLoc(\''+bld.id+'\',\''+loc.id+'\')">✕</button>'
+    +'</div>';
+  hdr.addEventListener('click',function(e){if(e.target.closest('div'))return;el.classList.toggle('collapsed');});
+  hdr.querySelector('.loc-name').addEventListener('click',function(){el.classList.toggle('collapsed');});
+  hdr.querySelector('.loc-chev').addEventListener('click',function(){el.classList.toggle('collapsed');});
+  el.appendChild(hdr);
+
+  var body=document.createElement('div');body.className='loc-body';
+  (loc.itpTypes||[]).forEach(function(itype){body.appendChild(buildItypeCard(bld,loc,itype));});
+  if(!(loc.itpTypes||[]).length){
+    var empty=document.createElement('div');
+    empty.style.cssText='padding:10px 0;color:var(--muted);font-size:12px';
+    empty.innerHTML='No ITP types yet — click <strong>＋ ITP Type</strong> above';
+    body.appendChild(empty);
+  }
+  el.appendChild(body);
+  return el;
+}
+
+function buildItypeCard(bld,loc,itype){
+  var counts=getItpCounts(itype);
+  var el=document.createElement('div');el.className='itype-card';el.id='itype-'+itype.id;
+
+  // Header
+  var hdr=document.createElement('div');hdr.className='itype-hdr';
+  var catColors={'equipment':'var(--purple)','installation':'var(--accent)','testing':'var(--warn)','fire':'var(--danger)','civil':'var(--green)','other':'var(--muted)'};
+  var catColor=catColors[itype.cat]||'var(--muted)';
+  hdr.innerHTML='<span class="itype-chev">▾</span>'
+    +'<span class="itype-name">'+escH(itype.name)+'</span>'
+    +(itype.cat?'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 7px;border-radius:5px;background:rgba(0,0,0,.2);border:1px solid '+catColor+';color:'+catColor+';flex-shrink:0">'+escH(itype.cat)+'</span>':'')
+    +'<div style="display:flex;gap:5px;flex-shrink:0;margin-left:8px" onclick="event.stopPropagation()">'
+      +'<button class="icon-btn struct-edit-btn" onclick="openEditItype(\''+bld.id+'\',\''+loc.id+'\',\''+itype.id+'\')">✎</button>'
+      +'<button class="icon-btn danger struct-edit-btn" onclick="delItype(\''+bld.id+'\',\''+loc.id+'\',\''+itype.id+'\')">✕</button>'
+    +'</div>';
+  hdr.addEventListener('click',function(e){if(e.target.closest('div[onclick]'))return;el.classList.toggle('collapsed');});
+  el.appendChild(hdr);
+
+  // Body
+  var body=document.createElement('div');body.className='itype-body';
+
+  // Status pills
+  var pillsHtml='<div class="status-pills">'
+    +'<span class="spill spill-total">Total: '+counts.total+'</span>'
+    +(counts.ns?'<span class="spill spill-ns">Not Started: '+counts.ns+'</span>':'')
+    +(counts.ip?'<span class="spill spill-ip">In Progress: '+counts.ip+'</span>':'')
+    +(counts.act?'<span class="spill spill-act">Action Req.: '+counts.act+'</span>':'')
+    +(counts.cl?'<span class="spill spill-cl">Closed: '+counts.cl+'</span>':'')
+    +'</div>';
+  var pillsEl=document.createElement('div');pillsEl.innerHTML=pillsHtml;
+  body.appendChild(pillsEl.firstChild);
+
+  // Drawings section
+  var drwSection=document.createElement('div');
+  if(!(itype.drawings||[]).length){
+    drwSection.innerHTML='<div class="no-drawings">📐 No drawings linked yet'
+      +'<button class="icon-btn accent struct-edit-btn" onclick="openPicker(\''+bld.id+'\',\''+loc.id+'\',\''+itype.id+'\')" style="margin-left:8px">＋ Link Drawings</button>'
+      +'</div>';
+  } else {
+    var drwsHtml='<div style="display:flex;flex-direction:column;gap:6px">';
+    (itype.drawings||[]).forEach(function(ld){
+      var safeId=escH(ld.id||'');
+      var safeType=escH(itype.name||'');
+      drwsHtml+='<div class="drw-row" data-dwg-id="'+safeId+'" data-itp-type="'+safeType+'">'
+        +'<span class="drw-num" style="cursor:pointer" onclick="openDrawingForPin(this.closest(\'.drw-row\').dataset.dwgId,this.closest(\'.drw-row\').dataset.itpType)" title="Click to open drawing and add ITP pins">'+escH(ld.num||'')+'</span>'
+        +'<input class="drw-name-input" value="'+escH(ld.name||'')+'" onchange="updateLinkedDrwName(\''+escH(bld.id)+'\',\''+escH(loc.id)+'\',\''+escH(itype.id)+'\',\''+safeId+'\',this.value)" onclick="event.stopPropagation()" title="Edit drawing title">'
+        +'<button class="icon-btn accent" onclick="openDrawingForPin(this.closest(\'.drw-row\').dataset.dwgId,this.closest(\'.drw-row\').dataset.itpType)" style="flex-shrink:0;gap:5px">📍 Add ITP</button>'
+        +'<button class="icon-btn danger struct-edit-btn" onclick="unlinkDrawing(\''+escH(bld.id)+'\',\''+escH(loc.id)+'\',\''+escH(itype.id)+'\',\''+safeId+'\');event.stopPropagation()" style="flex-shrink:0">✕</button>'
+        +'</div>';
+    });
+    drwsHtml+='<button class="icon-btn accent struct-edit-btn" onclick="openPicker(\''+bld.id+'\',\''+loc.id+'\',\''+itype.id+'\')" style="align-self:flex-start">＋ Link More Drawings</button>';
+    drwsHtml+='</div>';
+    drwSection.innerHTML=drwsHtml;
+  }
+  body.appendChild(drwSection);
+  el.appendChild(body);
+  return el;
+}
+
+// ── EDIT STRUCTURE MODE ──
+var _editMode=false;
+function toggleEditMode(){
+  if(!can('editStructure')){
+    toast('You do not have permission to edit the ITP structure');return;
+  }
+  _editMode=true;
+  document.body.classList.add('edit-mode');
+  toast('Edit mode on — add buildings, locations, ITP types and link drawings. Click ✓ Save Changes when done.');
+}
+function saveStructureMode(){
+  _editMode=false;
+  document.body.classList.remove('edit-mode');
+  saveStructure();
+  toast('Structure saved ✓');
+}
+
+// ── OPEN DRAWING PDF VIEWER ──
+function openDrawingForPin(drawingId,itpTypeName){
+  if(!drawingId){toast('No drawing ID — re-link this drawing');return;}
+  var base=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  var url=base+'hvac-pdf-viewer.html?drawingId='+encodeURIComponent(drawingId);
+  window.open(url,'_blank');
+}
+
+// ── BUILDING MODAL ──
+// ── AREA MODAL (unified Building + Location) ──
+var _areaParentBldId=null;
+function openAddArea(parentBldId){
+  _areaParentBldId=parentBldId||null;
+  document.getElementById('areaMoTitle').textContent='Add Area';
+  // If called from within a building, pre-fill building name
+  if(parentBldId){
+    var b=getBld(parentBldId);
+    document.getElementById('areaBld').value=b?b.name:'';
+  } else {
+    document.getElementById('areaBld').value='';
+  }
+  document.getElementById('areaLoc').value='';
+  document.getElementById('areaMo').classList.add('open');
+  setTimeout(function(){
+    var focus=_areaParentBldId?'areaLoc':'areaBld';
+    document.getElementById(focus).focus();
+  },80);
+}
+function closeAreaMo(){document.getElementById('areaMo').classList.remove('open');_areaParentBldId=null;}
+function showAreaBldSugg(){
+  var v=document.getElementById('areaBld').value;
+  var existing=[...new Set(structure.buildings.map(function(b){return b.name;}))];
+  var items=v?existing.filter(function(x){return x.toLowerCase().includes(v.toLowerCase());}):existing;
+  var list=document.getElementById('areaBldSugg');
+  if(!items.length){list.style.display='none';return;}
+  list.innerHTML=items.map(function(x){return'<div class="sugg-item" onmousedown="document.getElementById(\'areaBld\').value=\''+escH(x)+'\';document.getElementById(\'areaBldSugg\').style.display=\'none\'">'+escH(x)+'</div>';}).join('');
+  list.style.display='';
+}
+function showAreaLocSugg(){
+  var v=document.getElementById('areaLoc').value;
+  var defaults=['Basement','Ground Floor','Level 1','Level 2','Level 3','Level 4','Level 5','Level 6','Level 7','Level 8','Roof','Plant Room','Car Park','Podium','External'];
+  var existing=[];
+  structure.buildings.forEach(function(b){(b.locations||[]).forEach(function(l){if(l.name)existing.push(l.name);});});
+  var all=[...new Set([...defaults,...existing])];
+  var items=v?all.filter(function(x){return x.toLowerCase().includes(v.toLowerCase());}):all.slice(0,10);
+  var list=document.getElementById('areaLocSugg');
+  if(!items.length){list.style.display='none';return;}
+  list.innerHTML=items.map(function(x){return'<div class="sugg-item" onmousedown="document.getElementById(\'areaLoc\').value=\''+escH(x)+'\';document.getElementById(\'areaLocSugg\').style.display=\'none\'">'+escH(x)+'</div>';}).join('');
+  list.style.display='';
+}
+function saveArea(){
+  var bldName=document.getElementById('areaBld').value.trim();
+  var locName=document.getElementById('areaLoc').value.trim();
+  if(!bldName&&!locName){toast('Enter at least a Building or a Location');return;}
+
+  if(bldName){
+    // Find or create building
+    var bld=structure.buildings.find(function(b){return b.name.toLowerCase()===bldName.toLowerCase();});
+    if(!bld){
+      bld={id:nid(),name:bldName,desc:'',locations:[]};
+      structure.buildings.push(bld);
+    }
+    if(locName){
+      // Add location to this building
+      if(!bld.locations)bld.locations=[];
+      var exists=bld.locations.find(function(l){return l.name.toLowerCase()===locName.toLowerCase();});
+      if(!exists)bld.locations.push({id:nid(),name:locName,desc:'',itpTypes:[]});
+    }
+  } else if(locName){
+    // No building — store as a top-level "location-only" entry
+    // Use a building with id='_toplevel' and no name as the container
+    var bld=structure.buildings.find(function(b){return b.id==='_toplevel';});
+    if(!bld){bld={id:'_toplevel',name:'',desc:'',locations:[]};structure.buildings.push(bld);}
+    if(!bld.locations)bld.locations=[];
+    var exists=bld.locations.find(function(l){return l.name.toLowerCase()===locName.toLowerCase();});
+    if(!exists)bld.locations.push({id:nid(),name:locName,desc:'',itpTypes:[]});
+  }
+
+  saveStructure();closeAreaMo();renderStats();render();
+  toast('Area saved');
+}
+function delBld(id){
+  var b=getBld(id);if(!b)return;
+  if(!confirm('Delete "'+b.name+'" and all its locations and ITP types?'))return;
+  structure.buildings=structure.buildings.filter(function(x){return x.id!==id;});
+  saveStructure();renderStats();render();
+}
+function openEditBld(id){
+  var b=getBld(id);if(!b)return;
+  _areaParentBldId=null;
+  document.getElementById('areaMoTitle').textContent='Edit Building';
+  document.getElementById('areaBld').value=b.name||'';
+  document.getElementById('areaLoc').value='';
+  // Store edit context
+  document.getElementById('areaMo').dataset.editBldId=id;
+  document.getElementById('areaMo').classList.add('open');
+}
+function delLoc(bldId,locId){
+  var b=getBld(bldId);if(!b)return;
+  var l=getLoc(bldId,locId);if(!l)return;
+  if(!confirm('Delete location "'+l.name+'" and all its ITP types?'))return;
+  b.locations=b.locations.filter(function(x){return x.id!==locId;});
+  saveStructure();renderStats();render();
+}
+function openEditLoc(bldId,locId){
+  var l=getLoc(bldId,locId);if(!l)return;
+  _areaParentBldId=bldId;
+  var b=getBld(bldId);
+  document.getElementById('areaMoTitle').textContent='Edit Location';
+  document.getElementById('areaBld').value=b?b.name:'';
+  document.getElementById('areaLoc').value=l.name||'';
+  document.getElementById('areaMo').dataset.editLocId=locId;
+  document.getElementById('areaMo').dataset.editBldId=bldId;
+  document.getElementById('areaMo').classList.add('open');
+}
+
+
+
+// ── ITP TYPE MODAL ──
+var _editItypeBldId=null,_editItypeLocId=null,_editItypeId=null;
+function openAddItype(bldId,locId){
+  _editItypeBldId=bldId;_editItypeLocId=locId;_editItypeId=null;
+  var b=getBld(bldId),l=getLoc(bldId,locId);
+  document.getElementById('itypeMoTitle').textContent='Add ITP Type';
+  document.getElementById('itypeMoSub').textContent=(b?b.name:'')+' → '+(l?l.name:'');
+  document.getElementById('itypeName').value='';
+  document.getElementById('itypeCat').value='';
+  document.getElementById('itypeMo').classList.add('open');
+  setTimeout(function(){document.getElementById('itypeName').focus();},80);
+}
+function openEditItype(bldId,locId,itypeId){
+  var t=getItype(bldId,locId,itypeId);if(!t)return;
+  _editItypeBldId=bldId;_editItypeLocId=locId;_editItypeId=itypeId;
+  document.getElementById('itypeMoTitle').textContent='Edit ITP Type';
+  document.getElementById('itypeMoSub').textContent='';
+  document.getElementById('itypeName').value=t.name||'';
+  document.getElementById('itypeCat').value=t.cat||'';
+  document.getElementById('itypeMo').classList.add('open');
+}
+function closeItypeMo(){document.getElementById('itypeMo').classList.remove('open');_editItypeBldId=null;_editItypeLocId=null;_editItypeId=null;}
+function showItypeSugg(){
+  var v=document.getElementById('itypeName').value;
+  var items=v?ITP_MASTER.filter(function(x){return x.toLowerCase().includes(v.toLowerCase());}):ITP_MASTER.slice(0,10);
+  var list=document.getElementById('itypeSugg');
+  if(!items.length){list.style.display='none';return;}
+  list.innerHTML=items.map(function(x){return'<div class="sugg-item" onmousedown="document.getElementById(\'itypeName\').value=\''+escH(x)+'\';document.getElementById(\'itypeSugg\').style.display=\'none\'">'+escH(x)+'</div>';}).join('');
+  list.style.display='';
+}
+function saveItype(){
+  var name=document.getElementById('itypeName').value.trim();
+  if(!name){toast('ITP type name is required');return;}
+  var l=getLoc(_editItypeBldId,_editItypeLocId);if(!l)return;
+  if(!l.itpTypes)l.itpTypes=[];
+  var cat=document.getElementById('itypeCat').value;
+  if(_editItypeId){
+    var t=getItype(_editItypeBldId,_editItypeLocId,_editItypeId);if(!t)return;
+    t.name=name;t.cat=cat;
+  } else {
+    l.itpTypes.push({id:nid(),name:name,cat:cat,drawings:[]});
+  }
+  saveStructure();closeItypeMo();renderStats();render();
+}
+function delItype(bldId,locId,itypeId){
+  var l=getLoc(bldId,locId);if(!l)return;
+  var t=getItype(bldId,locId,itypeId);if(!t)return;
+  if(!confirm('Delete ITP type "'+t.name+'"?'))return;
+  l.itpTypes=l.itpTypes.filter(function(x){return x.id!==itypeId;});
+  saveStructure();renderStats();render();
+}
+
+// ── DRAWING PICKER ──
+var _pickerBldId=null,_pickerLocId=null,_pickerItypeId=null,_pickerLinked=[];
+function openPicker(bldId,locId,itypeId){
+  var t=getItype(bldId,locId,itypeId);if(!t)return;
+  _pickerBldId=bldId;_pickerLocId=locId;_pickerItypeId=itypeId;
+  _pickerLinked=(t.drawings||[]).map(function(d){return d.id;});
+  document.getElementById('pickerSub').textContent='Linking drawings to: '+t.name;
+  // Populate discipline filter
+  var discs=[...new Set(drawings.filter(function(d){return !d.superseded&&d.status!=='Obsolete';}).map(function(d){return d.cat||'';}).filter(Boolean))].sort();
+  var dSel=document.getElementById('pDisc');
+  dSel.innerHTML='<option value="">All Disciplines</option>'+discs.map(function(d){return'<option>'+escH(d)+'</option>';}).join('');
+  document.getElementById('pSrch').value='';
+  renderPicker();
+  document.getElementById('pickerMo').classList.add('open');
+}
+function closePicker(){document.getElementById('pickerMo').classList.remove('open');}
+function confirmPicker(){
+  var t=getItype(_pickerBldId,_pickerLocId,_pickerItypeId);if(!t)return;
+  // Rebuild linked drawings from _pickerLinked
+  t.drawings=_pickerLinked.map(function(id){
+    var d=drawings.find(function(x){return x.id===id;});
+    return d?{id:d.id,num:d.num,name:d.name,rev:d.rev}:null;
+  }).filter(Boolean);
+  saveStructure();closePicker();render();
+  toast('Drawings linked');
+}
+function renderPicker(){
+  var disc=document.getElementById('pDisc').value;
+  var cat=document.getElementById('pCat').value;
+  var q=(document.getElementById('pSrch').value||'').toLowerCase();
+  // Update category filter
+  var cSel=document.getElementById('pCat'),currC=cSel.value;
+  var baseDrws=drawings.filter(function(d){return !d.superseded&&d.status!=='Obsolete'&&(!disc||d.cat===disc);});
+  var cats=[...new Set(baseDrws.map(function(d){return d.subcat||'';}).filter(Boolean))].sort();
+  cSel.innerHTML='<option value="">All Categories</option>'+cats.map(function(c){return'<option'+(c===currC?' selected':'')+'>'+escH(c)+'</option>';}).join('');
+  var active=baseDrws.filter(function(d){
+    return(!cat||d.subcat===cat)&&(!q||((d.num||'').toLowerCase().includes(q)||(d.name||'').toLowerCase().includes(q)));
+  }).sort(function(a,b){return(a.num||'').localeCompare(b.num||'');});
+  var body=document.getElementById('pickerBody');
+  document.getElementById('pickerCount').textContent=_pickerLinked.length+' drawing'+((_pickerLinked.length!==1)?'s':'')+' selected';
+  if(!active.length){body.innerHTML='<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">No drawings found</td></tr>';return;}
+  body.innerHTML=active.map(function(d){
+    var on=_pickerLinked.indexOf(d.id)!==-1;
+    return'<tr>'
+      +'<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:600">'+escH(d.num||'')+'</td>'
+      +'<td style="font-size:13px;color:var(--text)">'+escH(d.name||'')+'</td>'
+      +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+escH(d.rev||'')+'</td>'
+      +'<td style="font-size:11px;color:var(--text2)">'+escH(d.subcat||'')+'</td>'
+      +'<td style="text-align:center"><button class="add-btn'+(on?' on':'')+'" onclick="togglePickerDrw(\''+d.id+'\')">'+(on?'✓':'+')+'</button></td>'
+      +'</tr>';
+  }).join('');
+}
+function togglePickerDrw(id){
+  var i=_pickerLinked.indexOf(id);
+  if(i===-1)_pickerLinked.push(id);else _pickerLinked.splice(i,1);
+  renderPicker();
+}
+function unlinkDrawing(bldId,locId,itypeId,drawingId){
+  var t=getItype(bldId,locId,itypeId);if(!t)return;
+  if(!confirm('Remove this drawing from the ITP type?'))return;
+  t.drawings=(t.drawings||[]).filter(function(d){return d.id!==drawingId;});
+  saveStructure();render();
+}
+
+// ── HELPERS ──
+function getBld(id){return structure.buildings.find(function(b){return b.id===id;});}
+function getLoc(bldId,locId){var b=getBld(bldId);return b?(b.locations||[]).find(function(l){return l.id===locId;}):null;}
+function getItype(bldId,locId,itypeId){var l=getLoc(bldId,locId);return l?(l.itpTypes||[]).find(function(t){return t.id===itypeId;}):null;}
+
+// ── UPDATE LINKED DRAWING NAME ──
+function updateLinkedDrwName(bldId,locId,itypeId,drawingId,newName){
+  var t=getItype(bldId,locId,itypeId);if(!t)return;
+  var d=(t.drawings||[]).find(function(x){return x.id===drawingId;});
+  if(d)d.name=newName;
+  saveStructure();
+}
+
+// ── CLOSE SUGGESTIONS ON OUTSIDE CLICK ──
+document.addEventListener('click',function(e){
+  ['areaBldSugg','areaLocSugg','itypeSugg'].forEach(function(id){
+    var el=document.getElementById(id);if(el&&!e.target.closest('#'+id))el.style.display='none';
+  });
+});
+
+// ── TOAST ──
+function toast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;white-space:nowrap;pointer-events:none';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .4s';setTimeout(function(){t.remove();},400);},2400);
+}
+</script>
+</body>
+</html>
