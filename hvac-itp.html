@@ -140,6 +140,14 @@ body.edit-mode #editStructBtn{display:none!important}
 body:not(.edit-mode) #saveStructBtn{display:none!important}
 body.edit-mode #saveStructBtn{display:inline-flex!important}
 body:not(.edit-mode) .no-drawings .icon-btn{display:none!important}
+/* Add ITP hidden in edit mode */
+body.edit-mode .add-itp-btn{display:none!important}
+/* Drawing title link — shown normally; input shown only in edit mode */
+.drw-title-link{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);cursor:pointer;text-decoration:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drw-title-link:hover{text-decoration:underline;color:#33d4ff}
+.struct-edit-only{display:none!important}
+body.edit-mode .drw-title-link{display:none!important}
+body.edit-mode .struct-edit-only{display:block!important;flex:1}
 /* In edit mode, highlight the active state */
 body.edit-mode .topbar{border-bottom-color:rgba(0,200,255,.4)}
 body.edit-mode #saveStructBtn{background:var(--green);color:#080c12}
@@ -660,10 +668,15 @@ function buildItypeCard(bld,loc,itype){
     (itype.drawings||[]).forEach(function(ld){
       var safeId=escH(ld.id||'');
       var safeType=escH(itype.name||'');
+      var title=escH(ld.name||ld.num||'Untitled Drawing');
       drwsHtml+='<div class="drw-row" data-dwg-id="'+safeId+'" data-itp-type="'+safeType+'">'
-        +'<span class="drw-num" style="cursor:pointer" onclick="openDrawingForPin(this.closest(\'.drw-row\').dataset.dwgId,this.closest(\'.drw-row\').dataset.itpType)" title="Click to open drawing and add ITP pins">'+escH(ld.num||'')+'</span>'
-        +'<input class="drw-name-input" value="'+escH(ld.name||'')+'" onchange="updateLinkedDrwName(\''+escH(bld.id)+'\',\''+escH(loc.id)+'\',\''+escH(itype.id)+'\',\''+safeId+'\',this.value)" onclick="event.stopPropagation()" title="Edit drawing title">'
-        +'<button class="icon-btn accent" onclick="openDrawingForPin(this.closest(\'.drw-row\').dataset.dwgId,this.closest(\'.drw-row\').dataset.itpType)" style="flex-shrink:0;gap:5px">📍 Add ITP</button>'
+        // Clickable title link — visible outside edit mode, opens PDF viewer
+        +'<a class="drw-title-link" onclick="openDrawingForPin(this.closest(\'.drw-row\').dataset.dwgId,this.closest(\'.drw-row\').dataset.itpType)" title="Open drawing">'+title+'</a>'
+        // Editable input — visible only in edit mode
+        +'<input class="drw-name-input struct-edit-only" value="'+title+'" onchange="updateLinkedDrwName(\''+escH(bld.id)+'\',\''+escH(loc.id)+'\',\''+escH(itype.id)+'\',\''+safeId+'\',this.value)" onclick="event.stopPropagation()" placeholder="Drawing title">'
+        // Add ITP — hidden in edit mode
+        +'<button class="icon-btn accent add-itp-btn" onclick="openDrawingForPin(this.closest(\'.drw-row\').dataset.dwgId,this.closest(\'.drw-row\').dataset.itpType)" style="flex-shrink:0;gap:5px">📍 Add ITP</button>'
+        // Unlink — edit mode only
         +'<button class="icon-btn danger struct-edit-btn" onclick="unlinkDrawing(\''+escH(bld.id)+'\',\''+escH(loc.id)+'\',\''+escH(itype.id)+'\',\''+safeId+'\');event.stopPropagation()" style="flex-shrink:0">✕</button>'
         +'</div>';
     });
@@ -690,6 +703,7 @@ function saveStructureMode(){
   _editMode=false;
   document.body.classList.remove('edit-mode');
   saveStructure();
+  render(); // re-render so drawing titles reflect edits
   toast('Structure saved ✓');
 }
 
@@ -938,6 +952,10 @@ function updateLinkedDrwName(bldId,locId,itypeId,drawingId,newName){
   var d=(t.drawings||[]).find(function(x){return x.id===drawingId;});
   if(d)d.name=newName;
   saveStructure();
+  // Update visible link text immediately without full re-render
+  document.querySelectorAll('.drw-row[data-dwg-id="'+drawingId+'"] .drw-title-link').forEach(function(link){
+    link.textContent=newName||(d&&d.num)||'Untitled Drawing';
+  });
 }
 
 // ── CLOSE SUGGESTIONS ON OUTSIDE CLICK ──
