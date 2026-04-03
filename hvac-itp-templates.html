@@ -342,7 +342,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 </div><!-- /main -->
 
 <!-- IMPORT FROM COMPANY MODAL -->
-<div class="mo" id="importModal" onclick="if(event.target===this)closeImportModal()">
+<div class="mo" id="importModal">
   <div class="modal" style="width:680px">
     <div class="modal-hdr">
       <h3>Import from Company Library</h3>
@@ -495,8 +495,17 @@ function genItpNum(){
 }
 
 // Status helpers
-function currentRev(itp){return itp.revisions[itp.revisions.length-1];}
-function isDraft(itp){return currentRev(itp).status==='draft';}
+function currentRev(itp){
+  // Return the last published (current) revision if one exists, otherwise the last revision (draft in progress)
+  var revs=itp.revisions;
+  for(var i=revs.length-1;i>=0;i--){if(revs[i].status==='current')return revs[i];}
+  return revs[revs.length-1]; // fallback to latest (draft)
+}
+function isDraft(itp){
+  // A template is in draft state if its latest revision is a draft
+  var last=itp.revisions[itp.revisions.length-1];
+  return last.status==='draft';
+}
 
 // ── DEFAULT FCU WATER COOLED TEMPLATE ──
 var FCU_WC_TEMPLATE = {
@@ -667,9 +676,13 @@ function renderRegister(){
   }
   var rows='';
   list.forEach(function(itp){
-    var rev=currentRev(itp);
+    var rev=currentRev(itp); // last published, or last draft if never published
+    var hasDraftInProgress=isDraft(itp)&&itp.revisions.length>1; // draft on top of a published version
     var verClass=rev.status==='current'?'current':rev.status==='draft'?'draft':'';
-    var stBadge=rev.status==='current'?'<span class="status-badge sb-current">Current</span>':rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>':'<span class="status-badge sb-superseded">Superseded</span>';
+    var stBadge=rev.status==='current'
+      ?'<span class="status-badge sb-current">Current</span>'+(hasDraftInProgress?'<span class="status-badge sb-draft" style="margin-left:4px">Draft ↑</span>':'')
+      :rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>'
+      :'<span class="status-badge sb-superseded">Superseded</span>';
     var importedBadge=itp.importedFrom?'<span class="imported-badge">imported</span>':'';
     rows+='<tr style="cursor:pointer" onclick="editItp(\''+itp.id+'\')">'
       +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
@@ -1095,10 +1108,10 @@ function renderImportList(){
   // Get IDs already imported into project
   var alreadyImported={};
   templates.forEach(function(t){if(t.importedFrom)alreadyImported[t.importedFrom]=true;});
-  // Only show company templates that have a published/current revision
+  // Only show company templates that have a current revision
   var list=companyTemplates.filter(function(t){
-    var hasCurrent=t.revisions&&t.revisions.some(function(r){return r.status==='current';});
-    if(!hasCurrent)return false;
+    var currentRev=t.revisions&&t.revisions.find(function(r){return r.status==='current';});
+    if(!currentRev)return false;
     return !q||(t.itpNo||'').toLowerCase().includes(q)||(t.itpType||'').toLowerCase().includes(q);
   });
   var selCount=_importSelected.length;
@@ -1109,12 +1122,10 @@ function renderImportList(){
   }
   var rows='';
   list.forEach(function(itp){
-    var rev=currentRev(itp);
+    var rev=itp.revisions.find(function(r){return r.status==='current';});
     var alreadyDone=alreadyImported[itp.id];
     var sel=_importSelected.indexOf(itp.id)!==-1;
-    var stBadge=rev.status==='current'?'<span class="status-badge sb-current">Current</span>':rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>':'<span class="status-badge sb-superseded">Superseded</span>';
-    var rowStyle=alreadyDone?'opacity:.5;':'cursor:pointer;';
-    rows+='<tr style="'+rowStyle+'" '+(alreadyDone?'title="Already imported"':'onclick="toggleImportSel(\''+itp.id+'\')"')+'>'
+    rows+='<tr style="'+(alreadyDone?'opacity:.5;':'cursor:pointer;')+'" '+(alreadyDone?'title="Already imported"':'onclick="toggleImportSel(\''+itp.id+'\')"')+'>'
       +'<td style="text-align:center;width:36px">'
         +(alreadyDone
           ?'<span style="color:var(--green);font-size:13px">✓</span>'
@@ -1124,8 +1135,8 @@ function renderImportList(){
       +'</td>'
       +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
       +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+(alreadyDone?'<span class="imported-badge">in project</span>':'')+'</td>'
-      +'<td><span class="itp-ver '+(rev.status==='current'?'current':rev.status==='draft'?'draft':'')+'">v'+rev.version+'</span></td>'
-      +'<td>'+stBadge+'</td>'
+      +'<td><span class="itp-ver current">v'+rev.version+'</span></td>'
+      +'<td><span class="status-badge sb-current">Current</span></td>'
       +'</tr>';
   });
   document.getElementById('importBody').innerHTML=rows;
@@ -1143,12 +1154,28 @@ function confirmImport(){
   _importSelected.forEach(function(cId){
     var src=companyTemplates.find(function(t){return t.id===cId;});
     if(!src)return;
-    // Deep copy, new ID, mark importedFrom
-    var clone=JSON.parse(JSON.stringify(src));
-    clone.id=nid();
-    clone.importedFrom=cId;
-    clone.importedDate=todayStr();
-    clone.importedBy=me;
+    // Find the current revision to import
+    var currentRev=src.revisions.find(function(r){return r.status==='current';});
+    if(!currentRev)return;
+    // Deep copy with new ID, import the current revision as a fresh draft
+    var revCopy=JSON.parse(JSON.stringify(currentRev));
+    revCopy.status='draft';
+    revCopy.version=1;
+    revCopy.modifiedDate=todayStr();
+    revCopy.modifiedBy=me;
+    revCopy.note='Imported from company library ('+src.itpNo+' v'+currentRev.version+')';
+    revCopy.lastUsed='';
+    var clone={
+      id:nid(),
+      itpNo:src.itpNo,
+      itpType:src.itpType,
+      createdBy:me,
+      createdDate:todayStr(),
+      importedFrom:cId,
+      importedDate:todayStr(),
+      importedBy:me,
+      revisions:[revCopy]
+    };
     templates.push(clone);
     imported++;
   });
@@ -1199,9 +1226,9 @@ function showToast(msg){
 }
 
 // ── MODAL CLOSE HANDLERS ──
-['newItpModal','revHistModal','publishModal','importModal'].forEach(function(id){
+['newItpModal','revHistModal','publishModal'].forEach(function(id){
   var el=document.getElementById(id);
-  if(el)el.addEventListener('click',function(e){if(e.target===this){if(id==='newItpModal')closeNewItpModal();else if(id==='revHistModal')closeRevHist();else if(id==='publishModal')closePublishModal();else if(id==='importModal')closeImportModal();}});
+  if(el)el.addEventListener('click',function(e){if(e.target===this){if(id==='newItpModal')closeNewItpModal();else if(id==='revHistModal')closeRevHist();else if(id==='publishModal')closePublishModal();}});
 });
 
 function bcParentClick(){
