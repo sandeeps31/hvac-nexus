@@ -266,8 +266,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
   <div class="topbar">
     <div class="bc">
-      <span class="bcl" onclick="navTo('project.html')">Project</span><span class="bcs">›</span>
-      <span class="bcl" onclick="navTo('hvac-itp.html')">ITP Register</span><span class="bcs">›</span>
+      <span class="bcl" id="bcParent" onclick="bcParentClick()">Project</span><span class="bcs">›</span>
       <span class="bcc" id="bcCurr">ITP Templates</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1096,14 +1095,16 @@ function renderImportList(){
   // Get IDs already imported into project
   var alreadyImported={};
   templates.forEach(function(t){if(t.importedFrom)alreadyImported[t.importedFrom]=true;});
+  // Only show company templates that have a published/current revision
   var list=companyTemplates.filter(function(t){
-    var match=!q||(t.itpNo||'').toLowerCase().includes(q)||(t.itpType||'').toLowerCase().includes(q);
-    return match;
+    var hasCurrent=t.revisions&&t.revisions.some(function(r){return r.status==='current';});
+    if(!hasCurrent)return false;
+    return !q||(t.itpNo||'').toLowerCase().includes(q)||(t.itpType||'').toLowerCase().includes(q);
   });
   var selCount=_importSelected.length;
   document.getElementById('importSelCount').textContent=selCount+' selected';
   if(!list.length){
-    document.getElementById('importBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">No company templates found</td></tr>';
+    document.getElementById('importBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">No published company templates available.<br><span style="font-size:11px">Only templates with a Current revision can be imported. Publish a draft in the Company Library first.</span></td></tr>';
     return;
   }
   var rows='';
@@ -1203,17 +1204,38 @@ function showToast(msg){
   if(el)el.addEventListener('click',function(e){if(e.target===this){if(id==='newItpModal')closeNewItpModal();else if(id==='revHistModal')closeRevHist();else if(id==='publishModal')closePublishModal();else if(id==='importModal')closeImportModal();}});
 });
 
+function bcParentClick(){
+  var params=new URLSearchParams(window.location.search);
+  if(params.get('mode')==='company')navTo('hvac-settings.html');
+  else navTo('hvac-itp.html');
+}
+
 // ── INIT ──
 (function(){
-  // Default to project tab; set SK and templates accordingly
-  currentLevel='project';
-  SK=SK_PROJECT;
-  try{var s=localStorage.getItem(SK_PROJECT);templates=s?JSON.parse(s):[];}catch(e){templates=[];}
-  // Set import button visible (project is default)
-  document.getElementById('importBtn').style.display='';
-  // Mark project tab active
-  document.getElementById('tab-project').classList.add('active');
-  document.getElementById('tab-company').classList.remove('active');
+  var params=new URLSearchParams(window.location.search);
+  var mode=params.get('mode')||'project'; // 'company' | 'project'
+
+  // Hide tab switcher entirely — mode determines which level is shown
+  document.getElementById('levelTabs').style.display='none';
+
+  if(mode==='company'){
+    // Company mode — lock to company library, no import button
+    currentLevel='company';
+    SK=SK_COMPANY;
+    templates=companyTemplates;
+    document.getElementById('importBtn').style.display='none';
+    document.getElementById('newItpBtn').textContent='＋ New Company Template';
+    document.getElementById('bcParent').textContent='Company Settings';
+    document.getElementById('bcCurr').textContent='ITP Templates';
+  } else {
+    // Project mode — lock to project templates, show import button
+    currentLevel='project';
+    SK=SK_PROJECT;
+    try{var s=localStorage.getItem(SK_PROJECT);templates=s?JSON.parse(s):[];}catch(e){templates=[];}
+    document.getElementById('importBtn').style.display='';
+    document.getElementById('bcParent').textContent='ITP Register';
+    document.getElementById('bcCurr').textContent='Project Templates';
+  }
   renderRegister();
 })();
 
