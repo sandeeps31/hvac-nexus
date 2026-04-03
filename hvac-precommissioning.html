@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HVAC NEXUS — Pre-Commissioning</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;
+  --border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.10);
+  --green:#00e5a0;--green-dim:rgba(0,229,160,.10);
+  --warn:#ffb830;--warn-dim:rgba(255,184,48,.10);
+  --danger:#ff4d6d;--danger-dim:rgba(255,77,109,.10);
+  --purple:#a78bfa;--purple-dim:rgba(167,139,250,.10);
+  --text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a;--radius:10px;--sb:230px;--sb-sm:52px
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;height:100vh;overflow:hidden;display:flex}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* SIDEBAR */
+.sb{width:var(--sb);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s;overflow:hidden}
+.sb.sm{width:var(--sb-sm)}
+.sb-top{padding:14px 14px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px}
+.sb-icon{font-size:20px}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}
+.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-section-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:12px 16px 4px;white-space:nowrap}
+.sb-item{display:flex;align-items:center;gap:9px;padding:7px 16px;color:var(--text2);cursor:pointer;border-left:2px solid transparent;transition:all .13s;white-space:nowrap;text-decoration:none}
+.sb-item:hover{background:var(--surface2);color:var(--text)}
+.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:14px;flex-shrink:0;width:18px;text-align:center}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-section-lbl,.sb.sm .sb-item-label{display:none}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:14px;flex-shrink:0;background:var(--surface)}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px;flex:1}
+.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--text2)}
+.bsm{padding:5px 12px;font-size:12px}
+
+/* LAYOUT */
+.body-wrap{flex:1;display:flex;overflow:hidden}
+.equip-panel{width:280px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.equip-panel-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.equip-panel-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700}
+.equip-list{flex:1;overflow-y:auto}
+.equip-item{padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .13s}
+.equip-item:hover{background:var(--surface2)}
+.equip-item.active{background:var(--accent-dim);border-left:2px solid var(--accent)}
+.equip-tag{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:600}
+.equip-name{font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.equip-progress{margin-top:5px;height:3px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.equip-progress-bar{height:100%;background:var(--green);border-radius:2px;transition:width .3s}
+
+.checklist-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.checklist-hdr{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.checklist-content{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:16px}
+.checklist-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);flex-direction:column;gap:8px}
+
+/* SECTIONS */
+.section-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.section-hdr{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.section-hdr-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text2);flex:1}
+.section-chev{font-size:10px;color:var(--muted);transition:transform .2s}
+.section-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+
+/* CHECK ITEMS */
+.check-row{display:grid;grid-template-columns:1fr 120px 130px 110px 80px;gap:0;border-bottom:1px solid var(--border);align-items:stretch}
+.check-row:last-child{border-bottom:none}
+.check-row:hover{background:rgba(255,255,255,.015)}
+.check-desc{padding:10px 14px;font-size:13px;color:var(--text);display:flex;align-items:center}
+.check-cell{padding:8px 10px;display:flex;align-items:center;justify-content:center;border-left:1px solid var(--border)}
+.result-btn{padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;transition:all .13s;font-weight:500}
+.result-btn:hover{border-color:var(--text2);color:var(--text)}
+.result-btn.pass{background:var(--green-dim);color:var(--green);border-color:rgba(0,229,160,.3)}
+.result-btn.fail{background:var(--danger-dim);color:var(--danger);border-color:rgba(255,77,109,.3)}
+.result-btn.na{background:var(--surface3);color:var(--text2);border-color:var(--border)}
+.result-btns{display:flex;gap:4px}
+.signoff-input{background:transparent;border:none;outline:none;color:var(--text2);font-size:11px;font-family:'DM Sans',sans-serif;width:100%;text-align:center}
+.signoff-input::placeholder{color:var(--muted)}
+.date-input{background:transparent;border:none;outline:none;color:var(--text2);font-size:11px;font-family:'DM Mono',monospace;width:100%;text-align:center}
+.check-row-hdr{display:grid;grid-template-columns:1fr 120px 130px 110px 80px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.check-row-hdr div{padding:7px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border)}
+.check-row-hdr div:first-child{border-left:none}
+
+/* STATS */
+.stats-bar{display:flex;gap:16px;align-items:center;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.stat-pill{font-family:'DM Mono',monospace;font-size:10px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted)}
+.stat-pill.green{background:var(--green-dim);color:var(--green);border-color:rgba(0,229,160,.2)}
+.stat-pill.red{background:var(--danger-dim);color:var(--danger);border-color:rgba(255,77,109,.2)}
+.stat-pill.warn{background:var(--warn-dim);color:var(--warn);border-color:rgba(255,184,48,.2)}
+
+/* SEARCH */
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:5px 10px}
+.search-box input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:100%}
+
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(4,8,16,.8);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.mo.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;width:500px;max-width:96vw;max-height:90vh}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color .15s}
+.mi:focus{border-color:var(--accent)}
+.ms{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer}
+.act-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:13px;cursor:pointer;transition:all .13s;display:inline-flex;align-items:center;justify-content:center}
+.act-btn:hover{color:var(--accent);border-color:var(--accent)}
+.act-btn.danger:hover{color:var(--danger);border-color:var(--danger)}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sb" id="sidebar">
+  <div class="sb-top">
+    <div class="sb-brand"><span class="sb-icon">🌀</span><span class="sb-name">HVAC NEXUS</span></div>
+    <button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">«</button>
+  </div>
+  <div class="sb-proj-block">
+    <div class="sb-proj-lbl">Current Project</div>
+    <div class="sb-proj-name" id="sb-proj-name">Greenfield Commercial Tower</div>
+    <div class="sb-proj-num" id="sb-proj-num">GCT001</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section-lbl">Commissioning</div>
+    <a class="sb-item" href="hvac-commissioning-plan.html"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning Plan</span></a>
+    <a class="sb-item active" href="hvac-precommissioning.html"><span class="sb-item-icon">🔩</span><span class="sb-item-label">Pre-Commissioning</span></a>
+    <a class="sb-item" href="hvac-commissioning.html"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Cx Tracker</span></a>
+  </nav>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl" onclick="goProject()">My Projects</span><span class="bcs">›</span>
+      <span class="bcl" id="bc-proj">Greenfield Commercial Tower</span><span class="bcs">›</span>
+      <span class="bcc">Pre-Commissioning</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="bg bsm btn" onclick="openAddEquipModal()">＋ Add Equipment</button>
+      <button class="bp bsm btn" id="signoffBtn" onclick="signOffSelected()" style="display:none">✓ Sign Off Selected</button>
+    </div>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar" id="statsBar">
+    <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text2)">Pre-Commissioning Checks</span>
+    <span class="stat-pill" id="stat-total">0 items</span>
+    <span class="stat-pill green" id="stat-pass">0 pass</span>
+    <span class="stat-pill red" id="stat-fail">0 fail</span>
+    <span class="stat-pill warn" id="stat-pending">0 pending</span>
+  </div>
+
+  <!-- BODY -->
+  <div class="body-wrap">
+    <!-- EQUIPMENT LIST -->
+    <div class="equip-panel">
+      <div class="equip-panel-hdr">
+        <span class="equip-panel-title">Equipment</span>
+        <div class="search-box" style="flex:1;margin-left:10px"><input type="text" id="equipSearch" placeholder="Filter…" oninput="renderEquipList()"></div>
+      </div>
+      <div class="equip-list" id="equipList"></div>
+    </div>
+
+    <!-- CHECKLIST -->
+    <div class="checklist-panel" id="checklistPanel">
+      <div class="checklist-empty" id="checklistEmpty">
+        <div style="font-size:32px">🔩</div>
+        <div style="font-size:13px">Select equipment from the list to view its pre-cx checklist</div>
+      </div>
+      <div id="checklistView" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+        <div class="checklist-hdr">
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800" id="cx-equip-title">—</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px" id="cx-equip-meta">—</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="bg bsm btn" onclick="exportEquipChecklist()">⬇ Export</button>
+            <button class="bg bsm btn" onclick="openAddItemModal()">＋ Add Check</button>
+          </div>
+        </div>
+        <div id="checklistContent" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD EQUIPMENT MODAL -->
+<div class="mo" id="addEquipModal" onclick="if(event.target===this)closeEquipModal()">
+  <div class="modal">
+    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800" id="equipModalTitle">Add Equipment</h3>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:18px 22px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label class="ml">Equipment Tag *</label><input class="mi" id="eq-tag" placeholder="e.g. FCU-L01-001"></div>
+        <div><label class="ml">Equipment Type</label>
+          <select class="ms" id="eq-type">
+            <option>FCU</option><option>AHU</option><option>Chiller</option><option>Cooling Tower</option>
+            <option>Pump</option><option>Fan</option><option>VAV</option><option>Other</option>
+          </select>
+        </div>
+      </div>
+      <div><label class="ml">Description</label><input class="mi" id="eq-desc" placeholder="Equipment description"></div>
+      <div><label class="ml">Location / Area</label><input class="mi" id="eq-location" placeholder="e.g. Level 2, Zone A"></div>
+      <div>
+        <label class="ml">Pre-load checklist template</label>
+        <select class="ms" id="eq-template">
+          <option value="fcu">FCU — Standard Pre-Cx Checks</option>
+          <option value="ahu">AHU — Standard Pre-Cx Checks</option>
+          <option value="pump">Pump — Standard Pre-Cx Checks</option>
+          <option value="blank">Blank (manual checks only)</option>
+        </select>
+      </div>
+    </div>
+    <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
+      <button class="bg bsm btn" onclick="closeEquipModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="saveEquip()">Add Equipment</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CHECK ITEM MODAL -->
+<div class="mo" id="addItemModal" onclick="if(event.target===this)closeItemModal()">
+  <div class="modal">
+    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800">Add Check Item</h3>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:18px 22px;display:flex;flex-direction:column;gap:14px">
+      <div><label class="ml">Description *</label><input class="mi" id="item-desc" placeholder="Check item description"></div>
+      <div><label class="ml">Section</label>
+        <select class="ms" id="item-section">
+          <option>Static Checks</option><option>Electrical Checks</option><option>Controls Checks</option>
+          <option>Mechanical Checks</option><option>Safety Checks</option><option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
+      <button class="bg bsm btn" onclick="closeItemModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="saveItem()">Add Check</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var SBK='hvacnexus_sb_collapsed';
+var _selEquip=null;
+
+// TEMPLATES
+var TEMPLATES={
+  fcu:[
+    {section:'Static Checks',desc:'Verify unit is installed per drawing and specification'},
+    {section:'Static Checks',desc:'Check coil connections — flow/return correct'},
+    {section:'Static Checks',desc:'Condensate drain connected and clear'},
+    {section:'Static Checks',desc:'Filter installed and clean'},
+    {section:'Static Checks',desc:'Access panels installed'},
+    {section:'Electrical Checks',desc:'Power supply connected and correct voltage'},
+    {section:'Electrical Checks',desc:'Wiring to controls panel complete'},
+    {section:'Electrical Checks',desc:'Earth/ground connection verified'},
+    {section:'Controls Checks',desc:'BMS connection established'},
+    {section:'Controls Checks',desc:'Thermostat/controller installed and responsive'},
+    {section:'Controls Checks',desc:'Manual on/off function tested'},
+    {section:'Mechanical Checks',desc:'Fan belt tension correct (if applicable)'},
+    {section:'Mechanical Checks',desc:'No visible leaks at connections'},
+    {section:'Safety Checks',desc:'Isolating valves accessible and tagged'},
+  ],
+  ahu:[
+    {section:'Static Checks',desc:'Unit installed level and properly supported'},
+    {section:'Static Checks',desc:'Ductwork connections complete and sealed'},
+    {section:'Static Checks',desc:'Filters installed — correct type and rating'},
+    {section:'Static Checks',desc:'Access doors operable'},
+    {section:'Electrical Checks',desc:'Motor wiring complete and correct rotation verified'},
+    {section:'Electrical Checks',desc:'VFD installed and wired (if applicable)'},
+    {section:'Controls Checks',desc:'Damper actuators installed and operational'},
+    {section:'Controls Checks',desc:'BMS I/O points verified'},
+    {section:'Mechanical Checks',desc:'Belt/drive coupling aligned and tensioned'},
+    {section:'Mechanical Checks',desc:'Drain pan clean and connected'},
+    {section:'Safety Checks',desc:'Fire/smoke dampers installed where required'},
+  ],
+  pump:[
+    {section:'Static Checks',desc:'Pump installed per drawing — flow direction correct'},
+    {section:'Static Checks',desc:'Isolation valves installed — inlet and outlet'},
+    {section:'Static Checks',desc:'Pressure gauges fitted at inlet and outlet'},
+    {section:'Electrical Checks',desc:'Motor wired and rotation verified (jog test)'},
+    {section:'Electrical Checks',desc:'Overload protection set correctly'},
+    {section:'Controls Checks',desc:'BMS on/off command verified'},
+    {section:'Controls Checks',desc:'Differential pressure sensor calibrated'},
+    {section:'Mechanical Checks',desc:'Coupling aligned — within tolerance'},
+    {section:'Mechanical Checks',desc:'No visible leaks at pipework joints'},
+    {section:'Safety Checks',desc:'Safety relief valve fitted and set'},
+  ],
+  blank:[]
+};
+
+// DATA
+var proj=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');
+var pKey=proj.num||'GCT001';
+var DK='hvacnexus_precx_'+pKey;
+var equipment=[];
+function load(){try{var s=localStorage.getItem(DK);if(s){var p=JSON.parse(s);equipment=Array.isArray(p)?p:[];}}catch(e){equipment=[];}}
+function save(){try{localStorage.setItem(DK,JSON.stringify(equipment));}catch(e){};}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function nid(){return Date.now()+'_'+Math.random().toString(36).slice(2,7);}
+load();
+
+// INIT
+(function(){
+  if(proj.name){document.getElementById('sb-proj-name').textContent=proj.name;document.getElementById('bc-proj').textContent=proj.name;}
+  if(proj.number)document.getElementById('sb-proj-num').textContent=proj.number;
+  applySB(localStorage.getItem(SBK)==='1');
+  renderEquipList();renderStats();
+})();
+
+function goProject(){window.location.href='project.html?id='+(proj.id||'gct001');}
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){document.getElementById('sidebar').classList.toggle('sm',c);document.getElementById('sbToggleBtn').textContent=c?'»':'«';}
+
+
+// STATS
+function renderStats(){
+  var total=0,pass=0,fail=0;
+  equipment.forEach(function(eq){(eq.checks||[]).forEach(function(c){total++;if(c.result==='PASS')pass++;else if(c.result==='FAIL')fail++;});});
+  var pending=total-pass-fail;
+  document.getElementById('stat-total').textContent=total+' item'+(total!==1?'s':'');
+  document.getElementById('stat-pass').textContent=pass+' pass';
+  document.getElementById('stat-fail').textContent=fail+' fail';
+  document.getElementById('stat-pending').textContent=pending+' pending';
+  document.getElementById('stat-fail').className='stat-pill'+(fail>0?' red':'');
+  document.getElementById('stat-pass').className='stat-pill'+(pass>0?' green':'');
+  document.getElementById('stat-pending').className='stat-pill'+(pending>0?' warn':'');
+}
+
+// EQUIP LIST
+function renderEquipList(){
+  var q=(document.getElementById('equipSearch').value||'').toLowerCase();
+  var el=document.getElementById('equipList');
+  var filtered=equipment.filter(function(e){return !q||(e.tag||'').toLowerCase().includes(q)||(e.desc||'').toLowerCase().includes(q);});
+  if(!filtered.length){el.innerHTML='<div style="padding:20px 16px;text-align:center;color:var(--muted);font-size:12px">No equipment added yet</div>';return;}
+  el.innerHTML=filtered.map(function(eq){
+    var checks=eq.checks||[];
+    var done=checks.filter(function(c){return c.result==='PASS'||c.result==='FAIL';}).length;
+    var pct=checks.length?Math.round(done/checks.length*100):0;
+    var isActive=_selEquip&&_selEquip.id===eq.id;
+    return'<div class="equip-item'+(isActive?' active':'')+'" onclick="selectEquip(\''+eq.id+'\')">'
+      +'<div class="equip-tag">'+escH(eq.tag||'')+'</div>'
+      +'<div class="equip-name">'+escH(eq.desc||eq.type||'')+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+escH(eq.location||'')+'</div>'
+      +'<div class="equip-progress"><div class="equip-progress-bar" style="width:'+pct+'%"></div></div>'
+      +'<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);margin-top:3px">'+done+'/'+checks.length+' checked</div>'
+      +'</div>';
+  }).join('');
+}
+
+// SELECT EQUIP
+function selectEquip(id){
+  _selEquip=equipment.find(function(e){return e.id===id;});
+  if(!_selEquip)return;
+  document.getElementById('checklistEmpty').style.display='none';
+  var cv=document.getElementById('checklistView');cv.style.display='flex';cv.style.flexDirection='column';
+  document.getElementById('cx-equip-title').textContent=(_selEquip.tag||'')+((_selEquip.desc)?' — '+_selEquip.desc:'');
+  document.getElementById('cx-equip-meta').textContent=(_selEquip.type||'')+(_selEquip.location?' · '+_selEquip.location:'');
+  renderEquipList();
+  renderChecklist();
+}
+
+// CHECKLIST
+function renderChecklist(){
+  if(!_selEquip)return;
+  var checks=_selEquip.checks||[];
+  var sections={};
+  checks.forEach(function(c){if(!sections[c.section])sections[c.section]=[];sections[c.section].push(c);});
+  var order=['Static Checks','Electrical Checks','Controls Checks','Mechanical Checks','Safety Checks','Other'];
+  var allSections=Object.keys(sections).sort(function(a,b){var ai=order.indexOf(a),bi=order.indexOf(b);return(ai<0?99:ai)-(bi<0?99:bi);});
+  var content=document.getElementById('checklistContent');
+  if(!checks.length){
+    content.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px;font-size:13px">No checks added yet — click <strong>＋ Add Check</strong> to add items</div>';
+    return;
+  }
+  content.innerHTML=allSections.map(function(sec){
+    var items=sections[sec];
+    var pass=items.filter(function(c){return c.result==='PASS';}).length;
+    return'<div class="section-block">'
+      +'<div class="section-hdr" onclick="toggleSection(this)">'
+        +'<span class="section-hdr-title">'+escH(sec)+'</span>'
+        +'<span class="section-count">'+pass+'/'+items.length+'</span>'
+        +'<span class="section-chev">▾</span>'
+      +'</div>'
+      +'<div class="section-body">'
+        +'<div class="check-row-hdr">'
+          +'<div style="border-left:none">Check Item</div>'
+          +'<div>Result</div>'
+          +'<div>Signed Off By</div>'
+          +'<div>Date</div>'
+          +'<div>Actions</div>'
+        +'</div>'
+        +items.map(function(c){
+          return'<div class="check-row">'
+            +'<div class="check-desc">'+escH(c.desc||'')+'</div>'
+            +'<div class="check-cell">'
+              +'<div class="result-btns">'
+                +'<button class="result-btn'+(c.result==='PASS'?' pass':'')+'" onclick="setResult(\''+c.id+'\',\'PASS\')">PASS</button>'
+                +'<button class="result-btn'+(c.result==='FAIL'?' fail':'')+'" onclick="setResult(\''+c.id+'\',\'FAIL\')">FAIL</button>'
+                +'<button class="result-btn'+(c.result==='N/A'?' na':'')+'" onclick="setResult(\''+c.id+'\',\'N/A\')">N/A</button>'
+              +'</div>'
+            +'</div>'
+            +'<div class="check-cell"><input class="signoff-input" placeholder="Name" value="'+escH(c.signedBy||'')+'" onchange="setField(\''+c.id+'\',\'signedBy\',this.value)"></div>'
+            +'<div class="check-cell"><input class="date-input" type="date" value="'+escH(c.date||'')+'" onchange="setField(\''+c.id+'\',\'date\',this.value)"></div>'
+            +'<div class="check-cell"><button class="act-btn danger" onclick="deleteCheck(\''+c.id+'\')" title="Delete">✕</button></div>'
+            +'</div>';
+        }).join('')
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function toggleSection(hdr){
+  var body=hdr.nextElementSibling;
+  var chev=hdr.querySelector('.section-chev');
+  var hidden=body.style.display==='none';
+  body.style.display=hidden?'':'none';
+  if(chev)chev.style.transform=hidden?'':'rotate(-90deg)';
+}
+
+function setResult(checkId,result){
+  if(!_selEquip)return;
+  var c=(_selEquip.checks||[]).find(function(x){return x.id===checkId;});
+  if(!c)return;
+  c.result=c.result===result?'':result;
+  if(c.result&&!c.date)c.date=new Date().toISOString().split('T')[0];
+  save();renderChecklist();renderEquipList();renderStats();
+}
+
+function setField(checkId,field,val){
+  if(!_selEquip)return;
+  var c=(_selEquip.checks||[]).find(function(x){return x.id===checkId;});
+  if(c)c[field]=val;
+  save();renderStats();
+}
+
+function deleteCheck(checkId){
+  if(!_selEquip)return;
+  if(!confirm('Remove this check item?'))return;
+  _selEquip.checks=(_selEquip.checks||[]).filter(function(c){return c.id!==checkId;});
+  save();renderChecklist();renderEquipList();renderStats();
+}
+
+// ADD EQUIPMENT
+function openAddEquipModal(){document.getElementById('eq-tag').value='';document.getElementById('eq-desc').value='';document.getElementById('eq-location').value='';document.getElementById('addEquipModal').classList.add('open');}
+function closeEquipModal(){document.getElementById('addEquipModal').classList.remove('open');}
+function saveEquip(){
+  var tag=document.getElementById('eq-tag').value.trim();
+  if(!tag){alert('Equipment tag is required.');return;}
+  var tmpl=document.getElementById('eq-template').value;
+  var checks=(TEMPLATES[tmpl]||[]).map(function(t){return{id:nid(),section:t.section,desc:t.desc,result:'',signedBy:'',date:'',notes:''};});
+  var eq={id:nid(),tag:tag,type:document.getElementById('eq-type').value,desc:document.getElementById('eq-desc').value.trim(),location:document.getElementById('eq-location').value.trim(),checks:checks,created:new Date().toISOString().split('T')[0]};
+  equipment.push(eq);
+  save();closeEquipModal();renderEquipList();renderStats();
+  selectEquip(eq.id);
+  showToast('Equipment added — '+checks.length+' checks loaded');
+}
+
+// ADD CHECK ITEM
+function openAddItemModal(){document.getElementById('item-desc').value='';document.getElementById('addItemModal').classList.add('open');}
+function closeItemModal(){document.getElementById('addItemModal').classList.remove('open');}
+function saveItem(){
+  if(!_selEquip)return;
+  var desc=document.getElementById('item-desc').value.trim();
+  if(!desc){alert('Description is required.');return;}
+  if(!_selEquip.checks)_selEquip.checks=[];
+  _selEquip.checks.push({id:nid(),section:document.getElementById('item-section').value,desc:desc,result:'',signedBy:'',date:'',notes:''});
+  save();closeItemModal();renderChecklist();renderEquipList();renderStats();
+  showToast('Check item added');
+}
+
+// EXPORT
+function exportEquipChecklist(){
+  if(!_selEquip)return;
+  var rows=['Equipment Tag,Description,Section,Check Item,Result,Signed By,Date'];
+  (_selEquip.checks||[]).forEach(function(c){rows.push([_selEquip.tag,_selEquip.desc,c.section,c.desc,c.result,c.signedBy,c.date].map(function(v){return'"'+(v||'').replace(/"/g,'""')+'"';}).join(','));});
+  var blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(_selEquip.tag||'precx')+'_checklist.csv';a.click();
+  showToast('Checklist exported');
+}
+
+function signOffSelected(){
+  if(!_selEquip)return;
+  var name=prompt('Sign off all pending items as:');if(!name)return;
+  var today=new Date().toISOString().split('T')[0];
+  (_selEquip.checks||[]).forEach(function(c){if(!c.result){c.result='PASS';c.signedBy=name;c.date=today;}});
+  save();renderChecklist();renderEquipList();renderStats();
+  showToast('Items signed off by '+name);
+}
+
+function showToast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;white-space:nowrap;pointer-events:none';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .4s';setTimeout(function(){t.remove();},400);},2200);
+}
+</script>
+</body>
+</html>
