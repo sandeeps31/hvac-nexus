@@ -303,14 +303,18 @@ var CUK='hvacnexus_current_user';
 var currentUser=null;
 function loadCurrentUser(){
   try{currentUser=JSON.parse(localStorage.getItem(CUK)||'null');}catch(e){currentUser=null;}
-  // Fallback: match against settings userName
   if(!currentUser){
     try{
       var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');
       var users=JSON.parse(localStorage.getItem('hvacnexus_users')||'[]');
+      // 1. Try match by settings userName
       var matched=users.find(function(u){return u.name===(cs.userName||'');});
-      if(matched)currentUser={id:matched.id,name:matched.name,role:matched.role};
-      else if(cs.userName)currentUser={id:'cs_user',name:cs.userName,role:cs.userRole||'Admin'};
+      // 2. Fall back to first Admin
+      if(!matched)matched=users.find(function(u){return u.role==='Admin';});
+      // 3. Fall back to first user
+      if(!matched&&users.length)matched=users[0];
+      if(matched){currentUser={id:matched.id,name:matched.name,role:matched.role};localStorage.setItem(CUK,JSON.stringify(currentUser));}
+      else if(cs.userName){currentUser={id:'cs_user',name:cs.userName,role:cs.userRole||'Admin'};}
     }catch(e){}
   }
 }
@@ -387,23 +391,25 @@ function applySB(c){document.getElementById('sidebar').classList.toggle('sm',c);
 
 // ── APPLY ROLE UI ──
 function applyRoleUI(){
-  var role=(currentUser&&currentUser.role)||'subcontractor';
-  var name=currentUser?currentUser.name:'Unknown';
-  var roleLabel={'Admin':'Admin','PM':'PM','Engineer':'Engineer','Subcontractor':'Subcontractor','Witness':'Witness','admin':'Admin','manager':'PM','subcontractor':'Subcontractor'}[role]||role;
+  var role=(currentUser&&currentUser.role)||'Admin';
+  var name=currentUser?currentUser.name:null;
+  var roleLabel={'Admin':'Admin','PM':'PM','Engineer':'Engineer','Subcontractor':'Subcontractor','Witness':'Witness'}[role]||role;
   var roleColor={'Admin':'var(--accent)','PM':'var(--green)','Engineer':'var(--warn)','Subcontractor':'var(--purple)','Witness':'var(--muted)'}[role]||'var(--muted)';
-  // Show current user in topbar
   var userIndicator=document.getElementById('userIndicator');
   if(userIndicator){
-    userIndicator.innerHTML='<span style="font-size:11px;color:var(--muted)">Logged in as</span> '
-      +'<span style="font-family:DM Mono,monospace;font-size:11px;font-weight:600;color:'+roleColor+'">'+escH(name)+'</span> '
-      +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 6px;border-radius:5px;border:1px solid '+roleColor+';color:'+roleColor+';opacity:.8">'+escH(roleLabel)+'</span>';
-    userIndicator.title='Manage users in Company Settings';
+    if(name){
+      userIndicator.innerHTML='<span style="font-size:11px;color:var(--muted)">Logged in as</span> '
+        +'<span style="font-family:DM Mono,monospace;font-size:11px;font-weight:600;color:'+roleColor+'">'+escH(name)+'</span> '
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 6px;border-radius:5px;border:1px solid '+roleColor+';color:'+roleColor+';opacity:.8">'+escH(roleLabel)+'</span>';
+    } else {
+      userIndicator.innerHTML='<span style="font-size:11px;color:var(--muted)">Not logged in —</span> '
+        +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);text-decoration:underline">Switch User</span>';
+    }
+    userIndicator.title='Switch user in Company Settings';
     userIndicator.onclick=function(){window.location.href='hvac-settings.html';};
   }
-  // Hide Edit Structure button for non-admins
   var editBtn=document.getElementById('editStructBtn');
   if(editBtn)editBtn.style.display=can('editStructure')?'':'none';
-  // Hide save button always on load
   var saveBtn=document.getElementById('saveStructBtn');
   if(saveBtn)saveBtn.style.display='none';
 }
