@@ -177,6 +177,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .rev-status-draft{color:var(--warn);font-family:'DM Mono',monospace;font-size:10px}
 
 
+/* ── LEVEL TABS ── */
+.level-tabs{display:flex;gap:0;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border)}
+.level-tab{padding:10px 20px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;user-select:none;display:flex;align-items:center;gap:7px}
+.level-tab:hover{color:var(--text2)}
+.level-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.level-tab .tab-count{font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:8px;background:var(--surface3);border:1px solid var(--border);color:var(--muted)}
+.level-tab.active .tab-count{background:var(--accent-dim);border-color:rgba(0,200,255,.3);color:var(--accent)}
+.imported-badge{font-family:'DM Mono',monospace;font-size:9px;padding:1px 7px;border-radius:5px;background:var(--purple-dim);border:1px solid rgba(167,139,250,.25);color:var(--purple);margin-left:6px;vertical-align:middle}
+
 /* ── SIDEBAR STANDARD ── */
 .sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden;overflow-x:hidden}
 .sb.sm{width:52px}
@@ -263,7 +272,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div style="display:flex;gap:8px;align-items:center">
       <button class="bg bsm btn" id="backToRegBtn" style="display:none" onclick="showRegister()">← Back to Templates</button>
       <button class="bg bsm btn" id="publishBtn" style="display:none" onclick="publishTemplate()">↑ Publish Revision</button>
+      <button class="bg bsm btn" id="importBtn" onclick="openImportModal()" style="gap:6px">⬇ Import from Company</button>
       <button class="bp bsm btn" id="newItpBtn" onclick="openNewItpModal()">＋ New ITP Template</button>
+    </div>
+  </div>
+
+  <!-- LEVEL TABS (register view only) -->
+  <div class="level-tabs" id="levelTabs">
+    <div class="level-tab" id="tab-company" onclick="switchLevel('company')">
+      🏢 <span>Company Library</span><span class="tab-count" id="tabCountCompany">0</span>
+    </div>
+    <div class="level-tab active" id="tab-project" onclick="switchLevel('project')">
+      📁 <span>Project Templates</span><span class="tab-count" id="tabCountProject">0</span>
     </div>
   </div>
 
@@ -320,6 +340,43 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   </div>
 
 </div><!-- /main -->
+
+<!-- IMPORT FROM COMPANY MODAL -->
+<div class="mo" id="importModal" onclick="if(event.target===this)closeImportModal()">
+  <div class="modal" style="width:680px">
+    <div class="modal-hdr">
+      <h3>Import from Company Library</h3>
+      <p>Select company templates to copy into this project's template library</p>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div style="padding:10px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px">
+          <span style="color:var(--muted)">🔍</span>
+          <input type="text" id="importSrch" placeholder="Search company templates…" oninput="renderImportList()" style="background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+        </div>
+      </div>
+      <div style="overflow-y:auto;max-height:380px">
+        <table class="reg-tbl" id="importTbl" style="border:none;border-radius:0">
+          <thead>
+            <tr>
+              <th style="width:36px"></th>
+              <th style="width:100px">ITP No.</th>
+              <th>ITP Type / Name</th>
+              <th style="width:80px">Version</th>
+              <th style="width:90px">Status</th>
+            </tr>
+          </thead>
+          <tbody id="importBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span style="flex:1;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="importSelCount">0 selected</span>
+      <button class="bg bsm btn" onclick="closeImportModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="confirmImport()">Import Selected →</button>
+    </div>
+  </div>
+</div>
 
 <!-- NEW ITP MODAL -->
 <div class="mo" id="newItpModal" onclick="if(event.target===this)closeNewItpModal()">
@@ -393,11 +450,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 <script>
 // ═══════════════════════════════════════════════════
 // ITP TEMPLATES — HVAC NEXUS
-// Storage: hvacnexus_itp_templates (company-level)
+// Company level: hvacnexus_itp_templates
+// Project level: hvacnexus_itp_templates_<projectNum>
 // ═══════════════════════════════════════════════════
-var SK = 'hvacnexus_itp_templates';
+var SK_COMPANY = 'hvacnexus_itp_templates';
+var _proj = (function(){try{return JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');}catch(e){return{};}}());
+var SK_PROJECT = 'hvacnexus_itp_templates_'+(_proj.num||_proj.number||'default');
 
-var templates = []; // array of ITP master records
+var currentLevel = 'project'; // 'company' | 'project'
+var SK = SK_PROJECT; // active storage key — switches with tab
+
+var templates = [];
+var companyTemplates = []; // always the company library
 var activeItpId = null;
 var _uid = 0;
 function nid(){return 'itp'+(++_uid)+Date.now();}
@@ -413,13 +477,20 @@ function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[
 
 // Storage
 function save(){try{localStorage.setItem(SK,JSON.stringify(templates));}catch(e){}}
-function load(){try{var s=localStorage.getItem(SK);if(s)templates=JSON.parse(s);}catch(e){templates=[];}}
+function load(){
+  try{var s=localStorage.getItem(SK_PROJECT);if(s)templates=JSON.parse(s);else templates=[];}catch(e){templates=[];}
+  try{var s2=localStorage.getItem(SK_COMPANY);if(s2)companyTemplates=JSON.parse(s2);else companyTemplates=[];}catch(e){companyTemplates=[];}
+}
 load();
 
-// Auto-generate ITP number
+// Auto-generate ITP number (uses active templates list)
 function genItpNum(){
   var max=0;
   templates.forEach(function(t){var m=(t.itpNo||'').match(/ITP-(\d+)/);if(m){var n=parseInt(m[1]);if(n>max)max=n;}});
+  // Also scan company templates to avoid clashes when on project level
+  if(currentLevel==='project'){
+    companyTemplates.forEach(function(t){var m=(t.itpNo||'').match(/ITP-(\d+)/);if(m){var n=parseInt(m[1]);if(n>max)max=n;}});
+  }
   return 'ITP-'+String(max+1).padStart(3,'0');
 }
 
@@ -490,9 +561,11 @@ var FCU_WC_TEMPLATE = {
   ]
 };
 
-// ── INIT: seed default template if none exists ──
+// ── INIT: seed default template into COMPANY library if none exists ──
 (function(){
-  if(!templates.length){
+  // Reload company templates fresh
+  try{var s=localStorage.getItem(SK_COMPANY);if(s)companyTemplates=JSON.parse(s);}catch(e){}
+  if(!companyTemplates.length){
     var me='Sandeep';
     try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
     var tmpl={
@@ -511,10 +584,36 @@ var FCU_WC_TEMPLATE = {
         lastUsed:''
       }]
     };
-    templates.push(tmpl);
-    save();
+    companyTemplates.push(tmpl);
+    try{localStorage.setItem(SK_COMPANY,JSON.stringify(companyTemplates));}catch(e){}
   }
+  // Set active templates based on currentLevel
+  templates = currentLevel==='company' ? companyTemplates : (function(){try{var s=localStorage.getItem(SK_PROJECT);return s?JSON.parse(s):[];}catch(e){return[];}}());
 })();
+
+// ── LEVEL SWITCHING ──
+function switchLevel(level){
+  currentLevel=level;
+  if(level==='company'){
+    SK=SK_COMPANY;
+    templates=companyTemplates;
+  } else {
+    SK=SK_PROJECT;
+    try{var s=localStorage.getItem(SK_PROJECT);templates=s?JSON.parse(s):[];}catch(e){templates=[];}
+  }
+  // Update tab UI
+  document.getElementById('tab-company').classList.toggle('active',level==='company');
+  document.getElementById('tab-project').classList.toggle('active',level==='project');
+  // Import button only on project tab
+  document.getElementById('importBtn').style.display=level==='project'?'':'none';
+  renderRegister();
+}
+function updateTabCounts(){
+  var cCount=companyTemplates.length;
+  var pCount=(function(){try{var s=localStorage.getItem(SK_PROJECT);return s?JSON.parse(s).length:0;}catch(e){return 0;}})();
+  document.getElementById('tabCountCompany').textContent=cCount;
+  document.getElementById('tabCountProject').textContent=pCount;
+}
 
 // ── VIEW MANAGEMENT ──
 function showView(id){
@@ -523,9 +622,11 @@ function showView(id){
 }
 function showRegister(){
   showView('register');
+  document.getElementById('levelTabs').style.display='';
   document.getElementById('backToRegBtn').style.display='none';
   document.getElementById('publishBtn').style.display='none';
   document.getElementById('newItpBtn').style.display='';
+  document.getElementById('importBtn').style.display=currentLevel==='project'?'':'none';
   document.getElementById('bcCurr').textContent='ITP Templates';
   activeItpId=null;
   renderRegister();
@@ -541,20 +642,27 @@ function editItp(itpId){
 function openEditor(itpId){
   activeItpId=itpId;
   showView('editor');
+  document.getElementById('levelTabs').style.display='none';
   document.getElementById('backToRegBtn').style.display='';
   document.getElementById('newItpBtn').style.display='none';
+  document.getElementById('importBtn').style.display='none';
   renderEditor();
 }
 
 // ── REGISTER ──
 function renderRegister(){
+  updateTabCounts();
   var q=(document.getElementById('srch').value||'').toLowerCase();
   var list=templates.filter(function(t){
     return !q||(t.itpNo||'').toLowerCase().includes(q)||(t.itpType||'').toLowerCase().includes(q);
   });
+  var levelLabel=currentLevel==='company'?'company library':'project';
   document.getElementById('itpCount').textContent=list.length+' template'+(list.length!==1?'s':'');
   if(!list.length){
-    document.getElementById('regBody').innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No ITP templates yet</div><div class="empty-sub">Create your first company-level ITP template to get started.</div></div></td></tr>';
+    var emptyMsg=currentLevel==='project'
+      ?'No project templates yet. Use <strong>Import from Company</strong> to add templates, or create a new one.'
+      :'No company templates yet. Create your first company-level ITP template.';
+    document.getElementById('regBody').innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No ITP templates yet</div><div class="empty-sub">'+emptyMsg+'</div></div></td></tr>';
     return;
   }
   var rows='';
@@ -562,9 +670,10 @@ function renderRegister(){
     var rev=currentRev(itp);
     var verClass=rev.status==='current'?'current':rev.status==='draft'?'draft':'';
     var stBadge=rev.status==='current'?'<span class="status-badge sb-current">Current</span>':rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>':'<span class="status-badge sb-superseded">Superseded</span>';
+    var importedBadge=itp.importedFrom?'<span class="imported-badge">imported</span>':'';
     rows+='<tr style="cursor:pointer" onclick="editItp(\''+itp.id+'\')">'
       +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
-      +'<td><span class="itp-name">'+escH(itp.itpType)+'</span></td>'
+      +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+importedBadge+'</td>'
       +'<td><span class="itp-ver '+verClass+'">v'+rev.version+'</span></td>'
       +'<td>'+stBadge+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(itp.createdDate)+'</td>'
@@ -970,6 +1079,85 @@ function deleteItp(itpId){
   save();renderRegister();
 }
 
+// ── IMPORT FROM COMPANY ──
+var _importSelected = [];
+function openImportModal(){
+  _importSelected=[];
+  document.getElementById('importSrch').value='';
+  // Reload company templates fresh
+  try{var s=localStorage.getItem(SK_COMPANY);companyTemplates=s?JSON.parse(s):[];}catch(e){}
+  renderImportList();
+  document.getElementById('importModal').classList.add('open');
+}
+function closeImportModal(){document.getElementById('importModal').classList.remove('open');_importSelected=[];}
+function renderImportList(){
+  var q=(document.getElementById('importSrch').value||'').toLowerCase();
+  // Get IDs already imported into project
+  var alreadyImported={};
+  templates.forEach(function(t){if(t.importedFrom)alreadyImported[t.importedFrom]=true;});
+  var list=companyTemplates.filter(function(t){
+    var match=!q||(t.itpNo||'').toLowerCase().includes(q)||(t.itpType||'').toLowerCase().includes(q);
+    return match;
+  });
+  var selCount=_importSelected.length;
+  document.getElementById('importSelCount').textContent=selCount+' selected';
+  if(!list.length){
+    document.getElementById('importBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">No company templates found</td></tr>';
+    return;
+  }
+  var rows='';
+  list.forEach(function(itp){
+    var rev=currentRev(itp);
+    var alreadyDone=alreadyImported[itp.id];
+    var sel=_importSelected.indexOf(itp.id)!==-1;
+    var stBadge=rev.status==='current'?'<span class="status-badge sb-current">Current</span>':rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>':'<span class="status-badge sb-superseded">Superseded</span>';
+    var rowStyle=alreadyDone?'opacity:.5;':'cursor:pointer;';
+    rows+='<tr style="'+rowStyle+'" '+(alreadyDone?'title="Already imported"':'onclick="toggleImportSel(\''+itp.id+'\')"')+'>'
+      +'<td style="text-align:center;width:36px">'
+        +(alreadyDone
+          ?'<span style="color:var(--green);font-size:13px">✓</span>'
+          :'<div style="width:18px;height:18px;border-radius:4px;border:1.5px solid '+(sel?'var(--accent)':'var(--border)')+';background:'+(sel?'var(--accent-dim)':'transparent')+';display:flex;align-items:center;justify-content:center;margin:auto;transition:all .13s">'
+            +(sel?'<span style="color:var(--accent);font-size:11px">✓</span>':'')
+          +'</div>')
+      +'</td>'
+      +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
+      +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+(alreadyDone?'<span class="imported-badge">in project</span>':'')+'</td>'
+      +'<td><span class="itp-ver '+(rev.status==='current'?'current':rev.status==='draft'?'draft':'')+'">v'+rev.version+'</span></td>'
+      +'<td>'+stBadge+'</td>'
+      +'</tr>';
+  });
+  document.getElementById('importBody').innerHTML=rows;
+}
+function toggleImportSel(id){
+  var i=_importSelected.indexOf(id);
+  if(i===-1)_importSelected.push(id);else _importSelected.splice(i,1);
+  renderImportList();
+}
+function confirmImport(){
+  if(!_importSelected.length){closeImportModal();return;}
+  var me='';
+  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'').split(' ')[0];}catch(e){}
+  var imported=0;
+  _importSelected.forEach(function(cId){
+    var src=companyTemplates.find(function(t){return t.id===cId;});
+    if(!src)return;
+    // Deep copy, new ID, mark importedFrom
+    var clone=JSON.parse(JSON.stringify(src));
+    clone.id=nid();
+    clone.importedFrom=cId;
+    clone.importedDate=todayStr();
+    clone.importedBy=me;
+    templates.push(clone);
+    imported++;
+  });
+  save();
+  // Reload project templates array
+  try{var s=localStorage.getItem(SK_PROJECT);templates=s?JSON.parse(s):[];}catch(e){}
+  closeImportModal();
+  renderRegister();
+  showToast(imported+' template'+(imported!==1?'s':'')+' imported into project');
+}
+
 // ── NEW ITP MODAL ──
 function openNewItpModal(){
   document.getElementById('new-itptype').value='';
@@ -1009,13 +1197,24 @@ function showToast(msg){
 }
 
 // ── MODAL CLOSE HANDLERS ──
-['newItpModal','revHistModal','publishModal'].forEach(function(id){
+['newItpModal','revHistModal','publishModal','importModal'].forEach(function(id){
   var el=document.getElementById(id);
-  if(el)el.addEventListener('click',function(e){if(e.target===this){if(id==='newItpModal')closeNewItpModal();else if(id==='revHistModal')closeRevHist();else if(id==='publishModal')closePublishModal();}});
+  if(el)el.addEventListener('click',function(e){if(e.target===this){if(id==='newItpModal')closeNewItpModal();else if(id==='revHistModal')closeRevHist();else if(id==='publishModal')closePublishModal();else if(id==='importModal')closeImportModal();}});
 });
 
-// Init
-renderRegister();
+// ── INIT ──
+(function(){
+  // Default to project tab; set SK and templates accordingly
+  currentLevel='project';
+  SK=SK_PROJECT;
+  try{var s=localStorage.getItem(SK_PROJECT);templates=s?JSON.parse(s):[];}catch(e){templates=[];}
+  // Set import button visible (project is default)
+  document.getElementById('importBtn').style.display='';
+  // Mark project tab active
+  document.getElementById('tab-project').classList.add('active');
+  document.getElementById('tab-company').classList.remove('active');
+  renderRegister();
+})();
 
 // ── SIDEBAR ──
 var SBK='hvacnexus_sb_collapsed';

@@ -534,13 +534,12 @@ function showTypeSugg(){
   onPinTypeInput();
 }
 function getTemplateTypes(){
-  // Get published templates — return [{itpNo, itpType}]
+  // Read project templates only, fall back to ITP_MASTER if none set up
   var result=[];
-  templates.forEach(function(t){
-    var published=t.revisions&&t.revisions.some(function(r){return r.status==='current'||r.status==='published';});
-    if(published)result.push({itpNo:t.itpNo,name:t.itpType});
-  });
-  // Fallback to ITP_MASTER if no templates set up yet
+  try{
+    var tmpl=JSON.parse(localStorage.getItem('hvacnexus_itp_templates_'+pKey)||'[]');
+    tmpl.forEach(function(t){if(t.itpType)result.push({itpNo:t.itpNo||'',name:t.itpType});});
+  }catch(e){}
   if(!result.length)result=ITP_MASTER.map(function(n){return{itpNo:'',name:n};});
   return result;
 }
