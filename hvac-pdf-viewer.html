@@ -15,7 +15,7 @@
   --danger:#ff4d6d;--danger-dim:rgba(255,77,109,.12);
   --purple:#a78bfa;--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a
 }
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:row}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
 /* TOPBAR */
@@ -177,7 +177,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 
 
 <!-- MAIN -->
-<div id="mainWrap" style="margin-left:230px;transition:margin-left .25s;display:flex;flex-direction:column;flex:1;overflow:hidden;min-width:0">
+<div id="mainWrap" style="position:fixed;top:0;left:230px;right:0;bottom:0;display:flex;flex-direction:column;transition:left .25s;overflow:hidden">
 
 <!-- TOPBAR -->
 <div class="topbar">
@@ -539,18 +539,24 @@ function showTypeSugg(){
   onPinTypeInput();
 }
 function getTemplateTypes(){
-  // Read project templates only, fall back to ITP_MASTER if none set up
+  // Read project templates only — no ITP_MASTER fallback
   var result=[];
   try{
     var tmpl=JSON.parse(localStorage.getItem('hvacnexus_itp_templates_'+pKey)||'[]');
     tmpl.forEach(function(t){if(t.itpType)result.push({itpNo:t.itpNo||'',name:t.itpType});});
   }catch(e){}
-  if(!result.length)result=ITP_MASTER.map(function(n){return{itpNo:'',name:n};});
   return result;
 }
 function renderTypeSugg(v){
   var linked=getLinkedItpTypes();
   var all=getTemplateTypes();
+  var list=document.getElementById('typeSugg');
+  // No project templates set up yet
+  if(!all.length){
+    list.innerHTML='<div class="sugg-item" style="color:var(--muted);pointer-events:none;font-size:11px">No project templates — import from ITP Templates first</div>';
+    list.style.display='';
+    return;
+  }
   var filtered=v
     ?all.filter(function(t){return t.name.toLowerCase().includes(v.toLowerCase())||(t.itpNo||'').toLowerCase().includes(v.toLowerCase());})
     :all;
@@ -558,7 +564,6 @@ function renderTypeSugg(v){
   var linkedItems=filtered.filter(function(t){return linked.includes(t.name);});
   var otherItems=filtered.filter(function(t){return !linked.includes(t.name);});
   var items=[...linkedItems,...otherItems].slice(0,12);
-  var list=document.getElementById('typeSugg');
   if(!items.length){list.style.display='none';return;}
   list.innerHTML=items.map(function(t){
     var isLinked=linked.includes(t.name);
@@ -741,7 +746,7 @@ function toast(msg){
 var SBK='hvacnexus_sb_collapsed';
 function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
-function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.left=c?'52px':'230px';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
 function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
