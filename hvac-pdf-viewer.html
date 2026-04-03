@@ -146,15 +146,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 <div class="place-hint" id="placeHint">📍 Click on drawing to place ITP pin — Esc to cancel</div>
 
 <!-- PIN MODAL -->
-<div class="mo" id="pinMo" onclick="if(event.target===this)closePinMo()">
+<div class="mo" id="pinMo">
   <div class="modal">
     <div class="modal-hdr"><h3 id="pinMoTitle">New ITP Pin</h3></div>
     <div class="modal-body">
       <div>
         <label class="ml">ITP Type *</label>
         <div class="sugg-wrap">
-          <input class="mi" id="pinItpType" placeholder="Select or type ITP type…" oninput="showTypeSugg()" autocomplete="off">
-          <div class="sugg-list" id="typeSugg"></div>
+          <input class="mi" id="pinItpType" placeholder="Select or type ITP type…" oninput="showTypeSugg()" onfocus="showTypeSugg()" autocomplete="off" readonly style="cursor:pointer" onclick="this.removeAttribute('readonly');showTypeSugg()">
+          <div class="sugg-list" id="typeSugg" style="max-height:200px"></div>
         </div>
       </div>
       <div id="pinEquipField">
@@ -204,6 +204,7 @@ var DKS='hvacnexus_itp_structure_'+pKey;
 var DKR='hvacnexus_itp_responses_'+pKey;
 var DKE='hvacnexus_equip_'+pKey;
 var CUK='hvacnexus_current_user';
+var ITK='hvacnexus_itp_templates';
 
 // ITP MASTER LIST (same as itp register)
 var ITP_MASTER=['AC Single Head - Split','AC Multi Head - Split','AC Multi Head CU - Split','AHU CHW and HHW','Attenuator','Boiler','CRAC Unit','Chiller - Water Cooled','Chiller - Air Cooled','Electric Duct Heater','Expansion Tank','FCU - Water Cooled','Fans','Humidifier','Hot Water Heater','MSSB/DCP','BMS Panel','Plate Heat Exchanger','Pump','VAV','VRF - BP Box','VRF - Indoor Unit','VRF - Outdoor Unit','Auto Refill Unit','Chemical Dosing Pot - Cooling Tower','Side Stream Filtration - Cooling Tower','PAC Unit - Air Cooled','PAC Unit - Water Cooled','Chilled Beams','Energy Recovery Ventilator','Security Grilles','DAHU','Pressure Relief Damper','VSD','Duct Installation Riser','Pipework Pressure Test','Refrigeration Pressure Test & Vacuum','Seismic Install','Flushing','Duct Installation','Duct Pressure Testing','Refrigeration Pipework Install','Mechanical Services Seals','Water Pipework Installation','Fire Seals','Fire Dampers','Penetration ITP'];
@@ -229,6 +230,7 @@ var drawings=[];
 var structure={buildings:[]};
 var responses={};
 var equipData=null;
+var templates=[];
 var curDrawing=null;
 
 function loadData(){
@@ -236,6 +238,7 @@ function loadData(){
   try{structure=JSON.parse(localStorage.getItem(DKS)||'{"buildings":[]}')||{buildings:[]};}catch(e){}
   try{responses=JSON.parse(localStorage.getItem(DKR)||'{}');}catch(e){}
   try{equipData=JSON.parse(localStorage.getItem(DKE)||'null');}catch(e){}
+  try{templates=JSON.parse(localStorage.getItem(ITK)||'[]');}catch(e){}
   curDrawing=drawings.find(function(d){return d.id===drawingId;})||null;
 }
 function saveDrawings(){try{localStorage.setItem(DKD,JSON.stringify(drawings));}catch(e){}}
@@ -372,6 +375,7 @@ function openNewPin(xPct,yPct){
   _editPinId=null;_pendingX=xPct;_pendingY=yPct;_pinStatus='not-started';
   document.getElementById('pinMoTitle').textContent='New ITP Pin';
   document.getElementById('pinItpType').value='';
+  document.getElementById('pinItpType').removeAttribute('readonly');
   document.getElementById('pinEquipTag').value='';
   document.getElementById('pinRef').value='';
   document.getElementById('pinNotes').value='';
@@ -457,20 +461,47 @@ function showTypeSugg(){
   renderTypeSugg(v);
   onPinTypeInput();
 }
+function getTemplateTypes(){
+  // Get published templates — return [{itpNo, itpType}]
+  var result=[];
+  templates.forEach(function(t){
+    var published=t.revisions&&t.revisions.some(function(r){return r.status==='current'||r.status==='published';});
+    if(published)result.push({itpNo:t.itpNo,name:t.itpType});
+  });
+  // Fallback to ITP_MASTER if no templates set up yet
+  if(!result.length)result=ITP_MASTER.map(function(n){return{itpNo:'',name:n};});
+  return result;
+}
 function renderTypeSugg(v){
-  var items=v?ITP_MASTER.filter(function(x){return x.toLowerCase().includes(v.toLowerCase());}):ITP_MASTER.slice(0,8);
-  // Also add linked types at top
   var linked=getLinkedItpTypes();
-  if(linked.length){items=[...new Set([...linked.filter(function(t){return!v||t.toLowerCase().includes(v.toLowerCase());}), ...items])];}
+  var all=getTemplateTypes();
+  var filtered=v
+    ?all.filter(function(t){return t.name.toLowerCase().includes(v.toLowerCase())||(t.itpNo||'').toLowerCase().includes(v.toLowerCase());})
+    :all;
+  // Put linked types first
+  var linkedItems=filtered.filter(function(t){return linked.includes(t.name);});
+  var otherItems=filtered.filter(function(t){return !linked.includes(t.name);});
+  var items=[...linkedItems,...otherItems].slice(0,12);
   var list=document.getElementById('typeSugg');
   if(!items.length){list.style.display='none';return;}
-  list.innerHTML=items.slice(0,10).map(function(x){
-    var isLinked=linked.includes(x);
-    return'<div class="sugg-item" onmousedown="pickType(\''+escH(x)+'\')">'+escH(x)+(isLinked?'<span style="float:right;font-family:DM Mono,monospace;font-size:9px;color:var(--accent)">linked</span>':'')+'</div>';
+  list.innerHTML=items.map(function(t){
+    var isLinked=linked.includes(t.name);
+    return'<div class="sugg-item" onmousedown="pickType(\''+escH(t.name)+'\')" style="display:flex;align-items:center;justify-content:space-between">'
+      +'<span>'+escH(t.name)+'</span>'
+      +'<span style="font-family:DM Mono,monospace;font-size:9px;color:'+(isLinked?'var(--accent)':'var(--muted)')+';">'
+        +(isLinked?'linked ':'')+escH(t.itpNo||'')
+      +'</span>'
+      +'</div>';
   }).join('');
   list.style.display='';
 }
-function pickType(t){document.getElementById('pinItpType').value=t;document.getElementById('typeSugg').style.display='none';onPinTypeInput();}
+function pickType(t){
+  var inp=document.getElementById('pinItpType');
+  inp.value=t;
+  inp.setAttribute('readonly','');
+  document.getElementById('typeSugg').style.display='none';
+  onPinTypeInput();
+}
 function onPinTypeInput(){
   var t=document.getElementById('pinItpType').value;
   var isEquip=EQUIP_TYPES.includes(t);
