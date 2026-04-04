@@ -617,7 +617,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 
 <script>
 var SK = 'hvacnexus_techsubs_GCT001';
-var EQK = 'hvacnexus_equip_GCT001';
+
 
 var submissions = [];
 var activeId = null; // currently open submission id
@@ -649,10 +649,10 @@ function today(){return new Date().toISOString().split('T')[0];}
 })();
 
 /* USER NAME */
-(function(){try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');if(cs.userName)document.getElementById('sbUserName').textContent=cs.userName;}catch(e){}})();
+(function(){try{var cs=(dbGetCurrentUser()||{});if(cs.userName)document.getElementById('sbUserName').textContent=cs.userName;}catch(e){}})();
 
 /* DATA */
-function save(){try{localStorage.setItem(SK,JSON.stringify(submissions));}catch(e){}}
+function save(){dbSetTechSubmissions(_tsPNum,submissions).catch(function(e){console.error(e);});}
 function load(){try{var s=localStorage.getItem(SK);if(s){var p=JSON.parse(s);submissions=Array.isArray(p)?p:[];}}catch(e){submissions=[];}}
 load();
 
@@ -688,12 +688,11 @@ function docChips(rev){
 }
 
 /* LOAD EQUIPMENT FROM SCHEDULE */
-function loadEquipSchedule(){
+async function loadEquipSchedule(){
   try{
-    var raw=localStorage.getItem(EQK);
+    var raw=await dbGetEquipment(_tsPNum);
     if(!raw)return null;
-    var p=JSON.parse(raw);
-    return p;
+    return (typeof raw==='string')?JSON.parse(raw):raw;
   }catch(e){return null;}
 }
 
