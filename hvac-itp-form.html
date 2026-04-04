@@ -302,12 +302,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 //   ?drawingId=xxx&pinId=xxx
 // ═══════════════════════════════════════════════════
 
-var DK = 'hvacnexus_drawings_GCT001';
-var ITK = 'hvacnexus_itp_templates';
-var EQK = 'hvacnexus_equip_GCT001';
-var RESP_SK = 'hvacnexus_itp_responses_GCT001';
-var SIG_SK = 'hvacnexus_user_signatures';
-var CS_SK = 'hvacnexus_company_settings';
+var _ifProj=dbGetCurrentProject();
+var _ifPNum=_ifProj.num||_ifProj.number||'GCT001';
+var SIG_SK='hvacnexus_user_signatures'; // signatures stay local
 
 var drawingId = '', pinId = '';
 var pin = null, itpTemplate = null, itpRevision = null;
@@ -325,14 +322,14 @@ function todayStr(){return new Date().toISOString().split('T')[0];}
 function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
 
 // ── LOAD DATA ──
-function loadDrawings(){try{var s=localStorage.getItem(DK);if(s){var p=JSON.parse(s);return Array.isArray(p)?p:[];}}catch(e){}return[];}
-function loadTemplates(){try{var s=localStorage.getItem(ITK);if(s)return JSON.parse(s);}catch(e){}return[];}
-function loadEquipSchedule(){try{var s=localStorage.getItem(EQK);if(s)return JSON.parse(s);}catch(e){}return null;}
-function loadResponses(){try{var s=localStorage.getItem(RESP_SK);if(s)return JSON.parse(s);}catch(e){}return{};}
-function saveResponses(){try{localStorage.setItem(RESP_SK,JSON.stringify(allResponses));}catch(e){}}
+async function loadDrawings(){try{var p=await dbGetDrawings(_ifPNum);return Array.isArray(p)?p:[];}catch(e){return [];}}
+async function loadTemplates(){try{var s=await dbGetItpProjectTemplates(_ifPNum);return Array.isArray(s)?s:[];}catch(e){return [];}}
+async function loadEquipSchedule(){try{return await dbGetEquipment(_ifPNum)||null;}catch(e){return null;}}
+async function loadResponses(){try{return await dbGetItpResponses(_ifPNum)||{};}catch(e){return {};}}
+function saveResponses(){dbSetItpResponses(_ifPNum,allResponses).catch(e=>console.error(e));}
 function loadSigs(){try{var s=localStorage.getItem(SIG_SK);if(s)return JSON.parse(s);}catch(e){}return{};}
 function saveSigs(sigs){try{localStorage.setItem(SIG_SK,JSON.stringify(sigs));}catch(e){}}
-function loadSettings(){try{var s=localStorage.getItem(CS_SK);if(s)return JSON.parse(s);}catch(e){}return{};}
+async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch(e){return {};}}
 
 // ── INIT ──
 (function(){
@@ -810,7 +807,7 @@ function updateStatus(val){
   var drawing=drawings.find(function(d){return d.id===drawingId;});
   if(drawing&&drawing.pins){
     var p=drawing.pins.find(function(x){return x.id===pinId;});
-    if(p){p.itpStatus=val;try{localStorage.setItem(DK,JSON.stringify(drawings));}catch(e){}}
+    if(p){p.itpStatus=val;dbSetDrawings(_ifPNum,drawings).catch(e=>console.error(e));}
   }
 }
 

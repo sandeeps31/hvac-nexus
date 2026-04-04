@@ -316,18 +316,20 @@ var TEAM_SK = 'hvacnexus_proj_team_' + projectId;
 var AREAS_SK = 'hvacnexus_proj_areas_' + projectId;
 var SUBBIES_SK = 'hvacnexus_proj_subbies_' + projectId;
 
-// Load project from projects list
-var projects = [];
-try { var ps = localStorage.getItem('hvacnexus_projects'); if(ps) projects = JSON.parse(ps); } catch(e) {}
-var proj = projects.find(function(p){ return p.id === projectId; }) || {};
-
-// Update breadcrumb
-var bcEl = document.querySelector('.bc-proj-name');
-if(bcEl && proj.name) bcEl.textContent = proj.name;
-
-// Load project settings (merged from projects list + local overrides)
-var settings = {};
-try { var ss = localStorage.getItem(SK); if(ss) settings = JSON.parse(ss); } catch(e) {}
+// ── ASYNC INIT ──
+var projects=[], proj={}, settings={}, team=[], subbies=[], contacts=[], areas=[];
+(async function(){
+  try{var ps=await dbGetProjects();if(ps)projects=ps;}catch(e){}
+  proj=projects.find(function(p){return p.id===projectId;})||{};
+  var bcEl=document.querySelector('.bc-proj-name');
+  if(bcEl&&proj.name)bcEl.textContent=proj.name;
+  try{var ss=await dbGetProject('proj_settings',projectId);if(ss)settings=ss;}catch(e){}
+  try{var td=await dbGetProject('proj_settings',projectId+'_team');if(td)team=td;}catch(e){}
+  try{var sd=await dbGetProject('proj_settings',projectId+'_subbies');if(sd)subbies=sd;}catch(e){}
+  try{var cd=await dbGetCompanySettings();if(cd&&cd.contacts)contacts=cd.contacts;}catch(e){}
+  try{var ad=await dbGetProject('proj_settings',projectId+'_areas');if(ad)areas=ad;}catch(e){}
+  loadFields();renderTeam();renderSubbies();renderAreas();
+})();
 
 function v(id){ var el=document.getElementById(id); return el?el.value:''; }
 
@@ -351,8 +353,8 @@ function saveAll() {
   // Update in projects list too
   var idx = projects.findIndex(function(p){ return p.id === projectId; });
   if(idx >= 0) Object.assign(projects[idx], data);
-  localStorage.setItem('hvacnexus_projects', JSON.stringify(projects));
-  localStorage.setItem(SK, JSON.stringify(data));
+  dbSetProjects(projects).catch(e=>console.error(e));
+  dbSetProject('proj_settings', projectId, data).catch(e=>console.error(e));
   showToast('Settings saved');
 }
 
@@ -365,10 +367,9 @@ function switchTab(tab) {
 }
 
 // TEAM
-var team = [];
-try { var td = localStorage.getItem(TEAM_SK); if(td) team = JSON.parse(td); } catch(e) {}
+var _teamPlaceholder=null; // loaded in async init above
 
-function saveTeam(){ localStorage.setItem(TEAM_SK, JSON.stringify(team)); }
+function saveTeam(){ dbSetProject('proj_settings', projectId+'_team', team).catch(e=>console.error(e)); }
 function renderTeam() {
   var list = document.getElementById('teamList');
   var roleColors = {Admin:'var(--accent)',PM:'var(--green)',Engineer:'var(--warn)',Subcontractor:'var(--text2)',Witness:'var(--muted)'};
@@ -402,14 +403,11 @@ function saveTeamMember() {
   ['tm-name','tm-company','tm-email','tm-phone'].forEach(function(id){document.getElementById(id).value='';});
 }
 
-// SUBCONTRACTORS
-var subbies = [];
-try { var sd = localStorage.getItem(SUBBIES_SK); if(sd) subbies = JSON.parse(sd); } catch(e) {}
-var contacts = [];
-try { var cd = localStorage.getItem('hvacnexus_contacts'); if(cd) contacts = JSON.parse(cd); } catch(e) {}
+// SUBCONTRACTORS — loaded in async init above
+var _subbiesPlaceholder=null;
 var DISCIPLINES = ['Mechanical','Electrical','Hydraulic','Fire','Architectural','Structural','BMS','Lift','Other'];
 
-function saveSubbies(){ localStorage.setItem(SUBBIES_SK, JSON.stringify(subbies)); }
+function saveSubbies(){ dbSetProject('proj_settings', projectId+'_subbies', subbies).catch(e=>console.error(e)); }
 function renderSubbies() {
   var list = document.getElementById('subbieList');
   if(!subbies.length) {
@@ -432,10 +430,9 @@ function addSubbieRow() {
   saveSubbies(); renderSubbies();
 }
 
-// AREAS
-var areas = [];
-try { var ad = localStorage.getItem(AREAS_SK); if(ad) areas = JSON.parse(ad); } catch(e) {}
-function saveAreas(){ localStorage.setItem(AREAS_SK, JSON.stringify(areas)); }
+// AREAS — loaded in async init above
+var _areasPlaceholder=null;
+function saveAreas(){ dbSetProject('proj_settings',projectId+'_areas',areas).catch(e=>console.error(e)); }
 function renderAreas() {
   var list = document.getElementById('areaList');
   if(!areas.length) {
@@ -468,10 +465,7 @@ function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 document.querySelector('.bc-proj-name').onclick = function(){ window.location.href='project.html?id='+projectId; };
 
 // INIT
-loadFields();
-renderTeam();
-renderSubbies();
-renderAreas();
+// Init handled in async IIFE above
 
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeTeamModal(); });
 
