@@ -346,9 +346,9 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   }
 
   // Load pin
-  var drawings=await loadDrawings();
-  var drawing=drawings.find(function(d){return d.id===drawingId;});
-  if(drawing&&drawing.pins){pin=drawing.pins.find(function(p){return p.id===pinId;});}
+  var _drawings=await dbGetDrawings(_ifPNum)||[];
+  var _drawing=Array.isArray(_drawings)?_drawings.find(function(d){return d.id===drawingId;}):null;
+  if(_drawing&&Array.isArray(_drawing.pins)){pin=_drawing.pins.find(function(p){return p.id===pinId;})||null;}
 
   if(!pin){
     document.getElementById('formPage').innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:40px;margin-bottom:16px">⚠️</div><div style="font-size:16px">Pin not found. Please return to drawings.</div><br><button class="btn bp" onclick="goBack()">✕ Close Tab</button></div>';
@@ -356,8 +356,8 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   }
 
   // Find ITP template
-  var templates=await loadTemplates();
-  var matched=templates.find(function(t){return t.itpType===pin.itpTypeLabel||t.itpNo===pin.ref;});
+  var _templates=await dbGetItpProjectTemplates(_ifPNum)||[];
+  var matched=Array.isArray(_templates)?_templates.find(function(t){return t.itpType===pin.itpTypeLabel||t.itpNo===pin.ref;}):null;
   if(matched){
     itpTemplate=matched;
     // Use current revision
@@ -368,7 +368,7 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   }
 
   // Load responses
-  allResponses=await loadResponses();
+  allResponses=await dbGetItpResponses(_ifPNum)||{};
   if(!allResponses[pinId]){
     allResponses[pinId]={status:'not-started',docNo:pin.docNo||'',rows:{},signoffs:{}};
   }
