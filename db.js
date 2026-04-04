@@ -110,8 +110,21 @@ async function dbSetProjects(data) {
 }
 
 // ── Current project (still localStorage — it's a session value) ──
+// Pages that should NOT redirect even without a project set:
+var _NO_REDIRECT_PAGES = ['index.html', 'project.html', 'hvac-settings.html'];
 function dbGetCurrentProject() {
-  try { return JSON.parse(localStorage.getItem('hvacnexus_current_project') || '{}'); } catch(e) { return {}; }
+  try {
+    var data = JSON.parse(localStorage.getItem('hvacnexus_current_project') || '{}');
+    // If no project is set and we're not on an exempt page, redirect to index
+    if (!data || (!data.num && !data.number)) {
+      var page = window.location.pathname.split('/').pop() || 'index.html';
+      if (_NO_REDIRECT_PAGES.indexOf(page) === -1) {
+        console.warn('No current project set — redirecting to index.html');
+        window.location.href = 'index.html';
+      }
+    }
+    return data || {};
+  } catch(e) { return {}; }
 }
 function dbSetCurrentProject(data) {
   localStorage.setItem('hvacnexus_current_project', JSON.stringify(data));
