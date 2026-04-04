@@ -332,13 +332,21 @@ function saveSigs(sigs){try{localStorage.setItem(SIG_SK,JSON.stringify(sigs));}c
 async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch(e){return {};}}
 
 // ── INIT ──
-(function(){
+(async function(){
   var params=new URLSearchParams(window.location.search);
   drawingId=params.get('drawingId')||'';
   pinId=params.get('pinId')||'';
 
+  // Hide sidebar if loaded inside an iframe
+  if(window.self!==window.top){
+    var sb=document.getElementById('sidebar');
+    var mw=document.getElementById('mainWrap');
+    if(sb)sb.style.display='none';
+    if(mw){mw.style.marginLeft='0';mw.style.left='0';}
+  }
+
   // Load pin
-  var drawings=loadDrawings();
+  var drawings=await loadDrawings();
   var drawing=drawings.find(function(d){return d.id===drawingId;});
   if(drawing&&drawing.pins){pin=drawing.pins.find(function(p){return p.id===pinId;});}
 
@@ -348,7 +356,7 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   }
 
   // Find ITP template
-  var templates=loadTemplates();
+  var templates=await loadTemplates();
   var matched=templates.find(function(t){return t.itpType===pin.itpTypeLabel||t.itpNo===pin.ref;});
   if(matched){
     itpTemplate=matched;
@@ -360,7 +368,7 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   }
 
   // Load responses
-  allResponses=loadResponses();
+  allResponses=await loadResponses();
   if(!allResponses[pinId]){
     allResponses[pinId]={status:'not-started',docNo:pin.docNo||'',rows:{},signoffs:{}};
   }
