@@ -194,7 +194,6 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -382,11 +381,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 </div>
 
 <script>
-var PC_SK='hvacnexus_progress_claims_GCT001';
-var BUD_SK='hvacnexus_budget_GCT001';
-var VAR_SK='hvacnexus_variations_GCT001';
-var INV_SK='hvacnexus_vendor_invoices_GCT001';
-var CO_SK='hvacnexus_company_settings';
+var _pcProj=dbGetCurrentProject();var _pcPNum=_pcProj.num||_pcProj.number||'GCT001';
 
 
 var claimsData={contractValue:0,retentionPct:5,lineItems:[],claims:[]};
@@ -408,19 +403,19 @@ function currentMonth(){var d=new Date();return d.getFullYear()+'-'+String(d.get
 // SIDEBAR
 
 
-(function(){applySB(localStorage.getItem(SBK)==='1');})();
+(async function(){applySB(localStorage.getItem(SBK)==='1');})();
 
 
 // DATA
-function save(){try{localStorage.setItem(PC_SK,JSON.stringify(claimsData));}catch(e){}}
-function load(){
-  try{var s=localStorage.getItem(PC_SK);if(s){var p=JSON.parse(s);if(p&&p.claims){claimsData=p;return;}}}catch(e){}
+function save(){dbSetProgressClaims(_pcPNum,claimsData).catch(e=>console.error(e));}
+async function load(){
+  try{var s=await dbGetProgressClaims(_pcPNum);if(s&&s.claims){claimsData=s;}}catch(e){}
   claimsData={contractValue:0,retentionPct:5,lineItems:[],claims:[]};
 }
 load();
 
 // COMPANY SETTINGS
-function loadCoSettings(){try{return JSON.parse(localStorage.getItem(CO_SK)||'{}');}catch(e){return {};}}
+async function loadCoSettings(){try{return await dbGetCompanySettings()||{};}catch(e){return {};}}
 function applyLetterhead(){
   var co=loadCoSettings();
   document.getElementById('lhCoName').textContent=co.coName||'Company Name';
@@ -436,7 +431,7 @@ applyLetterhead();
 // LOAD BUDGET LINE ITEMS
 function loadBudgetItems(){
   try{
-    var s=localStorage.getItem(BUD_SK);if(!s)return[];
+    var s=null/*use dbGetBudget*/;if(!s)return[];
     var p=JSON.parse(s);
     var items=[];
     (p.sections||[]).forEach(function(sec){
@@ -453,7 +448,7 @@ function loadBudgetItems(){
 // LOAD VARIATIONS (approved only option)
 function loadVariations(approvedOnly){
   try{
-    var s=localStorage.getItem(VAR_SK);if(!s)return[];
+    var s=null/*use dbGetVariations*/;if(!s)return[];
     var p=JSON.parse(s);
     var vars=Array.isArray(p.variations)?p.variations:[];
     if(approvedOnly) vars=vars.filter(function(v){return v.status==='Approved';});
@@ -464,7 +459,7 @@ function loadVariations(approvedOnly){
 // LOAD VENDOR INVOICES for a month
 function loadInvoicesForMonth(month){
   try{
-    var s=localStorage.getItem(INV_SK);if(!s)return[];
+    var s=null/*use dbGetVendorInvoices*/;if(!s)return[];
     var p=JSON.parse(s);
     var invs=Array.isArray(p.invoices)?p.invoices:[];
     return invs.filter(function(i){return i.month===month&&i.status==='Approved';});
@@ -1052,8 +1047,8 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
   localStorage.removeItem('hvacnexus_sb_groups');
-  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
-  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  try{var p=dbGetCurrentProject();if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
   if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
     handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});

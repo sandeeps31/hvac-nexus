@@ -176,7 +176,6 @@ body.edit-mode #saveStructBtn{background:var(--green);color:#080c12}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s;min-width:0;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -359,19 +358,16 @@ var CUK='hvacnexus_current_user';
 
 // ── CURRENT USER & PERMISSIONS ──
 var currentUser=null;
-function loadCurrentUser(){
-  try{currentUser=JSON.parse(localStorage.getItem(CUK)||'null');}catch(e){currentUser=null;}
+async function loadCurrentUser(){
+  currentUser=dbGetCurrentUser();
   if(!currentUser){
     try{
-      var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');
-      var users=JSON.parse(localStorage.getItem('hvacnexus_users')||'[]');
-      // 1. Try match by settings userName
+      var cs=await dbGetCompanySettings()||{};
+      var users=await dbGetUsers()||[];
       var matched=users.find(function(u){return u.name===(cs.userName||'');});
-      // 2. Fall back to first Admin
       if(!matched)matched=users.find(function(u){return u.role==='Admin';});
-      // 3. Fall back to first user
       if(!matched&&users.length)matched=users[0];
-      if(matched){currentUser={id:matched.id,name:matched.name,role:matched.role};localStorage.setItem(CUK,JSON.stringify(currentUser));}
+      if(matched){currentUser={id:matched.id,name:matched.name,role:matched.role};dbSetCurrentUser(currentUser);}
       else if(cs.userName){currentUser={id:'cs_user',name:cs.userName,role:cs.userRole||'Admin'};}
     }catch(e){}
   }
@@ -415,30 +411,31 @@ var ITP_MASTER=[
 ];
 
 // DATA
-var proj=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');
+var proj=dbGetCurrentProject();
 var pKey=proj.num||proj.number||'GCT001';
-var DK='hvacnexus_itp_structure_'+pKey;   // {buildings:[{id,name,desc,locations:[{id,name,desc,itpTypes:[{id,name,cat,drawings:[{id,num,name,rev}]}]}]}]}
-var DKD='hvacnexus_drawings_'+pKey;
-var DKR='hvacnexus_itp_responses_'+pKey;
 
 var structure={buildings:[]};
 var drawings=[];
 
-function loadAll(){
-  try{structure=JSON.parse(localStorage.getItem(DK)||'{"buildings":[]}')||{buildings:[]};}catch(e){structure={buildings:[]};}
-  try{drawings=JSON.parse(localStorage.getItem(DKD)||'[]');}catch(e){drawings=[];}
+async function loadAll(){
+  try{var s=await dbGetItpStructure(pKey);structure=(s&&s.buildings)?s:{buildings:[]};}catch(e){structure={buildings:[]};}
+  try{var d=await dbGetDrawings(pKey);drawings=Array.isArray(d)?d:[];}catch(e){drawings=[];}
 }
-function saveStructure(){try{localStorage.setItem(DK,JSON.stringify(structure));}catch(e){}}
+function saveStructure(){
+  dbSetItpStructure(pKey,structure).catch(function(e){console.error('saveStructure error:',e);});
+}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function nid(){return'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);}
-loadAll();
-loadCurrentUser();
 
-// INIT
-(function(){
+// ASYNC INIT
+(async function(){
   if(proj.name){document.getElementById('sb-proj-name').textContent=proj.name;document.getElementById('bc-proj').textContent=proj.name;}
-  if(proj.number)document.getElementById('sb-proj-num').textContent=proj.number;
+  if(proj.num||proj.number)document.getElementById('sb-proj-num').textContent=proj.num||proj.number;
   applySB(localStorage.getItem(SBK)==='1');
+  await loadCurrentUser();
+  await loadAll();
+  // Cache project templates for ITP type dropdown
+  try{window._cachedProjectTemplates=await dbGetItpProjectTemplates(pKey)||[];}catch(e){window._cachedProjectTemplates=[];}
   applyRoleUI();
   renderStats();render();
 })();
@@ -476,7 +473,7 @@ function applyRoleUI(){
 function getItpCounts(itype){
   // Count pins from linked drawings that belong to this ITP type
   var total=0,ns=0,ip=0,act=0,cl=0;
-  var resp={};try{resp=JSON.parse(localStorage.getItem(DKR)||'{}');}catch(e){}
+  var resp={};try{resp=JSON.parse(localStorage.getItem('hvacnexus_itp_responses_'+pKey)||'{}');}catch(e){}
   (itype.drawings||[]).forEach(function(ld){
     var drw=drawings.find(function(d){return d.id===ld.id;});
     if(!drw||!drw.pins)return;
@@ -852,8 +849,14 @@ function getItpTypeList(){
   // Pull from project templates only, fall back to ITP_MASTER if none set up
   var result=[];
   try{
-    var tmpl=JSON.parse(localStorage.getItem('hvacnexus_itp_templates_'+pKey)||'[]');
-    tmpl.forEach(function(t){if(t.itpType)result.push({name:t.itpType,itpNo:t.itpNo||''}); });
+    // Use cached project templates if available
+    if(window._cachedProjectTemplates&&window._cachedProjectTemplates.length){
+      window._cachedProjectTemplates.forEach(function(t){if(t.itpType)result.push({name:t.itpType,itpNo:t.itpNo||''}); });
+    } else {
+      // Fallback to localStorage during transition
+      var tmpl=JSON.parse(localStorage.getItem('hvacnexus_itp_templates_'+pKey)||'[]');
+      tmpl.forEach(function(t){if(t.itpType)result.push({name:t.itpType,itpNo:t.itpNo||''}); });
+    }
   }catch(e){}
   if(!result.length)result=ITP_MASTER.map(function(n){return{name:n,itpNo:''};});
   return result;

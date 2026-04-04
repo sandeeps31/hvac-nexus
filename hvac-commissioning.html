@@ -428,7 +428,6 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -837,11 +836,12 @@ function savePlan(){const b=document.querySelector('.btn-green');b.textContent='
 
 // TRACKER
 let trackerItems=[];
-var TRACKER_KEY='hvacnexus_tracker_GCT001';
-function saveTracker(){try{localStorage.setItem(TRACKER_KEY,JSON.stringify(trackerItems));}catch(e){}}
-function loadTracker(){
+var _cxProj=dbGetCurrentProject();var _cxPNum=_cxProj.num||_cxProj.number||'GCT001';
+var TRACKER_KEY='hvacnexus_tracker_'+_cxPNum;
+function saveTracker(){dbSetCommissioning(_cxPNum,trackerItems).catch(e=>console.error(e));}
+async function loadTracker(){
   try{
-    var s=localStorage.getItem(TRACKER_KEY);
+    var s=await dbGetCommissioning(_cxPNum);
     if(s){
       trackerItems=JSON.parse(s);
       // Strip any MSSB/DCP rows that were synced before the exclusion was added
@@ -880,14 +880,14 @@ var EQUIP_TYPE_NAMES={
   'reheat':'Reheat','hepa':'HEPA','edh':'EDH','grilles':'Grille','dampers':'Damper'
 };
 
-function syncTrackerFromSchedule(){
+async function syncTrackerFromSchedule(){
   try{
-    var raw=localStorage.getItem('hvacnexus_equip_GCT001');
+    var raw=await dbGetEquipment(_cxPNum);
     if(!raw){
       showTrackerToast('No equipment schedule data found. Open Equipment Schedule first.');
       return;
     }
-    var data=JSON.parse(raw);
+    var data=(typeof raw==='string')?JSON.parse(raw):raw;
     var tabs=data.tabs||[];
     var imported=0;
 
@@ -969,7 +969,7 @@ function navigateToTag(tag, status){
   var orig=found.style.background;
   found.style.transition='background .2s';
   found.style.background='rgba(0,200,255,.15)';
-  setTimeout(function(){found.style.background='rgba(0,200,255,.05)';},1500);
+  setTimeout(async function(){found.style.background='rgba(0,200,255,.05)';},1500);
   setTimeout(function(){found.style.background=orig;found.style.transition='';},3000);
 }
 
@@ -1020,7 +1020,7 @@ function editDeps(idx){
   var v=prompt('Edit dependencies (comma separated):',cur);
   if(v!==null){trackerItems[idx].deps=v;saveTracker();renderTracker();}
 }
-function renderTracker(){
+async function renderTracker(){
   var sf=document.getElementById('tracker-filter-status').value;
   var tf=document.getElementById('tracker-filter-type').value;
   var q=(document.getElementById('tracker-search').value||'').toLowerCase();
@@ -1034,7 +1034,7 @@ function renderTracker(){
   // Build MSSB lookup by equipment tag (from equipment schedule MSSB tab)
   var mssbByEquip={};
   try{
-    var raw2=localStorage.getItem('hvacnexus_equip_GCT001');
+    var raw2=await dbGetEquipment(_cxPNum);
     if(raw2){
       var d2=JSON.parse(raw2);
       var mssbTab=(d2.tabs||[]).find(function(t){return t.type==='mssb';});
@@ -1046,15 +1046,15 @@ function renderTracker(){
 
   // Build ITP response lookup
   var itpResponses={};
-  try{var rs=localStorage.getItem('hvacnexus_itp_responses_GCT001');if(rs)itpResponses=JSON.parse(rs);}catch(e){}
+  try{var rs=await dbGetItpResponses(_cxPNum);if(rs)itpResponses=rs;}catch(e){}
 
   // Build ITP template lookup
   var itpTemplates={};
-  try{var ts=localStorage.getItem('hvacnexus_itp_templates');if(ts)JSON.parse(ts).forEach(function(t){itpTemplates[t.itpNo]=t;itpTemplates[t.itpType]=t;});}catch(e){}
+  try{var ts=await dbGetItpTemplates();if(ts)ts.forEach(function(t){itpTemplates[t.itpNo]=t;itpTemplates[t.itpType]=t;});}catch(e){}
 
   // Build drawing pin lookup: equipId -> {drawingId, pinId, itpNo, itpTypeLabel}
   var pinLookup={};
-  try{var dk=localStorage.getItem('hvacnexus_drawings_GCT001');if(dk)JSON.parse(dk).forEach(function(d){(d.pins||[]).forEach(function(p){if(p.equip)pinLookup[p.equip]={drawingId:d.id,pinId:p.id,itpNo:p.ref||'',itpType:p.itpTypeLabel||''};});});}catch(e){}
+  try{var dk=await dbGetDrawings(_cxPNum);if(dk)dk.forEach(function(d){(d.pins||[]).forEach(function(p){if(p.equip)pinLookup[p.equip]={drawingId:d.id,pinId:p.id,itpNo:p.ref||'',itpType:p.itpTypeLabel||''};});});}catch(e){}
 
   function addWD2(dateStr,days){
     if(!dateStr||!days||isNaN(parseInt(days)))return '';
@@ -1270,7 +1270,7 @@ var CX_COL_DEFS=[
   {k:'powerPlus8',l:'Power Rcvd +8 Days',def:false},{k:'deps',l:'Dependencies',def:true},
   {k:'defect',l:'Defect',def:false},{k:'responsibility',l:'Responsibility',def:true},{k:'subby',l:'Subby Responsible',def:true}
 ];
-var CX_COL_STORE='hvacnexus_cx_cols_GCT001';
+var CX_COL_STORE='hvacnexus_cx_cols_'+_cxPNum;
 function getCxCols(){
   try{var s=localStorage.getItem(CX_COL_STORE);if(s)return JSON.parse(s);}catch(e){}
   var def={};CX_COL_DEFS.forEach(function(c){def[c.k]=c.def;});return def;
@@ -1307,9 +1307,9 @@ function applyColSettings(){
   renderTracker();
 }
 
-function openItpPrecx(tag){
+async function openItpPrecx(tag){
   var pinLookup2={};
-  try{var dk=localStorage.getItem('hvacnexus_drawings_GCT001');if(dk)JSON.parse(dk).forEach(function(d){(d.pins||[]).forEach(function(p){if(p.equip)pinLookup2[p.equip]={drawingId:d.id,pinId:p.id};});});}catch(e){}
+  try{var dk=await dbGetDrawings(_cxPNum);if(dk)dk.forEach(function(d){(d.pins||[]).forEach(function(p){if(p.equip)pinLookup2[p.equip]={drawingId:d.id,pinId:p.id};});});}catch(e){}
   var pi=pinLookup2[tag];
   if(!pi){showTrackerToast('No ITP pin found for '+tag+'. Add an ITP pin on the drawing first.');return;}
   var base=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
@@ -1407,27 +1407,27 @@ var PRECX_TEMPLATE_DATA={"sections": [{"title": "General / Documentation", "item
 (function(){
   try{
     // Always ensure template is up to date
-    localStorage.setItem('hvacnexus_precx_template', JSON.stringify(PRECX_TEMPLATE_DATA));
+    dbSetPrecxTemplate(PRECX_TEMPLATE_DATA).catch(e=>console.error(e));
   }catch(e){}
 })();
 loadTracker();renderTimeline();renderSystems();renderDocs();renderTracker();
 
 // ── PRE-CX CHECKLIST ──
-var PRECX_KEY = 'hvacnexus_precx_GCT001';
+var PRECX_KEY='hvacnexus_precx_'+_cxPNum;
 var precxData = [];  // [{id, title, collapsed, items:[{id,text,checked}]}]
 var precxUid = 1000;
 function puid(){return 'p'+(++precxUid);}
 
-function loadPrecx(){
+async function loadPrecx(){
   try{
-    var s=localStorage.getItem(PRECX_KEY);
+    var s=await dbGetProject('precx_data',_cxPNum);
     if(s){ precxData=JSON.parse(s); return; }
   }catch(e){}
   precxData=[];
 }
 
 function savePrecx(){
-  try{localStorage.setItem(PRECX_KEY,JSON.stringify(precxData));}catch(e){}
+  dbSetProject('precx_data',_cxPNum,precxData).catch(e=>console.error(e));
 }
 
 function openAreaModal(){
@@ -1440,10 +1440,10 @@ function openAreaModal(){
 function closeAreaModal(){
   document.getElementById('areaModal').classList.remove('open');
 }
-function getPrecxTemplateData(){
+async function getPrecxTemplateData(){
   // Returns [{sectionTitle, items:[string]}] from pre-cx template
   try{
-    var tmpl=localStorage.getItem('hvacnexus_precx_template');
+    var tmpl=await dbGetPrecxTemplate();
     if(tmpl){
       var td=JSON.parse(tmpl);
       if(td.sections&&td.sections.length) return td.sections;
@@ -2068,14 +2068,14 @@ document.querySelectorAll('.sb-item[data-tip]').forEach(function(el){
 // Company settings
 (function(){
   try{
-  var s=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');
+  var s=(_cachedCS||{});
   if(s.coName) document.getElementById('sb-proj-name').textContent=s.coName;
   if(s.userName) document.getElementById('sb-user').textContent=s.userName;
   }catch(e){}
 })();
 
 // ── MSSB & DCP COMMISSIONING TRACKER ──
-var MSSB_KEY='hvacnexus_mssb_cx_GCT001';
+var MSSB_KEY='hvacnexus_mssb_cx_'+_cxPNum;
 var mssbRows=[];
 var mssbUid=5000;
 function mid(){return 'm'+(++mssbUid);}
@@ -2095,15 +2095,15 @@ var MSSB_FIXED_COLS=[
 var mssbCols=JSON.parse(JSON.stringify(MSSB_FIXED_COLS));
 
 function saveMssb(){try{localStorage.setItem(MSSB_KEY,JSON.stringify({rows:mssbRows,cols:mssbCols}));}catch(e){}}
-function loadMssb(){try{var s=localStorage.getItem(MSSB_KEY);if(s){var d=JSON.parse(s);mssbRows=d.rows||[];if(d.cols&&d.cols.length)mssbCols=d.cols;}}catch(e){}}
+async function loadMssb(){try{var s=localStorage.getItem(MSSB_KEY);if(s){var d=JSON.parse(s);mssbRows=d.rows||[];if(d.cols&&d.cols.length)mssbCols=d.cols;}}catch(e){}}
 
-function loadMssbFromSchedule(){
+async function loadMssbFromSchedule(){
   // Try localStorage first (same folder)
   var found=false;
   try{
-  var raw=localStorage.getItem('hvacnexus_equip_GCT001');
+  var raw=await dbGetEquipment(_cxPNum);
   if(raw){
-    var data=JSON.parse(raw);
+    var data=(typeof raw==='string')?JSON.parse(raw):raw;
     var mssbTab=(data.tabs||[]).find(function(t){return t.type==='mssb';});
     if(mssbTab&&mssbTab.rows&&mssbTab.rows.length){
     var imported=0;
@@ -2330,8 +2330,8 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
   localStorage.removeItem('hvacnexus_sb_groups');
-  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
-  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  try{var p=dbGetCurrentProject();if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
   if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
     handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});

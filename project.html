@@ -85,7 +85,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .mod-tile.coming-soon:hover{transform:none;border-color:var(--border)}
 .cs-tag{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);background:var(--surface3);border:1px solid var(--border);padding:1px 7px;border-radius:10px;position:absolute;top:10px;right:10px}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -257,109 +256,100 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 var params=new URLSearchParams(window.location.search);
 var projectId=params.get('id')||'gct001';
 
-// Load project list
-var projects=[];
-try{var ps=localStorage.getItem('hvacnexus_projects');if(ps)projects=JSON.parse(ps);}catch(e){}
-var proj=projects.find(function(p){return p.id===projectId;})||{
-  id:'gct001',num:'GCT001',name:'Greenfield Commercial Tower',
-  client:'CPB Contractors',value:'$2,400,000',type:'Commercial',
-  status:'Active',location:'Sydney, NSW'
-};
+// ── ASYNC INIT ──
+(async function(){
+  // Load project list from Supabase
+  var projects=[];
+  try{var ps=await dbGetProjects();if(ps&&Array.isArray(ps))projects=ps;}catch(e){}
+  var proj=projects.find(function(p){return p.id===projectId;})||{
+    id:'gct001',num:'GCT001',name:'Greenfield Commercial Tower',
+    client:'CPB Contractors',value:'$2,400,000',type:'Commercial',
+    status:'Active',location:'Sydney, NSW'
+  };
 
-// Set current project so modules can read it
-localStorage.setItem('hvacnexus_current_project',JSON.stringify({id:proj.id,num:proj.num,name:proj.name}));
+  // Set current project so modules can read it
+  dbSetCurrentProject({id:proj.id,num:proj.num,name:proj.name});
   var psBtn=document.getElementById('projSettingsBtn');
   if(psBtn)psBtn.href='hvac-project-settings.html?id='+proj.id;
 
-// ── HEADER ──
-document.getElementById('hdrNum').textContent=proj.num||'';
-document.getElementById('hdrName').textContent=proj.name||'';
-var stEl=document.getElementById('hdrStatus');
-var stCls={Active:'ps-active',Tender:'ps-tender','On Hold':'ps-onhold',Complete:'ps-complete'};
-stEl.textContent=proj.status||'Active';
-stEl.className='proj-status-badge '+(stCls[proj.status]||'ps-active');
+  // ── HEADER ──
+  document.getElementById('hdrNum').textContent=proj.num||'';
+  document.getElementById('hdrName').textContent=proj.name||'';
+  var stEl=document.getElementById('hdrStatus');
+  var stCls={Active:'ps-active',Tender:'ps-tender','On Hold':'ps-onhold',Complete:'ps-complete'};
+  stEl.textContent=proj.status||'Active';
+  stEl.className='proj-status-badge '+(stCls[proj.status]||'ps-active');
 
-// ── BANNER ──
-document.getElementById('bannerName').textContent=proj.name||'—';
-document.getElementById('bannerNum').textContent=proj.num||'—';
-var metaHtml='';
-if(proj.client)metaHtml+='<div class="pbm"><div class="pbm-label">Client</div><div class="pbm-val">'+escH(proj.client)+'</div></div>';
-if(proj.value)metaHtml+='<div class="pbm"><div class="pbm-label">Contract Value</div><div class="pbm-val">'+escH(proj.value)+'</div></div>';
-if(proj.type)metaHtml+='<div class="pbm"><div class="pbm-label">Type</div><div class="pbm-val">'+escH(proj.type)+'</div></div>';
-if(proj.location)metaHtml+='<div class="pbm"><div class="pbm-label">Location</div><div class="pbm-val">'+escH(proj.location)+'</div></div>';
-if(proj.start)metaHtml+='<div class="pbm"><div class="pbm-label">Start</div><div class="pbm-val">'+escH(proj.start)+'</div></div>';
-if(proj.end)metaHtml+='<div class="pbm"><div class="pbm-label">End</div><div class="pbm-val">'+escH(proj.end)+'</div></div>';
-document.getElementById('bannerMeta').innerHTML=metaHtml;
+  // ── BANNER ──
+  document.getElementById('bannerName').textContent=proj.name||'—';
+  document.getElementById('bannerNum').textContent=proj.num||'—';
+  var metaHtml='';
+  if(proj.client)metaHtml+='<div class="pbm"><div class="pbm-label">Client</div><div class="pbm-val">'+escH(proj.client)+'</div></div>';
+  if(proj.value)metaHtml+='<div class="pbm"><div class="pbm-label">Contract Value</div><div class="pbm-val">'+escH(proj.value)+'</div></div>';
+  if(proj.type)metaHtml+='<div class="pbm"><div class="pbm-label">Type</div><div class="pbm-val">'+escH(proj.type)+'</div></div>';
+  if(proj.location)metaHtml+='<div class="pbm"><div class="pbm-label">Location</div><div class="pbm-val">'+escH(proj.location)+'</div></div>';
+  if(proj.start)metaHtml+='<div class="pbm"><div class="pbm-label">Start</div><div class="pbm-val">'+escH(proj.start)+'</div></div>';
+  if(proj.end)metaHtml+='<div class="pbm"><div class="pbm-label">End</div><div class="pbm-val">'+escH(proj.end)+'</div></div>';
+  document.getElementById('bannerMeta').innerHTML=metaHtml;
 
-// ── SUMMARY CARDS — read from localStorage ──
-var pKey=proj.num||'GCT001';
+  // ── SUMMARY CARDS — load from Supabase ──
+  var pKey=proj.num||'GCT001';
+  var drawingsData=[];var variationsData=[];var cxData=[];var equipData={};
+  try{var dv=await dbGetDrawings(pKey);drawingsData=Array.isArray(dv)?dv:[];}catch(e){}
+  try{var vv=await dbGetVariations(pKey);variationsData=Array.isArray(vv)?vv:(vv&&vv.variations?vv.variations:[]);}catch(e){}
+  try{var cv=await dbGetCommissioning(pKey);cxData=Array.isArray(cv)?cv:[];}catch(e){}
+  try{var ev=await dbGetEquipment(pKey);equipData=ev||{};}catch(e){}
 
-function getCount(key){
-  try{var s=localStorage.getItem(key);if(!s)return 0;var d=JSON.parse(s);return Array.isArray(d)?d.length:0;}catch(e){return 0;}
-}
-function getCountFiltered(key,fn){
-  try{var s=localStorage.getItem(key);if(!s)return 0;var d=JSON.parse(s);return Array.isArray(d)?d.filter(fn).length:0;}catch(e){return 0;}
-}
+  var drawings=drawingsData.length;
+  var equipment=(equipData.tabs||[]).reduce(function(a,t){return a+(t.rows||[]).length;},0);
+  var variations=variationsData.length;
+  var openVars=variationsData.filter(function(v){return v.status!=='approved'&&v.status!=='closed';}).length;
+  var cxItems=cxData.length;
+  var cxDone=cxData.filter(function(c){return c.status==='Cx Complete';}).length;
 
-var drawings=getCount('hvacnexus_drawings_'+pKey);
-var equipment=getCount('hvacnexus_equip_'+pKey);
-var variations=getCount('hvacnexus_variations_'+pKey);
-var openVars=getCountFiltered('hvacnexus_variations_'+pKey,function(v){return v.status!=='approved'&&v.status!=='closed';});
-var cxItems=getCount('hvacnexus_mssb_cx_'+pKey);
-var cxDone=getCountFiltered('hvacnexus_mssb_cx_'+pKey,function(c){return c.status==='Cx Complete';});
-
-var summaryGrid=document.getElementById('summaryGrid');
-summaryGrid.innerHTML=[
-  {num:drawings,label:'Drawings',sub:'in register',color:'var(--accent)'},
-  {num:equipment,label:'Equipment Items',sub:'on schedule',color:'var(--green)'},
-  {num:variations,label:'Variations',sub:openVars+' open',color:openVars>0?'var(--warn)':'var(--green)'},
-  {num:cxItems,label:'Cx Items',sub:cxDone+' complete',color:'var(--purple)'},
-].map(function(s){
-  return '<div class="sum-card">'
-    +'<div class="sum-num" style="color:'+s.color+'">'+s.num+'</div>'
-    +'<div class="sum-label">'+s.label+'</div>'
-    +'<div class="sum-sub">'+s.sub+'</div>'
-    +'</div>';
-}).join('');
-
-// ── ALERTS ──
-var alerts=[];
-
-// Open variations
-if(openVars>0){
-  alerts.push({type:'warn',icon:'💰',text:'<strong>'+openVars+' open variation'+(openVars!==1?'s':'')+
-    '</strong> pending approval'});
-}
-
-// Drawings with no PDF
-var drawingsData=[];
-try{var ds=localStorage.getItem('hvacnexus_drawings_'+pKey);if(ds){var dp=JSON.parse(ds);drawingsData=Array.isArray(dp)?dp:[];}}catch(e){}
-var noPdf=drawingsData.filter(function(d){return!d.pdfData&&!d.pdfUrl&&!d.superseded;}).length;
-if(noPdf>0){
-  alerts.push({type:'warn',icon:'📐',text:'<strong>'+noPdf+' drawing'+(noPdf!==1?'s':'')+
-    '</strong> missing PDF'});
-}
-
-// Cx items not started
-var notReady=getCountFiltered('hvacnexus_mssb_cx_'+pKey,function(c){
-  return c.status==='Not Ready'||!c.status;
-});
-if(notReady>0&&cxItems>0){
-  alerts.push({type:'info',icon:'⚙️',text:'<strong>'+notReady+' Cx item'+(notReady!==1?'s':'')+
-    '</strong> not yet ready for commissioning'});
-}
-
-var alertsPanel=document.getElementById('alertsPanel');
-if(!alerts.length){
-  alertsPanel.innerHTML='<div class="no-alerts"><span>✓</span> No alerts — project looks healthy</div>';
-} else {
-  alertsPanel.innerHTML=alerts.map(function(a){
-    return '<div class="alert alert-'+a.type+'">'
-      +'<span class="alert-icon">'+a.icon+'</span>'
-      +'<span class="alert-text">'+a.text+'</span>'
+  var summaryGrid=document.getElementById('summaryGrid');
+  summaryGrid.innerHTML=[
+    {num:drawings,label:'Drawings',sub:'in register',color:'var(--accent)'},
+    {num:equipment,label:'Equipment Items',sub:'on schedule',color:'var(--green)'},
+    {num:variations,label:'Variations',sub:openVars+' open',color:openVars>0?'var(--warn)':'var(--green)'},
+    {num:cxItems,label:'Cx Items',sub:cxDone+' complete',color:'var(--purple)'},
+  ].map(function(s){
+    return '<div class="sum-card">'
+      +'<div class="sum-num" style="color:'+s.color+'">'+s.num+'</div>'
+      +'<div class="sum-label">'+s.label+'</div>'
+      +'<div class="sum-sub">'+s.sub+'</div>'
       +'</div>';
   }).join('');
-}
+
+  // ── ALERTS ──
+  var alerts=[];
+  if(openVars>0){
+    alerts.push({type:'warn',icon:'💰',text:'<strong>'+openVars+' open variation'+(openVars!==1?'s':'')+
+      '</strong> pending approval'});
+  }
+  var noPdf=drawingsData.filter(function(d){return!d.pdfData&&!d.pdfUrl&&!d.superseded;}).length;
+  if(noPdf>0){
+    alerts.push({type:'warn',icon:'📐',text:'<strong>'+noPdf+' drawing'+(noPdf!==1?'s':'')+
+      '</strong> missing PDF'});
+  }
+  var notReady=cxData.filter(function(c){return c.status==='Not Ready'||!c.status;}).length;
+  if(notReady>0&&cxItems>0){
+    alerts.push({type:'info',icon:'⚙️',text:'<strong>'+notReady+' Cx item'+(notReady!==1?'s':'')+
+      '</strong> not yet ready for commissioning'});
+  }
+
+  var alertsPanel=document.getElementById('alertsPanel');
+  if(!alerts.length){
+    alertsPanel.innerHTML='<div class="no-alerts"><span>✓</span> No alerts — project looks healthy</div>';
+  } else {
+    alertsPanel.innerHTML=alerts.map(function(a){
+      return '<div class="alert alert-'+a.type+'">'
+        +'<span class="alert-icon">'+a.icon+'</span>'
+        +'<span class="alert-text">'+a.text+'</span>'
+        +'</div>';
+    }).join('');
+  }
+})(); // end async init
 
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 </script>

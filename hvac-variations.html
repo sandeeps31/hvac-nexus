@@ -104,7 +104,6 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 <!-- SIDEBAR -->
@@ -197,7 +196,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 <div class="mo" id="subPickModal"><div class="modal"><h3>Link Vendor Variation</h3><p class="modal-sub">Select a vendor variation to link to this line item.</p><div class="sv-pick-list" id="svPickList"></div><div class="mac"><button class="bg bsm btn" onclick="closeSubPicker()">Cancel</button><button class="bg bsm btn" onclick="navTo('hvac-subcontractor-variations.html')">+ New Vendor Var</button></div></div></div>
 <div class="mo" id="ratesModal"><div class="modal" style="width:520px;max-height:90vh;overflow-y:auto"><h3>Rate Schedule</h3><p class="modal-sub">Set hourly rates for each trade. These will auto-populate when creating line items.</p><table style="width:100%;border-collapse:collapse;margin-bottom:16px"><thead><tr><th style="text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:6px 0;border-bottom:1px solid var(--border)">Trade</th><th style="text-align:right;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--border);width:120px">Normal $/hr</th><th style="text-align:right;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:6px 0 6px 8px;border-bottom:1px solid var(--border);width:120px">OT $/hr</th></tr></thead><tbody id="ratesRows"></tbody></table><div class="mac"><button class="bg bsm btn" onclick="closeRatesModal()">Cancel</button><button class="bp bsm btn" onclick="saveRates()">Save Rates</button></div></div></div>
 <script>
-var SK='hvacnexus_variations_GCT001',SVK='hvacnexus_subvars_GCT001',RK='hvacnexus_labour_rates_GCT001';
+var _vProj=dbGetCurrentProject();var _vPNum=_vProj.num||_vProj.number||'GCT001';
 var variations=[],editingVar=null,lineItems=[],pickIdx=-1,uidN=0;
 var TRADES=[
   {id:'bim',label:'BIM Modelling'},
@@ -218,16 +217,20 @@ var TRADES=[
   {id:'spm',label:'Senior Project Manager'}
 ];
 var labourRates={};
-function loadRates(){try{var s=localStorage.getItem(RK);if(s)labourRates=JSON.parse(s);}catch(e){}}
-function saveRatesData(){try{localStorage.setItem(RK,JSON.stringify(labourRates));}catch(e){}}
+async function loadRates(){try{var s=await dbGetVariations(_vPNum+'_rates');if(s)labourRates=s;}catch(e){}}
+function saveRatesData(){dbSetVariations(_vPNum+'_rates',labourRates).catch(e=>console.error(e));}
 function ratesAreSet(){for(var i=0;i<TRADES.length;i++){var t=TRADES[i].id;if(!labourRates[t]||!labourRates[t].normal)return false;}return true;}
 function getRate(tid,ot){var r=labourRates[tid];if(!r)return 0;return ot==='ot'?(num(r.ot)||0):(num(r.normal)||0);}
 loadRates();
 function nid(){return++uidN;}function num(v){return parseFloat(v)||0;}function fmt(n){return'$'+Math.round(num(n)).toLocaleString('en-AU');}function fmtZ(n){var v=num(n);return v===0?'--':fmt(v);}function fmtD(d){return d?new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'--';}
 
 
-function loadData(){try{var s=localStorage.getItem(SK);if(s)return JSON.parse(s);}catch(e){}return null;}
-function saveData(){try{localStorage.setItem(SK,JSON.stringify({variations:variations}));var el=document.getElementById('saveInd');el.classList.add('show');setTimeout(function(){el.classList.remove('show');},2000);}catch(e){}}
+async function loadData(){try{var s=await dbGetVariations(_vPNum);if(s)return s;}catch(e){}return null;}
+function saveData(){
+  dbSetVariations(_vPNum,{variations:variations}).catch(function(e){console.error(e);});
+  var el=document.getElementById('saveInd');
+  if(el){el.classList.add('show');setTimeout(function(){el.classList.remove('show');},2000);}
+}
 var _d=loadData();if(_d&&_d.variations)variations=_d.variations;
 function genVarNum(){var m=0;for(var i=0;i<variations.length;i++){var match=(variations[i].num||'').match(/VAR-(\d+)/);if(match){var n=parseInt(match[1]);if(n>m)m=n;}}return'VAR-'+String(m+1).padStart(3,'0');}
 function liSub(items){var t=0;for(var i=0;i<items.length;i++){var li=items[i];if(li.type==='vendor'||li.type==='sub'){if(li.vcMode==='link'&&li.svValue)t+=num(li.svValue);else if(num(li.vendorAmt))t+=num(li.vendorAmt);else if(li.svValue)t+=num(li.svValue);}else t+=num(li.qty)*num(li.rate);}return t;}
@@ -261,7 +264,7 @@ document.getElementById('liBody').innerHTML=rows;var tas=document.querySelectorA
 function updateRowTotal(i){var li=lineItems[i],el=document.getElementById('liTot_'+i);if(!el)return;if(li.type==='vendor'){if(li.vcMode==='link'&&li.svValue)el.textContent=fmt(num(li.svValue));else if(li.vcMode==='manual')el.textContent=num(li.vendorAmt)?fmt(num(li.vendorAmt)):'--';else el.textContent='--';}else{el.textContent=(num(li.qty)&&num(li.rate))?fmt(num(li.qty)*num(li.rate)):'--';}updateTotals();}
 function updateTotals(){var sub=liSub(lineItems),mp=num(document.getElementById('marginPct').value),ma=sub*(mp/100),ex=sub+ma,g=ex*.1,tot=ex+g;document.getElementById('tot-sub').textContent=fmt(sub);document.getElementById('tot-margin-amt').textContent=fmt(ma);document.getElementById('tot-ex-gst').textContent=fmt(ex);document.getElementById('tot-gst').textContent=fmt(g);document.getElementById('tot-total').textContent=fmt(tot);}
 function addLI(){lineItems.push(newLI());renderLI();}
-function openSubPicker(idx){pickIdx=idx;var svData=[];try{var raw=localStorage.getItem(SVK);if(raw){var p=JSON.parse(raw);svData=p.subVars||[];}}catch(e){}var list=document.getElementById('svPickList');if(!svData.length){list.innerHTML='<div class="sv-pick-empty">No vendor variations found.<br>Go to Subbie Vars to create one first.</div>';}else{var h='';for(var i=0;i<svData.length;i++){var sv=svData[i],safeSub=(sv.subbie||'').replace(/\\/g,'').replace(/'/g,''),safeVal=num(sv.value);h+='<div class="sv-pick-row" onclick="linkSV(\''+sv.id+'\',\''+sv.num+'\',\''+safeSub+'\','+safeVal+')"><div class="sv-pick-num">'+sv.num+' &nbsp; '+sv.status+'</div><div class="sv-pick-sub">'+(sv.subbie||'--')+(sv.theirNum?' | Their No: '+sv.theirNum:'')+'</div><div class="sv-pick-val">'+(sv.value?'$'+num(sv.value).toLocaleString('en-AU'):'--')+'</div></div>';}list.innerHTML=h;}document.getElementById('subPickModal').classList.add('open');}
+async function openSubPicker(idx){pickIdx=idx;var svData=[];try{var raw=await dbGetSubVariations(_vPNum);if(raw){svData=raw.subVars||[];}}catch(e){}var list=document.getElementById('svPickList');if(!svData.length){list.innerHTML='<div class="sv-pick-empty">No vendor variations found.<br>Go to Subbie Vars to create one first.</div>';}else{var h='';for(var i=0;i<svData.length;i++){var sv=svData[i],safeSub=(sv.subbie||'').replace(/\\/g,'').replace(/'/g,''),safeVal=num(sv.value);h+='<div class="sv-pick-row" onclick="linkSV(\''+sv.id+'\',\''+sv.num+'\',\''+safeSub+'\','+safeVal+')"><div class="sv-pick-num">'+sv.num+' &nbsp; '+sv.status+'</div><div class="sv-pick-sub">'+(sv.subbie||'--')+(sv.theirNum?' | Their No: '+sv.theirNum:'')+'</div><div class="sv-pick-val">'+(sv.value?'$'+num(sv.value).toLocaleString('en-AU'):'--')+'</div></div>';}list.innerHTML=h;}document.getElementById('subPickModal').classList.add('open');}
 function closeSubPicker(){document.getElementById('subPickModal').classList.remove('open');}
 function linkSV(svId,svNum,svSubbie,svValue){if(pickIdx<0||pickIdx>=lineItems.length)return;lineItems[pickIdx].svId=svId;lineItems[pickIdx].svNum=svNum;lineItems[pickIdx].svSubbie=svSubbie;lineItems[pickIdx].svValue=svValue;if(!lineItems[pickIdx].desc)lineItems[pickIdx].desc=svSubbie+' - '+svNum;closeSubPicker();renderLI();}
 function openRatesModal(){
@@ -322,8 +325,8 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
   localStorage.removeItem('hvacnexus_sb_groups');
-  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
-  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  try{var p=dbGetCurrentProject();if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
   if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
     handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});

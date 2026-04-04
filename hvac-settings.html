@@ -131,16 +131,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
 <script>
 // Access check - only Admins
-(function(){
+(async function(){
   try {
-    var users = JSON.parse(localStorage.getItem('hvacnexus_users') || '[]');
-    var settings = JSON.parse(localStorage.getItem('hvacnexus_company_settings') || '{}');
+    var users = (_cachedUsers||[]);
+    var settings = (_cachedCS||{});
     var currentName = settings.userName || settings['user-name'] || '';
     var currentUser = users.find(function(u){ return u.name === currentName; });
     if(users.length > 0 && currentUser && currentUser.role !== 'Admin') {
@@ -193,7 +192,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
       <div class="sb-group-items" id="gitems-quality" style="display:block">
         <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Register</span></div>
-        <div class="sb-item" onclick="navTo('hvac-itp-templates.html?mode=company')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
+        <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
         <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
@@ -351,7 +350,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
         </div>
         <div class="card-body" style="display:flex;align-items:center;justify-content:space-between">
           <div style="font-size:13px;color:var(--text2)">Create and manage reusable ITP checklists for FCUs, AHUs, fans and other equipment types.</div>
-          <button class="btn bp bsm" onclick="navTo('hvac-itp-templates.html?mode=company')" style="flex-shrink:0;margin-left:16px">Open ITP Templates</button>
+          <button class="btn bp bsm" onclick="navTo('hvac-itp-templates.html')" style="flex-shrink:0;margin-left:16px">Open ITP Templates</button>
         </div>
       </div>
 
@@ -556,9 +555,9 @@ document.querySelectorAll('.sb-item[data-tip]').forEach(function(el){
 });
 
 // ── LOAD SETTINGS ──
-function loadSettings(){
+async function loadSettings(){
   try{
-    var s=localStorage.getItem(SETTINGS_KEY);
+    var s=await dbGetCompanySettings();
     if(s) return JSON.parse(s);
   }catch(e){}
   return {};
@@ -581,7 +580,7 @@ function applySettings(s){
 }
 
 // ── SAVE ──
-function saveAll(){
+async function saveAll(){
   var s = {
     coName:      document.getElementById('co-name').value.trim(),
     coAbn:       document.getElementById('co-abn').value.trim(),
@@ -595,7 +594,7 @@ function saveAll(){
     defaultMargin: parseFloat(document.getElementById('default-margin').value)||15,
     savedAt:     new Date().toISOString()
   };
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  await dbSetCompanySettings(s);
   // Update sidebar live
   if(s.coName)  document.getElementById('sb-proj-name').textContent = s.coName;
   if(s.userName)document.getElementById('sb-user').textContent = s.userName;
@@ -637,7 +636,7 @@ function processFile(file){
   reader.readAsArrayBuffer(file);
 }
 
-function parseXLSX(buffer, fileName){
+async function parseXLSX(buffer, fileName){
   try{
     var wb=XLSX.read(buffer,{type:'array'});
     var sheetName=wb.SheetNames.indexOf('Template')>=0?'Template':wb.SheetNames[0];
@@ -688,7 +687,7 @@ function parseXLSX(buffer, fileName){
       savedAt:new Date().toISOString(),
       stats:{categories:catOrder.length,lineItems:totalLI}
     };
-    localStorage.setItem(TEMPLATE_KEY,JSON.stringify(templateData));
+    await dbSetBudget('__template__',templateData);
     renderTemplateStatus(templateData);
     showToast('✓ Template loaded — '+catOrder.length+' categories, '+totalLI+' line items');
   }catch(err){
@@ -724,9 +723,9 @@ function renderTemplateStatus(td){
   document.getElementById('catPreviewList').innerHTML=html;
 }
 
-function clearTemplate(){
+async function clearTemplate(){
   if(!confirm('Remove the company template? All modules will revert to the default HVAC NEXUS structure.'))return;
-  localStorage.removeItem(TEMPLATE_KEY);
+  await dbSetBudget('__template__',null);
   document.getElementById('templateStatus').style.display='none';
   document.getElementById('templateStatus').classList.remove('loaded');
   document.getElementById('catPreview').style.display='none';
@@ -767,7 +766,7 @@ function processPrecxFile(file){
   };
   reader.readAsArrayBuffer(file);
 }
-function parsePrecxXLSX(buffer,fileName){
+async function parsePrecxXLSX(buffer,fileName){
   try{
     var wb=XLSX.read(buffer,{type:'array'});
     var sheetName=wb.SheetNames.indexOf('Template')>=0?'Template':wb.SheetNames[0];
@@ -798,7 +797,7 @@ function parsePrecxXLSX(buffer,fileName){
     }
     if(!sections.length){showToast('⚠ No SECTION rows found — check the TYPE column');return;}
     var td={sections:sections,fileName:fileName,savedAt:new Date().toISOString(),stats:{sections:sections.length,items:totalItems}};
-    localStorage.setItem(PRECX_TEMPLATE_KEY,JSON.stringify(td));
+    await dbSetPrecxTemplate(td);
     renderPrecxTemplateStatus(td);
     showToast('✓ Pre-Cx template loaded — '+sections.length+' sections, '+totalItems+' items');
   }catch(err){showToast('⚠ Error: '+err.message);console.error(err);}
@@ -824,29 +823,24 @@ function renderPrecxTemplateStatus(td){
   });
   document.getElementById('precxPreviewList').innerHTML=html;
 }
-function clearPrecxTemplate(){
+async function clearPrecxTemplate(){
   if(!confirm('Remove the Pre-Cx checklist template?')) return;
-  localStorage.removeItem(PRECX_TEMPLATE_KEY);
+  await dbSetPrecxTemplate(null);
   document.getElementById('precxTemplateStatus').style.display='none';
   document.getElementById('precxTemplateStatus').classList.remove('loaded');
   document.getElementById('precxCatPreview').style.display='none';
   showToast('✓ Pre-Cx template removed');
 }
 // Load existing precx template on startup
-try{
-  var pt=localStorage.getItem(PRECX_TEMPLATE_KEY);
-  if(pt) renderPrecxTemplateStatus(JSON.parse(pt));
-}catch(e){}
+(async function(){try{var pt=await dbGetPrecxTemplate();if(pt)renderPrecxTemplateStatus(typeof pt==='string'?JSON.parse(pt):pt);}catch(e){}})();
 
 // ── INIT ──
-var settings=loadSettings();
-applySettings(settings);
-
-// Load existing template if any
-try{
-  var tmpl=localStorage.getItem(TEMPLATE_KEY);
-  if(tmpl) renderTemplateStatus(JSON.parse(tmpl));
-}catch(e){}
+(async function(){
+  var settings=await loadSettings();
+  applySettings(settings);
+  // Load existing template if any
+  try{var tmpl=await dbGetBudget('__template__');if(tmpl)renderTemplateStatus(typeof tmpl==='string'?JSON.parse(tmpl):tmpl);}catch(e){}
+})();
 
 // -- TABS --
 function switchTab(tab) {
@@ -877,16 +871,16 @@ var users = [];
 var _umPin='', _umEditIdx=-1, _swPin='', _swUser=null;
 var CUK='hvacnexus_current_user';
 
-function loadUsers() {
-  try { var d = localStorage.getItem('hvacnexus_users'); if(d) users = JSON.parse(d); } catch(e) { users = []; }
+async function loadUsers() {
+  try { var d = await dbGetUsers(); if(d) users = d; } catch(e) { users = []; }
   if(!users.length) users = [{id:'u1',name:'Sandeep Sethu',role:'Admin',email:'sandeep@hvacnexus.com.au',pin:'0000',active:true}];
 }
-function saveUsers() { localStorage.setItem('hvacnexus_users', JSON.stringify(users)); }
+function saveUsers() { dbSetUsers(users).catch(e=>console.error(e)); }
 
 function renderUsers() {
   loadUsers();
   var list = document.getElementById('userList'); if(!list) return;
-  var cu=null;try{cu=JSON.parse(localStorage.getItem(CUK)||'null');}catch(e){}
+  var cu=dbGetCurrentUser();
   var banner=document.getElementById('currentUserBanner');
   if(banner&&cu){banner.style.display='';var rc={Admin:'var(--accent)',PM:'var(--green)',Engineer:'var(--warn)',Subcontractor:'var(--purple)',Witness:'var(--text2)'};banner.innerHTML='<span style="color:var(--muted)">Active session:</span> <strong style="color:var(--text)">'+escH(cu.name)+'</strong> <span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 7px;border-radius:5px;border:1px solid '+(rc[cu.role]||'var(--border)')+';color:'+(rc[cu.role]||'var(--muted)')+'">'+escH(cu.role||'')+'</span>';}
   var roleColors = {Admin:'var(--accent)',PM:'var(--green)',Engineer:'var(--warn)',Subcontractor:'var(--purple)',Witness:'var(--text2)'};
@@ -937,7 +931,7 @@ function openSwitchUser(){
   loadUsers();_swPin='';_swUser=null;
   document.getElementById('swUserList').style.display='';document.getElementById('swPinSection').style.display='none';document.getElementById('swCancelBtn').style.display='';
   document.getElementById('swSub').textContent='Select your profile';
-  var cu=null;try{cu=JSON.parse(localStorage.getItem(CUK)||'null');}catch(e){}
+  var cu=dbGetCurrentUser();
   var rc={Admin:'var(--accent)',PM:'var(--green)',Engineer:'var(--warn)',Subcontractor:'var(--purple)',Witness:'var(--text2)'};
   document.getElementById('swUserList').innerHTML=users.map(function(u){
     var isCurrent=cu&&cu.id===u.id;
@@ -955,7 +949,7 @@ function swPin(k){
   updateSwDots();document.getElementById('swWrong').style.display='none';
   if(_swPin.length===4){setTimeout(function(){
     if(_swUser&&_swPin===(_swUser.pin||'0000')){
-      localStorage.setItem(CUK,JSON.stringify({id:_swUser.id,name:_swUser.name,role:_swUser.role}));
+      dbSetCurrentUser({id:_swUser.id,name:_swUser.name,role:_swUser.role});
       document.getElementById('switchMo').style.display='none';renderUsers();showToast('Welcome, '+_swUser.name+'! ('+_swUser.role+')');
     }else{document.getElementById('swWrong').style.display='';_swPin='';updateSwDots();}
   },200);}
@@ -1224,8 +1218,8 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
   localStorage.removeItem('hvacnexus_sb_groups');
-  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
-  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  try{var p=dbGetCurrentProject();if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
   if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
     handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});

@@ -209,7 +209,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -454,12 +453,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 // Company level: hvacnexus_itp_templates
 // Project level: hvacnexus_itp_templates_<projectNum>
 // ═══════════════════════════════════════════════════
-var SK_COMPANY = 'hvacnexus_itp_templates';
-var _proj = (function(){try{return JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');}catch(e){return{};}}());
-var SK_PROJECT = 'hvacnexus_itp_templates_'+(_proj.num||_proj.number||'default');
+var _proj = dbGetCurrentProject();
+var _pNum = _proj.num||_proj.number||'GCT001';
 
 var currentLevel = 'project'; // 'company' | 'project'
-var SK = SK_PROJECT; // active storage key — switches with tab
 
 var templates = [];
 var companyTemplates = []; // always the company library
@@ -474,15 +471,20 @@ function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[
 
 
 // User name
-(function(){try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');var n=cs.userName||cs.contactName||'';if(n)document.getElementById('sbUserName').textContent=n.split(' ')[0];}catch(e){}})();
+(function(){try{var cs=_cachedCS||{};var n=cs.userName||cs.contactName||'';if(n)document.getElementById('sbUserName').textContent=n.split(' ')[0];}catch(e){}})();
 
 // Storage
-function save(){try{localStorage.setItem(SK,JSON.stringify(templates));}catch(e){}}
-function load(){
-  try{var s=localStorage.getItem(SK_PROJECT);if(s)templates=JSON.parse(s);else templates=[];}catch(e){templates=[];}
-  try{var s2=localStorage.getItem(SK_COMPANY);if(s2)companyTemplates=JSON.parse(s2);else companyTemplates=[];}catch(e){companyTemplates=[];}
+function save(){
+  if(currentLevel==='company'){
+    dbSetItpTemplates(templates).catch(function(e){console.error('Save company templates error:',e);});
+  } else {
+    dbSetItpProjectTemplates(_pNum,templates).catch(function(e){console.error('Save project templates error:',e);});
+  }
 }
-load();
+async function load(){
+  try{var s=await dbGetItpProjectTemplates(_pNum);templates=Array.isArray(s)?s:[];}catch(e){templates=[];}
+  try{var s2=await dbGetItpTemplates();companyTemplates=Array.isArray(s2)?s2:[];}catch(e){companyTemplates=[];}
+}
 
 // Auto-generate ITP number (uses active templates list)
 function genItpNum(){
@@ -571,58 +573,39 @@ var FCU_WC_TEMPLATE = {
   ]
 };
 
-// ── INIT: seed default template into COMPANY library if none exists ──
-(function(){
-  // Reload company templates fresh
-  try{var s=localStorage.getItem(SK_COMPANY);if(s)companyTemplates=JSON.parse(s);}catch(e){}
+// ── ASYNC INIT ──
+async function initTemplates(){
+  await load();
+  // Seed default FCU template into company library if empty
   if(!companyTemplates.length){
-    var me='Sandeep';
-    try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+    var cs=await dbGetCompanySettings();
+    var me=(cs&&(cs.userName||cs.contactName)||'Sandeep').split(' ')[0];
     var tmpl={
-      id:nid(),
-      itpNo:'ITP-001',
-      itpType:'FCU — Water Cooled',
-      createdBy:me,
-      createdDate:todayStr(),
-      revisions:[{
-        version:1,
-        status:'current',
-        sections:JSON.parse(JSON.stringify(FCU_WC_TEMPLATE.sections)),
-        modifiedDate:todayStr(),
-        modifiedBy:me,
-        note:'Initial revision',
-        lastUsed:''
-      }]
+      id:nid(),itpNo:'ITP-001',itpType:'FCU — Water Cooled',
+      createdBy:me,createdDate:todayStr(),
+      revisions:[{version:1,status:'current',sections:JSON.parse(JSON.stringify(FCU_WC_TEMPLATE.sections)),modifiedDate:todayStr(),modifiedBy:me,note:'Initial revision',lastUsed:''}]
     };
     companyTemplates.push(tmpl);
-    try{localStorage.setItem(SK_COMPANY,JSON.stringify(companyTemplates));}catch(e){}
+    await dbSetItpTemplates(companyTemplates);
   }
-  // Set active templates based on currentLevel
-  templates = currentLevel==='company' ? companyTemplates : (function(){try{var s=localStorage.getItem(SK_PROJECT);return s?JSON.parse(s):[];}catch(e){return[];}}());
-})();
+}
 
 // ── LEVEL SWITCHING ──
-function switchLevel(level){
+async function switchLevel(level){
   currentLevel=level;
   if(level==='company'){
-    SK=SK_COMPANY;
     templates=companyTemplates;
   } else {
-    SK=SK_PROJECT;
-    try{var s=localStorage.getItem(SK_PROJECT);templates=s?JSON.parse(s):[];}catch(e){templates=[];}
+    try{var s=await dbGetItpProjectTemplates(_pNum);templates=Array.isArray(s)?s:[];}catch(e){templates=[];}
   }
-  // Update tab UI
   document.getElementById('tab-company').classList.toggle('active',level==='company');
   document.getElementById('tab-project').classList.toggle('active',level==='project');
-  // Import button only on project tab
   document.getElementById('importBtn').style.display=level==='project'?'':'none';
   renderRegister();
 }
 function updateTabCounts(){
-  var cCount=companyTemplates.length;
-  var pCount=(function(){try{var s=localStorage.getItem(SK_PROJECT);return s?JSON.parse(s).length:0;}catch(e){return 0;}})();
-  document.getElementById('tabCountCompany').textContent=cCount;
-  document.getElementById('tabCountProject').textContent=pCount;
+  document.getElementById('tabCountCompany').textContent=companyTemplates.length;
+  document.getElementById('tabCountProject').textContent=templates.length;
 }
 
 // ── VIEW MANAGEMENT ──
@@ -934,7 +917,7 @@ function renderEditorBody(itp, rev, canEdit){
 // ── DRAFT / PUBLISH ──
 function startDraft(itp){
   var me='Sandeep';
-  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
   var latestRev=currentRev(itp);
   var newRev={
     version:latestRev.version+1,
@@ -951,7 +934,7 @@ function startDraft(itp){
 
 function autosave(itp){
   var me='Sandeep';
-  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
   var rev=currentRev(itp);
   rev.modifiedDate=todayStr();
   rev.modifiedBy=me;
@@ -1014,7 +997,7 @@ function exportItpPDF(itpId){
   exportRevData(itp,currentRev(itp));
 }
 function exportRevData(itp,rev){
-  var co={};try{co=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');}catch(e){}
+  var co={};try{co=_cachedCS||{};}catch(e){}
   var typeLabels={yesno:'YES / NO / N.A.',passfail:'PASS / FAIL',input:'Input Value',photo:'Photo / Attachment',signoff:'Sign-off'};
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+itp.itpNo+' v'+rev.version+'</title>'
     +'<style>body{font-family:Arial,sans-serif;font-size:10px;color:#111;padding:20px}'
@@ -1071,7 +1054,7 @@ function exportRevData(itp,rev){
 function duplicateItp(itpId){
   var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
   var me='Sandeep';
-  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
   var clone=JSON.parse(JSON.stringify(itp));
   clone.id=nid();
   clone.itpNo=genItpNum();
@@ -1095,11 +1078,11 @@ function deleteItp(itpId){
 
 // ── IMPORT FROM COMPANY ──
 var _importSelected = [];
-function openImportModal(){
+async function openImportModal(){
   _importSelected=[];
   document.getElementById('importSrch').value='';
-  // Reload company templates fresh
-  try{var s=localStorage.getItem(SK_COMPANY);companyTemplates=s?JSON.parse(s):[];}catch(e){}
+  // Reload company templates fresh from Supabase
+  try{var s=await dbGetItpTemplates();companyTemplates=Array.isArray(s)?s:[];}catch(e){}
   renderImportList();
   document.getElementById('importModal').classList.add('open');
 }
@@ -1150,7 +1133,7 @@ function toggleImportSel(id){
 function confirmImport(){
   if(!_importSelected.length){closeImportModal();return;}
   var me='';
-  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'').split(' ')[0];}catch(e){}
+  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'').split(' ')[0];}catch(e){}
   var imported=0;
   _importSelected.forEach(function(cId){
     var src=companyTemplates.find(function(t){return t.id===cId;});
@@ -1181,8 +1164,6 @@ function confirmImport(){
     imported++;
   });
   save();
-  // Reload project templates array
-  try{var s=localStorage.getItem(SK_PROJECT);templates=s?JSON.parse(s):[];}catch(e){}
   closeImportModal();
   renderRegister();
   showToast(imported+' template'+(imported!==1?'s':'')+' imported into project');
@@ -1201,7 +1182,7 @@ function confirmNewItp(){
   if(!typeName){document.getElementById('new-itptype').focus();return;}
   var itpNo=document.getElementById('new-itpno').value.trim()||genItpNum();
   var me='Sandeep';
-  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
   var newItp={
     id:nid(),itpNo:itpNo,itpType:typeName,
     createdBy:me,createdDate:todayStr(),
@@ -1239,27 +1220,29 @@ function bcParentClick(){
 }
 
 // ── INIT ──
-(function(){
+var _cachedCS = {};
+(async function(){
   var params=new URLSearchParams(window.location.search);
-  var mode=params.get('mode')||'project'; // 'company' | 'project'
+  var mode=params.get('mode')||'project';
 
-  // Hide tab switcher entirely — mode determines which level is shown
+  // Load company settings for 'me' lookups throughout the page
+  try{_cachedCS=await dbGetCompanySettings()||{};}catch(e){}
+
+  // Load all templates
+  await initTemplates();
+
+  // Hide tab switcher — mode determines level
   document.getElementById('levelTabs').style.display='none';
 
   if(mode==='company'){
-    // Company mode — lock to company library, no import button
     currentLevel='company';
-    SK=SK_COMPANY;
     templates=companyTemplates;
     document.getElementById('importBtn').style.display='none';
     document.getElementById('newItpBtn').textContent='＋ New Company Template';
     document.getElementById('bcParent').textContent='Company Settings';
     document.getElementById('bcCurr').textContent='ITP Templates';
   } else {
-    // Project mode — lock to project templates, show import button
     currentLevel='project';
-    SK=SK_PROJECT;
-    try{var s=localStorage.getItem(SK_PROJECT);templates=s?JSON.parse(s):[];}catch(e){templates=[];}
     document.getElementById('importBtn').style.display='';
     document.getElementById('bcParent').textContent='ITP Register';
     document.getElementById('bcCurr').textContent='Project Templates';

@@ -85,7 +85,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .ms:focus{border-color:var(--accent)}.ms option{background:var(--surface2)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -176,8 +175,13 @@ var _uid=100;
 var _editingId=null;
 function nid(){return 'p'+(++_uid)+Date.now();}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function save(){try{localStorage.setItem(SK,JSON.stringify(projects));}catch(e){}}
-function load(){try{var s=localStorage.getItem(SK);if(s){var p=JSON.parse(s);projects=Array.isArray(p)?p:[];}}catch(e){projects=[];}}
+function save(){
+  dbSetProjects(projects).catch(function(e){console.error('saveProjects:',e);});
+}
+async function load(){
+  try{var s=await dbGetProjects();if(s&&Array.isArray(s)&&s.length){projects=s;return;}}catch(e){}
+  projects=[];
+}
 
 function seedIfEmpty(){
   if(projects.length===0){
@@ -250,7 +254,7 @@ function renderProjects(){
 
 function openProject(id){
   var p=projects.find(function(x){return x.id===id;});if(!p)return;
-  localStorage.setItem('hvacnexus_current_project',JSON.stringify({id:p.id,num:p.num,name:p.name}));
+  dbSetCurrentProject({id:p.id,num:p.num,name:p.name});
   window.location.href='project.html?id='+p.id;
 }
 
@@ -319,7 +323,11 @@ function deleteProject(id){
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
 
-load();seedIfEmpty();renderProjects();
+(async function(){
+  await load();
+  seedIfEmpty();
+  renderProjects();
+})();
 </script>
 </body>
 </html>

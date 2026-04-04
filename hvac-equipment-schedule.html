@@ -261,7 +261,6 @@ body.sb-sm{padding-left:var(--sb-sm)}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -521,12 +520,16 @@ var tabs=[],activeId=null,selType=null,nrVis=false,sortK=null,sortD=1,uidN=0;
 
 (function(){applySB(localStorage.getItem(SBK)==='1');})();
 
-var EQUIP_SK='hvacnexus_equip_GCT001';
-function saveEquip(){try{localStorage.setItem(EQUIP_SK,JSON.stringify({tabs:tabs,activeId:activeId}));}catch(e){}}
-function loadEquip(){
+var _eqProj=dbGetCurrentProject();
+var _eqPNum=_eqProj.num||_eqProj.number||'GCT001';
+
+function saveEquip(){
+  dbSetEquipment(_eqPNum,{tabs:tabs,activeId:activeId}).catch(function(e){console.error('saveEquip error:',e);});
+}
+async function loadEquip(){
   try{
-    var s=localStorage.getItem(EQUIP_SK);
-    if(s){var d=JSON.parse(s);if(d.tabs&&d.tabs.length){tabs=d.tabs;activeId=d.activeId||tabs[0].id;return true;}}
+    var d=await dbGetEquipment(_eqPNum);
+    if(d&&d.tabs&&d.tabs.length){tabs=d.tabs;activeId=d.activeId||tabs[0].id;return true;}
   }catch(e){}
   return false;
 }
@@ -542,8 +545,8 @@ function renderStrip(){
   ['tso','abar'].forEach(function(id){document.getElementById(id).style.display=has?(id==='tso'?'block':'flex'):'none';});document.getElementById('addbar').style.display='none';
   if(!has){
 // ── Load saved data or pre-load MSSB defaults ──
-(function(){
-  if(loadEquip()){ renderStrip(); return; }
+(async function(){
+  if(await loadEquip()){ await loadRevData(); renderStrip(); return; }
   // No saved data — pre-load MSSB defaults
   var mssbId='tab_mssb_preload';
   tabs.push({id:mssbId,type:'mssb',rows:[
@@ -1216,19 +1219,23 @@ document.getElementById('ceModal').addEventListener('click',function(e){if(e.tar
 // REVISION / LOCK / CHANGE TRACKING SYSTEM
 // ══════════════════════════════════════════════════
 var REV_SK='hvacnexus_equip_revisions_GCT001';
-var LOCK_SK='hvacnexus_equip_lock_GCT001';
+var LOCK_SK='hvacnexus_equip_lock_'+_eqPNum;
 var viewingRevIdx=null;
 var revData={};
 var exportingRevIdx=null;
 
-function saveRevData(){try{localStorage.setItem(REV_SK,JSON.stringify(revData));}catch(e){}}
-function loadRevData(){try{var s=localStorage.getItem(REV_SK);if(s)revData=JSON.parse(s);}catch(e){revData={};}}
-loadRevData();
+function saveRevData(){
+  dbSetEquipmentRevisions(_eqPNum,revData).catch(function(e){console.error('saveRevData error:',e);});
+}
+async function loadRevData(){
+  try{var s=await dbGetEquipmentRevisions(_eqPNum);if(s)revData=s;}catch(e){revData={};}
+}
 
 function getTabRev(tabId){if(!revData[tabId])revData[tabId]={revisions:[],draft:null};return revData[tabId];}
 
 function getCurrentUser(){
-  try{var cs=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');var n=cs.userName||cs.contactName||'You';return n.split(' ')[0];}catch(e){return 'You';}
+  try{var cu=dbGetCurrentUser();if(cu&&cu.name)return cu.name.split(' ')[0];}catch(e){}
+  return 'You';
 }
 function todayStr(){return new Date().toISOString().split('T')[0];}
 function fmtD(d){if(!d)return '';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
@@ -1544,7 +1551,7 @@ function exportRevPDF(){
   var def=tab?defn(tab.type):null;var tr=getTabRev(tabId);
   var rv=exportingRevIdx!==null?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
   var rows=getExportRows();var cols=tab?getCols(tab):[];
-  var co={};try{co=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');}catch(e){}
+  var co={};try{var _cu=dbGetCurrentUser();if(_cu)co={userName:_cu.name};}catch(e){}
   var revLabel=rv?rv.rev:'Current';var revDate=rv?fmtD(rv.date):'';
   var prevRevIdx=exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2;
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];

@@ -141,7 +141,6 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -314,8 +313,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
 </div>
 
 <script>
-var SK='hvacnexus_procsched_GCT001';
-var EQ_SK='hvacnexus_equip_GCT001';
+var _psProj=dbGetCurrentProject();var _psPNum=_psProj.num||_psProj.number||'GCT001';
 
 var items=[];
 var editingId=null;
@@ -344,8 +342,8 @@ function isPast(ds){if(!ds)return false;return ds<today();}
 
 
 // DATA
-function save(){try{localStorage.setItem(SK,JSON.stringify(items));}catch(e){}}
-function load(){try{var s=localStorage.getItem(SK);if(s){var p=JSON.parse(s);items=Array.isArray(p)?p:[];}}catch(e){items=[];}}
+function save(){dbSetProcurement(_psPNum,items).catch(e=>console.error(e));}
+async function load(){try{var p=await dbGetProcurement(_psPNum);items=Array.isArray(p)?p:[];}catch(e){items=[];}}
 load();
 
 // ETA RECALC
@@ -370,7 +368,7 @@ function resetAndResync(){
 
 function syncFromEquipment(){
   var raw=null;
-  try{raw=localStorage.getItem(EQ_SK);if(raw)raw=JSON.parse(raw);}catch(e){}
+  try{raw=null/*equip loaded separately*/;if(raw)raw=JSON.parse(raw);}catch(e){}
   if(!raw||!raw.tabs||!raw.tabs.length){
     alert('No equipment schedule data found. Open the Equipment Schedule and add equipment first.');return;
   }
@@ -417,7 +415,7 @@ function syncFromEquipment(){
 // CHECK for new equipment not in schedule
 function checkSyncNeeded(){
   var raw=null;
-  try{raw=localStorage.getItem(EQ_SK);if(raw)raw=JSON.parse(raw);}catch(e){}
+  try{raw=null/*equip loaded separately*/;if(raw)raw=JSON.parse(raw);}catch(e){}
   if(!raw||!raw.tabs)return;
   var existing=new Set(items.map(function(i){return i.assetId;}));
   var newCount=0;
@@ -482,7 +480,7 @@ function populateFilters(){
 
 function getRequiredQty(item){
   try{
-    var raw=localStorage.getItem(EQ_SK);
+    var raw=null/*equip loaded separately*/;
     if(!raw) return 0;
     var eq=JSON.parse(raw);
     if(!eq||!eq.tabs) return 0;
@@ -707,8 +705,8 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
   localStorage.removeItem('hvacnexus_sb_groups');
-  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
-  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  try{var p=dbGetCurrentProject();if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
   if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
     handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});

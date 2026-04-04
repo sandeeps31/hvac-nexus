@@ -182,7 +182,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -405,10 +404,10 @@ var ASSOC_ITEMS = {
   'Electrical - Variable Speed Drive':['Installation & wiring', 'Programming & commissioning'],
 };
 
-function getSuggestions(grpName){
+async function getSuggestions(grpName){
   // First try company template
   try{
-    var tmpl=localStorage.getItem('hvacnexus_company_template');
+    var tmpl=await dbGetBudget('__template__');
     if(tmpl){
       var td=JSON.parse(tmpl);
       for(var cat in td.grouped){
@@ -486,10 +485,10 @@ function onCatChange(catVal){
 
 
 // ── STORAGE ──
-function loadData(){try{const s=localStorage.getItem(STORAGE_KEY);if(s)return JSON.parse(s);}catch(e){}return null;}
+async function loadData(){try{const s=await dbGetPurchaseOrders(_poPNum);if(s)return s;}catch(e){}return null;}
 function saveData(){
   try{
-    localStorage.setItem(STORAGE_KEY,JSON.stringify({sections,margin:15,ts:Date.now()}));
+    dbSetPurchaseOrders(_poPNum,{sections,margin:15,ts:Date.now()}).catch(e=>console.error(e));
     const i=document.getElementById('saveInd');i.classList.add('show');setTimeout(()=>i.classList.remove('show'),2000);
   }catch(e){}
 }
@@ -829,7 +828,7 @@ function printPO(){
     +'<div class="tf"><span>Total incl GST</span><span>$'+Math.round(tot).toLocaleString('en-AU')+'</span></div>'
     +'</div>'
     +notesHtml
-    +'<scr'+'ipt>(function(){try{var cp=localStorage.getItem(\'hvacnexus_current_project\');if(cp){var p=JSON.parse(cp);document.querySelectorAll(\'.bc-proj-name\').forEach(function(el){el.textContent=p.name||el.textContent;});}}catch(e){}})();<\/scr'+'ipt>\n</body></html>';
+    +'<scr'+'ipt>(async function(){try{var cp=localStorage.getItem(\'hvacnexus_current_project\');if(cp){var p=JSON.parse(cp);document.querySelectorAll(\'.bc-proj-name\').forEach(function(el){el.textContent=p.name||el.textContent;});}}catch(e){}})();<\/scr'+'ipt>\n</body></html>';
 
   var w=window.open('','_blank','width=900,height=700');
   w.document.write(html);
@@ -896,7 +895,7 @@ document.querySelectorAll('.sb-item[data-tip]').forEach(function(el){
 // ── APPLY COMPANY SETTINGS ──
 (function(){
   try{
-    var s=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');
+    var s=(_cachedCS||{});
     if(s.coName){
       var el=document.querySelector('.sb-proj-name');
       if(el)el.textContent=s.coName;
@@ -917,8 +916,8 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
   localStorage.removeItem('hvacnexus_sb_groups');
-  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
-  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  try{var p=dbGetCurrentProject();if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
   if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
     handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});

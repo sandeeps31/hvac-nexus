@@ -125,7 +125,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 <!-- SIDEBAR -->
@@ -275,14 +274,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 var params=new URLSearchParams(window.location.search);
 var drawingId=params.get('drawingId')||'';
 var itpTypeFilter=params.get('itpType')||''; // optional pre-filter
-var proj=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');
+var proj=dbGetCurrentProject();
 var pKey=proj.num||proj.number||'GCT001';
-var DKD='hvacnexus_drawings_'+pKey;
-var DKS='hvacnexus_itp_structure_'+pKey;
-var DKR='hvacnexus_itp_responses_'+pKey;
-var DKE='hvacnexus_equip_'+pKey;
-var CUK='hvacnexus_current_user';
-var ITK='hvacnexus_itp_templates';
 
 // ITP MASTER LIST (same as itp register)
 var ITP_MASTER=['AC Single Head - Split','AC Multi Head - Split','AC Multi Head CU - Split','AHU CHW and HHW','Attenuator','Boiler','CRAC Unit','Chiller - Water Cooled','Chiller - Air Cooled','Electric Duct Heater','Expansion Tank','FCU - Water Cooled','Fans','Humidifier','Hot Water Heater','MSSB/DCP','BMS Panel','Plate Heat Exchanger','Pump','VAV','VRF - BP Box','VRF - Indoor Unit','VRF - Outdoor Unit','Auto Refill Unit','Chemical Dosing Pot - Cooling Tower','Side Stream Filtration - Cooling Tower','PAC Unit - Air Cooled','PAC Unit - Water Cooled','Chilled Beams','Energy Recovery Ventilator','Security Grilles','DAHU','Pressure Relief Damper','VSD','Duct Installation Riser','Pipework Pressure Test','Refrigeration Pressure Test & Vacuum','Seismic Install','Flushing','Duct Installation','Duct Pressure Testing','Refrigeration Pipework Install','Mechanical Services Seals','Water Pipework Installation','Fire Seals','Fire Dampers','Penetration ITP'];
@@ -311,22 +304,26 @@ var equipData=null;
 var templates=[];
 var curDrawing=null;
 
-function loadData(){
-  try{drawings=JSON.parse(localStorage.getItem(DKD)||'[]');}catch(e){}
-  try{structure=JSON.parse(localStorage.getItem(DKS)||'{"buildings":[]}')||{buildings:[]};}catch(e){}
-  try{responses=JSON.parse(localStorage.getItem(DKR)||'{}');}catch(e){}
-  try{equipData=JSON.parse(localStorage.getItem(DKE)||'null');}catch(e){}
-  try{templates=JSON.parse(localStorage.getItem(ITK)||'[]');}catch(e){}
+async function loadData(){
+  try{var d=await dbGetDrawings(pKey);drawings=Array.isArray(d)?d:[];}catch(e){}
+  try{var s=await dbGetItpStructure(pKey);structure=(s&&s.buildings)?s:{buildings:[]};}catch(e){}
+  try{var r=await dbGetItpResponses(pKey);responses=r||{};}catch(e){}
+  try{var eq=await dbGetEquipment(pKey);equipData=eq||null;}catch(e){}
+  try{var pt=await dbGetItpProjectTemplates(pKey);templates=Array.isArray(pt)?pt:[];}catch(e){}
   curDrawing=drawings.find(function(d){return d.id===drawingId;})||null;
 }
-function saveDrawings(){try{localStorage.setItem(DKD,JSON.stringify(drawings));}catch(e){}}
-function saveResponses(){try{localStorage.setItem(DKR,JSON.stringify(responses));}catch(e){}}
+function saveDrawings(){
+  dbSetDrawings(pKey,drawings).catch(function(e){console.error('saveDrawings error:',e);});
+}
+function saveResponses(){
+  dbSetItpResponses(pKey,responses).catch(function(e){console.error('saveResponses error:',e);});
+}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function nid(){return'pin_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);}
 
 // ── INIT ──
-loadData();
-(function(){
+(async function(){
+  await loadData();
   if(!drawingId){showError('No drawing ID provided');return;}
   if(!curDrawing){showError('Drawing not found');return;}
   document.title=(curDrawing.num||'Drawing')+' — HVAC NEXUS';
@@ -541,12 +538,10 @@ function showTypeSugg(){
   onPinTypeInput();
 }
 function getTemplateTypes(){
-  // Read project templates only — no ITP_MASTER fallback
+  // Use templates loaded from Supabase at init (project level)
   var result=[];
-  try{
-    var tmpl=JSON.parse(localStorage.getItem('hvacnexus_itp_templates_'+pKey)||'[]');
-    tmpl.forEach(function(t){if(t.itpType)result.push({itpNo:t.itpNo||'',name:t.itpType});});
-  }catch(e){}
+  templates.forEach(function(t){if(t.itpType)result.push({itpNo:t.itpNo||'',name:t.itpType});});
+  if(!result.length)result=ITP_MASTER.map(function(n){return{itpNo:'',name:n};});
   return result;
 }
 function renderTypeSugg(v){

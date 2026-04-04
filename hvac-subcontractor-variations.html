@@ -144,7 +144,6 @@ input[type=number]{-moz-appearance:textfield}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -338,8 +337,8 @@ input[type=number]{-moz-appearance:textfield}
 </div>
 
 <script>
-var SVK='hvacnexus_subvars_GCT001';
-var VK='hvacnexus_variations_GCT001';
+var _svProj=dbGetCurrentProject();var _svPNum=_svProj.num||_svProj.number||'GCT001';
+
 
 var subVars=[];
 var editingId=null;
@@ -359,13 +358,13 @@ function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 
 
 // DATA
-function save(){try{localStorage.setItem(SVK,JSON.stringify({subVars:subVars}));}catch(e){}}
-function load(){try{var s=localStorage.getItem(SVK);if(s){var p=JSON.parse(s);subVars=Array.isArray(p.subVars)?p.subVars:[];}}catch(e){subVars=[];}}
+function save(){dbSetSubVariations(_svPNum,{subVars:subVars}).catch(e=>console.error(e));}
+async function load(){try{var p=await dbGetSubVariations(_svPNum);subVars=p&&Array.isArray(p.subVars)?p.subVars:[];}catch(e){subVars=[];}}
 load();
 
 // LOAD VARIATIONS from variations module
 function loadVariations(){
-  try{var s=localStorage.getItem(VK);if(s){var p=JSON.parse(s);return Array.isArray(p.variations)?p.variations:[];}}catch(e){}
+  try{var s=null/*migrated*/;if(s){var p=JSON.parse(s);return Array.isArray(p.variations)?p.variations:[];}}catch(e){}
   return [];
 }
 
@@ -374,7 +373,7 @@ function saveVariation(v){
   var vars=loadVariations();
   var idx=vars.findIndex(function(x){return x.id===v.id;});
   if(idx>=0) vars[idx]=v; else vars.push(v);
-  try{localStorage.setItem(VK,JSON.stringify({variations:vars}));}catch(e){}
+  try{/*migrated*/void(JSON.stringify({variations:vars}));}catch(e){}
 }
 
 // GENERATE SV number
@@ -401,7 +400,7 @@ function genVarNum(){
 // UPDATE or INSERT linked variation's vendor cost line item
 function syncValueToVariation(svId, svNum, svSubbie, svValue){
   var vars=[];
-  try{var raw=localStorage.getItem(VK);if(raw){var p=JSON.parse(raw);vars=Array.isArray(p.variations)?p.variations:[];}}catch(e){}
+  try{var raw=null/*migrated*/;if(raw){var p=JSON.parse(raw);vars=Array.isArray(p.variations)?p.variations:[];}}catch(e){}
   // Find the SV to get its desc and linkedVarId
   var svDesc='';var linkedVarId=null;
   try{var svRaw=localStorage.getItem(SVK);if(svRaw){var svP=JSON.parse(svRaw);var svObj=(svP.subVars||[]).find(function(x){return x.id===svId;});if(svObj){svDesc=svObj.desc||'';linkedVarId=svObj.linkedVarId;}}}catch(e){}
@@ -430,7 +429,7 @@ function syncValueToVariation(svId, svNum, svSubbie, svValue){
       });
     }
   });
-  try{localStorage.setItem(VK,JSON.stringify({variations:vars}));}catch(e){}
+  try{/*migrated*/void(JSON.stringify({variations:vars}));}catch(e){}
 }
 
 // SUMMARY
@@ -665,8 +664,8 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
   localStorage.removeItem('hvacnexus_sb_groups');
-  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
-  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  try{var p=dbGetCurrentProject();if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
   if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
     handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});

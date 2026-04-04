@@ -215,7 +215,6 @@ canvas#pdfCanvas{display:block}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -736,41 +735,21 @@ async function deletePdfFromSupabase(url){
 (function(){try{var s=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');if(s.coName)document.getElementById('sb-proj-name').textContent=s.coName;if(s.userName)document.getElementById('sb-user').textContent=s.userName;}catch(e){}})();
 
 // ── DATA ──
-var DK='hvacnexus_drawings_GCT001';
+var _proj=dbGetCurrentProject();
+var _pNum=_proj.num||_proj.number||'GCT001';
 var drawings=[];
 var _uid=100;
 function nid(){return ++_uid;}
-function save(){
-  try{
-    // Never store pdfData in localStorage — always use Supabase pdfUrl
-    var toStore=drawings.map(function(d){
-      var c=Object.assign({},d);delete c.pdfData;return c;
-    });
-    localStorage.setItem(DK,JSON.stringify(toStore));
-  }catch(e){console.error('Save error:',e);}
-}
-function load(){try{var s=localStorage.getItem(DK);if(s){var p=JSON.parse(s);drawings=Array.isArray(p)?p:[];}}catch(e){drawings=[];}}
-load();
 
-// Migrate: fix new revisions that were created before history-chaining was added
-// Find all superseded drawings and ensure their successors carry the full history chain
-(function migrateHistory(){
-  var superseded=drawings.filter(function(d){return d.superseded;});
-  superseded.forEach(function(orig){
-    // Find the successor — same num, not superseded, created after orig
-    var successors=drawings.filter(function(d){return !d.superseded&&d.num===orig.num;});
-    successors.forEach(function(succ){
-      if(!succ.history||succ.history.length<2){
-        // Successor is missing the chain — prepend orig's history
-        var origHist=orig.history||[{rev:orig.rev,status:orig.status,approval:orig.approval||'',subDate:orig.subDate||'',recorded:''}];
-        var succHist=succ.history||[{rev:succ.rev,status:succ.status,approval:succ.approval||'',subDate:succ.subDate||'',recorded:''}];
-        // Combine: orig history entries first, then succ's own entry
-        succ.history=origHist.concat(succHist.filter(function(h){return h.rev!==orig.rev||(origHist.length===0);}));
-      }
-    });
-  });
-  if(superseded.length>0)try{localStorage.setItem('hvacnexus_drawings_GCT001',JSON.stringify(drawings.map(function(d){if(d.superseded){var c=Object.assign({},d);delete c.pdfData;return c;}return d;})));}catch(e){}
-})();
+function save(){
+  var toStore=drawings.map(function(d){var c=Object.assign({},d);delete c.pdfData;return c;});
+  dbSetDrawings(_pNum,toStore).catch(function(e){console.error('Save error:',e);});
+}
+
+async function load(){
+  try{var data=await dbGetDrawings(_pNum);drawings=Array.isArray(data)?data:[];}
+  catch(e){drawings=[];}
+}
 
 var CATS=['Mechanical','Electrical','Architectural','Hydraulic','Base Build Mechanical','MSSB','DCP','RCP'];
 var CAT_ICONS={Mechanical:'💨',Electrical:'⚡',Architectural:'🏗️',Hydraulic:'💧','Base Build Mechanical':'🏢',MSSB:'⚡',DCP:'🔌',RCP:'🏛️'};
@@ -779,8 +758,8 @@ var ST_CLS={IFR:'st-p',IFA:'st-ifa',IFC:'st-ifc',AB:'st-ab',Preliminary:'st-p',O
 var APPR_CLS={Approved:'st-ab','Approved with Comments':'st-ifa',Pending:'st-p',Rejected:'st-rej',Obsolete:'st-obs'};
 var SUBCATS={Mechanical:['General','Schematics','Schedules','Mechanical Services Layout','Piping Layout','Sections','Builders Works','Board Drawings','Seismics'],Architectural:['Partitions','Reflected Ceiling Plan','Fire Compartment Plan','General Arrangement','Doors','Wall Finishes','Ceiling Finishes','Room Layout'],Electrical:['General'],Hydraulic:['General'],'Base Build Mechanical':['General'],MSSB:['General'],DCP:['General'],RCP:['General']};
 
-// Areas — loaded from localStorage so user can add custom ones
-var AREAS_KEY='hvacnexus_areas_'+DK.replace('hvacnexus_drawings_','');
+// Areas — UI preference, stays in localStorage
+var AREAS_KEY='hvacnexus_areas_'+_pNum;
 var DEFAULT_AREAS=['General','Basement','Ground Floor','Level 1','Level 2','Level 3','Level 4','Level 5','Roof','Plant Room','External'];
 function loadAreas(){try{var s=localStorage.getItem(AREAS_KEY);return s?JSON.parse(s):DEFAULT_AREAS.slice();}catch(e){return DEFAULT_AREAS.slice();}}
 function saveAreas(a){try{localStorage.setItem(AREAS_KEY,JSON.stringify(a));}catch(e){}}
@@ -1877,10 +1856,10 @@ function generateTransmittal(){
   var desc=document.getElementById('txDesc').value.trim();
   var to=document.getElementById('txTo').value.trim();
   var today=new Date().toISOString().split('T')[0];
-  var proj=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');
+  var proj=dbGetCurrentProject();
   var projName=proj.name||document.getElementById('sb-proj-name').textContent||'Project';
   // Save transmittal record
-  var txKey='hvacnexus_transmittals_'+DK.replace('hvacnexus_drawings_','');
+  var txKey='hvacnexus_transmittals_'+_pNum;
   var txList=[];try{txList=JSON.parse(localStorage.getItem(txKey)||'[]');}catch(e){}
   var txNum='T-'+String(txList.length+1).padStart(3,'0');
   txList.push({num:txNum,date:today,to:to,desc:desc,drawings:_transmittalDrawings.map(function(d){return{num:d.num,name:d.name,rev:d.rev,status:d.status};})});
@@ -2213,15 +2192,17 @@ function dzDrop(e,id,handler){
   }
 }
 
-renderList();
-
-// ── DRAWING REGISTER ──
+// ── ASYNC INIT ──
+(async function init(){
+  await load();
+  renderList();
+})();
 function openRegisterModal(){buildRegisterPreview();document.getElementById('registerModal').classList.add('open');}
 function closeRegisterModal(){document.getElementById('registerModal').classList.remove('open');}
 function getRegisterData(type){
-  var proj=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');
+  var proj=dbGetCurrentProject();
   var projName=proj.name||document.getElementById('sb-proj-name').textContent||'Project';
-  var projNum=proj.number||DK.replace('hvacnexus_drawings_','');
+  var projNum=proj.number||proj.num||_pNum;
   var mech=drawings.filter(function(d){return d.cat==='Mechanical'||d.cat==='Base Build Mechanical';});
   if(type==='type2'){
     // Type 2: latest revision per drawing — include obsolete but mark them

@@ -261,6 +261,14 @@ async function dbSetTechSubmissions(projectNum, data) {
   return await dbSetProject('tech_submissions', projectNum, data);
 }
 
+// ── Vendor Invoices ──
+async function dbGetVendorInvoices(projectNum) {
+  return await dbGetProject('procurement', projectNum+'_vi') || {};
+}
+async function dbSetVendorInvoices(projectNum, data) {
+  return await dbSetProject('procurement', projectNum+'_vi', data);
+}
+
 // ── Pre-Cx Template ──
 async function dbGetPrecxTemplate() {
   return await dbGet('precx_template') || {};
