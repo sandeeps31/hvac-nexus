@@ -77,6 +77,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .yn-btn.sel-na{border-color:var(--muted);background:var(--surface3);color:var(--muted)}
 .yn-btn.sel-pass{border-color:var(--green);background:var(--green-dim);color:var(--green)}
 .yn-btn.sel-fail{border-color:var(--danger);background:var(--danger-dim);color:var(--danger)}
+.row-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 12px 8px;border-top:1px solid var(--border)}
+.row-stamp{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);flex:1}
+.defect-btn{font-size:11px;font-family:'DM Mono',monospace;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,77,109,.4);background:rgba(255,77,109,.08);color:var(--danger);cursor:pointer;white-space:nowrap;transition:all .15s}
+.defect-btn:hover{background:rgba(255,77,109,.18);border-color:var(--danger)}
+.defect-mo{position:fixed;inset:0;background:rgba(4,8,16,.82);z-index:2000;display:none;align-items:center;justify-content:center}
+.defect-mo.open{display:flex}
+.defect-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:440px;max-width:96vw;display:flex;flex-direction:column}
+.defect-card-hdr{padding:14px 18px 10px;border-bottom:1px solid var(--border);font-family:'Syne',sans-serif;font-size:14px;font-weight:800}
+.defect-card-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.defect-card-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
 
 .text-inp{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;width:200px;transition:border-color .2s}
 .text-inp:focus{border-color:var(--accent)}.text-inp::placeholder{color:var(--muted)}
@@ -223,7 +233,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
 
 <div class="topbar">
-  <div class="bc">
+  <div class="bc" style="display:none">
     <span class="bcl" id="backBtn" onclick="goBack()">✕ Close</span>
     <span class="bcs">›</span>
     <span class="bcc" id="bcTitle">ITP Form</span>
@@ -374,6 +384,9 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   }
   responses=allResponses[pinId];
 
+  // Load equipment schedule into cache
+  try{_cachedEquipData=await dbGetEquipment(_ifPNum)||null;}catch(e){_cachedEquipData=null;}
+
   // Set status dropdown
   document.getElementById('statusSel').value=responses.status||'not-started';
 
@@ -420,36 +433,59 @@ function goBack(){
 
 // ── HEADER ──
 function renderHeader(){
-  var cs=loadSettings();
   var equipData=getEquipData(pin.equip);
   var meta=document.getElementById('formMeta');
   meta.innerHTML='';
+
   function addField(lbl,val,cls){
     var d=document.createElement('div');d.className='fmf';
     var l=document.createElement('div');l.className='fmf-lbl';l.textContent=lbl;
     var v=document.createElement('div');v.className='fmf-val'+(cls?' '+cls:'');v.textContent=val||'—';
     d.appendChild(l);d.appendChild(v);meta.appendChild(d);
   }
-  addField('ITP No.',pin.ref||'—','mono');
-  addField('ITP Type',pin.itpTypeLabel||pin.itpType||'—');
-  addField('Equipment ID',pin.equip||'—','mono');
-  // Version removed from detail view
-  if(equipData){
-    addField('Make/Model',(equipData.manufacturer||equipData.make||'')+(equipData.model?' · '+equipData.model:''));
-    addField('Location',equipData.location||'—');
+  function addEditable(lbl,key,placeholder,cls){
+    var d=document.createElement('div');d.className='fmf';
+    var l=document.createElement('div');l.className='fmf-lbl';l.textContent=lbl;
+    var i=document.createElement('input');i.className='doc-input'+(cls?' '+cls:'');
+    i.value=responses[key]||'';i.placeholder=placeholder||'';
+    i.onchange=function(){responses[key]=this.value;autosave();};
+    d.appendChild(l);d.appendChild(i);meta.appendChild(d);
   }
-  // Doc No — editable
-  var docF=document.createElement('div');docF.className='fmf';
-  var docL=document.createElement('div');docL.className='fmf-lbl';docL.textContent='Client Doc No.';
-  var docI=document.createElement('input');docI.className='doc-input';docI.value=responses.docNo||'';docI.placeholder='Client / Builder doc no.';
-  docI.onchange=function(){responses.docNo=this.value;autosave();};
-  docF.appendChild(docL);docF.appendChild(docI);meta.appendChild(docF);
+
+  // 1. Client Doc No (editable)
+  addEditable('Client Doc No.','docNo','Client / Builder doc no.');
+
+  // 2. ITP No
+  addField('ITP No.', itpTemplate?itpTemplate.itpNo:(pin.ref||'—'), 'mono');
+
+  // 3. ITP Type — from project template
+  addField('ITP Type', itpTemplate?itpTemplate.itpType:(pin.itpTypeLabel||'—'));
+
+  // 4. Equipment ID
+  addField('Equipment ID', pin.equip||'—', 'mono');
+
+  // 5. Location details — pre-fill from equip schedule, editable
+  var eqBuilding=(equipData&&(equipData.building||equipData.floor||''))||'';
+  var eqLocation=(equipData&&(equipData.location||equipData.room||''))||'';
+  var eqSub=(equipData&&(equipData.subLocation||equipData.sub_location||''))||'';
+  addEditable('Building','locBuilding','e.g. Tower B');
+  // Pre-fill if not already stored
+  if(!responses.locBuilding&&eqBuilding){responses.locBuilding=eqBuilding;}
+  document.querySelector && (function(){
+    var inputs=document.getElementById('formMeta').querySelectorAll('input');
+    var last=inputs[inputs.length-1];
+    if(last&&!last.value&&eqBuilding)last.value=eqBuilding;
+  })();
+
+  addEditable('Location','locLocation','e.g. Level 02 Plant Room');
+  addEditable('Sub Location','locSubLocation','e.g. Zone A');
 }
 
 // ── EQUIPMENT DATA ──
+var _cachedEquipData=null;
 function getEquipData(equipId){
   if(!equipId)return null;
-  var eq=loadEquipSchedule();if(!eq||!eq.tabs)return null;
+  var eq=_cachedEquipData;if(!eq||!eq.tabs)return null;
   for(var i=0;i<eq.tabs.length;i++){
     var tab=eq.tabs[i];
     for(var j=0;j<(tab.rows||[]).length;j++){
@@ -551,7 +587,22 @@ function renderRow(row, sec){
   } else if(row.checkType==='signoff'){
     // Handled in sign-off section
   }
-  wrap.appendChild(stepEl);wrap.appendChild(descEl);wrap.appendChild(respEl);
+  // User/date stamp
+  var stampId='stamp_'+rowKey.replace(/[^a-zA-Z0-9]/g,'_');
+  var stampEl=document.createElement('div');stampEl.className='row-stamp';stampEl.id=stampId;
+  var st=responses.rows[rowKey+'_stamp'];
+  stampEl.textContent=st?(st.user+' · '+st.date):'';
+
+  // Defect button
+  var defectBtn=document.createElement('button');defectBtn.className='defect-btn';defectBtn.textContent='+ Defect';
+  defectBtn.title='Raise a defect for this item';
+  (function(rk,rd){defectBtn.onclick=function(){openDefectModal(rk,rd);};})(rowKey,row.desc||'');
+
+  var actionsEl=document.createElement('div');actionsEl.className='row-actions';
+  actionsEl.appendChild(stampEl);
+  actionsEl.appendChild(defectBtn);
+
+  wrap.appendChild(stepEl);wrap.appendChild(descEl);wrap.appendChild(respEl);wrap.appendChild(actionsEl);
   return wrap;
 }
 
@@ -563,10 +614,26 @@ function renderYesNo(key,options,stored){
     var selClass=opt==='YES'||opt==='PASS'?'sel-yes':opt==='NO'||opt==='FAIL'?'sel-no':'sel-na';
     if(stored===opt)btn.classList.add(opt==='PASS'?'sel-pass':opt==='FAIL'?'sel-fail':selClass);
     (function(b,o,k,sc){b.onclick=function(){
+      var isSelected=b.classList.contains(o==='PASS'?'sel-pass':o==='FAIL'?'sel-fail':sc);
       // Clear siblings
       group.querySelectorAll('.yn-btn').forEach(function(x){x.className='yn-btn';});
-      b.classList.add(o==='PASS'?'sel-pass':o==='FAIL'?'sel-fail':sc);
-      responses.rows[k]=o;autosave();updateProgress();
+      if(!isSelected){
+        b.classList.add(o==='PASS'?'sel-pass':o==='FAIL'?'sel-fail':sc);
+        responses.rows[k]=o;
+        // Store user/date stamp
+        var u=dbGetCurrentUser();
+        responses.rows[k+'_stamp']={user:u?(u.name||u.username||'Unknown'):'Unknown',date:todayStr()};
+      } else {
+        delete responses.rows[k];
+        delete responses.rows[k+'_stamp'];
+      }
+      autosave();updateProgress();
+      // Re-render stamp display
+      var stampEl=document.getElementById('stamp_'+k.replace(/[^a-zA-Z0-9]/g,'_'));
+      if(stampEl){
+        var st=responses.rows[k+'_stamp'];
+        stampEl.textContent=st?(st.user+' · '+st.date):'';
+      }
     };})(btn,opt,key,selClass);
     group.appendChild(btn);
   });
@@ -867,6 +934,87 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   });
 })();
 
+</script>
+<!-- DEFECT MODAL -->
+<div class="defect-mo" id="defectMo" onclick="if(event.target===this)closeDefectModal()">
+  <div class="defect-card">
+    <div class="defect-card-hdr">🔴 Raise Defect</div>
+    <div class="defect-card-body">
+      <div>
+        <label class="ml" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace">Description</label>
+        <textarea class="mi" id="defectDesc" rows="3" style="resize:vertical;margin-top:4px"></textarea>
+      </div>
+      <div>
+        <label class="ml" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace">Assign To</label>
+        <select class="mi" id="defectAssignee" style="margin-top:4px"><option value="">— Select user —</option></select>
+      </div>
+      <div>
+        <label class="ml" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace">Priority</label>
+        <select class="mi" id="defectPriority" style="margin-top:4px">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+      </div>
+    </div>
+    <div class="defect-card-footer">
+      <button class="btn" onclick="closeDefectModal()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 16px;cursor:pointer">Cancel</button>
+      <button onclick="saveDefect()" style="background:var(--danger);border:none;color:#fff;border-radius:7px;padding:7px 16px;cursor:pointer;font-weight:600">Raise Defect</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _defectRowKey='', _defectRowDesc='';
+function openDefectModal(rowKey, rowDesc){
+  _defectRowKey=rowKey; _defectRowDesc=rowDesc;
+  document.getElementById('defectDesc').value=rowDesc||'';
+  // Populate assignees from users
+  dbGetUsers().then(function(users){
+    var sel=document.getElementById('defectAssignee');
+    sel.innerHTML='<option value="">— Select user —</option>'
+      +(users||[]).map(function(u){return '<option value="'+escH(u.name||u.username||u.id||'')+'">'+escH(u.name||u.username||'Unknown')+'</option>';}).join('');
+  });
+  document.getElementById('defectMo').classList.add('open');
+}
+function closeDefectModal(){document.getElementById('defectMo').classList.remove('open');}
+async function saveDefect(){
+  var desc=document.getElementById('defectDesc').value.trim();
+  if(!desc){alert('Please enter a description');return;}
+  var assignee=document.getElementById('defectAssignee').value;
+  var priority=document.getElementById('defectPriority').value;
+  var u=dbGetCurrentUser();
+  var defect={
+    id:'def_'+Date.now(),
+    rowKey:_defectRowKey,
+    desc:desc,
+    assignee:assignee,
+    priority:priority,
+    status:'open',
+    raisedBy:u?(u.name||u.username||'Unknown'):'Unknown',
+    raisedDate:todayStr(),
+    itpRef:pin.ref||'',
+    itpType:pin.itpTypeLabel||'',
+    equip:pin.equip||'',
+    drawingId:drawingId,
+    pinId:pinId
+  };
+  // Save to defects list in Supabase
+  try{
+    var existing=await dbGetProject('defects',_ifPNum)||[];
+    if(!Array.isArray(existing))existing=[];
+    existing.push(defect);
+    await dbSetProject('defects',_ifPNum,existing);
+  }catch(e){console.error('Defect save error:',e);}
+  closeDefectModal();
+  // Show confirmation
+  var toast=document.createElement('div');
+  toast.textContent='Defect raised ✓';
+  toast.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--danger);color:#fff;padding:8px 20px;border-radius:8px;font-size:13px;z-index:9999;font-weight:600';
+  document.body.appendChild(toast);
+  setTimeout(function(){document.body.removeChild(toast);},2500);
+}
 </script>
 </body>
 </html>
