@@ -75,7 +75,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 .modal-body{overflow-y:auto;flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
 .modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:7px;justify-content:flex-end;flex-shrink:0}
 .ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
-.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
+.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}.mi select,.mi option,select.mi,select.mi option{background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px}
 .mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
 .ms{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer}
 .ms:focus{border-color:var(--accent)}.ms option,.ms optgroup{background:var(--surface2)}
@@ -230,7 +230,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
     <div class="modal-body">
       <div>
         <label class="ml">ITP TYPE *</label>
-        <select class="mi" id="pinItpType" onchange="onPinTypeInput()" style="cursor:pointer"></select>
+        <select class="mi" id="pinItpType" onchange="onPinTypeInput()" style="cursor:pointer;height:38px;appearance:auto"></select>
       </div>
       <div id="pinEquipField">
         <label class="ml" id="pinEquipLabel">Equipment Tag</label>
@@ -457,7 +457,7 @@ function openNewPin(xPct,yPct){
   setStatus('not-started');
   populateTypeSelect('');
   document.getElementById('pinMo').classList.add('open');
-  setTimeout(function(){document.getElementById('pinItpType').focus();},150);
+  setTimeout(function(){document.getElementById('pinItpType').focus();},80);
 }
 function openEditPin(pinId){
   var pin=(curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===pinId;});if(!pin)return;
@@ -538,18 +538,56 @@ function populateTypeSelect(selectedVal){
       return '<option value="'+escH(t.name)+'"'+(t.name===selectedVal?' selected':'')+'>'+escH(t.name)+(t.itpNo?' ('+escH(t.itpNo)+')':'')+'</option>';
     }).join('');
 }
-function showTypeSugg(){} // no-op, kept for compatibility
-function renderTypeSugg(){} // no-op, kept for compatibility
-function pickType(t){
-  document.getElementById('pinItpType').value=t;
-  onPinTypeInput();
-}
+function showTypeSugg(){}
 function getTemplateTypes(){
   // Use templates loaded from Supabase at init (project level)
   var result=[];
   templates.forEach(function(t){if(t.itpType)result.push({itpNo:t.itpNo||'',name:t.itpType});});
   if(!result.length)result=ITP_MASTER.map(function(n){return{itpNo:'',name:n};});
   return result;
+}
+function renderTypeSugg(v){
+  var linked=getLinkedItpTypes();
+  var all=getTemplateTypes();
+  var list=document.getElementById('typeSugg');
+  var inp=document.getElementById('pinItpType');
+  // Position fixed dropdown below the input
+  if(inp){
+    var r=inp.getBoundingClientRect();
+    list.style.top=(r.bottom+3)+'px';
+    list.style.left=r.left+'px';
+    list.style.width=r.width+'px';
+  }
+  // No project templates set up yet
+  if(!all.length){
+    list.innerHTML='<div class="sugg-item" style="color:var(--muted);pointer-events:none;font-size:11px">No project templates — import from ITP Templates first</div>';
+    list.style.display='';
+    return;
+  }
+  var filtered=v
+    ?all.filter(function(t){return t.name.toLowerCase().includes(v.toLowerCase())||(t.itpNo||'').toLowerCase().includes(v.toLowerCase());})
+    :all;
+  var linkedItems=filtered.filter(function(t){return linked.includes(t.name);});
+  var otherItems=filtered.filter(function(t){return !linked.includes(t.name);});
+  var items=[...linkedItems,...otherItems].slice(0,12);
+  if(!items.length){list.style.display='none';return;}
+  list.innerHTML=items.map(function(t){
+    var isLinked=linked.includes(t.name);
+    return'<div class="sugg-item" onmousedown="pickType(\''+escH(t.name)+'\')" style="display:flex;align-items:center;justify-content:space-between">'
+      +'<span>'+escH(t.name)+'</span>'
+      +'<span style="font-family:DM Mono,monospace;font-size:9px;color:'+(isLinked?'var(--accent)':'var(--muted)')+';">'
+        +(isLinked?'linked ':'')+escH(t.itpNo||'')
+      +'</span>'
+      +'</div>';
+  }).join('');
+  list.style.display='';
+}
+function pickType(t){
+  var inp=document.getElementById('pinItpType');
+  inp.value=t;
+  inp.setAttribute('readonly','');
+  document.getElementById('typeSugg').style.display='none';
+  onPinTypeInput();
 }
 function onPinTypeInput(){
   var t=document.getElementById('pinItpType').value;
