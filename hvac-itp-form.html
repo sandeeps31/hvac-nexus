@@ -77,7 +77,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .yn-btn.sel-na{border-color:var(--muted);background:var(--surface3);color:var(--muted)}
 .yn-btn.sel-pass{border-color:var(--green);background:var(--green-dim);color:var(--green)}
 .yn-btn.sel-fail{border-color:var(--danger);background:var(--danger-dim);color:var(--danger)}
-.row-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 12px 8px;border-top:1px solid var(--border)}
+.row-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 12px 8px}
 .row-stamp{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);flex:1}
 .defect-btn{font-size:11px;font-family:'DM Mono',monospace;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,77,109,.4);background:rgba(255,77,109,.08);color:var(--danger);cursor:pointer;white-space:nowrap;transition:all .15s}
 .defect-btn:hover{background:rgba(255,77,109,.18);border-color:var(--danger)}
@@ -455,13 +455,16 @@ function renderHeader(){
   // 1. Client Doc No (editable)
   addEditable('Client Doc No.','docNo','Client / Builder doc no.');
 
-  // 2. ITP No
-  addField('ITP No.', itpTemplate?itpTemplate.itpNo:(pin.ref||'—'), 'mono');
+  // 2. Form No — from company template (fixed reference for AS accreditation)
+  addField('Form No.', itpTemplate?itpTemplate.itpNo:(pin.ref||'—'), 'mono');
 
-  // 3. ITP Type — from project template
+  // 3. Ref No — auto-generated per pin (ITP-0042)
+  addField('Ref No.', pin.ref||'—', 'mono');
+
+  // 4. ITP Type — from project template
   addField('ITP Type', itpTemplate?itpTemplate.itpType:(pin.itpTypeLabel||'—'));
 
-  // 4. Equipment ID
+  // 5. Equipment ID
   addField('Equipment ID', pin.equip||'—', 'mono');
 
   // 5. Location details — pre-fill from equip schedule, editable
@@ -985,8 +988,16 @@ async function saveDefect(){
   var assignee=document.getElementById('defectAssignee').value;
   var priority=document.getElementById('defectPriority').value;
   var u=dbGetCurrentUser();
+  // Auto-generate DEF-XXXX ref
+  var existingDefs=[];
+  try{existingDefs=await dbGetProject('defects',_ifPNum)||[];}catch(e){}
+  if(!Array.isArray(existingDefs))existingDefs=[];
+  var maxDef=0;
+  existingDefs.forEach(function(d){var m=(d.ref||'').match(/^DEF-(\d+)$/);if(m){var n=parseInt(m[1]);if(n>maxDef)maxDef=n;}});
+  var defRef='DEF-'+String(maxDef+1).padStart(4,'0');
   var defect={
     id:'def_'+Date.now(),
+    ref:defRef,
     rowKey:_defectRowKey,
     desc:desc,
     assignee:assignee,

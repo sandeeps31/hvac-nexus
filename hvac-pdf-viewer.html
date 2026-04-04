@@ -492,11 +492,15 @@ function savePin(){
   var ref=document.getElementById('pinRef').value.trim();
   var notes=document.getElementById('pinNotes').value.trim();
   if(!ref){
-    // Auto-generate ref
-    var existing=(curDrawing.pins||[]).filter(function(p){return p.itpTypeLabel===type;});
-    var seq=existing.length+((_editPinId&&existing.find(function(p){return p.id===_editPinId;}))?0:1);
-    var prefix=type.split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,3);
-    ref=prefix+'-'+String(seq).padStart(3,'0');
+    // Auto-generate ITP-XXXX ref — find highest across ALL drawings in project
+    var maxSeq=0;
+    drawings.forEach(function(d){
+      (d.pins||[]).forEach(function(p){
+        var m=(p.ref||'').match(/^ITP-(\d+)$/);
+        if(m){var n=parseInt(m[1]);if(n>maxSeq)maxSeq=n;}
+      });
+    });
+    ref='ITP-'+String(maxSeq+1).padStart(4,'0');
   }
   if(_editPinId){
     var pin=(curDrawing.pins||[]).find(function(p){return p.id===_editPinId;});
