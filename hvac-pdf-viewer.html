@@ -229,11 +229,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
     <div class="modal-hdr"><h3 id="pinMoTitle">New ITP Pin</h3></div>
     <div class="modal-body">
       <div>
-        <label class="ml">ITP Type *</label>
-        <div class="sugg-wrap">
-          <input class="mi" id="pinItpType" placeholder="Select or type ITP type…" oninput="showTypeSugg()" onfocus="setTimeout(showTypeSugg,50)" onclick="showTypeSugg()" autocomplete="off" style="cursor:pointer">
-          <div class="sugg-list" id="typeSugg" style="max-height:200px"></div>
-        </div>
+        <label class="ml">ITP TYPE *</label>
+        <select class="mi" id="pinItpType" onchange="onPinTypeInput()" style="cursor:pointer"></select>
       </div>
       <div id="pinEquipField">
         <label class="ml" id="pinEquipLabel">Equipment Tag</label>
@@ -458,7 +455,7 @@ function openNewPin(xPct,yPct){
   document.getElementById('deletePinBtn').style.display='none';
   document.getElementById('pinEquipField').style.display='';
   setStatus('not-started');
-  renderTypeSugg('');
+  populateTypeSelect('');
   document.getElementById('pinMo').classList.add('open');
   setTimeout(function(){document.getElementById('pinItpType').focus();},150);
 }
@@ -473,7 +470,7 @@ function openEditPin(pinId){
   document.getElementById('deletePinBtn').style.display='';
   onPinTypeInput();
   setStatus(_pinStatus);
-  renderTypeSugg(pin.itpTypeLabel||'');
+  populateTypeSelect(pin.itpTypeLabel||'');
   document.getElementById('pinMo').classList.add('open');
 }
 function closePinMo(){document.getElementById('pinMo').classList.remove('open');_editPinId=null;}
@@ -533,9 +530,18 @@ function deletePin(){
 }
 
 // ── TYPE SUGGESTIONS ──
-function showTypeSugg(){
-  var v=document.getElementById('pinItpType').value;
-  renderTypeSugg(v);
+function populateTypeSelect(selectedVal){
+  var sel=document.getElementById('pinItpType');
+  var types=getTemplateTypes();
+  sel.innerHTML='<option value="">— Select ITP Type —</option>'
+    +types.map(function(t){
+      return '<option value="'+escH(t.name)+'"'+(t.name===selectedVal?' selected':'')+'>'+escH(t.name)+(t.itpNo?' ('+escH(t.itpNo)+')':'')+'</option>';
+    }).join('');
+}
+function showTypeSugg(){} // no-op, kept for compatibility
+function renderTypeSugg(){} // no-op, kept for compatibility
+function pickType(t){
+  document.getElementById('pinItpType').value=t;
   onPinTypeInput();
 }
 function getTemplateTypes(){
@@ -544,49 +550,6 @@ function getTemplateTypes(){
   templates.forEach(function(t){if(t.itpType)result.push({itpNo:t.itpNo||'',name:t.itpType});});
   if(!result.length)result=ITP_MASTER.map(function(n){return{itpNo:'',name:n};});
   return result;
-}
-function renderTypeSugg(v){
-  var linked=getLinkedItpTypes();
-  var all=getTemplateTypes();
-  var list=document.getElementById('typeSugg');
-  var inp=document.getElementById('pinItpType');
-  // Position fixed dropdown below the input
-  if(inp){
-    var r=inp.getBoundingClientRect();
-    list.style.top=(r.bottom+3)+'px';
-    list.style.left=r.left+'px';
-    list.style.width=r.width+'px';
-  }
-  // No project templates set up yet
-  if(!all.length){
-    list.innerHTML='<div class="sugg-item" style="color:var(--muted);pointer-events:none;font-size:11px">No project templates — import from ITP Templates first</div>';
-    list.style.display='';
-    return;
-  }
-  var filtered=v
-    ?all.filter(function(t){return t.name.toLowerCase().includes(v.toLowerCase())||(t.itpNo||'').toLowerCase().includes(v.toLowerCase());})
-    :all;
-  var linkedItems=filtered.filter(function(t){return linked.includes(t.name);});
-  var otherItems=filtered.filter(function(t){return !linked.includes(t.name);});
-  var items=[...linkedItems,...otherItems].slice(0,12);
-  if(!items.length){list.style.display='none';return;}
-  list.innerHTML=items.map(function(t){
-    var isLinked=linked.includes(t.name);
-    return'<div class="sugg-item" onmousedown="pickType(\''+escH(t.name)+'\')" style="display:flex;align-items:center;justify-content:space-between">'
-      +'<span>'+escH(t.name)+'</span>'
-      +'<span style="font-family:DM Mono,monospace;font-size:9px;color:'+(isLinked?'var(--accent)':'var(--muted)')+';">'
-        +(isLinked?'linked ':'')+escH(t.itpNo||'')
-      +'</span>'
-      +'</div>';
-  }).join('');
-  list.style.display='';
-}
-function pickType(t){
-  var inp=document.getElementById('pinItpType');
-  inp.value=t;
-  inp.setAttribute('readonly','');
-  document.getElementById('typeSugg').style.display='none';
-  onPinTypeInput();
 }
 function onPinTypeInput(){
   var t=document.getElementById('pinItpType').value;
