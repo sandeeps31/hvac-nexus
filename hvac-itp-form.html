@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-05 08:24 -->
+<!-- build: 2026-04-05 08:59 -->
 <html lang="en">
 <head>
 <link rel="stylesheet" href="theme.css">
@@ -274,7 +274,7 @@ async function loadDrawings(){try{var p=await dbGetDrawings(_ifPNum);return Arra
 async function loadTemplates(){try{var s=await dbGetItpProjectTemplates(_ifPNum);return Array.isArray(s)?s:[];}catch(e){return [];}}
 async function loadEquipSchedule(){try{return await dbGetEquipment(_ifPNum)||null;}catch(e){return null;}}
 async function loadResponses(){try{return await dbGetItpResponses(_ifPNum)||{};}catch(e){return {};}}
-function saveResponses(){dbSetItpResponses(_ifPNum,allResponses).catch(e=>console.error(e));}
+function saveResponses(){allResponses[pinId]=responses;dbSetItpResponses(_ifPNum,allResponses).catch(e=>console.error(e));}
 function loadSigs(){try{var s=localStorage.getItem(SIG_SK);if(s)return JSON.parse(s);}catch(e){}return{};}
 function saveSigs(sigs){try{localStorage.setItem(SIG_SK,JSON.stringify(sigs));}catch(e){}}
 async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch(e){return {};}}
@@ -870,27 +870,36 @@ function updateStatus(val){
 
 // ── AUTOSAVE ──
 var _saving=false;
+var _pendingChanges=false;
 function autosave(){
+  // Only mark as pending — actual save happens on Save Changes click
+  _pendingChanges=true;
+  var ind=document.getElementById('saveInd');
+  if(ind){ind.textContent='Unsaved •';ind.style.color='var(--warn)';ind.style.opacity='1';}
+}
+async function saveChanges(){
   if(_saving)return;
+  _saving=true;
   allResponses[pinId]=responses;
-  saveResponses();
-  // Sync equipId back to pin.equip in drawings so label persists on reload
+  // Save responses
+  try{await dbSetItpResponses(_ifPNum,allResponses);}catch(e){console.error(e);}
+  // Sync equipId back to pin.equip
   if(responses.equipId){
-    dbGetDrawings(_ifPNum).then(function(drawings){
-      if(!Array.isArray(drawings))return;
-      var drw=drawings.find(function(d){return d.id===drawingId;});
-      if(drw&&drw.pins){
-        var p=drw.pins.find(function(x){return x.id===pinId;});
-        if(p&&p.equip!==responses.equipId){
-          p.equip=responses.equipId;
-          dbSetDrawings(_ifPNum,drawings).catch(function(e){console.error(e);});
+    try{
+      var drawings=await dbGetDrawings(_ifPNum);
+      if(Array.isArray(drawings)){
+        var drw=drawings.find(function(d){return d.id===drawingId;});
+        if(drw&&drw.pins){
+          var p=drw.pins.find(function(x){return x.id===pinId;});
+          if(p&&p.equip!==responses.equipId){p.equip=responses.equipId;await dbSetDrawings(_ifPNum,drawings);}
         }
       }
-    }).catch(function(e){console.error(e);});
+    }catch(e){console.error(e);}
   }
+  _saving=false;
+  _pendingChanges=false;
   var ind=document.getElementById('saveInd');
-  ind.style.opacity='1';
-  setTimeout(function(){ind.style.opacity='0';},1500);
+  if(ind){ind.textContent='Saved ✓';ind.style.color='var(--green)';ind.style.opacity='1';setTimeout(function(){ind.style.opacity='0';},2000);}
 }
 
 // ── TOAST ──
@@ -921,6 +930,10 @@ function toggleEditMode(){
   var statusSel=document.getElementById('statusSel');
   var repinBtn=document.getElementById('repinBtn');
   var deleteBtn=document.getElementById('deleteItpBtn');
+  if(!_editMode){
+    // Switching to locked — trigger save
+    saveChanges();
+  }
   btn.textContent=_editMode?'✓ Save Changes':'✎ Edit ITP';
   btn.style.background=_editMode?'var(--warn)':'var(--accent)';
   statusSel.disabled=!_editMode;
