@@ -145,6 +145,7 @@ select.mi{height:36px;appearance:auto}
     <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
       <input type="checkbox" id="showDeleted" onchange="render()"> Show deleted
     </label>
+    <button class="btn bg bsm" onclick="openColsModal()">⚙ Columns</button>
     <button class="btn bp bsm" onclick="openAddModal()">＋ Add ITP</button>
   </div>
 
@@ -163,19 +164,7 @@ select.mi{height:36px;appearance:auto}
     </div>
     <div class="tbl-wrap">
       <table class="tbl">
-        <thead><tr>
-          <th>Ref No.</th>
-          <th>Form No.</th>
-          <th>ITP Type</th>
-          <th>Equipment ID</th>
-          <th>Client Doc No.</th>
-          <th>Building</th>
-          <th>Location</th>
-          <th>Status</th>
-          <th>Drawing</th>
-          <th>Raised By</th>
-          <th>Date</th>
-        </tr></thead>
+        <thead><tr id="tblHead"></tr></thead>
         <tbody id="tblBody"></tbody>
       </table>
       <div class="empty" id="emptyState" style="display:none">No ITPs found</div>
@@ -185,22 +174,36 @@ select.mi{height:36px;appearance:auto}
 
 <!-- ADD ITP MODAL -->
 <div class="mo" id="addMo" onclick="if(event.target===this)closeAddModal()">
-  <div class="modal">
+  <div class="modal" style="width:480px">
     <div class="modal-hdr"><h3>Add ITP</h3></div>
     <div class="modal-body">
-      <div><label class="ml">ITP Type *</label><select class="mi" id="newItpType"><option value="">— Select —</option></select></div>
-      <div><label class="ml">Equipment ID</label><input class="mi" id="newEquip" placeholder="e.g. FCU-L02-001"></div>
+      <div><label class="ml">ITP Type *</label><select class="mi" id="newItpType" onchange="onNewItpTypeChange()"><option value="">— Select —</option></select></div>
+      <div>
+        <label class="ml">Equipment ID</label>
+        <input class="mi" id="newEquip" placeholder="e.g. FCU-L02-001" onchange="onNewEquipChange()">
+        <div id="newEquipInfo" style="font-size:11px;color:var(--muted);margin-top:4px;font-family:'DM Mono',monospace"></div>
+      </div>
       <div><label class="ml">Client Doc No.</label><input class="mi" id="newDocNo" placeholder="Client / Builder doc no."></div>
       <div style="display:flex;gap:10px">
         <div style="flex:1"><label class="ml">Building</label><input class="mi" id="newBuilding" placeholder="e.g. Tower B"></div>
         <div style="flex:1"><label class="ml">Location</label><input class="mi" id="newLocation" placeholder="e.g. Level 02"></div>
         <div style="flex:1"><label class="ml">Sub Location</label><input class="mi" id="newSubLoc" placeholder="e.g. Zone A"></div>
       </div>
-      <div><label class="ml">Notes</label><textarea class="mi" id="newNotes" rows="2" placeholder="Optional…" style="resize:vertical"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn bg" onclick="closeAddModal()">Cancel</button>
       <button class="btn bp" onclick="saveNewItp()">Save ITP</button>
+    </div>
+  </div>
+</div>
+
+<!-- COLUMNS MODAL -->
+<div class="mo" id="colsMo" onclick="if(event.target===this)closeColsModal()">
+  <div class="modal" style="width:340px">
+    <div class="modal-hdr"><h3>Show / Hide Columns</h3></div>
+    <div class="modal-body" id="colsBody" style="gap:8px"></div>
+    <div class="modal-footer">
+      <button class="btn bg" onclick="closeColsModal()">Close</button>
     </div>
   </div>
 </div>
@@ -219,32 +222,87 @@ function todayStr(){return new Date().toISOString().split('T')[0];}
 function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
 
 // ── LOAD DATA ──
+// ── COLUMNS DEFINITION ──
+var COLS=[
+  {key:'docNo',    label:'Client Doc No.',  def:true},
+  {key:'ref',      label:'ITP No.',         def:true},
+  {key:'ref',      label:'Ref No.',         def:true},
+  {key:'formNo',   label:'Form No.',        def:true},
+  {key:'itpType',  label:'ITP Type',        def:true},
+  {key:'equip',    label:'Equipment ID',    def:true},
+  {key:'building', label:'Building',        def:true},
+  {key:'location', label:'Location',        def:true},
+  {key:'subLocation',label:'Sub Location',  def:true},
+  {key:'status',   label:'Status',          def:true},
+  {key:'createdBy',label:'Created By',      def:true},
+];
+// Load column visibility from localStorage
+var _colVis={};
+try{_colVis=JSON.parse(localStorage.getItem('hvacnexus_reg_cols')||'{}');}catch(e){}
+COLS.forEach(function(c){if(_colVis[c.label]===undefined)_colVis[c.label]=c.def;});
+
+function saveColVis(){localStorage.setItem('hvacnexus_reg_cols',JSON.stringify(_colVis));}
+function visibleCols(){return COLS.filter(function(c){return _colVis[c.label];});}
+
+function renderColHeaders(){
+  var tr=document.getElementById('tblHead');
+  tr.innerHTML=visibleCols().map(function(c){return '<th>'+escH(c.label)+'</th>';}).join('');
+}
+
+// ── EQUIPMENT SCHEDULE CACHE ──
+var _equipSchedule=null;
+async function getEquipSchedule(){
+  if(_equipSchedule)return _equipSchedule;
+  try{_equipSchedule=await dbGetEquipment(pNum)||null;}catch(e){_equipSchedule=null;}
+  return _equipSchedule;
+}
+function lookupEquip(equipId){
+  if(!equipId||!_equipSchedule||!_equipSchedule.tabs)return null;
+  for(var i=0;i<_equipSchedule.tabs.length;i++){
+    var tab=_equipSchedule.tabs[i];
+    for(var j=0;j<(tab.rows||[]).length;j++){
+      var r=tab.rows[j];
+      if((r.tag||r.equipId||'').toLowerCase()===equipId.toLowerCase())return r;
+    }
+  }
+  return null;
+}
+
 async function loadAll(){
-  // Load all drawings and extract pins
-  var drawings=await dbGetDrawings(pNum)||[];
-  var responses=await dbGetItpResponses(pNum)||{};
-  templates=await dbGetItpProjectTemplates(pNum)||[];
+  var results=await Promise.all([
+    dbGetDrawings(pNum).catch(function(){return [];}),
+    dbGetItpResponses(pNum).catch(function(){return {};}),
+    dbGetItpProjectTemplates(pNum).catch(function(){return [];}),
+    getEquipSchedule()
+  ]);
+  var drawings=results[0]||[];
+  var responses=results[1]||{};
+  templates=results[2]||[];
 
   allItps=[];
   drawings.forEach(function(drw){
     (drw.pins||[]).filter(function(p){return p.type==='itp';}).forEach(function(pin){
       var resp=responses[pin.id]||{};
       var tmpl=templates.find(function(t){return t.itpType===pin.itpTypeLabel;});
+      // Pull location from responses, fallback to equipment schedule
+      var equipId=resp.equipId||pin.equip||'';
+      var eq=lookupEquip(equipId);
+      var building=resp.locBuilding||(eq&&(eq.building||eq.floor||eq.level||''))||'';
+      var location=resp.locLocation||(eq&&(eq.location||eq.room||''))||'';
+      var subLocation=resp.locSubLocation||(eq&&(eq.sublocation||eq.subLocation||''))||'';
       allItps.push({
         ref:pin.ref||'',
         formNo:tmpl?tmpl.itpNo:'—',
         itpType:pin.itpTypeLabel||'',
-        equip:pin.equip||'',
+        equip:equipId,
         docNo:resp.docNo||'',
-        building:resp.locBuilding||'',
-        location:resp.locLocation||'',
-        subLocation:resp.locSubLocation||'',
+        building:building,
+        location:location,
+        subLocation:subLocation,
         status:resp.status||'not-started',
         drawingId:drw.id,
-        drawingNum:drw.num||drw.name||'',
         pinId:pin.id,
-        raisedBy:resp.raisedBy||'',
-        raisedDate:resp.raisedDate||pin.createdDate||'',
+        createdBy:resp.raisedBy||'',
         deleted:resp.deleted||false,
         deletedBy:resp.deletedBy||'',
         deletedDate:resp.deletedDate||''
@@ -252,18 +310,17 @@ async function loadAll(){
     });
   });
 
-  // Sort by ref
   allItps.sort(function(a,b){
     var an=parseInt((a.ref||'').replace(/[^0-9]/g,''))||0;
     var bn=parseInt((b.ref||'').replace(/[^0-9]/g,''))||0;
     return an-bn;
   });
 
-  // Populate type filter
   var types=[...new Set(allItps.map(function(i){return i.itpType;}).filter(Boolean))].sort();
   var filtType=document.getElementById('filtType');
   filtType.innerHTML='<option value="">All ITP types</option>'+types.map(function(t){return '<option value="'+escH(t)+'">'+escH(t)+'</option>';}).join('');
 
+  renderColHeaders();
   renderStats();
   render();
 }
@@ -305,23 +362,27 @@ function render(){
   };
   var STATUS_LBL={'not-started':'Not Started','in-progress':'In Progress','action':'Action Req.','closed':'Closed'};
 
+  var vcols=visibleCols();
   var tbody=document.getElementById('tblBody');
   tbody.innerHTML=filtered.map(function(itp){
     var badgeCls=itp.deleted?'badge-del':(BADGE[itp.status]||'badge-ns');
     var statusLbl=itp.deleted?'Deleted':(STATUS_LBL[itp.status]||itp.status);
-    return '<tr class="'+(itp.deleted?'deleted':'')+'" onclick="openItp(\''+escH(itp.drawingId)+'\',\''+escH(itp.pinId)+'\')" title="'+(itp.deleted?'Deleted by '+escH(itp.deletedBy)+' on '+escH(itp.deletedDate):'Click to open ITP form')+'">'
-      +'<td class="ref">'+escH(itp.ref||'—')+'</td>'
-      +'<td class="mono">'+escH(itp.formNo)+'</td>'
-      +'<td>'+escH(itp.itpType||'—')+'</td>'
-      +'<td class="mono">'+escH(itp.equip||'—')+'</td>'
-      +'<td>'+escH(itp.docNo||'—')+'</td>'
-      +'<td>'+escH(itp.building||'—')+'</td>'
-      +'<td>'+escH(itp.location||'—')+'</td>'
-      +'<td><span class="badge '+badgeCls+'">'+escH(statusLbl)+'</span></td>'
-      +'<td class="mono" style="font-size:11px;color:var(--muted)">'+escH(itp.drawingNum||'—')+'</td>'
-      +'<td style="color:var(--muted);font-size:12px">'+escH(itp.raisedBy||'—')+'</td>'
-      +'<td style="color:var(--muted);font-size:12px;font-family:\'DM Mono\',monospace">'+fmtDate(itp.raisedDate)+'</td>'
-      +'</tr>';
+    var cells=vcols.map(function(c){
+      var v='—';
+      if(c.key==='ref')v=itp.ref||'—';
+      else if(c.key==='formNo')v=itp.formNo||'—';
+      else if(c.key==='itpType')v=itp.itpType||'—';
+      else if(c.key==='equip')v=itp.equip||'—';
+      else if(c.key==='docNo')v=itp.docNo||'—';
+      else if(c.key==='building')v=itp.building||'—';
+      else if(c.key==='location')v=itp.location||'—';
+      else if(c.key==='subLocation')v=itp.subLocation||'—';
+      else if(c.key==='status')return '<td><span class="badge '+badgeCls+'">'+escH(statusLbl)+'</span></td>';
+      else if(c.key==='createdBy')v=itp.createdBy||'—';
+      var isMono=c.key==='ref'||c.key==='formNo'||c.key==='equip';
+      return '<td class="'+(isMono?'mono ref':'')+'">'+escH(v)+'</td>';
+    }).join('');
+    return '<tr class="'+(itp.deleted?'deleted':'')+'" onclick="openItp(''+escH(itp.drawingId)+'',''+escH(itp.pinId)+'')" title="'+(itp.deleted?'Deleted by '+escH(itp.deletedBy)+' on '+escH(itp.deletedDate):'Click to open ITP form')+'">'+cells+'</tr>';
   }).join('');
 
   document.getElementById('emptyState').style.display=filtered.length?'none':'block';
@@ -343,6 +404,27 @@ function openAddModal(){
 }
 function closeAddModal(){document.getElementById('addMo').classList.remove('open');}
 
+function onNewItpTypeChange(){}
+function onNewEquipChange(){
+  var equipId=document.getElementById('newEquip').value.trim();
+  var eq=lookupEquip(equipId);
+  var info=document.getElementById('newEquipInfo');
+  if(eq){
+    var b=eq.building||eq.floor||eq.level||'';
+    var l=eq.location||eq.room||'';
+    var s=eq.sublocation||eq.subLocation||'';
+    document.getElementById('newBuilding').value=b;
+    document.getElementById('newLocation').value=l;
+    document.getElementById('newSubLoc').value=s;
+    info.textContent=(eq.manufacturer||eq.make||'')+(eq.model?' · '+eq.model:'');
+    info.style.color='var(--green)';
+  } else if(equipId){
+    info.textContent='Not found on Equipment Schedule';
+    info.style.color='var(--warn)';
+  } else {
+    info.textContent='';
+  }
+}
 async function saveNewItp(){
   var itpType=document.getElementById('newItpType').value;
   if(!itpType){alert('Please select an ITP type');return;}
@@ -351,7 +433,6 @@ async function saveNewItp(){
   var building=document.getElementById('newBuilding').value.trim();
   var location=document.getElementById('newLocation').value.trim();
   var subLoc=document.getElementById('newSubLoc').value.trim();
-  var notes=document.getElementById('newNotes').value.trim();
   var u=dbGetCurrentUser();
 
   // Generate ref no — find highest ITP-XXXX across all pins
@@ -387,7 +468,7 @@ async function saveNewItp(){
   responses[pinId]={
     status:'not-started',docNo:docNo,
     locBuilding:building,locLocation:location,locSubLocation:subLoc,
-    rows:{},signoffs:{},
+    rows:{},signoffs:{},equipId:equip,
     raisedBy:u?(u.name||u.username||'Unknown'):'Unknown',
     raisedDate:todayStr()
   };
@@ -395,6 +476,24 @@ async function saveNewItp(){
 
   closeAddModal();
   await loadAll();
+}
+
+// ── COLUMNS MODAL ──
+function openColsModal(){
+  var body=document.getElementById('colsBody');
+  body.innerHTML=COLS.map(function(c){
+    return '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 0;border-bottom:1px solid var(--border)">'
+      +'<input type="checkbox" '+((_colVis[c.label])?'checked':'')+' onchange="toggleCol(''+escH(c.label)+'',this.checked)" style="width:16px;height:16px">'
+      +'<span>'+escH(c.label)+'</span></label>';
+  }).join('');
+  document.getElementById('colsMo').classList.add('open');
+}
+function closeColsModal(){document.getElementById('colsMo').classList.remove('open');}
+function toggleCol(label,vis){
+  _colVis[label]=vis;
+  saveColVis();
+  renderColHeaders();
+  render();
 }
 
 // ── SIDEBAR ──
