@@ -506,7 +506,20 @@ function renderRow(row, sec){
   } else if(row.checkType==='signoff'){
     // Handled in sign-off section
   }
-  wrap.appendChild(stepEl);wrap.appendChild(descEl);wrap.appendChild(respEl);
+  // Stamp element (shows user + date + time when value selected)
+  var stampId='stamp_'+rowKey.replace(/[^a-zA-Z0-9]/g,'_');
+  var stampEl=document.createElement('div');stampEl.className='row-stamp';stampEl.id=stampId;
+  var existingStamp=responses.rows[rowKey+'_stamp'];
+  stampEl.textContent=existingStamp?(existingStamp.user+' · '+existingStamp.date+(existingStamp.time?' '+existingStamp.time:'')):'';
+  respEl.insertBefore(stampEl,respEl.firstChild);
+
+  // Defect button
+  var defectBtn=document.createElement('button');defectBtn.className='defect-btn';defectBtn.textContent='+ Defect';
+  (function(rk,rd){defectBtn.onclick=function(){openDefectModal(rk,rd);};})(rowKey,row.desc||'');
+  var actionsEl=document.createElement('div');actionsEl.className='row-actions';
+  actionsEl.appendChild(defectBtn);
+
+  wrap.appendChild(stepEl);wrap.appendChild(descEl);wrap.appendChild(respEl);wrap.appendChild(actionsEl);
   return wrap;
 }
 
@@ -524,14 +537,17 @@ function renderYesNo(key,options,stored){
         b.classList.add(o==='PASS'?'sel-pass':o==='FAIL'?'sel-fail':sc);
         responses.rows[k]=o;
         var u=dbGetCurrentUser();
-        responses.rows[k+'_stamp']={user:u?(u.name||u.username||'Unknown'):'Unknown',date:todayStr()};
+        var now=new Date();
+        var hh=now.getHours();var ampm=hh>=12?'pm':'am';hh=hh%12||12;
+        var mm=String(now.getMinutes()).padStart(2,'0');
+        responses.rows[k+'_stamp']={user:u?(u.name||u.username||'Unknown'):'Unknown',date:todayStr(),time:hh+':'+mm+ampm};
       } else {
         delete responses.rows[k];
         delete responses.rows[k+'_stamp'];
       }
       autosave();updateProgress();
       var stampEl=document.getElementById('stamp_'+k.replace(/[^a-zA-Z0-9]/g,'_'));
-      if(stampEl){var st=responses.rows[k+'_stamp'];stampEl.textContent=st?(st.user+' · '+st.date):'';}
+      if(stampEl){var st=responses.rows[k+'_stamp'];stampEl.textContent=st?(st.user+' · '+st.date+(st.time?' '+st.time:'')):'';} 
     };})(btn,opt,key,selClass);
     group.appendChild(btn);
   });
@@ -821,7 +837,7 @@ function toggleEditMode(){
   var statusSel=document.getElementById('statusSel');
   var repinBtn=document.getElementById('repinBtn');
   var deleteBtn=document.getElementById('deleteItpBtn');
-  btn.textContent=_editMode?'🔒 Lock ITP':'✎ Edit ITP';
+  btn.textContent=_editMode?'✓ Save Changes':'✎ Edit ITP';
   btn.style.background=_editMode?'var(--warn)':'var(--accent)';
   statusSel.disabled=!_editMode;
   repinBtn.style.display=_editMode?'':'none';
