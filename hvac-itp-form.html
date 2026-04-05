@@ -406,6 +406,15 @@ function renderHeader(){
     var mk=document.getElementById('hdr-make');var md=document.getElementById('hdr-model');
     if(mk)mk.textContent=(eq2&&(eq2.manufacturer||eq2.make))||'—';
     if(md)md.textContent=(eq2&&eq2.model)||'—';
+    // Auto-fill location fields if empty
+    if(eq2){
+      var bldInp=document.querySelector('input[data-response-key="locBuilding"]');
+      var locInp=document.querySelector('input[data-response-key="locLocation"]');
+      var subInp=document.querySelector('input[data-response-key="locSubLocation"]');
+      if(bldInp&&!bldInp.value){var b=eq2.building||eq2.floor||eq2.level||'';bldInp.value=b;responses.locBuilding=b;}
+      if(locInp&&!locInp.value){var l=eq2.location||eq2.room||'';locInp.value=l;responses.locLocation=l;}
+      if(subInp&&!subInp.value){var s=eq2.sublocation||eq2.sub_location||eq2.subLocation||'';subInp.value=s;responses.locSubLocation=s;}
+    }
     autosave();
   };
   g2.appendChild(eqE.wrap);
@@ -414,10 +423,11 @@ function renderHeader(){
   var modelD=makeField('Model',(eq&&eq.model)||'—','mono');
   modelD.querySelector('.fmf-val').id='hdr-model';g2.appendChild(modelD);
 
-  // ── GROUP 3: Location ──
+  // ── GROUP 3: Location — pre-fill from equipment schedule ──
   var g3=group();
-  var eqBuilding=(eq&&(eq.building||eq.floor||''))||'';
+  var eqBuilding=(eq&&(eq.building||eq.floor||eq.level||''))||'';
   var eqLocation=(eq&&(eq.location||eq.room||''))||'';
+  var eqSub=(eq&&(eq.sublocation||eq.sub_location||eq.subLocation||''))||'';
   var bldE=makeEditable('Building','locBuilding','e.g. Tower B');
   if(!responses.locBuilding&&eqBuilding){responses.locBuilding=eqBuilding;bldE.inp.value=eqBuilding;}
   g3.appendChild(bldE.wrap);
@@ -425,6 +435,7 @@ function renderHeader(){
   if(!responses.locLocation&&eqLocation){responses.locLocation=eqLocation;locE.inp.value=eqLocation;}
   g3.appendChild(locE.wrap);
   var subE=makeEditable('Sub Location','locSubLocation','e.g. Zone A');
+  if(!responses.locSubLocation&&eqSub){responses.locSubLocation=eqSub;subE.inp.value=eqSub;}
   g3.appendChild(subE.wrap);
 }
 
