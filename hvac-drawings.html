@@ -1420,11 +1420,40 @@ function renderPinOverlay(){
   var canvas=document.getElementById('pdfCanvas');
   if(!canvas||canvas.style.display==='none') return;
   var cw=canvas.width,ch=canvas.height; // use intrinsic pixel size, not CSS size
-  d.pins.forEach(function(pin){
-    if(activeLayer!=='all'&&pin.type!==activeLayer) return;
+  // Calculate offsets for overlapping pins
+  var visiblePins=d.pins.filter(function(p){return activeLayer==='all'||p.type===activeLayer;});
+  var THRESH=32; // pixels — pins within this distance get offset
+  var offsets={}; // pinId -> {dx, dy}
+  // First pass: find all overlap groups
+  var processed={};
+  visiblePins.forEach(function(pin,i){
+    if(processed[pin.id])return;
+    var px=pin.x/100*cw, py=pin.y/100*ch;
+    // Find all pins (including self) within threshold
+    var group=visiblePins.filter(function(p2){
+      var dx=p2.x/100*cw-px, dy=p2.y/100*ch-py;
+      return Math.sqrt(dx*dx+dy*dy)<THRESH;
+    });
+    if(group.length===1){
+      // No overlap — no offset
+      offsets[pin.id]={dx:0,dy:0};
+    } else {
+      // Spread all pins in group evenly around a circle
+      var radius=group.length===2?16:22;
+      group.forEach(function(p2,idx){
+        var angle=(idx/group.length)*2*Math.PI - Math.PI/2;
+        offsets[p2.id]={dx:Math.cos(angle)*radius, dy:Math.sin(angle)*radius};
+        processed[p2.id]=true;
+      });
+    }
+    processed[pin.id]=true;
+  });
+
+  visiblePins.forEach(function(pin){
+    var off=offsets[pin.id]||{dx:0,dy:0};
     var el=document.createElement('div');el.className='drw-pin '+pin.type;
-    el.style.left=(pin.x/100*cw)+'px';
-    el.style.top=(pin.y/100*ch)+'px';
+    el.style.left=((pin.x/100*cw)+off.dx)+'px';
+    el.style.top=((pin.y/100*ch)+off.dy)+'px';
     var m=document.createElement('div');m.className='pin-marker';
     var inner=document.createElement('div');inner.className='pin-marker-inner';
     inner.textContent=(pin.ref||'').replace(/[A-Z]+-/,'');
