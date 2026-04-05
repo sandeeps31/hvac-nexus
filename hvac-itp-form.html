@@ -853,14 +853,21 @@ function openRepinDrawing(){
   var url=b+'hvac-pdf-viewer.html?drawingId='+encodeURIComponent(drawingId)+'&movePin='+encodeURIComponent(pinId);
   if(window.self!==window.top){window.parent.location.href=url;}else{window.location.href=url;}
 }
-function confirmDeleteItp(){
+async function confirmDeleteItp(){
   if(!confirm('Delete this ITP? It will be hidden but can be restored from the ITP Register.'))return;
   responses.deleted=true;
   var u=dbGetCurrentUser();
   responses.deletedBy=u?(u.name||u.username||'Unknown'):'Unknown';
   responses.deletedDate=todayStr();
-  autosave();
-  // Close and reload pins in parent
+  allResponses[pinId]=responses;
+  // Await the save before closing so the iframe doesn't get destroyed mid-request
+  try{
+    await dbSetItpResponses(_ifPNum,allResponses);
+  } catch(e){
+    console.error('Delete save error:',e);
+    alert('Could not save deletion — check your connection and try again.');
+    return;
+  }
   if(window.self!==window.top&&window.parent.closeItpDetail){
     window.parent.closeItpDetail();
   } else { goBack(); }
