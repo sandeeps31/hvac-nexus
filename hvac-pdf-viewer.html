@@ -64,6 +64,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 .itp-pin:hover .pin-label{display:block}
 
 /* PLACE HINT */
+.ctx-menu{position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:2000;min-width:160px;padding:4px;display:none}
+.ctx-item{padding:8px 14px;font-size:13px;cursor:pointer;border-radius:5px;display:flex;align-items:center;gap:8px;color:var(--text)}
+.ctx-item:hover{background:var(--accent-dim);color:var(--accent)}
 .place-hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,200,255,.15);border:1.5px solid var(--accent);color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;padding:8px 18px;border-radius:8px;z-index:100;display:none;pointer-events:none;backdrop-filter:blur(4px)}
 
 /* PIN MODAL */
@@ -219,6 +222,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 </div>
 
 <!-- PLACE HINT -->
+<div id="pinCtxMenu" class="ctx-menu">
+  <div class="ctx-item" onclick="ctxMovePin()">📍 Move Pin</div>
+</div>
+
 <div class="place-hint" id="placeHint">📍 Click on drawing to place ITP pin — Esc to cancel</div>
 
 </div><!-- /mainWrap -->
@@ -422,7 +429,12 @@ function renderPins(){
     el.innerHTML='<div class="pin-dot '+(ST_COLOR[st]||'ns')+'">'+escH((label||'').slice(0,2).toUpperCase())+'</div>'
       +'<div class="pin-label">'+escH(label)+(pin.itpTypeLabel?' · '+escH(pin.itpTypeLabel):'')+'</div>';
     el.addEventListener('click',function(e){e.stopPropagation();openItpDetail(pin);});
-    el.addEventListener('contextmenu',function(e){e.preventDefault();e.stopPropagation();startMovePin(pin.id);});
+    (function(pid){el.addEventListener('contextmenu',function(e){
+      e.preventDefault();e.stopPropagation();
+      var menu=document.getElementById('pinCtxMenu');
+      menu._pinId=pid;
+      menu.style.left=e.clientX+'px';menu.style.top=e.clientY+'px';menu.style.display='block';
+    });})(pin.id);
     layer.appendChild(el);
   });
 }
@@ -454,6 +466,13 @@ function startMovePin(pinId){
   viewer.style.cursor='crosshair';
   viewer.classList.add('grabbing');
 }
+function ctxMovePin(){
+  var menu=document.getElementById('pinCtxMenu');
+  var pinId=menu._pinId;
+  menu.style.display='none';
+  startMovePin(pinId);
+}
+document.addEventListener('click',function(){document.getElementById('pinCtxMenu').style.display='none';});
 function cancelMoveMode(){
   if(!_movingPinId)return;
   _movingPinId=null;
