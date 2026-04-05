@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<!-- build: 2026-04-05 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Defects — HVAC NEXUS</title>
+<link rel="stylesheet" href="theme.css">
+<script src="db.js"></script>
+<style>
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex}
+.sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden}
+.sb.sm{width:52px}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px;overflow:hidden}.sb-icon{font-size:20px;flex-shrink:0}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0;scrollbar-width:thin}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;text-decoration:none}.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none}.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);width:10px}.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-group-hdr,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.main{position:fixed;top:0;left:230px;right:0;bottom:0;display:flex;flex-direction:column;transition:left .25s}
+.topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:14px;flex-shrink:0;background:var(--surface)}
+.bc{display:flex;align-items:center;gap:6px;flex:1;min-width:0;font-size:13px}
+.bcl{color:var(--text2);cursor:pointer;white-space:nowrap}.bcl:hover{color:var(--accent)}
+.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:600;white-space:nowrap}
+.btn{border:none;border-radius:7px;padding:7px 14px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#000}.bg{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+.bsm{padding:5px 12px;font-size:12px}
+.content{flex:1;overflow-y:auto;padding:20px 24px}
+.stats-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:4px;min-width:100px}
+.stat-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800}
+.stat-lbl{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px}
+.filter-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.fi{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
+.fi:focus{border-color:var(--accent)}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 12px;flex:1;min-width:200px;max-width:300px}
+.search-box input{background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%}
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{background:var(--surface2);padding:10px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--surface2)}
+.mono{font-family:'DM Mono',monospace;font-size:12px}
+.ref-link{color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none}
+.ref-link:hover{text-decoration:underline}
+.badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:5px;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;white-space:nowrap}
+.badge-open{background:rgba(255,77,109,.15);color:var(--danger)}
+.badge-closed{background:rgba(0,229,160,.15);color:var(--green)}
+.badge-high{background:rgba(255,77,109,.15);color:var(--danger)}
+.badge-medium{background:rgba(255,184,48,.15);color:var(--warn)}
+.badge-low{background:rgba(0,229,160,.15);color:var(--green)}
+.pin-icon{cursor:pointer;font-size:16px;text-align:center}
+.overdue{color:var(--danger);font-weight:600}
+.empty{padding:60px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sb" id="sidebar">
+  <div class="sb-top"><div class="sb-brand"><span class="sb-icon">&#10052;</span><span class="sb-name">HVAC NEXUS</span></div><button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">&laquo;</button></div>
+  <div class="sb-proj-block"><div class="sb-proj-lbl">Current Project</div><div class="sb-proj-name" id="sb-proj-name">—</div><div class="sb-proj-num" id="sb-proj-num">—</div></div>
+  <nav class="sb-nav">
+    <div class="sb-item" onclick="navTo('project.html')" style="border-bottom:1px solid var(--border);margin-bottom:4px"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Dashboard</span></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('financials')"><span class="sb-group-chev" id="gchev-financials">▾</span><span class="sb-group-name">Financials</span></div>
+      <div class="sb-group-items" id="gitems-financials" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
+        <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span></div>
+        <div class="sb-item" onclick="navTo('hvac-vendor-invoices.html')"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
+        <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('procurement')"><span class="sb-group-chev" id="gchev-procurement">▾</span><span class="sb-group-name">Procurement</span></div>
+      <div class="sb-group-items" id="gitems-procurement" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
+        <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('technical')"><span class="sb-group-chev" id="gchev-technical">▾</span><span class="sb-group-name">Technical</span></div>
+      <div class="sb-group-items" id="gitems-technical" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-rfi.html')"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span></div>
+        <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span></div>
+        <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></div>
+        <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('commissioning')"><span class="sb-group-chev" id="gchev-commissioning">▾</span><span class="sb-group-name">Commissioning</span></div>
+      <div class="sb-group-items" id="gitems-commissioning" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-precommissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span></div>
+        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
+      <div class="sb-group-items" id="gitems-quality" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
+        <div class="sb-item" onclick="navTo('hvac-itp-register.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Register</span></div>
+        <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
+        <div class="sb-item active"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
+      <div class="sb-group-items" id="gitems-settings" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
+      </div></div>
+  </nav>
+  <div class="sb-footer"><div class="sb-av" id="sb-av">?</div><span class="sb-user-name" id="sb-user">—</span></div>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="mainWrap">
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl" onclick="navTo('project.html')">My Projects</span><span class="bcs">›</span>
+      <span class="bcl" id="bc-proj">Project</span><span class="bcs">›</span>
+      <span class="bcc">Defects</span>
+    </div>
+    <button class="btn bp bsm" onclick="newDefect()">＋ New Defect</button>
+  </div>
+
+  <div class="content">
+    <div class="stats-row" id="statsRow"></div>
+
+    <div class="filter-row">
+      <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search ref, description, assignee…" oninput="render()"></div>
+      <select class="fi" id="filtStatus" onchange="render()">
+        <option value="">All statuses</option>
+        <option value="open">Open</option>
+        <option value="closed">Closed</option>
+      </select>
+      <select class="fi" id="filtPriority" onchange="render()">
+        <option value="">All priorities</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+    </div>
+
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr>
+          <th>Def No.</th>
+          <th>Description</th>
+          <th>Building</th>
+          <th>Location</th>
+          <th>Sub Location</th>
+          <th>Status</th>
+          <th>Assignee</th>
+          <th>Priority</th>
+          <th>Issue Date</th>
+          <th>Due Date</th>
+          <th>Drawing Pin</th>
+        </tr></thead>
+        <tbody id="tblBody"></tbody>
+      </table>
+      <div class="empty" id="emptyState" style="display:none">No defects found</div>
+    </div>
+  </div>
+</div>
+
+<script>
+var proj=dbGetCurrentProject();
+var pNum=proj.num||proj.number||'GCT001';
+var SBK='hvacnexus_sb_collapsed';
+var allDefects=[];
+var _drawings=[];
+
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+function isOverdue(d){return d&&d<todayStr();}
+
+function newDefect(){
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  window.location.href=b+'hvac-defect-form.html';
+}
+
+async function loadAll(){
+  var results=await Promise.all([
+    dbGetProject('defects',pNum).catch(function(){return[];}),
+    dbGetDrawings(pNum).catch(function(){return[];})
+  ]);
+  allDefects=results[0]||[];
+  _drawings=results[1]||[];
+  // Sort by ref
+  allDefects.sort(function(a,b){
+    var an=parseInt((a.ref||'').replace(/[^0-9]/g,''))||0;
+    var bn=parseInt((b.ref||'').replace(/[^0-9]/g,''))||0;
+    return an-bn;
+  });
+  renderStats();
+  render();
+}
+
+function renderStats(){
+  var total=allDefects.length;
+  var open=allDefects.filter(function(d){return d.status==='open';}).length;
+  var closed=allDefects.filter(function(d){return d.status==='closed';}).length;
+  var overdue=allDefects.filter(function(d){return d.status==='open'&&isOverdue(d.dueDate);}).length;
+  var high=allDefects.filter(function(d){return d.status==='open'&&d.priority==='high';}).length;
+  var stats=[
+    {val:total,lbl:'Total',col:'var(--accent)'},
+    {val:open,lbl:'Open',col:'var(--danger)'},
+    {val:closed,lbl:'Closed',col:'var(--green)'},
+    {val:overdue,lbl:'Overdue',col:'var(--warn)'},
+    {val:high,lbl:'High Priority',col:'var(--danger)'},
+  ];
+  document.getElementById('statsRow').innerHTML=stats.map(function(s){
+    return '<div class="stat-card"><div class="stat-val" style="color:'+s.col+'">'+s.val+'</div><div class="stat-lbl">'+s.lbl+'</div></div>';
+  }).join('');
+}
+
+function render(){
+  var q=(document.getElementById('srch').value||'').toLowerCase();
+  var fStatus=document.getElementById('filtStatus').value;
+  var fPriority=document.getElementById('filtPriority').value;
+  var filtered=allDefects.filter(function(d){
+    if(fStatus&&d.status!==fStatus)return false;
+    if(fPriority&&d.priority!==fPriority)return false;
+    if(q){
+      var hay=((d.ref||'')+' '+(d.desc||'')+' '+(d.assignee||'')+' '+(d.building||'')+' '+(d.location||'')).toLowerCase();
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  });
+
+  var tbody=document.getElementById('tblBody');
+  var today=todayStr();
+  tbody.innerHTML=filtered.map(function(d){
+    var overdue=d.status==='open'&&d.dueDate&&d.dueDate<today;
+    var drw=d.drawingId?_drawings.find(function(x){return x.id===d.drawingId;}):null;
+    var pinCell=drw
+      ?'<span class="pin-icon" title="Open drawing: '+(drw.num||drw.name||'')+'" onclick="openDrawingPin(\''+escH(d.drawingId)+'\',\''+escH(d.id)+'\')">📍</span>'
+      :'<span title="No drawing linked" style="color:var(--warn);font-size:16px">⚠️</span>';
+    return '<tr>'\
+      +'<td><a class="ref-link" onclick="openDefect(\''+escH(d.id)+'\')">'+escH(d.ref||'—')+'</a></td>'\
+      +'<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(d.desc||'')+'">'+escH(d.desc||'—')+'</td>'\
+      +'<td>'+escH(d.building||'—')+'</td>'\
+      +'<td>'+escH(d.location||'—')+'</td>'\
+      +'<td>'+escH(d.subLocation||'—')+'</td>'\
+      +'<td><span class="badge badge-'+escH(d.status||'open')+'">'+escH((d.status||'open').toUpperCase())+'</span></td>'\
+      +'<td>'+escH(d.assignee||'—')+'</td>'\
+      +'<td><span class="badge badge-'+escH(d.priority||'medium')+'">'+escH((d.priority||'medium').toUpperCase())+'</span></td>'\
+      +'<td class="mono">'+fmtDate(d.issueDate)+'</td>'\
+      +'<td class="mono'+(overdue?' overdue':'')+'">'+fmtDate(d.dueDate)+(overdue?' ⚠':'')+'</td>'\
+      +'<td style="text-align:center">'+pinCell+'</td>'\
+      +'</tr>';
+  }).join('');
+  document.getElementById('emptyState').style.display=filtered.length?'none':'block';
+}
+
+function openDefect(id){
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  window.location.href=b+'hvac-defect-form.html?id='+encodeURIComponent(id);
+}
+
+function openDrawingPin(drawingId, defectId){
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  window.location.href=b+'hvac-pdf-viewer.html?drawingId='+encodeURIComponent(drawingId)+'&highlightDefect='+encodeURIComponent(defectId);
+}
+
+// ── SIDEBAR ──
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main){main.style.marginLeft=c?'52px':'';main.style.left=c?'52px':'230px';}if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
+
+(async function(){
+  applySB(localStorage.getItem(SBK)==='1');
+  var p=dbGetCurrentProject();
+  if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;var bc=document.getElementById('bc-proj');if(bc)bc.textContent=p.name;}
+  if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}
+  var cu=dbGetCurrentUser();
+  if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}
+  await loadAll();
+})();
+</script>
+</body>
+</html>

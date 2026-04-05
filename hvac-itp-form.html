@@ -1030,14 +1030,19 @@ function applyLockState(){
 <script>
 var _defectRowKey='', _defectRowDesc='';
 function openDefectModal(rowKey, rowDesc){
-  _defectRowKey=rowKey; _defectRowDesc=rowDesc;
-  document.getElementById('defectDesc').value=rowDesc||'';
-  dbGetUsers().then(function(users){
-    var sel=document.getElementById('defectAssignee');
-    sel.innerHTML='<option value="">— Select user —</option>'
-      +(users||[]).map(function(u){return '<option value="'+escH(u.name||u.username||u.id||'')+'">'+escH(u.name||u.username||'Unknown')+'</option>';}).join('');
+  // Navigate to defect form pre-filled with ITP context
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  var params=new URLSearchParams({
+    desc: rowDesc||'',
+    itpRef: pin.ref||'',
+    equip: pin.equip||responses.equipId||'',
+    building: responses.locBuilding||'',
+    location: responses.locLocation||'',
+    subLocation: responses.locSubLocation||''
   });
-  document.getElementById('defectMo').classList.add('open');
+  // Open in parent window if in iframe
+  var target=window.self!==window.top?window.parent:window;
+  target.open(b+'hvac-defect-form.html?'+params.toString(),'_blank');
 }
 function closeDefectModal(){document.getElementById('defectMo').classList.remove('open');}
 async function saveDefect(){

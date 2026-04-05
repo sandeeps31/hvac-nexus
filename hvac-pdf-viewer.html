@@ -55,6 +55,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 /* ITP PINS */
 .itp-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:30;transition:transform .1s}
 .itp-pin:hover{transform:translate(-50%,-50%) scale(1.2)}
+.def-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:10;display:flex;flex-direction:column;align-items:center;pointer-events:all}
+.def-dot{width:24px;height:24px;background:var(--danger);border:2px solid #fff;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 0 2px rgba(0,0,0,.3);transition:all .13s}
+.def-dot span{transform:rotate(-45deg);font-size:9px;font-weight:700;color:#fff;font-family:'DM Mono',monospace}
+.def-pin:hover .def-dot{transform:rotate(45deg) scale(1.2)}
+.def-label{margin-top:4px;background:rgba(8,12,18,.9);border:1px solid var(--danger);border-radius:5px;padding:2px 7px;font-family:'DM Mono',monospace;font-size:9px;color:var(--danger);white-space:nowrap;pointer-events:none;display:none}
+.def-pin:hover .def-label{display:block}
 .itp-pin.flashing{transform:translate(-50%,-50%) scale(1.6);z-index:999;transition:transform .3s}
 .itp-pin.flashing .pin-dot{box-shadow:0 0 0 6px rgba(0,200,255,.4),0 4px 16px rgba(0,0,0,.6)!important}
 .pin-dot{height:24px;min-width:24px;padding:0 7px;border-radius:12px;border:2px solid rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 0 2px rgba(0,0,0,.3);transition:all .13s;white-space:nowrap;letter-spacing:0.5px}
@@ -309,6 +315,7 @@ var responses={};
 var equipData=null;
 var templates=[];
 var curDrawing=null;
+var defects=[];
 
 async function loadData(){
   try{var d=await dbGetDrawings(pKey);drawings=Array.isArray(d)?d:[];}catch(e){}
@@ -316,6 +323,7 @@ async function loadData(){
   try{var r=await dbGetItpResponses(pKey);responses=r||{};}catch(e){}
   try{var eq=await dbGetEquipment(pKey);equipData=eq||null;}catch(e){}
   try{var pt=await dbGetItpProjectTemplates(pKey);templates=Array.isArray(pt)?pt:[];}catch(e){}
+  try{var df=await dbGetProject('defects',pKey);defects=Array.isArray(df)?df:[];}catch(e){}
   curDrawing=drawings.find(function(d){return d.id===drawingId;})||null;
 }
 function saveDrawings(){
@@ -343,6 +351,11 @@ function nid(){return'pin_'+Date.now()+'_'+Math.random().toString(36).slice(2,5)
   var movePinId=params.get('movePin')||'';
   if(movePinId){
     setTimeout(function(){startMovePin(movePinId);},800);
+  }
+  // Handle highlightDefect param — navigate from defect list
+  var highlightDef=params.get('highlightDefect')||'';
+  if(highlightDef){
+    setTimeout(function(){fitToScreen();renderPins();},800);
   }
 })();
 
@@ -446,6 +459,24 @@ function renderPins(){
     });})(pin.id);
     layer.appendChild(el);
   });
+
+  // Render defect pins
+  defects.filter(function(d){return d.drawingId===drawingId&&d.pinX!=null;}).forEach(function(def){
+    var el=document.createElement('div');
+    el.className='def-pin';
+    el.style.left=(sr.left-vr.left+def.pinX/100*sr.width)+'px';
+    el.style.top=(sr.top-vr.top+def.pinY/100*sr.height)+'px';
+    var isOpen=def.status==='open';
+    el.innerHTML='<div class="def-dot" style="background:'+(isOpen?'var(--danger)':'var(--green)')+'"><span>'+escH((def.ref||'DEF').replace('DEF-',''))+'</span></div>'
+      +'<div class="def-label">'+escH(def.ref||'DEF')+(def.desc?' · '+escH(def.desc.slice(0,30)):'')+'</div>';
+    el.addEventListener('click',function(e){e.stopPropagation();openDefectDetail(def);});
+    layer.appendChild(el);
+  });
+}
+
+function openDefectDetail(def){
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  window.open(b+'hvac-defect-form.html?id='+encodeURIComponent(def.id),'_blank');
 }
 
 // ── PLACE MODE ──

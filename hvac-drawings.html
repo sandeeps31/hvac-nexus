@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="stylesheet" href="theme.css">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Drawings — HVAC NEXUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
+:root{--bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;--border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.10);--green:#00e5a0;--green-dim:rgba(0,229,160,.10);--warn:#ffb830;--warn-dim:rgba(255,184,48,.10);--danger:#ff4d6d;--danger-dim:rgba(255,77,109,.10);--purple:#a78bfa;--purple-dim:rgba(167,139,250,.10);--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a;--radius:10px;--sb:230px;--sb-sm:52px}
+*{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;height:100vh;overflow:hidden}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 input[type=number]{-moz-appearance:textfield}
@@ -187,6 +189,7 @@ canvas#pdfCanvas{display:block}
 .upload-zone:hover{border-color:var(--accent);background:var(--accent-dim)}.upload-zone input{display:none}
 .upload-zone-text{font-size:13px;color:var(--text2)}
 .itp-cl-editor{background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:8px;margin-top:4px;max-height:140px;overflow-y:auto}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 
 /* ── SIDEBAR STANDARD ── */
@@ -252,7 +255,7 @@ canvas#pdfCanvas{display:block}
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
       <div class="sb-group-items" id="gitems-quality" style="display:block">
-        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Register</span></div>
+        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
         <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
         <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
       </div></div>
@@ -1577,6 +1580,32 @@ function confirmPin(type, addAnother){
     if(!desc){alert('Description required.');return;}
     pin.ref=document.getElementById('def-ref').value;pin.desc=desc;pin.status=document.getElementById('def-status').value;
     document.getElementById('defectModal').classList.remove('open');
+    // Also create defect record in defects table and open form
+    (async function(defRef, defDesc, pinId, drawingId, px, py){
+      var pNum=(dbGetCurrentProject()||{}).num||'GCT001';
+      var u=dbGetCurrentUser();
+      var existing=await dbGetProject('defects',pNum)||[];
+      if(!Array.isArray(existing))existing=[];
+      var defObj={
+        id:'def_'+Date.now(),
+        ref:defRef,
+        status:'open',
+        desc:defDesc,
+        priority:'medium',
+        drawingId:drawingId,
+        pinX:px,
+        pinY:py,
+        raisedBy:u?(u.name||u.username||''):'',
+        issueDate:new Date().toISOString().split('T')[0],
+        photos:[],closePhotos:[],
+        createdAt:new Date().toISOString()
+      };
+      existing.push(defObj);
+      await dbSetProject('defects',pNum,existing);
+      // Open defect form to fill in full details
+      var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+      window.open(b+'hvac-defect-form.html?id='+encodeURIComponent(defObj.id),'_blank');
+    })(pin.ref, pin.desc, pin.id, curId, _pendingPos.x, _pendingPos.y);
   } else if(type==='fire'){
     var desc=document.getElementById('fire-desc').value.trim();
     if(!desc){alert('Description required.');return;}

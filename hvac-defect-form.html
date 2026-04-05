@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<!-- build: 2026-04-05 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Defect Form — HVAC NEXUS</title>
+<link rel="stylesheet" href="theme.css">
+<script src="db.js"></script>
+<style>
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+.topbar-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;flex:1}
+.topbar-ref{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent)}
+.btn{border:none;border-radius:7px;padding:7px 14px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#000}
+.bg{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+.bd{background:transparent;border:1px solid rgba(255,77,109,.4);color:var(--danger)}
+.bsm{padding:5px 12px;font-size:12px}
+.page{max-width:860px;margin:0 auto;padding:24px 20px 80px;width:100%}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden}
+.card-hdr{padding:14px 20px;border-bottom:1px solid var(--border);font-family:'Syne',sans-serif;font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px}
+.card-body{padding:20px;display:flex;flex-direction:column;gap:14px}
+.frow{display:flex;gap:14px;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:180px}
+.field.full{flex:100%}
+.field.half{flex:0 0 calc(50% - 7px)}
+.fl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.fi{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%}
+.fi:focus{border-color:var(--accent)}
+.fi:disabled{opacity:0.6;cursor:default}
+select.fi{height:38px;appearance:auto;cursor:pointer}
+textarea.fi{resize:vertical;min-height:80px}
+.sugg-wrap{position:relative}
+.sugg-list{position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border);border-radius:7px;max-height:180px;overflow-y:auto;display:none;box-shadow:0 8px 20px rgba(0,0,0,.5)}
+.sugg-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
+.sugg-item:last-child{border-bottom:none}
+.sugg-item:hover{background:var(--surface3);color:var(--accent)}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:5px;font-family:'DM Mono',monospace;font-size:10px;font-weight:700}
+.badge-open{background:rgba(255,77,109,.15);color:var(--danger)}
+.badge-closed{background:rgba(0,229,160,.15);color:var(--green)}
+/* Photo upload */
+.photo-grid{display:flex;flex-wrap:wrap;gap:10px}
+.photo-thumb{position:relative;width:100px;height:100px;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.photo-thumb img{width:100%;height:100%;object-fit:cover}
+.photo-thumb .photo-del{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
+.photo-thumb .photo-date{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);color:#fff;font-size:9px;text-align:center;padding:2px;font-family:'DM Mono',monospace}
+.photo-add{width:100px;height:100px;border-radius:8px;border:2px dashed var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);gap:4px;font-size:11px;transition:all .15s}
+.photo-add:hover{border-color:var(--accent);color:var(--accent)}
+/* Drawing pin section */
+.drw-pick{display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)}
+.drw-pick-icon{font-size:24px}
+/* Close defect */
+.close-section{background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.2);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">Defect <span class="topbar-ref" id="defRef">DEF-???</span></div>
+  <select id="statusSel" class="fi" style="width:140px;height:34px;font-size:12px" onchange="onStatusChange(this.value)">
+    <option value="open">Open</option>
+    <option value="closed">Closed</option>
+  </select>
+  <button class="btn bg bsm" onclick="exportPdf()">⬇ PDF</button>
+  <button class="btn bp bsm" id="saveBtn" onclick="saveDefect()">Save</button>
+  <button class="btn bd bsm" id="deleteBtn" onclick="confirmDelete()" style="display:none">🗑 Delete</button>
+  <button class="btn bg bsm" onclick="goBack()">✕ Close</button>
+</div>
+
+<div class="page">
+
+  <!-- DETAILS -->
+  <div class="card">
+    <div class="card-hdr">📋 Defect Details</div>
+    <div class="card-body">
+      <div class="frow">
+        <div class="field half">
+          <label class="fl">Description *</label>
+          <textarea class="fi" id="defDesc" rows="3" placeholder="Describe the defect…"></textarea>
+        </div>
+        <div class="field half">
+          <div class="frow">
+            <div class="field">
+              <label class="fl">Priority</label>
+              <select class="fi" id="defPriority">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="fl">ITP Ref (if linked)</label>
+              <input class="fi" id="defItpRef" placeholder="e.g. ITP-0042" readonly style="opacity:.7">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field">
+          <label class="fl">Building</label>
+          <input class="fi" id="defBuilding" placeholder="e.g. Tower B">
+        </div>
+        <div class="field">
+          <label class="fl">Location</label>
+          <input class="fi" id="defLocation" placeholder="e.g. Level 02 Plant Room">
+        </div>
+        <div class="field">
+          <label class="fl">Sub Location</label>
+          <input class="fi" id="defSubLoc" placeholder="e.g. Zone A">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ASSIGNMENT & DATES -->
+  <div class="card">
+    <div class="card-hdr">👤 Assignment & Dates</div>
+    <div class="card-body">
+      <div class="frow">
+        <div class="field">
+          <label class="fl">Assignee</label>
+          <div class="sugg-wrap">
+            <input class="fi" id="defAssignee" placeholder="Type to search team…" oninput="showAssigneeSugg()" onblur="setTimeout(hideAssigneeSugg,150)" autocomplete="off">
+            <div class="sugg-list" id="assigneeSugg"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="fl">Raised By</label>
+          <input class="fi" id="defRaisedBy" readonly style="opacity:.7">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field">
+          <label class="fl">Issue Date</label>
+          <input class="fi" id="defIssueDate" type="date" onchange="calcDueDate()">
+        </div>
+        <div class="field">
+          <label class="fl">Due Date <span id="dueDaysHint" style="font-size:9px;color:var(--muted)"></span></label>
+          <input class="fi" id="defDueDate" type="date">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHOTOS -->
+  <div class="card">
+    <div class="card-hdr">📷 Photos</div>
+    <div class="card-body">
+      <div class="photo-grid" id="photoGrid">
+        <label class="photo-add" title="Add photo">
+          <span style="font-size:24px">+</span>
+          <span>Add Photo</span>
+          <input type="file" accept="image/*" multiple style="display:none" onchange="addPhotos(this)">
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWING PIN -->
+  <div class="card">
+    <div class="card-hdr">📍 Drawing Pin</div>
+    <div class="card-body">
+      <div class="drw-pick" id="pinInfo">
+        <span class="drw-pick-icon">📄</span>
+        <div style="flex:1">
+          <div id="pinDrawingName" style="font-size:13px;font-weight:600">No drawing linked</div>
+          <div id="pinDrawingNum" style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"></div>
+        </div>
+        <button class="btn bg bsm" onclick="openDrawingPicker()">📍 Pin on Drawing</button>
+        <button class="btn bd bsm" id="removePinBtn" onclick="removePin()" style="display:none">Remove Pin</button>
+      </div>
+      <div id="drawingPickerWrap" style="display:none;margin-top:10px">
+        <select class="fi" id="drawingPicker" onchange="selectDrawing(this.value)">
+          <option value="">— Select a drawing —</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLOSE DEFECT -->
+  <div class="card" id="closeSection" style="display:none">
+    <div class="card-hdr">✅ Close Defect</div>
+    <div class="card-body">
+      <div class="close-section">
+        <div style="font-size:13px;color:var(--text2)">To close this defect, a photo and comment are required.</div>
+        <div class="field">
+          <label class="fl">Close-out Comment *</label>
+          <textarea class="fi" id="closeComment" rows="2" placeholder="Describe the rectification work done…"></textarea>
+        </div>
+        <div>
+          <label class="fl" style="margin-bottom:6px">Close-out Photo *</label>
+          <div class="photo-grid" id="closePhotoGrid">
+            <label class="photo-add" title="Add close-out photo">
+              <span style="font-size:24px">+</span>
+              <span>Add Photo</span>
+              <input type="file" accept="image/*" multiple style="display:none" onchange="addClosePhotos(this)">
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+var params=new URLSearchParams(window.location.search);
+var defectId=params.get('id')||'';
+var pNum=(dbGetCurrentProject()||{}).num||'GCT001';
+var _team=[];
+var _drawings=[];
+var _settings={};
+var _defect=null; // current defect object
+var _photos=[]; // [{data, date}]
+var _closePhotos=[];
+var _isNew=!defectId;
+
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+
+// ── LOAD ──
+(async function(){
+  var results=await Promise.all([
+    dbGetProject('proj_settings',pNum+'_team').catch(function(){return[];}),
+    dbGetDrawings(pNum).catch(function(){return[];}),
+    dbGetProject('proj_settings',pNum).catch(function(){return{};}),
+    dbGetProject('defects',pNum).catch(function(){return[];})
+  ]);
+  _team=results[0]||[];
+  _drawings=results[1]||[];
+  _settings=results[2]||{};
+  var allDefects=results[3]||[];
+
+  // Set due days hint
+  if(_settings.defectDays){
+    document.getElementById('dueDaysHint').textContent='(default: '+_settings.defectDays+' business days)';
+  }
+
+  // Populate drawing picker
+  var sel=document.getElementById('drawingPicker');
+  sel.innerHTML='<option value="">— Select a drawing —</option>'
+    +_drawings.filter(function(d){return d.id!=='_register';}).map(function(d){
+      return '<option value="'+escH(d.id)+'">'+escH(d.num||d.name||d.id)+'</option>';
+    }).join('');
+
+  var u=dbGetCurrentUser();
+
+  if(defectId){
+    // Load existing defect
+    _defect=allDefects.find(function(d){return d.id===defectId;})||null;
+    if(_defect) populateForm(_defect);
+    document.getElementById('deleteBtn').style.display='';
+  } else {
+    // New defect - pre-fill from URL params
+    var nextNum=1;
+    allDefects.forEach(function(d){var m=(d.ref||'').match(/^DEF-(\d+)$/);if(m){var n=parseInt(m[1]);if(n>=nextNum)nextNum=n+1;}});
+    var ref='DEF-'+String(nextNum).padStart(3,'0');
+    document.getElementById('defRef').textContent=ref;
+    document.getElementById('defIssueDate').value=todayStr();
+    document.getElementById('defRaisedBy').value=u?(u.name||u.username||''):'';
+    // Pre-fill from ITP if linked
+    var itpRef=params.get('itpRef')||'';
+    var desc=params.get('desc')||'';
+    var equip=params.get('equip')||'';
+    if(itpRef)document.getElementById('defItpRef').value=itpRef;
+    if(desc)document.getElementById('defDesc').value=desc;
+    var building=params.get('building')||'';
+    var location=params.get('location')||'';
+    var subLocation=params.get('subLocation')||'';
+    var equip=params.get('equip')||'';
+    if(building)document.getElementById('defBuilding').value=building;
+    if(location)document.getElementById('defLocation').value=location;
+    if(subLocation)document.getElementById('defSubLoc').value=subLocation;
+    calcDueDate();
+  }
+})();
+
+function populateForm(d){
+  document.getElementById('defRef').textContent=d.ref||'DEF-???';
+  document.getElementById('statusSel').value=d.status||'open';
+  document.getElementById('defDesc').value=d.desc||'';
+  document.getElementById('defPriority').value=d.priority||'medium';
+  document.getElementById('defItpRef').value=d.itpRef||'';
+  document.getElementById('defAssignee').value=d.assignee||'';
+  document.getElementById('defRaisedBy').value=d.raisedBy||'';
+  document.getElementById('defIssueDate').value=d.issueDate||'';
+  document.getElementById('defDueDate').value=d.dueDate||'';
+  document.getElementById('defBuilding').value=d.building||'';
+  document.getElementById('defLocation').value=d.location||'';
+  document.getElementById('defSubLoc').value=d.subLocation||'';
+  document.getElementById('closeComment').value=d.closeComment||'';
+  _photos=d.photos||[];
+  _closePhotos=d.closePhotos||[];
+  renderPhotos();
+  renderClosePhotos();
+  if(d.drawingId){
+    var drw=_drawings.find(function(x){return x.id===d.drawingId;});
+    if(drw){
+      document.getElementById('pinDrawingName').textContent=drw.name||drw.num||'Drawing';
+      document.getElementById('pinDrawingNum').textContent=drw.num||'';
+      document.getElementById('removePinBtn').style.display='';
+    }
+  }
+  onStatusChange(d.status||'open');
+}
+
+// ── STATUS ──
+function onStatusChange(val){
+  document.getElementById('closeSection').style.display=val==='closed'?'':'none';
+}
+
+// ── DUE DATE CALC ──
+function calcDueDate(){
+  var issueDate=document.getElementById('defIssueDate').value;
+  var days=parseInt(_settings.defectDays)||0;
+  if(!issueDate||!days)return;
+  var d=new Date(issueDate);
+  var added=0;
+  while(added<days){
+    d.setDate(d.getDate()+1);
+    var dow=d.getDay();
+    if(dow!==0&&dow!==6)added++; // skip Sat(6) Sun(0)
+  }
+  document.getElementById('defDueDate').value=d.toISOString().split('T')[0];
+}
+
+// ── ASSIGNEE SEARCH ──
+function showAssigneeSugg(){
+  var v=(document.getElementById('defAssignee').value||'').toLowerCase();
+  var list=document.getElementById('assigneeSugg');
+  var matches=_team.filter(function(m){return m.name.toLowerCase().includes(v)||(m.company||'').toLowerCase().includes(v);});
+  if(!matches.length){list.style.display='none';return;}
+  list.innerHTML=matches.map(function(m){
+    return '<div class="sugg-item" onmousedown="pickAssignee(\''+escH(m.name)+'\')">'+escH(m.name)+'<span style="color:var(--muted);font-size:11px;margin-left:8px">'+escH(m.role||'')+'</span></div>';
+  }).join('');
+  list.style.display='';
+}
+function hideAssigneeSugg(){document.getElementById('assigneeSugg').style.display='none';}
+function pickAssignee(name){document.getElementById('defAssignee').value=name;hideAssigneeSugg();}
+
+// ── PHOTOS ──
+function addPhotos(input){
+  var files=Array.from(input.files);
+  files.forEach(function(file){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      _photos.push({data:e.target.result,date:todayStr(),name:file.name});
+      renderPhotos();
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+function renderPhotos(){
+  var grid=document.getElementById('photoGrid');
+  var thumbs=_photos.map(function(p,i){
+    return '<div class="photo-thumb"><img src="'+p.data+'"><button class="photo-del" onclick="removePhoto('+i+')">×</button><div class="photo-date">'+fmtDate(p.date)+'</div></div>';
+  }).join('');
+  grid.innerHTML=thumbs+'<label class="photo-add" title="Add photo"><span style="font-size:24px">+</span><span>Add Photo</span><input type="file" accept="image/*" multiple style="display:none" onchange="addPhotos(this)"></label>';
+}
+function removePhoto(i){_photos.splice(i,1);renderPhotos();}
+
+function addClosePhotos(input){
+  var files=Array.from(input.files);
+  files.forEach(function(file){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      _closePhotos.push({data:e.target.result,date:todayStr(),name:file.name});
+      renderClosePhotos();
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+function renderClosePhotos(){
+  var grid=document.getElementById('closePhotoGrid');
+  var thumbs=_closePhotos.map(function(p,i){
+    return '<div class="photo-thumb"><img src="'+p.data+'"><button class="photo-del" onclick="removeClosePhoto('+i+')">×</button><div class="photo-date">'+fmtDate(p.date)+'</div></div>';
+  }).join('');
+  grid.innerHTML=thumbs+'<label class="photo-add" title="Add close-out photo"><span style="font-size:24px">+</span><span>Add Photo</span><input type="file" accept="image/*" multiple style="display:none" onchange="addClosePhotos(this)"></label>';
+}
+function removeClosePhoto(i){_closePhotos.splice(i,1);renderClosePhotos();}
+
+// ── DRAWING PIN ──
+function openDrawingPicker(){
+  var w=document.getElementById('drawingPickerWrap');
+  w.style.display=w.style.display==='none'?'':'none';
+}
+function selectDrawing(drawingId){
+  if(!drawingId)return;
+  var drw=_drawings.find(function(d){return d.id===drawingId;});
+  if(!drw)return;
+  if(!_defect)_defect={};
+  _defect.drawingId=drawingId;
+  document.getElementById('pinDrawingName').textContent=drw.name||drw.num||'Drawing';
+  document.getElementById('pinDrawingNum').textContent=drw.num||'';
+  document.getElementById('removePinBtn').style.display='';
+  document.getElementById('drawingPickerWrap').style.display='none';
+  // Save first, then navigate to drawings module to pin
+  saveDefect().then(function(){
+    var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+    window.location.href=b+'hvac-drawings.html?pinDefect='+encodeURIComponent(defectId||'')+'&drawingId='+encodeURIComponent(drawingId);
+  });
+}
+function removePin(){
+  if(!_defect)return;
+  delete _defect.drawingId;delete _defect.pinX;delete _defect.pinY;
+  document.getElementById('pinDrawingName').textContent='No drawing linked';
+  document.getElementById('pinDrawingNum').textContent='';
+  document.getElementById('removePinBtn').style.display='none';
+}
+
+// ── SAVE ──
+async function saveDefect(){
+  var desc=document.getElementById('defDesc').value.trim();
+  if(!desc){alert('Description is required');return;}
+  var status=document.getElementById('statusSel').value;
+  if(status==='closed'){
+    var comment=document.getElementById('closeComment').value.trim();
+    if(!comment){alert('A close-out comment is required to close this defect');return;}
+    if(!_closePhotos.length){alert('A close-out photo is required to close this defect');return;}
+  }
+  var ref=document.getElementById('defRef').textContent;
+  var u=dbGetCurrentUser();
+  var now=new Date();
+  var defObj={
+    id:defectId||('def_'+Date.now()),
+    ref:ref,
+    status:status,
+    desc:desc,
+    priority:document.getElementById('defPriority').value,
+    itpRef:document.getElementById('defItpRef').value,
+    assignee:document.getElementById('defAssignee').value,
+    raisedBy:document.getElementById('defRaisedBy').value||(u?(u.name||''):''),
+    issueDate:document.getElementById('defIssueDate').value,
+    dueDate:document.getElementById('defDueDate').value,
+    building:document.getElementById('defBuilding').value,
+    location:document.getElementById('defLocation').value,
+    subLocation:document.getElementById('defSubLoc').value,
+    closeComment:document.getElementById('closeComment').value,
+    photos:_photos,
+    closePhotos:_closePhotos,
+    drawingId:_defect?_defect.drawingId:'',
+    pinX:_defect?_defect.pinX:null,
+    pinY:_defect?_defect.pinY:null,
+    updatedAt:now.toISOString()
+  };
+  if(_isNew)defObj.createdAt=now.toISOString();
+  // Save
+  try{
+    var existing=await dbGetProject('defects',pNum)||[];
+    if(!Array.isArray(existing))existing=[];
+    var idx=existing.findIndex(function(d){return d.id===defObj.id;});
+    if(idx>=0)existing[idx]=defObj;else existing.push(defObj);
+    await dbSetProject('defects',pNum,existing);
+    defectId=defObj.id;
+    _isNew=false;
+    _defect=defObj;
+    document.getElementById('deleteBtn').style.display='';
+    showToast('Saved ✓','var(--green)');
+  }catch(e){
+    console.error(e);
+    showToast('Save failed — check connection','var(--danger)');
+  }
+}
+
+async function confirmDelete(){
+  if(!defectId||!confirm('Delete this defect? This cannot be undone.'))return;
+  try{
+    var existing=await dbGetProject('defects',pNum)||[];
+    existing=existing.filter(function(d){return d.id!==defectId;});
+    await dbSetProject('defects',pNum,existing);
+    goBack();
+  }catch(e){showToast('Delete failed','var(--danger)');}
+}
+
+function goBack(){
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  window.location.href=b+'hvac-defects.html';
+}
+
+function showToast(msg,col){
+  var t=document.createElement('div');
+  t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(col||'var(--accent)')+';color:'+(col==='var(--green)'?'#000':'#fff')+';padding:10px 24px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.4)';
+  document.body.appendChild(t);
+  setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},2500);
+}
+
+function exportPdf(){
+  var title='Defect '+document.getElementById('defRef').textContent;
+  var w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+title+'</title><style>body{font-family:sans-serif;padding:20px;color:#000}h2{margin-bottom:16px}.row{display:flex;gap:20px;margin-bottom:12px}.lbl{font-size:10px;text-transform:uppercase;color:#666;letter-spacing:1px}.val{font-size:13px;font-weight:500}img{max-width:200px;border-radius:4px;margin:4px}@media print{@page{margin:15mm}}</style></head><body>');
+  w.document.write('<h2>'+title+' — '+document.getElementById('defDesc').value+'</h2>');
+  w.document.write('<div class="row"><div><div class="lbl">Status</div><div class="val">'+document.getElementById('statusSel').value+'</div></div><div><div class="lbl">Priority</div><div class="val">'+document.getElementById('defPriority').value+'</div></div><div><div class="lbl">Assignee</div><div class="val">'+document.getElementById('defAssignee').value+'</div></div><div><div class="lbl">Issue Date</div><div class="val">'+document.getElementById('defIssueDate').value+'</div></div><div><div class="lbl">Due Date</div><div class="val">'+document.getElementById('defDueDate').value+'</div></div></div>');
+  w.document.write('<div class="row"><div><div class="lbl">Building</div><div class="val">'+document.getElementById('defBuilding').value+'</div></div><div><div class="lbl">Location</div><div class="val">'+document.getElementById('defLocation').value+'</div></div><div><div class="lbl">Sub Location</div><div class="val">'+document.getElementById('defSubLoc').value+'</div></div></div>');
+  if(_photos.length){w.document.write('<div class="lbl" style="margin-bottom:8px">Photos</div>');_photos.forEach(function(p){w.document.write('<img src="'+p.data+'"><span style="font-size:10px;margin-right:12px">'+p.date+'</span>');});}
+  if(_closePhotos.length){w.document.write('<div class="lbl" style="margin:12px 0 8px">Close-out Photos</div>');_closePhotos.forEach(function(p){w.document.write('<img src="'+p.data+'"><span style="font-size:10px;margin-right:12px">'+p.date+'</span>');});}
+  if(document.getElementById('closeComment').value){w.document.write('<div class="lbl" style="margin-top:12px">Close-out Comment</div><div class="val">'+document.getElementById('closeComment').value+'</div>');}
+  w.document.write('</body></html>');
+  w.document.close();
+  setTimeout(function(){w.print();},500);
+}
+</script>
+</body>
+</html>

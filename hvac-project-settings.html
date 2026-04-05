@@ -1,12 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="stylesheet" href="theme.css">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HVAC NEXUS — Project Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
+:root{
+  --bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;
+  --border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.10);
+  --green:#00e5a0;--green-dim:rgba(0,229,160,.10);
+  --warn:#ffb830;--warn-dim:rgba(255,184,48,.10);
+  --danger:#ff4d6d;--danger-dim:rgba(255,77,109,.10);
+  --text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a;--radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
 .bc{display:flex;align-items:center;gap:7px;font-size:13px}
 .bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}
@@ -215,6 +225,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
             <input class="field-input" id="p-retention" type="number" min="0" max="20" step="0.5" placeholder="e.g. 5"/>
             <span class="field-hint">Retention held on progress claims</span>
           </div>
+          <div class="field">
+            <span class="field-label">Defect Due Days (business days)</span>
+            <input class="field-input" id="p-defect-days" type="number" min="1" max="90" step="1" placeholder="e.g. 5"/>
+            <span class="field-hint">Business days from issue date to calculate default due date</span>
+          </div>
           <div class="field full">
             <span class="field-label">Description</span>
             <textarea class="field-input" id="p-desc" rows="2" placeholder="Brief project description..." style="resize:vertical"></textarea>
@@ -325,8 +340,8 @@ function v(id){ var el=document.getElementById(id); return el?el.value:''; }
 
 function loadFields() {
   var data = Object.assign({}, proj, settings);
-  var fields = ['p-num','p-name','p-client','p-type','p-value','p-location','p-start','p-end','p-margin','p-retention','p-desc','p-status'];
-  var keys   = ['num','name','client','type','value','location','start','end','margin','retention','desc','status'];
+  var fields = ['p-num','p-name','p-client','p-type','p-value','p-location','p-start','p-end','p-margin','p-retention','p-desc','p-status','p-defect-days'];
+  var keys   = ['num','name','client','type','value','location','start','end','margin','retention','desc','status','defectDays'];
   fields.forEach(function(f,i){
     var el = document.getElementById(f); if(!el) return;
     el.value = data[keys[i]] || '';
@@ -338,7 +353,7 @@ function saveAll() {
     num:v('p-num'), name:v('p-name'), client:v('p-client'),
     type:v('p-type'), value:v('p-value'), location:v('p-location'),
     start:v('p-start'), end:v('p-end'), margin:v('p-margin'),
-    retention:v('p-retention'), desc:v('p-desc'), status:v('p-status')
+    retention:v('p-retention'), desc:v('p-desc'), status:v('p-status'), defectDays:v('p-defect-days')
   };
   // Update in projects list too
   var idx = projects.findIndex(function(p){ return p.id === projectId; });
