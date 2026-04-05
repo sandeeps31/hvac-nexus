@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-05 03:27 -->
+<!-- build: 2026-04-05 08:24 -->
 <html lang="en">
 <head>
 <link rel="stylesheet" href="theme.css">
@@ -285,6 +285,10 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   drawingId=params.get('drawingId')||'';
   pinId=params.get('pinId')||'';
 
+  // Show loading state
+  var _meta=document.getElementById('formMeta');
+  if(_meta)_meta.innerHTML='<div style="color:var(--muted);font-size:12px;font-family:'DM Mono',monospace;padding:8px 0">Loading ITP data…</div>';
+
   // Load pin
   var _drawings=await dbGetDrawings(_ifPNum)||[];
   var _drawing=Array.isArray(_drawings)?_drawings.find(function(d){return d.id===drawingId;}):null;
@@ -295,27 +299,29 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
     return;
   }
 
-  // Find ITP template
-  var _templates=await dbGetItpProjectTemplates(_ifPNum)||[];
+  // Load all data in parallel
+  var _parallel=await Promise.all([
+    dbGetItpProjectTemplates(_ifPNum).catch(function(){return [];}),
+    dbGetItpResponses(_ifPNum).catch(function(){return {};}),
+    dbGetEquipment(_ifPNum).catch(function(){return null;})
+  ]);
+  var _templates=_parallel[0]||[];
+  var _allResp=_parallel[1]||{};
+  _cachedEquipData=_parallel[2]||null;
+
   var matched=Array.isArray(_templates)?_templates.find(function(t){return t.itpType===pin.itpTypeLabel||t.itpNo===pin.ref;}):null;
   if(matched){
     itpTemplate=matched;
-    // Use current revision
     var rev=matched.revisions[matched.revisions.length-1];
-    // Prefer current status rev
     matched.revisions.forEach(function(r){if(r.status==='current')rev=r;});
     itpRevision=rev;
   }
 
-  // Load responses
-  allResponses=await dbGetItpResponses(_ifPNum)||{};
+  allResponses=_allResp;
   if(!allResponses[pinId]){
     allResponses[pinId]={status:'not-started',docNo:pin.docNo||'',rows:{},signoffs:{}};
   }
   responses=allResponses[pinId];
-
-  // Load equipment into cache
-  try{_cachedEquipData=await dbGetEquipment(_ifPNum)||null;}catch(e){_cachedEquipData=null;}
 
   // Set status dropdown
   document.getElementById('statusSel').value=responses.status||'not-started';
@@ -400,16 +406,37 @@ function renderHeader(){
     responses.equipId=this.value;
     var eq2=getEquipData(this.value);
     var mk=document.getElementById('hdr-make');var md=document.getElementById('hdr-model');
-    if(mk)mk.textContent=(eq2&&(eq2.manufacturer||eq2.make))||'—';
-    if(md)md.textContent=(eq2&&eq2.model)||'—';
-    // Auto-fill location fields if empty
+    var bldInp=document.querySelector('input[data-response-key="locBuilding"]');
+    var locInp=document.querySelector('input[data-response-key="locLocation"]');
+    var subInp=document.querySelector('input[data-response-key="locSubLocation"]');
     if(eq2){
-      var bldInp=document.querySelector('input[data-response-key="locBuilding"]');
-      var locInp=document.querySelector('input[data-response-key="locLocation"]');
-      var subInp=document.querySelector('input[data-response-key="locSubLocation"]');
-      if(bldInp&&!bldInp.value){var b=eq2.building||eq2.floor||eq2.level||'';bldInp.value=b;responses.locBuilding=b;}
-      if(locInp&&!locInp.value){var l=eq2.location||eq2.room||'';locInp.value=l;responses.locLocation=l;}
-      if(subInp&&!subInp.value){var s=eq2.sublocation||eq2.subLocation||eq2.sub_location||eq2['Sub Location']||'';subInp.value=s;responses.locSubLocation=s;}
+      // Found — populate fields
+      if(mk)mk.textContent=(eq2.manufacturer||eq2.make)||'—';
+      if(md)md.textContent=eq2.model||'—';
+      var b=eq2.building||eq2.floor||eq2.level||'';
+      var l=eq2.location||eq2.room||'';
+      var s=eq2.sublocation||eq2.subLocation||eq2.sub_location||eq2['Sub Location']||'';
+      if(bldInp){bldInp.value=b;responses.locBuilding=b;}
+      if(locInp){locInp.value=l;responses.locLocation=l;}
+      if(subInp){subInp.value=s;responses.locSubLocation=s;}
+    } else {
+      // Not found — clear fields and show warning
+      if(mk)mk.textContent='—';
+      if(md)md.textContent='—';
+      if(bldInp){bldInp.value='';responses.locBuilding='';}
+      if(locInp){locInp.value='';responses.locLocation='';}
+      if(subInp){subInp.value='';responses.locSubLocation='';}
+      // Show disappearing toast if user typed something
+      if(this.value.trim()){
+        var existing=document.getElementById('equip-not-found-toast');
+        if(existing)existing.remove();
+        var t=document.createElement('div');
+        t.id='equip-not-found-toast';
+        t.textContent='Equipment ID not found on Equipment Schedule';
+        t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--warn);color:#000;padding:8px 20px;border-radius:8px;font-size:12px;font-weight:600;z-index:9999;font-family:'DM Mono',monospace;white-space:nowrap;transition:opacity .5s';
+        document.body.appendChild(t);
+        setTimeout(function(){t.style.opacity='0';setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},500);},5000);
+      }
     }
     // Notify parent to update pin label immediately
     if(window.self!==window.top&&window.parent.updatePinEquip){
