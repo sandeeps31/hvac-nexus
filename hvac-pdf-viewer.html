@@ -893,8 +893,19 @@ function openItpDetail(pin){
 function closeItpDetail(){
   document.getElementById('itpDetailMo').style.display='none';
   document.getElementById('itpDetailFrame').src='';
-  // Reload pins in case status changed inside the form
-  loadData().then(function(){renderPins();});
+  // Reload data and sync equipId from responses back to pin
+  loadData().then(function(){
+    // Sync equipId from responses into pin.equip for label display
+    if(curDrawing&&curDrawing.pins){
+      curDrawing.pins.forEach(function(pin){
+        var resp=responses[pin.id];
+        if(resp&&resp.equipId&&resp.equipId!==pin.equip){
+          pin.equip=resp.equipId;
+        }
+      });
+    }
+    renderPins();
+  });
 }
 // Close on backdrop click
 document.getElementById('itpDetailMo').addEventListener('click',function(e){
