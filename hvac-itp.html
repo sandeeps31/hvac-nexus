@@ -24,6 +24,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
 .sb-item-icon{font-size:14px;flex-shrink:0;width:18px;text-align:center}
 .topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:14px;flex-shrink:0;background:var(--surface)}
+.itp-landing{display:flex;align-items:center;justify-content:center;height:calc(100vh - 52px);gap:32px}
+.itp-landing-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px 48px;display:flex;flex-direction:column;align-items:center;gap:16px;cursor:pointer;transition:all .2s;width:260px;text-align:center}
+.itp-landing-card:hover{border-color:var(--accent);background:var(--accent-dim);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,200,255,.15)}
+.itp-landing-icon{font-size:40px}
+.itp-landing-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text)}
+.itp-landing-desc{font-size:12px;color:var(--muted);line-height:1.5}
 .bc{display:flex;align-items:center;gap:7px;font-size:13px;flex:1}
 .bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
 .btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
@@ -176,7 +182,6 @@ body.edit-mode #saveStructBtn{background:var(--green);color:#080c12}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s;min-width:0;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
 
@@ -216,7 +221,7 @@ body.edit-mode #saveStructBtn{background:var(--green);color:#080c12}
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
       <div class="sb-group-items" id="gitems-quality" style="display:block">
-        <div class="sb-item active" ><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Register</span></div>
+        <div class="sb-item active" ><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
         <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
         <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
       </div></div>
@@ -230,12 +235,36 @@ body.edit-mode #saveStructBtn{background:var(--green);color:#080c12}
 
 
 <!-- MAIN -->
-<div class="main" id="mainWrap">
+<!-- ITP LANDING PAGE -->
+<div class="main" id="landingWrap" style="position:fixed;top:0;left:230px;right:0;bottom:0;background:var(--bg);z-index:10;transition:left .25s">
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl" onclick="goProject()">My Projects</span><span class="bcs">›</span>
+      <span class="bcl" id="bc-proj-landing">Project</span><span class="bcs">›</span>
+      <span class="bcc">ITPs</span>
+    </div>
+  </div>
+  <div class="itp-landing">
+    <div class="itp-landing-card" onclick="showItpRegister()">
+      <div class="itp-landing-icon">📋</div>
+      <div class="itp-landing-title">ITP Register</div>
+      <div class="itp-landing-desc">View and manage all ITPs across the project. Add standalone ITPs with full form detail.</div>
+    </div>
+    <div class="itp-landing-card" onclick="showItpOnDrawings()">
+      <div class="itp-landing-icon">📍</div>
+      <div class="itp-landing-title">ITP on Drawings</div>
+      <div class="itp-landing-desc">View drawings and manage ITP pins placed on specific locations within each drawing.</div>
+    </div>
+  </div>
+</div>
+
+<div class="main" id="mainWrap" style="display:none">
   <div class="topbar">
     <div class="bc">
       <span class="bcl" onclick="goProject()">My Projects</span><span class="bcs">›</span>
       <span class="bcl" id="bc-proj">Project</span><span class="bcs">›</span>
-      <span class="bcc">ITP Register</span>
+      <span class="bcl" onclick="showLanding()" style="cursor:pointer">ITPs</span><span class="bcs">›</span>
+      <span class="bcc">ITP on Drawings</span>
     </div>
     <div id="userIndicator" style="display:flex;align-items:center;gap:6px;flex-shrink:0;cursor:pointer" onclick="window.location.href='hvac-settings.html'" title="Manage users in Settings"></div>
     <button class="bp bsm btn struct-edit-btn" id="addAreaBtn" onclick="openAddArea(null)">＋ Add Area</button>
@@ -351,6 +380,26 @@ body.edit-mode #saveStructBtn{background:var(--green);color:#080c12}
 <script>
 // ═══════════════════════════════════════════
 // ITP REGISTER — HVAC NEXUS
+// ── LANDING PAGE ──
+function showLanding(){
+  document.getElementById('landingWrap').style.display='';
+  document.getElementById('mainWrap').style.display='none';
+  var p=dbGetCurrentProject();
+  var el=document.getElementById('bc-proj-landing');
+  if(el&&p.name)el.textContent=p.name;
+}
+function showItpRegister(){
+  // Navigate to ITP register page (to be built)
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  window.location.href=b+'hvac-itp-register.html';
+}
+function showItpOnDrawings(){
+  document.getElementById('landingWrap').style.display='none';
+  document.getElementById('mainWrap').style.display='';
+  // Apply sidebar to mainWrap
+  applySB(localStorage.getItem('hvacnexus_sb_collapsed')==='1');
+}
+
 // Structure: Buildings → Locations → ITP Types → Linked Drawings → Pins
 // ═══════════════════════════════════════════
 
@@ -439,6 +488,8 @@ function nid(){return'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
   try{window._cachedProjectTemplates=await dbGetItpProjectTemplates(pKey)||[];}catch(e){window._cachedProjectTemplates=[];}
   applyRoleUI();
   renderStats();render();
+  // Show landing page on load
+  showLanding();
 })();
 
 function goProject(){window.location.href='project.html?id='+(proj.id||'gct001');}
@@ -998,7 +1049,7 @@ function toast(msg){
 var SBK='hvacnexus_sb_collapsed';
 function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
-function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function applySB(c){var sb=document.getElementById('sidebar');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);['mainWrap','landingWrap'].forEach(function(id){var el=document.getElementById(id);if(el&&el.style.display!=='none'){el.style.marginLeft=c?'52px':'';el.style.left=c?'52px':'230px';}});if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
 function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
 (function(){
   applySB(localStorage.getItem(SBK)==='1');

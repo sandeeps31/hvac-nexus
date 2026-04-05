@@ -164,7 +164,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
       <div class="sb-group-items" id="gitems-quality" style="display:block">
-        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Register</span></div>
+        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
         <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
         <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
       </div></div>
@@ -331,6 +331,11 @@ function nid(){return'pin_'+Date.now()+'_'+Math.random().toString(36).slice(2,5)
   if(curDrawing.pdfUrl&&!curDrawing.pdfData){loadFromUrl(curDrawing.pdfUrl);}
   else if(curDrawing.pdfData){loadFromData(curDrawing.pdfData);}
   else{showNoPdf();}
+  // Auto-start move pin mode if URL param present
+  var movePinId=params.get('movePin')||'';
+  if(movePinId){
+    setTimeout(function(){startMovePin(movePinId);},800);
+  }
 })();
 
 // ── LAYER CHIPS ──
@@ -417,7 +422,7 @@ function renderPins(){
     el.innerHTML='<div class="pin-dot '+(ST_COLOR[st]||'ns')+'">'+escH((label||'').slice(0,2).toUpperCase())+'</div>'
       +'<div class="pin-label">'+escH(label)+(pin.itpTypeLabel?' · '+escH(pin.itpTypeLabel):'')+'</div>';
     el.addEventListener('click',function(e){e.stopPropagation();openItpDetail(pin);});
-    el.addEventListener('contextmenu',function(e){e.preventDefault();e.stopPropagation();openEditPin(pin.id);});
+    el.addEventListener('contextmenu',function(e){e.preventDefault();e.stopPropagation();startMovePin(pin.id);});
     layer.appendChild(el);
   });
 }
@@ -433,6 +438,35 @@ function togglePlaceMode(){
   hint.style.display=_placing?'block':'none';
   viewer.classList.toggle('grabbing',_placing);
   viewer.style.cursor=_placing?'crosshair':'grab';
+}
+// ── MOVE PIN MODE ──
+var _movingPinId = null;
+function startMovePin(pinId){
+  _movingPinId=pinId;
+  _placing=false; // cancel any add mode
+  var btn=document.getElementById('addItpBtn');
+  btn.classList.remove('placing');
+  btn.textContent='📍 Add ITP';
+  var hint=document.getElementById('placeHint');
+  hint.textContent='📍 Click new position for pin — Esc to cancel';
+  hint.style.display='block';
+  var viewer=document.getElementById('viewer');
+  viewer.style.cursor='crosshair';
+  viewer.classList.add('grabbing');
+}
+function cancelMoveMode(){
+  if(!_movingPinId)return;
+  _movingPinId=null;
+  document.getElementById('placeHint').style.display='none';
+  var viewer=document.getElementById('viewer');
+  viewer.style.cursor='grab';
+  viewer.classList.remove('grabbing');
+}
+function commitMovePin(xPct,yPct){
+  var pin=(curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===_movingPinId;});
+  if(pin){pin.x=xPct;pin.y=yPct;saveDrawings();renderPins();}
+  cancelMoveMode();
+  toast('Pin moved ✓');
 }
 function cancelPlaceMode(){
   if(!_placing)return;
@@ -692,14 +726,14 @@ viewer.addEventListener('wheel',function(e){
 },{passive:false});
 
 viewer.addEventListener('click',function(e){
-  if(!_placing)return;
-  // Convert click to canvas-relative percentage
   var stage=document.getElementById('pdfStage');
   var sr=stage.getBoundingClientRect();
   var xPct=((e.clientX-sr.left)/sr.width)*100;
   var yPct=((e.clientY-sr.top)/sr.height)*100;
   xPct=Math.max(0,Math.min(100,xPct));
   yPct=Math.max(0,Math.min(100,yPct));
+  if(_movingPinId){commitMovePin(xPct,yPct);return;}
+  if(!_placing)return;
   cancelPlaceMode();
   openNewPin(xPct,yPct);
 });
@@ -735,7 +769,7 @@ viewer.addEventListener('touchend',function(e){
   Array.from(e.changedTouches).forEach(function(t){delete _touches[t.identifier];});
 });
 
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){cancelPlaceMode();closePinMo();}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){cancelMoveMode();cancelPlaceMode();closePinMo();}});
 
 document.addEventListener('click',function(e){
   ['typeSugg','equipSugg'].forEach(function(id){var el=document.getElementById(id);if(el&&!e.target.closest('#'+id))el.style.display='none';});

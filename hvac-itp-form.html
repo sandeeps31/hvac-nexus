@@ -77,16 +77,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .yn-btn.sel-na{border-color:var(--muted);background:var(--surface3);color:var(--muted)}
 .yn-btn.sel-pass{border-color:var(--green);background:var(--green-dim);color:var(--green)}
 .yn-btn.sel-fail{border-color:var(--danger);background:var(--danger-dim);color:var(--danger)}
-.row-actions{display:flex;align-items:center;flex-shrink:0}
-.row-stamp{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:160px;text-align:right;padding-right:10px}
-.defect-btn{font-size:11px;font-family:'DM Mono',monospace;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,77,109,.4);background:rgba(255,77,109,.08);color:var(--danger);cursor:pointer;white-space:nowrap;transition:all .15s}
-.defect-btn:hover{background:rgba(255,77,109,.18);border-color:var(--danger)}
-.defect-mo{position:fixed;inset:0;background:rgba(4,8,16,.82);z-index:2000;display:none;align-items:center;justify-content:center}
-.defect-mo.open{display:flex}
-.defect-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:440px;max-width:96vw;display:flex;flex-direction:column}
-.defect-card-hdr{padding:14px 18px 10px;border-bottom:1px solid var(--border);font-family:'Syne',sans-serif;font-size:14px;font-weight:800}
-.defect-card-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
-.defect-card-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
 
 .text-inp{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;width:200px;transition:border-color .2s}
 .text-inp:focus{border-color:var(--accent)}.text-inp::placeholder{color:var(--muted)}
@@ -219,7 +209,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
       <div class="sb-group-items" id="gitems-quality" style="display:block">
-        <div class="sb-item active" ><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Register</span></div>
+        <div class="sb-item active" ><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
         <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
         <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
       </div></div>
@@ -233,20 +223,25 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
 
 <div class="topbar">
-  <div class="bc" style="display:none">
+  <div class="bc">
     <span class="bcl" id="backBtn" onclick="goBack()">✕ Close</span>
     <span class="bcs">›</span>
     <span class="bcc" id="bcTitle">ITP Form</span>
   </div>
   <div class="status-wrap">
     <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Status</span>
-    <select class="status-sel" id="statusSel" onchange="updateStatus(this.value)">
+    <select class="status-sel" id="statusSel" onchange="updateStatus(this.value)" disabled>
       <option value="not-started">Not Started</option>
       <option value="in-progress">In Progress</option>
       <option value="action">Action Required</option>
       <option value="closed">Closed</option>
     </select>
     <div id="saveInd" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--green);opacity:0;transition:opacity .3s">Saved ✓</div>
+    <div style="display:flex;gap:6px;margin-left:8px">
+      <button id="editItpBtn" onclick="toggleEditMode()" style="background:var(--accent);border:none;color:#000;border-radius:7px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700">✎ Edit ITP</button>
+      <button id="repinBtn" onclick="openRepinDrawing()" style="display:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 12px;cursor:pointer;font-size:12px" title="Open drawing and move pin">📍 Repin</button>
+      <button id="deleteItpBtn" onclick="confirmDeleteItp()" style="display:none;background:transparent;border:1px solid rgba(255,77,109,.4);color:var(--danger);border-radius:7px;padding:6px 12px;cursor:pointer;font-size:12px" title="Soft delete this ITP">🗑 Delete</button>
+    </div>
   </div>
 </div>
 
@@ -342,23 +337,15 @@ function saveSigs(sigs){try{localStorage.setItem(SIG_SK,JSON.stringify(sigs));}c
 async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch(e){return {};}}
 
 // ── INIT ──
-(async function(){
+(function(){
   var params=new URLSearchParams(window.location.search);
   drawingId=params.get('drawingId')||'';
   pinId=params.get('pinId')||'';
 
-  // Hide sidebar if loaded inside an iframe
-  if(window.self!==window.top){
-    var sb=document.getElementById('sidebar');
-    var mw=document.getElementById('mainWrap');
-    if(sb)sb.style.display='none';
-    if(mw){mw.style.marginLeft='0';mw.style.left='0';}
-  }
-
   // Load pin
-  var _drawings=await dbGetDrawings(_ifPNum)||[];
-  var _drawing=Array.isArray(_drawings)?_drawings.find(function(d){return d.id===drawingId;}):null;
-  if(_drawing&&Array.isArray(_drawing.pins)){pin=_drawing.pins.find(function(p){return p.id===pinId;})||null;}
+  var drawings=loadDrawings();
+  var drawing=drawings.find(function(d){return d.id===drawingId;});
+  if(drawing&&drawing.pins){pin=drawing.pins.find(function(p){return p.id===pinId;});}
 
   if(!pin){
     document.getElementById('formPage').innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:40px;margin-bottom:16px">⚠️</div><div style="font-size:16px">Pin not found. Please return to drawings.</div><br><button class="btn bp" onclick="goBack()">✕ Close Tab</button></div>';
@@ -366,8 +353,8 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   }
 
   // Find ITP template
-  var _templates=await dbGetItpProjectTemplates(_ifPNum)||[];
-  var matched=Array.isArray(_templates)?_templates.find(function(t){return t.itpType===pin.itpTypeLabel||t.itpNo===pin.ref;}):null;
+  var templates=loadTemplates();
+  var matched=templates.find(function(t){return t.itpType===pin.itpTypeLabel||t.itpNo===pin.ref;});
   if(matched){
     itpTemplate=matched;
     // Use current revision
@@ -378,14 +365,11 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   }
 
   // Load responses
-  allResponses=await dbGetItpResponses(_ifPNum)||{};
+  allResponses=loadResponses();
   if(!allResponses[pinId]){
     allResponses[pinId]={status:'not-started',docNo:pin.docNo||'',rows:{},signoffs:{}};
   }
   responses=allResponses[pinId];
-
-  // Load equipment schedule into cache
-  try{_cachedEquipData=await dbGetEquipment(_ifPNum)||null;}catch(e){_cachedEquipData=null;}
 
   // Set status dropdown
   document.getElementById('statusSel').value=responses.status||'not-started';
@@ -433,62 +417,36 @@ function goBack(){
 
 // ── HEADER ──
 function renderHeader(){
+  var cs=loadSettings();
   var equipData=getEquipData(pin.equip);
   var meta=document.getElementById('formMeta');
   meta.innerHTML='';
-
   function addField(lbl,val,cls){
     var d=document.createElement('div');d.className='fmf';
     var l=document.createElement('div');l.className='fmf-lbl';l.textContent=lbl;
     var v=document.createElement('div');v.className='fmf-val'+(cls?' '+cls:'');v.textContent=val||'—';
     d.appendChild(l);d.appendChild(v);meta.appendChild(d);
   }
-  function addEditable(lbl,key,placeholder,cls){
-    var d=document.createElement('div');d.className='fmf';
-    var l=document.createElement('div');l.className='fmf-lbl';l.textContent=lbl;
-    var i=document.createElement('input');i.className='doc-input'+(cls?' '+cls:'');
-    i.value=responses[key]||'';i.placeholder=placeholder||'';
-    i.onchange=function(){responses[key]=this.value;autosave();};
-    d.appendChild(l);d.appendChild(i);meta.appendChild(d);
+  addField('ITP No.',pin.ref||'—','mono');
+  addField('ITP Type',pin.itpTypeLabel||pin.itpType||'—');
+  addField('Equipment ID',pin.equip||'—','mono');
+  // Version removed from detail view
+  if(equipData){
+    addField('Make/Model',(equipData.manufacturer||equipData.make||'')+(equipData.model?' · '+equipData.model:''));
+    addField('Location',equipData.location||'—');
   }
-
-  // 1. Client Doc No (editable)
-  addEditable('Client Doc No.','docNo','Client / Builder doc no.');
-
-  // 2. Form No — from company template (fixed reference for AS accreditation)
-  addField('Form No.', itpTemplate?itpTemplate.itpNo:(pin.ref||'—'), 'mono');
-
-  // 3. Ref No — auto-generated per pin (ITP-0042)
-  addField('Ref No.', pin.ref||'—', 'mono');
-
-  // 4. ITP Type — from project template
-  addField('ITP Type', itpTemplate?itpTemplate.itpType:(pin.itpTypeLabel||'—'));
-
-  // 5. Equipment ID
-  addField('Equipment ID', pin.equip||'—', 'mono');
-
-  // 5. Location details — pre-fill from equip schedule, editable
-  var eqBuilding=(equipData&&(equipData.building||equipData.floor||''))||'';
-  var eqLocation=(equipData&&(equipData.location||equipData.room||''))||'';
-  var eqSub=(equipData&&(equipData.subLocation||equipData.sub_location||''))||'';
-  addEditable('Building','locBuilding','e.g. Tower B');
-  // Pre-fill if not already stored
-  if(!responses.locBuilding&&eqBuilding){responses.locBuilding=eqBuilding;}
-  document.querySelector && (function(){
-    var inputs=document.getElementById('formMeta').querySelectorAll('input');
-    var last=inputs[inputs.length-1];
-    if(last&&!last.value&&eqBuilding)last.value=eqBuilding;
-  })();
-
-  addEditable('Location','locLocation','e.g. Level 02 Plant Room');
-  addEditable('Sub Location','locSubLocation','e.g. Zone A');
+  // Doc No — editable
+  var docF=document.createElement('div');docF.className='fmf';
+  var docL=document.createElement('div');docL.className='fmf-lbl';docL.textContent='Client Doc No.';
+  var docI=document.createElement('input');docI.className='doc-input';docI.value=responses.docNo||'';docI.placeholder='Client / Builder doc no.';
+  docI.onchange=function(){responses.docNo=this.value;autosave();};
+  docF.appendChild(docL);docF.appendChild(docI);meta.appendChild(docF);
 }
 
 // ── EQUIPMENT DATA ──
-var _cachedEquipData=null;
 function getEquipData(equipId){
   if(!equipId)return null;
-  var eq=_cachedEquipData;if(!eq||!eq.tabs)return null;
+  var eq=loadEquipSchedule();if(!eq||!eq.tabs)return null;
   for(var i=0;i<eq.tabs.length;i++){
     var tab=eq.tabs[i];
     for(var j=0;j<(tab.rows||[]).length;j++){
@@ -590,24 +548,7 @@ function renderRow(row, sec){
   } else if(row.checkType==='signoff'){
     // Handled in sign-off section
   }
-  // User/date stamp
-  var stampId='stamp_'+rowKey.replace(/[^a-zA-Z0-9]/g,'_');
-  var stampEl=document.createElement('div');stampEl.className='row-stamp';stampEl.id=stampId;
-  var st=responses.rows[rowKey+'_stamp'];
-  stampEl.textContent=st?(st.user+' · '+st.date):'';
-
-  // Defect button
-  var defectBtn=document.createElement('button');defectBtn.className='defect-btn';defectBtn.textContent='+ Defect';
-  defectBtn.title='Raise a defect for this item';
-  (function(rk,rd){defectBtn.onclick=function(){openDefectModal(rk,rd);};})(rowKey,row.desc||'');
-
-  // stamp left of buttons, defect far right
-  respEl.insertBefore(stampEl, respEl.firstChild);
-
-  var actionsEl=document.createElement('div');actionsEl.className='row-actions';
-  actionsEl.appendChild(defectBtn);
-
-  wrap.appendChild(stepEl);wrap.appendChild(descEl);wrap.appendChild(respEl);wrap.appendChild(actionsEl);
+  wrap.appendChild(stepEl);wrap.appendChild(descEl);wrap.appendChild(respEl);
   return wrap;
 }
 
@@ -619,26 +560,10 @@ function renderYesNo(key,options,stored){
     var selClass=opt==='YES'||opt==='PASS'?'sel-yes':opt==='NO'||opt==='FAIL'?'sel-no':'sel-na';
     if(stored===opt)btn.classList.add(opt==='PASS'?'sel-pass':opt==='FAIL'?'sel-fail':selClass);
     (function(b,o,k,sc){b.onclick=function(){
-      var isSelected=b.classList.contains(o==='PASS'?'sel-pass':o==='FAIL'?'sel-fail':sc);
       // Clear siblings
       group.querySelectorAll('.yn-btn').forEach(function(x){x.className='yn-btn';});
-      if(!isSelected){
-        b.classList.add(o==='PASS'?'sel-pass':o==='FAIL'?'sel-fail':sc);
-        responses.rows[k]=o;
-        // Store user/date stamp
-        var u=dbGetCurrentUser();
-        responses.rows[k+'_stamp']={user:u?(u.name||u.username||'Unknown'):'Unknown',date:todayStr()};
-      } else {
-        delete responses.rows[k];
-        delete responses.rows[k+'_stamp'];
-      }
-      autosave();updateProgress();
-      // Re-render stamp display
-      var stampEl=document.getElementById('stamp_'+k.replace(/[^a-zA-Z0-9]/g,'_'));
-      if(stampEl){
-        var st=responses.rows[k+'_stamp'];
-        stampEl.textContent=st?(st.user+' · '+st.date):'';
-      }
+      b.classList.add(o==='PASS'?'sel-pass':o==='FAIL'?'sel-fail':sc);
+      responses.rows[k]=o;autosave();updateProgress();
     };})(btn,opt,key,selClass);
     group.appendChild(btn);
   });
@@ -940,6 +865,57 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 })();
 
 </script>
+
+<!-- EDIT MODE & DELETE -->
+<script>
+var _editMode = false;
+function toggleEditMode(){
+  _editMode=!_editMode;
+  var btn=document.getElementById('editItpBtn');
+  var statusSel=document.getElementById('statusSel');
+  var repinBtn=document.getElementById('repinBtn');
+  var deleteBtn=document.getElementById('deleteItpBtn');
+  btn.textContent=_editMode?'🔒 Lock ITP':'✎ Edit ITP';
+  btn.style.background=_editMode?'var(--warn)':'var(--accent)';
+  statusSel.disabled=!_editMode;
+  repinBtn.style.display=_editMode?'':'none';
+  deleteBtn.style.display=_editMode?'':'none';
+  document.querySelectorAll('.text-inp,.plant-inp,.doc-input').forEach(function(el){el.disabled=!_editMode;});
+  document.querySelectorAll('.yn-btn').forEach(function(el){
+    el.style.pointerEvents=_editMode?'auto':'none';
+    el.style.opacity=_editMode?'1':'0.5';
+  });
+  // Defect btn always clickable
+  document.querySelectorAll('.defect-btn').forEach(function(el){
+    el.style.pointerEvents='auto';el.style.opacity='1';
+  });
+}
+function openRepinDrawing(){
+  if(!drawingId||!pinId)return;
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  var url=b+'hvac-pdf-viewer.html?drawingId='+encodeURIComponent(drawingId)+'&movePin='+encodeURIComponent(pinId);
+  if(window.self!==window.top){window.parent.location.href=url;}else{window.location.href=url;}
+}
+function confirmDeleteItp(){
+  if(!confirm('Delete this ITP? It will be hidden but can be restored from the ITP Register.'))return;
+  responses.deleted=true;
+  responses.deletedBy=(dbGetCurrentUser()||{}).name||'Unknown';
+  responses.deletedDate=todayStr();
+  autosave();
+  if(window.self!==window.top&&window.parent.closeItpDetail){
+    window.parent.closeItpDetail();
+  } else { goBack(); }
+}
+// Lock all inputs on load
+(function(){
+  setTimeout(function(){
+    document.querySelectorAll('.text-inp,.plant-inp').forEach(function(el){el.disabled=true;});
+    document.querySelectorAll('.yn-btn').forEach(function(el){el.style.pointerEvents='none';el.style.opacity='0.5';});
+    document.querySelectorAll('.defect-btn').forEach(function(el){el.style.pointerEvents='auto';el.style.opacity='1';});
+  },500);
+})();
+</script>
+
 <!-- DEFECT MODAL -->
 <div class="defect-mo" id="defectMo" onclick="if(event.target===this)closeDefectModal()">
   <div class="defect-card">
@@ -964,7 +940,7 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
       </div>
     </div>
     <div class="defect-card-footer">
-      <button class="btn" onclick="closeDefectModal()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 16px;cursor:pointer">Cancel</button>
+      <button onclick="closeDefectModal()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 16px;cursor:pointer">Cancel</button>
       <button onclick="saveDefect()" style="background:var(--danger);border:none;color:#fff;border-radius:7px;padding:7px 16px;cursor:pointer;font-weight:600">Raise Defect</button>
     </div>
   </div>
@@ -975,7 +951,6 @@ var _defectRowKey='', _defectRowDesc='';
 function openDefectModal(rowKey, rowDesc){
   _defectRowKey=rowKey; _defectRowDesc=rowDesc;
   document.getElementById('defectDesc').value=rowDesc||'';
-  // Populate assignees from users
   dbGetUsers().then(function(users){
     var sel=document.getElementById('defectAssignee');
     sel.innerHTML='<option value="">— Select user —</option>'
@@ -990,7 +965,6 @@ async function saveDefect(){
   var assignee=document.getElementById('defectAssignee').value;
   var priority=document.getElementById('defectPriority').value;
   var u=dbGetCurrentUser();
-  // Auto-generate DEF-XXXX ref
   var existingDefs=[];
   try{existingDefs=await dbGetProject('defects',_ifPNum)||[];}catch(e){}
   if(!Array.isArray(existingDefs))existingDefs=[];
@@ -998,35 +972,24 @@ async function saveDefect(){
   existingDefs.forEach(function(d){var m=(d.ref||'').match(/^DEF-(\d+)$/);if(m){var n=parseInt(m[1]);if(n>maxDef)maxDef=n;}});
   var defRef='DEF-'+String(maxDef+1).padStart(4,'0');
   var defect={
-    id:'def_'+Date.now(),
-    ref:defRef,
-    rowKey:_defectRowKey,
-    desc:desc,
-    assignee:assignee,
-    priority:priority,
+    id:'def_'+Date.now(), ref:defRef,
+    rowKey:_defectRowKey, desc:desc, assignee:assignee, priority:priority,
     status:'open',
     raisedBy:u?(u.name||u.username||'Unknown'):'Unknown',
     raisedDate:todayStr(),
-    itpRef:pin.ref||'',
-    itpType:pin.itpTypeLabel||'',
-    equip:pin.equip||'',
-    drawingId:drawingId,
-    pinId:pinId
+    itpRef:pin.ref||'', itpType:pin.itpTypeLabel||'',
+    equip:pin.equip||'', drawingId:drawingId, pinId:pinId
   };
-  // Save to defects list in Supabase
   try{
-    var existing=await dbGetProject('defects',_ifPNum)||[];
-    if(!Array.isArray(existing))existing=[];
-    existing.push(defect);
-    await dbSetProject('defects',_ifPNum,existing);
+    existingDefs.push(defect);
+    await dbSetProject('defects',_ifPNum,existingDefs);
   }catch(e){console.error('Defect save error:',e);}
   closeDefectModal();
-  // Show confirmation
   var toast=document.createElement('div');
-  toast.textContent='Defect raised ✓';
+  toast.textContent=defRef+' raised ✓';
   toast.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--danger);color:#fff;padding:8px 20px;border-radius:8px;font-size:13px;z-index:9999;font-weight:600';
   document.body.appendChild(toast);
-  setTimeout(function(){document.body.removeChild(toast);},2500);
+  setTimeout(function(){if(document.body.contains(toast))document.body.removeChild(toast);},2500);
 }
 </script>
 </body>
