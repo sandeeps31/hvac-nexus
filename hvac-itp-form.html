@@ -804,7 +804,9 @@ function updateStatus(val){
 }
 
 // ── AUTOSAVE ──
+var _saving=false;
 function autosave(){
+  if(_saving)return;
   allResponses[pinId]=responses;
   saveResponses();
   var ind=document.getElementById('saveInd');
@@ -855,15 +857,17 @@ function openRepinDrawing(){
 }
 async function confirmDeleteItp(){
   if(!confirm('Delete this ITP? It will be hidden but can be restored from the ITP Register.'))return;
+  _saving=true;
   responses.deleted=true;
   var u=dbGetCurrentUser();
   responses.deletedBy=u?(u.name||u.username||'Unknown'):'Unknown';
   responses.deletedDate=todayStr();
   allResponses[pinId]=responses;
-  // Await the save before closing so the iframe doesn't get destroyed mid-request
   try{
     await dbSetItpResponses(_ifPNum,allResponses);
+    _saving=false;
   } catch(e){
+    _saving=false;
     console.error('Delete save error:',e);
     alert('Could not save deletion — check your connection and try again.');
     return;
