@@ -792,12 +792,14 @@ function updateProgress(){
 function updateStatus(val){
   responses.status=val;autosave();
   // Update pin status in drawings
-  var drawings=loadDrawings();
-  var drawing=drawings.find(function(d){return d.id===drawingId;});
-  if(drawing&&drawing.pins){
-    var p=drawing.pins.find(function(x){return x.id===pinId;});
-    if(p){p.itpStatus=val;dbSetDrawings(_ifPNum,drawings).catch(e=>console.error(e));}
-  }
+  dbGetDrawings(_ifPNum).then(function(drawings){
+    if(!Array.isArray(drawings))return;
+    var drawing=drawings.find(function(d){return d.id===drawingId;});
+    if(drawing&&drawing.pins){
+      var p=drawing.pins.find(function(x){return x.id===pinId;});
+      if(p){p.itpStatus=val;dbSetDrawings(_ifPNum,drawings).catch(function(e){console.error(e);});}
+    }
+  }).catch(function(e){console.error(e);});
 }
 
 // ── AUTOSAVE ──
