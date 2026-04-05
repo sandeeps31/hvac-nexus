@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ITP Register — HVAC NEXUS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<script src="db.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--surface3:#222d42;--border:#1e2d45;--text:#e8edf5;--text2:#8899bb;--muted:#4a5a7a;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.12);--green:#00d68f;--green-dim:rgba(0,214,143,.12);--warn:#ffaa00;--danger:#ff4d6d;--danger-dim:rgba(255,77,109,.12)}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex}
+
+/* SIDEBAR */
+.sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden}
+.sb.sm{width:52px}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px;overflow:hidden}.sb-icon{font-size:20px;flex-shrink:0}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0;scrollbar-width:thin}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;text-decoration:none}.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none}.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);width:10px}.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-group-hdr,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}
+
+/* MAIN */
+.main{position:fixed;top:0;left:230px;right:0;bottom:0;display:flex;flex-direction:column;transition:left .25s}
+.topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:14px;flex-shrink:0;background:var(--surface)}
+.bc{display:flex;align-items:center;gap:6px;flex:1;min-width:0;font-size:13px}
+.bcl{color:var(--text2);cursor:pointer;white-space:nowrap}.bcl:hover{color:var(--accent)}
+.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:600;white-space:nowrap}
+.btn{border:none;border-radius:7px;padding:7px 14px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#000}.bg{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+.bsm{padding:5px 12px;font-size:12px}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:20px 24px}
+
+/* STATS */
+.stats-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:4px;min-width:120px}
+.stat-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800}
+.stat-lbl{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px}
+
+/* FILTERS */
+.filter-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.fi{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
+.fi:focus{border-color:var(--accent)}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 12px;flex:1;min-width:200px;max-width:320px}
+.search-box input{background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%}
+
+/* TABLE */
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{background:var(--surface2);padding:10px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--surface2);cursor:pointer}
+.tbl tr.deleted td{opacity:0.45}
+.mono{font-family:'DM Mono',monospace;font-size:12px}
+.ref{color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;font-weight:600}
+.badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:5px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.badge-ns{background:rgba(74,90,122,.3);color:var(--muted)}
+.badge-ip{background:rgba(255,170,0,.15);color:var(--warn)}
+.badge-act{background:rgba(255,77,109,.15);color:var(--danger)}
+.badge-cl{background:rgba(0,214,143,.15);color:var(--green)}
+.badge-del{background:rgba(255,77,109,.1);color:var(--danger);border:1px solid rgba(255,77,109,.3)}
+.empty{padding:60px;text-align:center;color:var(--muted);font-size:14px}
+
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(4,8,16,.82);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.mo.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;width:520px;max-width:96vw;max-height:90vh}
+.modal-hdr{padding:16px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-hdr h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:800}
+.modal-body{overflow-y:auto;flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:7px;justify-content:flex-end;flex-shrink:0}
+.ml{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
+.mi:focus{border-color:var(--accent)}
+select.mi{height:36px;appearance:auto}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sb" id="sidebar"><div class="sb-resize-handle" id="sbResize"></div>
+  <div class="sb-top"><div class="sb-brand"><span class="sb-icon">&#10052;</span><span class="sb-name">HVAC NEXUS</span></div><button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">&laquo;</button></div>
+  <div class="sb-proj-block"><div class="sb-proj-lbl">Current Project</div><div class="sb-proj-name" id="sb-proj-name">—</div><div class="sb-proj-num" id="sb-proj-num">—</div></div>
+  <nav class="sb-nav">
+    <div class="sb-item" onclick="navTo('project.html')" style="border-bottom:1px solid var(--border);margin-bottom:4px"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Dashboard</span></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('financials')"><span class="sb-group-chev" id="gchev-financials">▾</span><span class="sb-group-name">Financials</span></div>
+      <div class="sb-group-items" id="gitems-financials" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
+        <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span></div>
+        <div class="sb-item" onclick="navTo('hvac-vendor-invoices.html')"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
+        <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('procurement')"><span class="sb-group-chev" id="gchev-procurement">▾</span><span class="sb-group-name">Procurement</span></div>
+      <div class="sb-group-items" id="gitems-procurement" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
+        <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('technical')"><span class="sb-group-chev" id="gchev-technical">▾</span><span class="sb-group-name">Technical</span></div>
+      <div class="sb-group-items" id="gitems-technical" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-rfi.html')"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span></div>
+        <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span></div>
+        <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></div>
+        <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('commissioning')"><span class="sb-group-chev" id="gchev-commissioning">▾</span><span class="sb-group-name">Commissioning</span></div>
+      <div class="sb-group-items" id="gitems-commissioning" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-precommissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span></div>
+        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
+      <div class="sb-group-items" id="gitems-quality" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
+        <div class="sb-item active"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Register</span></div>
+        <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
+        <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
+      <div class="sb-group-items" id="gitems-settings" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
+      </div></div>
+  </nav>
+  <div class="sb-footer"><div class="sb-av" id="sb-av">?</div><span class="sb-user-name" id="sb-user">—</span></div>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="mainWrap">
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl" onclick="navTo('project.html')">My Projects</span><span class="bcs">›</span>
+      <span class="bcl" id="bc-proj">Project</span><span class="bcs">›</span>
+      <span class="bcl" onclick="navTo('hvac-itp.html')">ITPs</span><span class="bcs">›</span>
+      <span class="bcc">ITP Register</span>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
+      <input type="checkbox" id="showDeleted" onchange="render()"> Show deleted
+    </label>
+    <button class="btn bp bsm" onclick="openAddModal()">＋ Add ITP</button>
+  </div>
+
+  <div class="content">
+    <div class="stats-row" id="statsRow"></div>
+    <div class="filter-row">
+      <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search ref, type, equipment…" oninput="render()"></div>
+      <select class="fi" id="filtStatus" onchange="render()">
+        <option value="">All statuses</option>
+        <option value="not-started">Not Started</option>
+        <option value="in-progress">In Progress</option>
+        <option value="action">Action Required</option>
+        <option value="closed">Closed</option>
+      </select>
+      <select class="fi" id="filtType" onchange="render()"><option value="">All ITP types</option></select>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr>
+          <th>Ref No.</th>
+          <th>Form No.</th>
+          <th>ITP Type</th>
+          <th>Equipment ID</th>
+          <th>Client Doc No.</th>
+          <th>Building</th>
+          <th>Location</th>
+          <th>Status</th>
+          <th>Drawing</th>
+          <th>Raised By</th>
+          <th>Date</th>
+        </tr></thead>
+        <tbody id="tblBody"></tbody>
+      </table>
+      <div class="empty" id="emptyState" style="display:none">No ITPs found</div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD ITP MODAL -->
+<div class="mo" id="addMo" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal">
+    <div class="modal-hdr"><h3>Add ITP</h3></div>
+    <div class="modal-body">
+      <div><label class="ml">ITP Type *</label><select class="mi" id="newItpType"><option value="">— Select —</option></select></div>
+      <div><label class="ml">Equipment ID</label><input class="mi" id="newEquip" placeholder="e.g. FCU-L02-001"></div>
+      <div><label class="ml">Client Doc No.</label><input class="mi" id="newDocNo" placeholder="Client / Builder doc no."></div>
+      <div style="display:flex;gap:10px">
+        <div style="flex:1"><label class="ml">Building</label><input class="mi" id="newBuilding" placeholder="e.g. Tower B"></div>
+        <div style="flex:1"><label class="ml">Location</label><input class="mi" id="newLocation" placeholder="e.g. Level 02"></div>
+        <div style="flex:1"><label class="ml">Sub Location</label><input class="mi" id="newSubLoc" placeholder="e.g. Zone A"></div>
+      </div>
+      <div><label class="ml">Notes</label><textarea class="mi" id="newNotes" rows="2" placeholder="Optional…" style="resize:vertical"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bg" onclick="closeAddModal()">Cancel</button>
+      <button class="btn bp" onclick="saveNewItp()">Save ITP</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var proj=dbGetCurrentProject();
+var pNum=proj.num||proj.number||'GCT001';
+var SBK='hvacnexus_sb_collapsed';
+
+var allItps=[]; // {ref, formNo, itpType, equip, docNo, building, location, subLocation, status, drawingId, drawingNum, pinId, raisedBy, raisedDate, deleted, responses}
+var templates=[];
+
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+
+// ── LOAD DATA ──
+async function loadAll(){
+  // Load all drawings and extract pins
+  var drawings=await dbGetDrawings(pNum)||[];
+  var responses=await dbGetItpResponses(pNum)||{};
+  templates=await dbGetItpProjectTemplates(pNum)||[];
+
+  allItps=[];
+  drawings.forEach(function(drw){
+    (drw.pins||[]).filter(function(p){return p.type==='itp';}).forEach(function(pin){
+      var resp=responses[pin.id]||{};
+      var tmpl=templates.find(function(t){return t.itpType===pin.itpTypeLabel;});
+      allItps.push({
+        ref:pin.ref||'',
+        formNo:tmpl?tmpl.itpNo:'—',
+        itpType:pin.itpTypeLabel||'',
+        equip:pin.equip||'',
+        docNo:resp.docNo||'',
+        building:resp.locBuilding||'',
+        location:resp.locLocation||'',
+        subLocation:resp.locSubLocation||'',
+        status:resp.status||'not-started',
+        drawingId:drw.id,
+        drawingNum:drw.num||drw.name||'',
+        pinId:pin.id,
+        raisedBy:resp.raisedBy||'',
+        raisedDate:resp.raisedDate||pin.createdDate||'',
+        deleted:resp.deleted||false,
+        deletedBy:resp.deletedBy||'',
+        deletedDate:resp.deletedDate||''
+      });
+    });
+  });
+
+  // Sort by ref
+  allItps.sort(function(a,b){
+    var an=parseInt((a.ref||'').replace(/[^0-9]/g,''))||0;
+    var bn=parseInt((b.ref||'').replace(/[^0-9]/g,''))||0;
+    return an-bn;
+  });
+
+  // Populate type filter
+  var types=[...new Set(allItps.map(function(i){return i.itpType;}).filter(Boolean))].sort();
+  var filtType=document.getElementById('filtType');
+  filtType.innerHTML='<option value="">All ITP types</option>'+types.map(function(t){return '<option value="'+escH(t)+'">'+escH(t)+'</option>';}).join('');
+
+  renderStats();
+  render();
+}
+
+function renderStats(){
+  var live=allItps.filter(function(i){return !i.deleted;});
+  var stats=[
+    {val:live.length,lbl:'Total ITPs',col:'var(--accent)'},
+    {val:live.filter(function(i){return i.status==='not-started';}).length,lbl:'Not Started',col:'var(--muted)'},
+    {val:live.filter(function(i){return i.status==='in-progress';}).length,lbl:'In Progress',col:'var(--warn)'},
+    {val:live.filter(function(i){return i.status==='action';}).length,lbl:'Action Req.',col:'var(--danger)'},
+    {val:live.filter(function(i){return i.status==='closed';}).length,lbl:'Closed',col:'var(--green)'},
+  ];
+  document.getElementById('statsRow').innerHTML=stats.map(function(s){
+    return '<div class="stat-card"><div class="stat-val" style="color:'+s.col+'">'+s.val+'</div><div class="stat-lbl">'+s.lbl+'</div></div>';
+  }).join('');
+}
+
+function render(){
+  var q=(document.getElementById('srch').value||'').toLowerCase();
+  var fStatus=document.getElementById('filtStatus').value;
+  var fType=document.getElementById('filtType').value;
+  var showDel=document.getElementById('showDeleted').checked;
+
+  var filtered=allItps.filter(function(i){
+    if(!showDel&&i.deleted)return false;
+    if(fStatus&&i.status!==fStatus)return false;
+    if(fType&&i.itpType!==fType)return false;
+    if(q){
+      var hay=(i.ref+' '+i.itpType+' '+i.equip+' '+i.docNo+' '+i.building+' '+i.location).toLowerCase();
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  });
+
+  var BADGE={
+    'not-started':'badge-ns','in-progress':'badge-ip',
+    'action':'badge-act','closed':'badge-cl'
+  };
+  var STATUS_LBL={'not-started':'Not Started','in-progress':'In Progress','action':'Action Req.','closed':'Closed'};
+
+  var tbody=document.getElementById('tblBody');
+  tbody.innerHTML=filtered.map(function(itp){
+    var badgeCls=itp.deleted?'badge-del':(BADGE[itp.status]||'badge-ns');
+    var statusLbl=itp.deleted?'Deleted':(STATUS_LBL[itp.status]||itp.status);
+    return '<tr class="'+(itp.deleted?'deleted':'')+'" onclick="openItp(\''+escH(itp.drawingId)+'\',\''+escH(itp.pinId)+'\')" title="'+(itp.deleted?'Deleted by '+escH(itp.deletedBy)+' on '+escH(itp.deletedDate):'Click to open ITP form')+'">'
+      +'<td class="ref">'+escH(itp.ref||'—')+'</td>'
+      +'<td class="mono">'+escH(itp.formNo)+'</td>'
+      +'<td>'+escH(itp.itpType||'—')+'</td>'
+      +'<td class="mono">'+escH(itp.equip||'—')+'</td>'
+      +'<td>'+escH(itp.docNo||'—')+'</td>'
+      +'<td>'+escH(itp.building||'—')+'</td>'
+      +'<td>'+escH(itp.location||'—')+'</td>'
+      +'<td><span class="badge '+badgeCls+'">'+escH(statusLbl)+'</span></td>'
+      +'<td class="mono" style="font-size:11px;color:var(--muted)">'+escH(itp.drawingNum||'—')+'</td>'
+      +'<td style="color:var(--muted);font-size:12px">'+escH(itp.raisedBy||'—')+'</td>'
+      +'<td style="color:var(--muted);font-size:12px;font-family:\'DM Mono\',monospace">'+fmtDate(itp.raisedDate)+'</td>'
+      +'</tr>';
+  }).join('');
+
+  document.getElementById('emptyState').style.display=filtered.length?'none':'block';
+}
+
+function openItp(drawingId, pinId){
+  if(!drawingId||!pinId)return;
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  var url=b+'hvac-itp-form.html?drawingId='+encodeURIComponent(drawingId)+'&pinId='+encodeURIComponent(pinId);
+  window.open(url,'_blank');
+}
+
+// ── ADD ITP MODAL ──
+function openAddModal(){
+  var sel=document.getElementById('newItpType');
+  sel.innerHTML='<option value="">— Select —</option>'
+    +templates.map(function(t){return '<option value="'+escH(t.itpType)+'">'+escH(t.itpType)+'</option>';}).join('');
+  document.getElementById('addMo').classList.add('open');
+}
+function closeAddModal(){document.getElementById('addMo').classList.remove('open');}
+
+async function saveNewItp(){
+  var itpType=document.getElementById('newItpType').value;
+  if(!itpType){alert('Please select an ITP type');return;}
+  var equip=document.getElementById('newEquip').value.trim();
+  var docNo=document.getElementById('newDocNo').value.trim();
+  var building=document.getElementById('newBuilding').value.trim();
+  var location=document.getElementById('newLocation').value.trim();
+  var subLoc=document.getElementById('newSubLoc').value.trim();
+  var notes=document.getElementById('newNotes').value.trim();
+  var u=dbGetCurrentUser();
+
+  // Generate ref no — find highest ITP-XXXX across all pins
+  var maxSeq=0;
+  allItps.forEach(function(i){
+    var m=(i.ref||'').match(/^ITP-(\d+)$/);
+    if(m){var n=parseInt(m[1]);if(n>maxSeq)maxSeq=n;}
+  });
+  var ref='ITP-'+String(maxSeq+1).padStart(4,'0');
+  var pinId='pin_'+Date.now()+'_reg';
+
+  // Find matching template for formNo
+  var tmpl=templates.find(function(t){return t.itpType===itpType;});
+
+  // Save as a standalone pin on a virtual drawing ID '_register'
+  var drawings=await dbGetDrawings(pNum)||[];
+  var regDrw=drawings.find(function(d){return d.id==='_register';});
+  if(!regDrw){
+    regDrw={id:'_register',num:'ITP Register',name:'Standalone ITPs',cat:'Register',pins:[]};
+    drawings.push(regDrw);
+  }
+  if(!regDrw.pins)regDrw.pins=[];
+  regDrw.pins.push({
+    id:pinId,type:'itp',ref:ref,
+    itpTypeLabel:itpType,equip:equip,
+    notes:notes,itpStatus:'not-started',
+    x:0,y:0
+  });
+  await dbSetDrawings(pNum,drawings);
+
+  // Save initial response
+  var responses=await dbGetItpResponses(pNum)||{};
+  responses[pinId]={
+    status:'not-started',docNo:docNo,
+    locBuilding:building,locLocation:location,locSubLocation:subLoc,
+    rows:{},signoffs:{},
+    raisedBy:u?(u.name||u.username||'Unknown'):'Unknown',
+    raisedDate:todayStr()
+  };
+  await dbSetItpResponses(pNum,responses);
+
+  closeAddModal();
+  await loadAll();
+}
+
+// ── SIDEBAR ──
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main){main.style.marginLeft=c?'52px':'';main.style.left=c?'52px':'230px';}if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
+
+// ── INIT ──
+(async function(){
+  applySB(localStorage.getItem(SBK)==='1');
+  var p=dbGetCurrentProject();
+  if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;var bc=document.getElementById('bc-proj');if(bc)bc.textContent=p.name;}
+  if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}
+  var cu=dbGetCurrentUser();
+  if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}
+  await loadAll();
+})();
+</script>
+</body>
+</html>
