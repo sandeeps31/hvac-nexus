@@ -55,6 +55,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 /* ITP PINS */
 .itp-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:30;transition:transform .1s}
 .itp-pin:hover{transform:translate(-50%,-50%) scale(1.2)}
+.itp-pin.flashing{transform:translate(-50%,-50%) scale(2);z-index:999;transition:transform .3s}
+.itp-pin.flashing .pin-dot{box-shadow:0 0 0 6px rgba(0,200,255,.4),0 4px 16px rgba(0,0,0,.6)!important}
 .pin-dot{width:22px;height:22px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 0 3px rgba(0,0,0,.3);transition:all .13s}
 .pin-dot.ns{background:#3d5a7a;border-color:#5a7a9a}
 .pin-dot.ip{background:#cc8800;border-color:var(--warn)}
@@ -193,6 +195,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
   <div class="tb-sep"></div>
   <button class="tb-btn add-itp" id="addItpBtn" onclick="togglePlaceMode()">📍 Add ITP</button>
   <button class="tb-btn" id="showDeletedBtn" onclick="toggleShowDeleted()" title="Show deleted pins" style="font-size:11px">🗑 Deleted</button>
+  <button class="tb-btn" id="flashPinsBtn" onclick="flashPins()" title="Flash pins for 5 seconds">⚡ Spotlight</button>
   <div class="tb-sep"></div>
   <button class="z-btn" onclick="zoom(1.25)" title="Zoom in">+</button>
   <button class="z-btn" onclick="zoom(0.8)" title="Zoom out">−</button>
@@ -427,8 +430,8 @@ function renderPins(){
     var resp=responses[pin.id]||{};
     var isDeleted=resp.deleted||false;
     if(isDeleted&&!_showDeleted)return;
-    var dotStyle=isDeleted?' style="opacity:0.35;filter:grayscale(1)"':'';
-    el.innerHTML='<div class="pin-dot '+(ST_COLOR[st]||'ns')+'"'+dotStyle+'>'+escH((label||'').slice(0,2).toUpperCase())+'</div>'
+    var dotStyle=isDeleted?' style="background:#111!important;border-color:#555!important;color:#fff!important;opacity:0.85"':'';
+    el.innerHTML='<div class="pin-dot '+(isDeleted?'':ST_COLOR[st]||'ns')+'"'+dotStyle+'>'+escH((label||'').slice(0,2).toUpperCase())+'</div>'
       +'<div class="pin-label">'+(pin.equip?escH(pin.equip):'—')+(pin.itpTypeLabel?' · '+escH(pin.itpTypeLabel):'')+'</div>';
     el.addEventListener('click',function(e){e.stopPropagation();openItpDetail(pin);});
     (function(pid){el.addEventListener('contextmenu',function(e){
@@ -595,6 +598,23 @@ function deletePin(){
 }
 
 // ── TYPE SUGGESTIONS ──
+var _flashTimer=null;
+function flashPins(){
+  var btn=document.getElementById('flashPinsBtn');
+  // Clear any existing flash
+  if(_flashTimer){clearTimeout(_flashTimer);document.querySelectorAll('.itp-pin').forEach(function(el){el.classList.remove('flashing');});_flashTimer=null;btn.textContent='⚡ Spotlight';btn.style.color='';return;}
+  // Flash all visible pins
+  document.querySelectorAll('.itp-pin').forEach(function(el){el.classList.add('flashing');});
+  btn.textContent='⚡ 5s...';btn.style.color='var(--accent)';
+  // Countdown
+  var secs=5;
+  var interval=setInterval(function(){secs--;btn.textContent='⚡ '+secs+'s...';},1000);
+  _flashTimer=setTimeout(function(){
+    clearInterval(interval);
+    document.querySelectorAll('.itp-pin').forEach(function(el){el.classList.remove('flashing');});
+    _flashTimer=null;btn.textContent='⚡ Spotlight';btn.style.color='';
+  },5000);
+}
 function toggleShowDeleted(){
   _showDeleted=!_showDeleted;
   var btn=document.getElementById('showDeletedBtn');
