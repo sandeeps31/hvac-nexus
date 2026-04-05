@@ -847,6 +847,20 @@ function autosave(){
   if(_saving)return;
   allResponses[pinId]=responses;
   saveResponses();
+  // Sync equipId back to pin.equip in drawings so label persists on reload
+  if(responses.equipId){
+    dbGetDrawings(_ifPNum).then(function(drawings){
+      if(!Array.isArray(drawings))return;
+      var drw=drawings.find(function(d){return d.id===drawingId;});
+      if(drw&&drw.pins){
+        var p=drw.pins.find(function(x){return x.id===pinId;});
+        if(p&&p.equip!==responses.equipId){
+          p.equip=responses.equipId;
+          dbSetDrawings(_ifPNum,drawings).catch(function(e){console.error(e);});
+        }
+      }
+    }).catch(function(e){console.error(e);});
+  }
   var ind=document.getElementById('saveInd');
   ind.style.opacity='1';
   setTimeout(function(){ind.style.opacity='0';},1500);
