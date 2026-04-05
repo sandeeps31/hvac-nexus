@@ -346,47 +346,70 @@ function hideAssigneeSugg(){document.getElementById('assigneeSugg').style.displa
 function pickAssignee(name){document.getElementById('defAssignee').value=name;hideAssigneeSugg();}
 
 // ── PHOTOS ──
-function addPhotos(input){
+async function addPhotos(input){
   var files=Array.from(input.files);
-  files.forEach(function(file){
-    var reader=new FileReader();
-    reader.onload=function(e){
-      _photos.push({data:e.target.result,date:todayStr(),name:file.name});
-      renderPhotos();
-    };
-    reader.readAsDataURL(file);
-  });
   input.value='';
+  for(var i=0;i<files.length;i++){
+    var file=files[i];
+    showToast('Uploading photo '+(i+1)+' of '+files.length+'…','var(--accent)');
+    var url=await uploadPhoto(file,'defects');
+    if(url){
+      _photos.push({url:url,date:todayStr(),name:file.name});
+    } else {
+      // Fallback to base64 if upload fails
+      await new Promise(function(resolve){
+        var reader=new FileReader();
+        reader.onload=function(e){_photos.push({url:e.target.result,date:todayStr(),name:file.name});resolve();};
+        reader.readAsDataURL(file);
+      });
+    }
+    renderPhotos();
+  }
 }
 function renderPhotos(){
   var grid=document.getElementById('photoGrid');
   var thumbs=_photos.map(function(p,i){
-    return '<div class="photo-thumb"><img src="'+p.data+'"><button class="photo-del" onclick="removePhoto('+i+')">×</button><div class="photo-date">'+fmtDate(p.date)+'</div></div>';
+    return '<div class="photo-thumb"><img src="'+escH(p.url||p.data||'')+'"><button class="photo-del" onclick="removePhoto('+i+')">×</button><div class="photo-date">'+fmtDate(p.date)+'</div></div>';
   }).join('');
   grid.innerHTML=thumbs+'<label class="photo-add" title="Add photo"><span style="font-size:24px">+</span><span>Add Photo</span><input type="file" accept="image/*" multiple style="display:none" onchange="addPhotos(this)"></label>';
 }
-function removePhoto(i){_photos.splice(i,1);renderPhotos();}
+function removePhoto(i){
+  var p=_photos[i];
+  if(p&&p.url&&p.url.includes('hvacnex-photos'))deletePhoto(p.url);
+  _photos.splice(i,1);renderPhotos();
+}
 
-function addClosePhotos(input){
+async function addClosePhotos(input){
   var files=Array.from(input.files);
-  files.forEach(function(file){
-    var reader=new FileReader();
-    reader.onload=function(e){
-      _closePhotos.push({data:e.target.result,date:todayStr(),name:file.name});
-      renderClosePhotos();
-    };
-    reader.readAsDataURL(file);
-  });
   input.value='';
+  for(var i=0;i<files.length;i++){
+    var file=files[i];
+    showToast('Uploading close-out photo…','var(--accent)');
+    var url=await uploadPhoto(file,'defects/closeout');
+    if(url){
+      _closePhotos.push({url:url,date:todayStr(),name:file.name});
+    } else {
+      await new Promise(function(resolve){
+        var reader=new FileReader();
+        reader.onload=function(e){_closePhotos.push({url:e.target.result,date:todayStr(),name:file.name});resolve();};
+        reader.readAsDataURL(file);
+      });
+    }
+    renderClosePhotos();
+  }
 }
 function renderClosePhotos(){
   var grid=document.getElementById('closePhotoGrid');
   var thumbs=_closePhotos.map(function(p,i){
-    return '<div class="photo-thumb"><img src="'+p.data+'"><button class="photo-del" onclick="removeClosePhoto('+i+')">×</button><div class="photo-date">'+fmtDate(p.date)+'</div></div>';
+    return '<div class="photo-thumb"><img src="'+escH(p.url||p.data||'')+'"><button class="photo-del" onclick="removeClosePhoto('+i+')">×</button><div class="photo-date">'+fmtDate(p.date)+'</div></div>';
   }).join('');
   grid.innerHTML=thumbs+'<label class="photo-add" title="Add close-out photo"><span style="font-size:24px">+</span><span>Add Photo</span><input type="file" accept="image/*" multiple style="display:none" onchange="addClosePhotos(this)"></label>';
 }
-function removeClosePhoto(i){_closePhotos.splice(i,1);renderClosePhotos();}
+function removeClosePhoto(i){
+  var p=_closePhotos[i];
+  if(p&&p.url&&p.url.includes('hvacnex-photos'))deletePhoto(p.url);
+  _closePhotos.splice(i,1);renderClosePhotos();
+}
 
 // ── DRAWING PIN ──
 function openDrawingPicker(){
@@ -406,7 +429,7 @@ function selectDrawing(drawingId){
   // Save first, then navigate to drawings module to pin
   saveDefect().then(function(){
     var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
-    window.location.href=b+'hvac-drawings.html?pinDefect='+encodeURIComponent(defectId||'')+'&drawingId='+encodeURIComponent(drawingId);
+    window.location.href=b+'hvac-drawing-viewer.html?id='+encodeURIComponent(drawingId)+'&pinDefect='+encodeURIComponent(defectId||'');
   });
 }
 function removePin(){
@@ -501,8 +524,8 @@ function exportPdf(){
   w.document.write('<h2>'+title+' — '+document.getElementById('defDesc').value+'</h2>');
   w.document.write('<div class="row"><div><div class="lbl">Status</div><div class="val">'+document.getElementById('statusSel').value+'</div></div><div><div class="lbl">Priority</div><div class="val">'+document.getElementById('defPriority').value+'</div></div><div><div class="lbl">Assignee</div><div class="val">'+document.getElementById('defAssignee').value+'</div></div><div><div class="lbl">Issue Date</div><div class="val">'+document.getElementById('defIssueDate').value+'</div></div><div><div class="lbl">Due Date</div><div class="val">'+document.getElementById('defDueDate').value+'</div></div></div>');
   w.document.write('<div class="row"><div><div class="lbl">Building</div><div class="val">'+document.getElementById('defBuilding').value+'</div></div><div><div class="lbl">Location</div><div class="val">'+document.getElementById('defLocation').value+'</div></div><div><div class="lbl">Sub Location</div><div class="val">'+document.getElementById('defSubLoc').value+'</div></div></div>');
-  if(_photos.length){w.document.write('<div class="lbl" style="margin-bottom:8px">Photos</div>');_photos.forEach(function(p){w.document.write('<img src="'+p.data+'"><span style="font-size:10px;margin-right:12px">'+p.date+'</span>');});}
-  if(_closePhotos.length){w.document.write('<div class="lbl" style="margin:12px 0 8px">Close-out Photos</div>');_closePhotos.forEach(function(p){w.document.write('<img src="'+p.data+'"><span style="font-size:10px;margin-right:12px">'+p.date+'</span>');});}
+  if(_photos.length){w.document.write('<div class="lbl" style="margin-bottom:8px">Photos</div>');_photos.forEach(function(p){w.document.write('<img src="'+(p.url||p.data||'')+'"><span style="font-size:10px;margin-right:12px">'+p.date+'</span>');});}
+  if(_closePhotos.length){w.document.write('<div class="lbl" style="margin:12px 0 8px">Close-out Photos</div>');_closePhotos.forEach(function(p){w.document.write('<img src="'+(p.url||p.data||'')+'"><span style="font-size:10px;margin-right:12px">'+p.date+'</span>');});}
   if(document.getElementById('closeComment').value){w.document.write('<div class="lbl" style="margin-top:12px">Close-out Comment</div><div class="val">'+document.getElementById('closeComment').value+'</div>');}
   w.document.write('</body></html>');
   w.document.close();

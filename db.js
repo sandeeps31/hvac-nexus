@@ -110,21 +110,8 @@ async function dbSetProjects(data) {
 }
 
 // ── Current project (still localStorage — it's a session value) ──
-// Pages that should NOT redirect even without a project set:
-var _NO_REDIRECT_PAGES = ['index.html', 'project.html', 'hvac-settings.html'];
 function dbGetCurrentProject() {
-  try {
-    var data = JSON.parse(localStorage.getItem('hvacnexus_current_project') || '{}');
-    // If no project is set and we're not on an exempt page, redirect to index
-    if (!data || (!data.num && !data.number)) {
-      var page = window.location.pathname.split('/').pop() || 'index.html';
-      if (_NO_REDIRECT_PAGES.indexOf(page) === -1) {
-        console.warn('No current project set — redirecting to index.html');
-        window.location.href = 'index.html';
-      }
-    }
-    return data || {};
-  } catch(e) { return {}; }
+  try { return JSON.parse(localStorage.getItem('hvacnexus_current_project') || '{}'); } catch(e) { return {}; }
 }
 function dbSetCurrentProject(data) {
   localStorage.setItem('hvacnexus_current_project', JSON.stringify(data));
@@ -290,6 +277,47 @@ async function dbSetPrecxTemplate(data) {
   return await dbSet('precx_template', data);
 }
 
+
+// ═══════════════════════════════════════════════════
+// PHOTO STORAGE HELPERS
+// Upload photos to hvacnex-photos bucket
+// Returns URL string, or null on failure
+// ═══════════════════════════════════════════════════
+const PHOTO_BUCKET = 'hvacnex-photos';
+
+async function uploadPhoto(file, folder) {
+  try {
+    folder = folder || 'general';
+    var ext = file.name.split('.').pop() || 'jpg';
+    var path = folder + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + '.' + ext;
+    var res = await fetch(SUPABASE_URL + '/storage/v1/object/' + PHOTO_BUCKET + '/' + path, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'Content-Type': file.type || 'image/jpeg'
+      },
+      body: file
+    });
+    if (!res.ok) { console.warn('Photo upload failed:', await res.text()); return null; }
+    return SUPABASE_URL + '/storage/v1/object/public/' + PHOTO_BUCKET + '/' + path;
+  } catch(e) {
+    console.warn('uploadPhoto error:', e.message);
+    return null;
+  }
+}
+
+async function deletePhoto(url) {
+  try {
+    if (!url || !url.includes(PHOTO_BUCKET)) return;
+    var path = url.split('/object/public/' + PHOTO_BUCKET + '/')[1];
+    if (!path) return;
+    await fetch(SUPABASE_URL + '/storage/v1/object/' + PHOTO_BUCKET + '/' + path, {
+      method: 'DELETE',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+    });
+  } catch(e) { console.warn('deletePhoto error:', e.message); }
+}
 // ═══════════════════════════════════════════════════
 // MIGRATION HELPER
 // Run once to copy all localStorage data to Supabase

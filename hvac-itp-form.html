@@ -625,18 +625,21 @@ function renderPhotoBtn(key){
   var existing=responses.rows[key];var count=Array.isArray(existing)?existing.length:0;
   var label=document.createElement('label');label.className='photo-btn';
   var inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.multiple=true;
-  inp.onchange=(function(k){return function(){
+  inp.onchange=(function(k,lbl){return async function(){
     var files=this.files;if(!files.length)return;
-    var names=[];for(var i=0;i<files.length;i++)names.push(files[i].name);
     var existing2=Array.isArray(responses.rows[k])?responses.rows[k]:[];
-    responses.rows[k]=existing2.concat(names);
+    for(var i=0;i<files.length;i++){
+      var file=files[i];
+      var url=await uploadPhoto(file,'itps/'+(_ifPNum||'proj'));
+      existing2.push(url||file.name);
+    }
+    responses.rows[k]=existing2;
     autosave();
-    // Re-render the button count
-    var ct=label.querySelector('.photo-count');
+    var ct=lbl.querySelector('.photo-count');
     if(ct)ct.textContent=responses.rows[k].length+' photo'+(responses.rows[k].length!==1?'s':'');
-    else{var nc=document.createElement('span');nc.className='photo-count';nc.textContent=responses.rows[k].length+' photo'+(responses.rows[k].length!==1?'s':'');label.appendChild(nc);}
+    else{var nc=document.createElement('span');nc.className='photo-count';nc.textContent=responses.rows[k].length+' photo'+(responses.rows[k].length!==1?'s':'');lbl.appendChild(nc);}
     updateProgress();
-  };})(key);
+  };})(key,label);
   label.innerHTML='📷 <span>Photo</span>';
   label.appendChild(inp);
   if(count>0){var ct=document.createElement('span');ct.className='photo-count';ct.textContent=count+' photo'+(count!==1?'s':'');label.appendChild(ct);}
