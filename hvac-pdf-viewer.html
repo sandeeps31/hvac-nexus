@@ -191,6 +191,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
   </div>
   <div class="tb-sep"></div>
   <button class="tb-btn add-itp" id="addItpBtn" onclick="togglePlaceMode()">📍 Add ITP</button>
+  <button class="tb-btn" id="showDeletedBtn" onclick="toggleShowDeleted()" title="Show deleted pins" style="font-size:11px">🗑 Deleted</button>
   <div class="tb-sep"></div>
   <button class="z-btn" onclick="zoom(1.25)" title="Zoom in">+</button>
   <button class="z-btn" onclick="zoom(0.8)" title="Zoom out">−</button>
@@ -247,10 +248,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
         </div>
       </div>
       <div>
-        <label class="ml">Ref No.</label>
-        <input class="mi" id="pinRef" placeholder="Auto-generated if left blank">
-      </div>
-      <div>
         <label class="ml">Status</label>
         <div class="st-row">
           <div class="st-opt sel-ns" id="st-not-started" onclick="setStatus('not-started')">Not Started</div>
@@ -259,10 +256,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
           <div class="st-opt" id="st-closed" onclick="setStatus('closed')">Closed</div>
         </div>
       </div>
-      <div>
-        <label class="ml">Notes</label>
-        <textarea class="mi" id="pinNotes" rows="2" placeholder="Optional…" style="resize:vertical"></textarea>
-      </div>
+      <textarea id="pinNotes" style="display:none"></textarea>
+      <input type="hidden" id="pinRef">
     </div>
     <div class="modal-footer">
       <button class="mbg mbtn" onclick="closePinMo()">Cancel</button>
@@ -293,6 +288,7 @@ var _dragging=false,_lastX=0,_lastY=0;
 var _canvasW=0,_canvasH=0;
 var _renderTask=null;
 var _placing=false;
+var _showDeleted=false;
 var _pendingX=0,_pendingY=0; // canvas % position for new pin
 var _editPinId=null;
 var _pinStatus='not-started';
@@ -426,8 +422,12 @@ function renderPins(){
     el.style.top=(sr.top-vr.top+pin.y/100*sr.height)+'px';
     el.style.pointerEvents='all';
     var label=pin.equip||pin.ref||pin.itpTypeLabel||'ITP';
-    el.innerHTML='<div class="pin-dot '+(ST_COLOR[st]||'ns')+'">'+escH((label||'').slice(0,2).toUpperCase())+'</div>'
-      +'<div class="pin-label">'+escH(label)+(pin.itpTypeLabel?' · '+escH(pin.itpTypeLabel):'')+'</div>';
+    var resp=responses[pin.id]||{};
+    var isDeleted=resp.deleted||false;
+    if(isDeleted&&!_showDeleted)return;
+    var dotStyle=isDeleted?' style="opacity:0.35;filter:grayscale(1)"':'';
+    el.innerHTML='<div class="pin-dot '+(ST_COLOR[st]||'ns')+'"'+dotStyle+'>'+escH((label||'').slice(0,2).toUpperCase())+'</div>'
+      +'<div class="pin-label">'+(pin.equip?escH(pin.equip):'—')+(pin.itpTypeLabel?' · '+escH(pin.itpTypeLabel):'')+'</div>';
     el.addEventListener('click',function(e){e.stopPropagation();openItpDetail(pin);});
     (function(pid){el.addEventListener('contextmenu',function(e){
       e.preventDefault();e.stopPropagation();
@@ -565,8 +565,9 @@ function savePin(){
   } else {
     var pinId=nid();
     if(!curDrawing.pins)curDrawing.pins=[];
-    curDrawing.pins.push({id:pinId,type:'itp',itpTypeLabel:type,equip:equip,ref:ref,notes:notes,itpStatus:_pinStatus,x:_pendingX,y:_pendingY});
-    responses[pinId]={status:_pinStatus,rows:{},signoffs:{}};
+    var u=dbGetCurrentUser();
+    curDrawing.pins.push({id:pinId,type:'itp',itpTypeLabel:type,equip:equip,ref:ref,notes:'',itpStatus:_pinStatus,x:_pendingX,y:_pendingY});
+    responses[pinId]={status:_pinStatus,rows:{},signoffs:{},equipId:equip,raisedBy:u?(u.name||u.username||'Unknown'):'Unknown',raisedDate:new Date().toISOString().split('T')[0]};
     saveResponses();
     // Update layer chips
     buildLayerChips();
@@ -579,15 +580,26 @@ function savePin(){
 
 function deletePin(){
   if(!_editPinId)return;
-  if(!confirm('Delete this ITP pin?'))return;
-  curDrawing.pins=(curDrawing.pins||[]).filter(function(p){return p.id!==_editPinId;});
-  delete responses[_editPinId];
-  saveDrawings();saveResponses();
+  if(!confirm('Delete this ITP pin? It will be hidden but recoverable from the ITP Register.'))return;
+  // Soft delete - mark in responses, keep pin data
+  if(!responses[_editPinId])responses[_editPinId]={rows:{},signoffs:{}};
+  responses[_editPinId].deleted=true;
+  responses[_editPinId].deletedDate=new Date().toISOString().split('T')[0];
+  var u=dbGetCurrentUser();
+  responses[_editPinId].deletedBy=u?(u.name||u.username||'Unknown'):'Unknown';
+  saveResponses();
   closePinMo();renderPins();buildLayerChips();
-  toast('Pin deleted');
+  toast('ITP hidden — recoverable from ITP Register');
 }
 
 // ── TYPE SUGGESTIONS ──
+function toggleShowDeleted(){
+  _showDeleted=!_showDeleted;
+  var btn=document.getElementById('showDeletedBtn');
+  btn.style.color=_showDeleted?'var(--danger)':'';
+  btn.style.borderColor=_showDeleted?'var(--danger)':'';
+  renderPins();
+}
 function populateTypeSelect(selectedVal){
   var sel=document.getElementById('pinItpType');
   var types=getTemplateTypes();
@@ -696,7 +708,7 @@ function renderPdf(pdf){
         canvas.width=vpHi.width;canvas.height=vpHi.height;
         canvas.getContext('2d').drawImage(hi,0,0);
         _canvasW=vpHi.width;_canvasH=vpHi.height;
-        applyTransform();renderPins();
+        fitToScreen();renderPins();
       }).catch(function(){});
     });
   });

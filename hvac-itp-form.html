@@ -148,6 +148,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
 /* ── SIDEBAR STANDARD ── */
 .main{margin-left:0;transition:margin-left .25s}
+.row-actions{display:flex;align-items:center;flex-shrink:0}
+.row-stamp{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:160px;text-align:right;padding-right:10px}
+.defect-btn{font-size:11px;font-family:'DM Mono',monospace;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,77,109,.4);background:rgba(255,77,109,.08);color:var(--danger);cursor:pointer;white-space:nowrap;transition:all .15s}
+.defect-btn:hover{background:rgba(255,77,109,.18);border-color:var(--danger)}
+.defect-mo{position:fixed;inset:0;background:rgba(4,8,16,.82);z-index:2000;display:none;align-items:center;justify-content:center}
+.defect-mo.open{display:flex}
+.defect-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:440px;max-width:96vw;display:flex;flex-direction:column}
+.defect-card-hdr{padding:14px 18px 10px;border-bottom:1px solid var(--border);font-family:'Syne',sans-serif;font-size:14px;font-weight:800}
+.defect-card-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.defect-card-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;600&display=swap" rel="stylesheet">
 <script src="db.js"></script>
@@ -352,36 +362,54 @@ function goBack(){
 
 // ── HEADER ──
 function renderHeader(){
-  var cs=loadSettings();
   var equipData=getEquipData(pin.equip);
   var meta=document.getElementById('formMeta');
   meta.innerHTML='';
+
   function addField(lbl,val,cls){
     var d=document.createElement('div');d.className='fmf';
     var l=document.createElement('div');l.className='fmf-lbl';l.textContent=lbl;
     var v=document.createElement('div');v.className='fmf-val'+(cls?' '+cls:'');v.textContent=val||'—';
     d.appendChild(l);d.appendChild(v);meta.appendChild(d);
   }
-  addField('ITP No.',pin.ref||'—','mono');
-  addField('ITP Type',pin.itpTypeLabel||pin.itpType||'—');
-  addField('Equipment ID',pin.equip||'—','mono');
-  // Version removed from detail view
-  if(equipData){
-    addField('Make/Model',(equipData.manufacturer||equipData.make||'')+(equipData.model?' · '+equipData.model:''));
-    addField('Location',equipData.location||'—');
+  function addEditable(lbl,key,placeholder,cls){
+    var d=document.createElement('div');d.className='fmf';
+    var l=document.createElement('div');l.className='fmf-lbl';l.textContent=lbl;
+    var i=document.createElement('input');i.className='doc-input'+(cls?' '+cls:'');
+    i.value=responses[key]||'';i.placeholder=placeholder||'';
+    i.disabled=!_editMode;
+    i.onchange=function(){responses[key]=this.value;autosave();};
+    i.dataset.responseKey=key;
+    d.appendChild(l);d.appendChild(i);meta.appendChild(d);
+    return i;
   }
-  // Doc No — editable
-  var docF=document.createElement('div');docF.className='fmf';
-  var docL=document.createElement('div');docL.className='fmf-lbl';docL.textContent='Client Doc No.';
-  var docI=document.createElement('input');docI.className='doc-input';docI.value=responses.docNo||'';docI.placeholder='Client / Builder doc no.';
-  docI.onchange=function(){responses.docNo=this.value;autosave();};
-  docF.appendChild(docL);docF.appendChild(docI);meta.appendChild(docF);
+
+  // 1. Client Doc No (editable)
+  addEditable('Client Doc No.','docNo','Client / Builder doc no.');
+  // 2. Form No - company template fixed ref
+  addField('Form No.', itpTemplate?itpTemplate.itpNo:(pin.formNo||'—'), 'mono');
+  // 3. Ref No - auto generated per pin
+  addField('Ref No.', pin.ref||'—', 'mono');
+  // 4. ITP Type
+  addField('ITP Type', itpTemplate?itpTemplate.itpType:(pin.itpTypeLabel||'—'));
+  // 5. Equipment ID - editable
+  var equipInp=addEditable('Equipment ID','equipId',pin.equip||'e.g. FCU-L02-001','mono');
+  if(!responses.equipId&&pin.equip){responses.equipId=pin.equip;equipInp.value=pin.equip;}
+  // 6. Location fields - pre-fill from equip schedule
+  var eqBuilding=(equipData&&(equipData.building||equipData.floor||''))||'';
+  var eqLocation=(equipData&&(equipData.location||equipData.room||''))||'';
+  var bldInp=addEditable('Building','locBuilding','e.g. Tower B');
+  if(!responses.locBuilding&&eqBuilding){responses.locBuilding=eqBuilding;bldInp.value=eqBuilding;}
+  var locInp=addEditable('Location','locLocation','e.g. Level 02 Plant Room');
+  if(!responses.locLocation&&eqLocation){responses.locLocation=eqLocation;locInp.value=eqLocation;}
+  addEditable('Sub Location','locSubLocation','e.g. Zone A');
 }
 
 // ── EQUIPMENT DATA ──
 function getEquipData(equipId){
+  if(!equipId)equipId=responses.equipId||pin.equip||'';
   if(!equipId)return null;
-  var eq=loadEquipSchedule();if(!eq||!eq.tabs)return null;
+  var eq=_cachedEquipData;if(!eq||!eq.tabs)return null;
   for(var i=0;i<eq.tabs.length;i++){
     var tab=eq.tabs[i];
     for(var j=0;j<(tab.rows||[]).length;j++){
@@ -495,10 +523,20 @@ function renderYesNo(key,options,stored){
     var selClass=opt==='YES'||opt==='PASS'?'sel-yes':opt==='NO'||opt==='FAIL'?'sel-no':'sel-na';
     if(stored===opt)btn.classList.add(opt==='PASS'?'sel-pass':opt==='FAIL'?'sel-fail':selClass);
     (function(b,o,k,sc){b.onclick=function(){
-      // Clear siblings
+      var isSelected=b.classList.contains(o==='PASS'?'sel-pass':o==='FAIL'?'sel-fail':sc);
       group.querySelectorAll('.yn-btn').forEach(function(x){x.className='yn-btn';});
-      b.classList.add(o==='PASS'?'sel-pass':o==='FAIL'?'sel-fail':sc);
-      responses.rows[k]=o;autosave();updateProgress();
+      if(!isSelected){
+        b.classList.add(o==='PASS'?'sel-pass':o==='FAIL'?'sel-fail':sc);
+        responses.rows[k]=o;
+        var u=dbGetCurrentUser();
+        responses.rows[k+'_stamp']={user:u?(u.name||u.username||'Unknown'):'Unknown',date:todayStr()};
+      } else {
+        delete responses.rows[k];
+        delete responses.rows[k+'_stamp'];
+      }
+      autosave();updateProgress();
+      var stampEl=document.getElementById('stamp_'+k.replace(/[^a-zA-Z0-9]/g,'_'));
+      if(stampEl){var st=responses.rows[k+'_stamp'];stampEl.textContent=st?(st.user+' · '+st.date):'';}
     };})(btn,opt,key,selClass);
     group.appendChild(btn);
   });
@@ -812,9 +850,11 @@ function openRepinDrawing(){
 function confirmDeleteItp(){
   if(!confirm('Delete this ITP? It will be hidden but can be restored from the ITP Register.'))return;
   responses.deleted=true;
-  responses.deletedBy=(dbGetCurrentUser()||{}).name||'Unknown';
+  var u=dbGetCurrentUser();
+  responses.deletedBy=u?(u.name||u.username||'Unknown'):'Unknown';
   responses.deletedDate=todayStr();
   autosave();
+  // Close and reload pins in parent
   if(window.self!==window.top&&window.parent.closeItpDetail){
     window.parent.closeItpDetail();
   } else { goBack(); }
