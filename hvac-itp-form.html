@@ -322,6 +322,7 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   renderHeader();
   renderSections();
   updateProgress();
+  applyLockState(); // start locked
 
   // Auto-scroll to section if ?section= param present
   var sectionParam=params.get('section');
@@ -844,15 +845,7 @@ function toggleEditMode(){
   statusSel.disabled=!_editMode;
   repinBtn.style.display=_editMode?'':'none';
   deleteBtn.style.display=_editMode?'':'none';
-  document.querySelectorAll('.text-inp,.plant-inp,.doc-input').forEach(function(el){el.disabled=!_editMode;});
-  document.querySelectorAll('.yn-btn').forEach(function(el){
-    el.style.pointerEvents=_editMode?'auto':'none';
-    el.style.opacity=_editMode?'1':'0.5';
-  });
-  // Defect btn always clickable
-  document.querySelectorAll('.defect-btn').forEach(function(el){
-    el.style.pointerEvents='auto';el.style.opacity='1';
-  });
+  applyLockState();
 }
 function openRepinDrawing(){
   if(!drawingId||!pinId)return;
@@ -872,14 +865,12 @@ function confirmDeleteItp(){
     window.parent.closeItpDetail();
   } else { goBack(); }
 }
-// Lock all inputs on load
-(function(){
-  setTimeout(function(){
-    document.querySelectorAll('.text-inp,.plant-inp').forEach(function(el){el.disabled=true;});
-    document.querySelectorAll('.yn-btn').forEach(function(el){el.style.pointerEvents='none';el.style.opacity='0.5';});
-    document.querySelectorAll('.defect-btn').forEach(function(el){el.style.pointerEvents='auto';el.style.opacity='1';});
-  },500);
-})();
+// Lock state function — called after render
+function applyLockState(){
+  document.querySelectorAll('.text-inp,.plant-inp,.doc-input').forEach(function(el){el.disabled=!_editMode;});
+  document.querySelectorAll('.yn-btn').forEach(function(el){el.style.pointerEvents=_editMode?'auto':'none';el.style.opacity=_editMode?'1':'0.5';});
+  document.querySelectorAll('.defect-btn').forEach(function(el){el.style.pointerEvents='auto';el.style.opacity='1';});
+}
 </script>
 
 <!-- DEFECT MODAL -->
