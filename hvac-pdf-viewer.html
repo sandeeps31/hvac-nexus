@@ -53,12 +53,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 #pdfCanvas{display:block}
 
 /* ITP PINS */
-.itp-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:30;transition:transform .1s}
+.itp-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:30;transition:transform .1s;pointer-events:all}
 .itp-pin:hover{transform:translate(-50%,-50%) scale(1.2)}
 
 .itp-pin.flashing{transform:translate(-50%,-50%) scale(1.6);z-index:999;transition:transform .3s}
 .itp-pin.flashing .pin-dot{box-shadow:0 0 0 6px rgba(0,200,255,.4),0 4px 16px rgba(0,0,0,.6)!important}
-.pin-dot{height:24px;min-width:24px;padding:0 7px;border-radius:12px;border:2px solid rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 0 2px rgba(0,0,0,.3);transition:all .13s;white-space:nowrap;letter-spacing:0.5px}
+.pin-dot{height:32px;min-width:32px;padding:0 10px;border-radius:16px;border:2px solid rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 10px rgba(0,0,0,.6),0 0 0 2px rgba(0,0,0,.3);transition:all .13s;white-space:nowrap;letter-spacing:0.5px}
 .pin-dot.ns{background:#3d5a7a;border-color:#5a7a9a}
 .pin-dot.ip{background:#cc8800;border-color:var(--warn)}
 .pin-dot.act{background:#cc2244;border-color:var(--danger)}
@@ -221,8 +221,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 
 <!-- VIEWER -->
 <div class="viewer grab" id="viewer">
-  <div id="pdfStage"><canvas id="pdfCanvas"></canvas></div>
-  <div id="pinLayer" style="position:absolute;inset:0;pointer-events:none;z-index:30"></div>
+  <div id="pdfStage"><canvas id="pdfCanvas"></canvas><div id="pinLayer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:30"></div></div>
   <div class="loading" id="loading"><div class="spin"></div><span>Loading drawing…</span></div>
   <div class="error-state" id="errorState"><div style="font-size:36px">⚠️</div><div id="errorMsg">Could not load PDF</div></div>
   <div class="no-pdf" id="noPdf"><div style="font-size:48px">📄</div><div>No PDF attached to this drawing</div><div style="font-size:11px">Upload a PDF in the Drawings module first</div></div>
@@ -418,16 +417,13 @@ function renderPins(){
   var layer=document.getElementById('pinLayer');
   layer.innerHTML='';
   layer.style.pointerEvents='none';
-  var stage=document.getElementById('pdfStage');
-  var sr=stage.getBoundingClientRect();
-  var vr=document.getElementById('viewer').getBoundingClientRect();
   (curDrawing.pins||[]).filter(function(p){return p.type==='itp';}).forEach(function(pin){
     if(!pinVisible(pin))return;
     var st=getPinStatus(pin);
     var el=document.createElement('div');
     el.className='itp-pin';
-    el.style.left=(sr.left-vr.left+pin.x/100*sr.width)+'px';
-    el.style.top=(sr.top-vr.top+pin.y/100*sr.height)+'px';
+    el.style.left=pin.x+'%';
+    el.style.top=pin.y+'%';
     el.style.pointerEvents='all';
     var label=pin.equip||pin.ref||pin.itpTypeLabel||'ITP';
     var resp=responses[pin.id]||{};
