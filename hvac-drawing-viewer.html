@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 09:46 -->
+<!-- build: 2026-04-06 10:06 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -467,18 +467,9 @@ function renderPins(){
 
 // ── PLACE MODE ──
 function togglePlaceMode(){
-  _placing=!_placing;
-  var btn=document.getElementById('addItpBtn');
-  var hint=document.getElementById('placeHint');
-  var viewer=document.getElementById('viewer');
-  btn.classList.toggle('placing',_placing);
-  btn.textContent=_placing?'✕ Cancel':'📍 Add ITP';
-  hint.style.display=_placing?'block':'none';
-  viewer.classList.toggle('grabbing',_placing);
-  viewer.style.cursor=_placing?'crosshair':'grab';
+  setPinType(_pinType?'':'itp');
 }
-// ── MOVE PIN MODE ──
-var _movingPinId = null;
+
 function startMovePin(pinId){
   _movingPinId=pinId;
   _placing=false; // cancel any add mode
@@ -998,32 +989,33 @@ function togglePinsPanel(){
 function renderPinPanel(){
   var list=document.getElementById('pinPanelList');
   if(!list||!curDrawing)return;
-  var typeFilter=(document.getElementById('pinPanelFilter')||{}).value||'';
+  var tf=(document.getElementById('pinPanelFilter')||{}).value||'';
   var pins=(curDrawing.pins||[]).filter(function(p){
     var resp=responses[p.id]||{};
     if(resp.deleted)return false;
-    if(typeFilter&&p.type!==typeFilter)return false;
+    if(tf&&p.type!==tf)return false;
     return true;
   });
   if(!pins.length){
     list.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">No pins on this drawing</div>';
     return;
   }
-  var STATUS_LBL={'not-started':'Not Started','in-progress':'In Progress','action':'Action Req.','closed':'Closed'};
-  var html='';
+  var SL={'not-started':'Not Started','in-progress':'In Progress','action':'Action Req.','closed':'Closed'};
+  var h='';
   pins.forEach(function(p){
     var resp=responses[p.id]||{};
-    var status=resp.status||'not-started';
-    var label=p.ref||(p.itpTypeLabel?p.itpTypeLabel.slice(0,20):'Pin');
-    var desc=p.equip||(p.itpTypeLabel||p.type||'');
-    var t=p.type||'itp';
-    html+='<div class="pin-card '+t+'" onclick="flashPin(''+escH(p.id)+'')">';
-    html+='<div class="pin-card-ref">'+escH(label)+'</div>';
-    html+='<div class="pin-card-desc">'+escH(desc)+'</div>';
-    html+='<div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:DM Mono,monospace">'+escH(STATUS_LBL[status]||status)+'</div>';
-    html+='</div>';
+    var st=resp.status||'not-started';
+    var lbl=p.ref||(p.itpTypeLabel?p.itpTypeLabel.slice(0,20):'Pin');
+    var dsc=p.equip||(p.itpTypeLabel||p.type||'');
+    var tp=p.type||'itp';
+    var onclick='flashPin("'+escH(p.id)+'")';
+    h+='<div class="pin-card '+tp+'" onclick="'+onclick+'">';
+    h+='<div class="pin-card-ref">'+escH(lbl)+'</div>';
+    h+='<div class="pin-card-desc">'+escH(dsc)+'</div>';
+    h+='<div style="font-size:10px;color:var(--muted);margin-top:4px">'+escH(SL[st]||st)+'</div>';
+    h+='</div>';
   });
-  list.innerHTML=html;
+  list.innerHTML=h;
 }
 
 function flashPin(pinId){
