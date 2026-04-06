@@ -212,7 +212,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
 </div>
 
 <!-- ADD DRAWING MODAL -->
-<div class="mo" id="addModal" onclick="if(event.target===this)closeAddModal()">
+<div class="mo" id="addModal">
   <div class="modal" style="width:560px;max-height:90vh;display:flex;flex-direction:column">
     <!-- Header with tabs -->
     <div style="padding:18px 22px 0;border-bottom:1px solid var(--border);flex-shrink:0">
@@ -512,9 +512,9 @@ var drawings=[];
 var _uid=100;
 function nid(){return ++_uid;}
 
-function save(){
+async function save(){
   var toStore=drawings.map(function(d){var c=Object.assign({},d);delete c.pdfData;return c;});
-  dbSetDrawings(_pNum,toStore).catch(function(e){console.error('Save error:',e);});
+  try{await dbSetDrawings(_pNum,toStore);}catch(e){console.error('Save error:',e);}
 }
 
 async function load(){
@@ -576,7 +576,7 @@ function handleModalPdf(inp){
   _pendingPdfData=null;_pendingPdfFile=file;
   if(lbl)lbl.textContent=file.name+' ✓ ready';
 }
-function saveDrawing(){
+async function saveDrawing(){
   var num=document.getElementById('f-num').value.trim();
   var name=document.getElementById('f-name').value.trim();
   if(!num||!name){alert('Drawing Number and Name are required.');return;}
@@ -595,7 +595,7 @@ function saveDrawing(){
     history:[{rev:rev,status:status,approval:approval,subDate:subDate,apprDate:'',recorded:today}],
     pins:[],pdfData:null,pdfUrl:null};
   drawings.push(drwObj);
-  save();closeAddModal();renderList();
+  await save();closeAddModal();renderList();
   if(_pendingPdfFile){
     var btn=document.getElementById('addModalSaveBtn');
     uploadPdfToSupabase(_pendingPdfFile,newId).then(function(url){
