@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 04:30 -->
+<!-- build: 2026-04-06 04:53 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -191,7 +191,9 @@ body.sb-sm{padding-left:var(--sb-sm)}
   </div>
   <div style="display:flex;gap:8px">
     <button class="bg bsm btn" id="backBtn" style="display:none" onclick="goList()">← Back</button>
+    <button class="bg bsm btn" onclick="openSetupRegisterModal()" style="color:var(--text2)">📋 Setup Register</button>
     <button class="bg bsm btn" id="bulkEditBtn" onclick="openBulkEditModal()" style="color:var(--text2)">✏ Bulk Edit</button>
+    <button class="bg bsm btn" onclick="openRegisterModal()" style="color:var(--text2)">📋 Register</button>
     <button class="bp bsm btn" id="addBtn" onclick="openAddModal()">＋ Add Drawing</button>
   </div>
 </div>
@@ -532,7 +534,7 @@ var CAT_ICONS={Mechanical:'💨',Electrical:'⚡',Architectural:'🏗️',Hydrau
 var STATUS_LIST=['IFR','IFA','IFC','AB','Obsolete'];
 var ST_CLS={IFR:'st-p',IFA:'st-ifa',IFC:'st-ifc',AB:'st-ab',Preliminary:'st-p',Obsolete:'st-obs'};
 var APPR_CLS={Approved:'st-ab','Approved with Comments':'st-ifa',Pending:'st-p',Rejected:'st-rej',Obsolete:'st-obs'};
-var SUBCATS={Mechanical:['General','Schematics','Schedules','Mechanical Services Layout','Piping Layout','Sections','Builders Works','Board Drawings','Seismics'],Architectural:['Partitions','Reflected Ceiling Plan','Fire Compartment Plan','General Arrangement','Doors','Wall Finishes','Ceiling Finishes','Room Layout'],Electrical:['General'],Hydraulic:['General'],'Base Build Mechanical':['General'],MSSB:['General'],DCP:['General'],RCP:['General']};
+var SUBCATS={Mechanical:['General','Schematics','Schedules','Mechanical Services Layout','Piping Layout','Sections','Risers','Mechanical Board Drawings','Seismics'],Architectural:['Partitions','Reflected Ceiling Plan','Fire Compartment Plan','General Arrangement','Doors','Wall Finishes','Ceiling Finishes','Room Layout'],Electrical:['General'],Hydraulic:['General'],'Base Build Mechanical':['General'],MSSB:['General'],DCP:['General'],RCP:['General']};
 
 // Areas — UI preference, stays in localStorage
 var AREAS_KEY='hvacnexus_areas_'+_pNum;
@@ -646,8 +648,10 @@ function buildDrawingRow(d){
   var pc=(d.pins||[]).length;
   var apprCls=(APPR_CLS||{})[d.approval]||'st-p';
   if(d.status==='Obsolete')tr.style.opacity='0.5';
+  var hasPdf=!!(d.pdfUrl||d.pdfData);
   tr.innerHTML=
-    '<td class="drw-num" style="cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(d.num||'')+'</td>'
+    '<td style="text-align:center;font-size:16px" title="'+(hasPdf?'PDF uploaded':'No PDF')+'">'+(hasPdf?'<span style="color:var(--danger)">📄</span>':'<span style="color:var(--border)">—</span>')+'</td>'
+    +'<td class="drw-num" style="cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(d.num||'')+'</td>'
     +'<td style="color:var(--text);font-weight:500;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(d.name||'')+'</td>'
     +'<td style="white-space:nowrap"><span class="drw-rev">'+escH(d.rev||'-')+'</span></td>'
     +'<td style="white-space:nowrap"><span class="drw-status '+(ST_CLS[d.status]||'st-p')+'">'+escH(d.status||'-')+'</span></td>'
@@ -661,7 +665,7 @@ function buildDrawingRow(d){
         +'<button class="drw-act-btn" onclick="openRevHistory(\''+d.id+'\')"><span class="tip">Revision history</span>&#128336;</button>'
       +'</div>'
     +'</td>';
-  (function(id){tr.cells[0].onclick=function(){openDrawing(id);};tr.cells[1].onclick=function(){openDrawing(id);};})(d.id);
+  (function(id){tr.cells[1].onclick=function(){openDrawing(id);};tr.cells[2].onclick=function(){openDrawing(id);};})(d.id);
   return tr;
 }
 
@@ -736,7 +740,7 @@ function renderList(){
       +'<col style="width:100px">'
       +'</colgroup>'
       +'<thead><tr>'
-      +'<th>Drawing No.</th><th>Drawing Name</th>'
+      +'<th style="width:32px;text-align:center">PDF</th><th>Drawing No.</th><th>Drawing Name</th>'
       +'<th>Rev</th><th>Status</th>'
       +'<th>Approval</th><th>Sub Date</th>'
       +'<th></th><th style="text-align:right">Actions</th>'
@@ -1471,5 +1475,106 @@ function updateEditSubcat(){populateSubcat('e-cat','e-subcat');}
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- DRAWING REGISTER MODAL -->
+<div class="mo" id="registerModal" onclick="if(event.target===this)closeRegisterModal()">
+  <div class="modal" style="width:820px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-hdr" style="display:flex;align-items:center;justify-content:space-between">
+      <h3>Drawing Register</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn bg bsm" id="regTab1" onclick="setRegTab('type1')" style="border-color:var(--accent);color:var(--accent)">Type 1 — All Revisions</button>
+        <button class="btn bg bsm" id="regTab2" onclick="setRegTab('type2')">Type 2 — Current Only</button>
+      </div>
+    </div>
+    <div class="modal-body" style="flex:1;overflow-y:auto;padding:0">
+      <div id="registerPreview" style="overflow-x:auto;padding:16px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bg" onclick="closeRegisterModal()">Close</button>
+      <button class="btn bg bsm" onclick="exportRegisterXlsx()">⬇ Excel</button>
+      <button class="btn bp bsm" onclick="exportRegisterPdf()">⬇ PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- DRAWING REGISTER MODAL -->
+<div class="mo" id="registerModal" onclick="if(event.target===this)closeRegisterModal()">
+  <div class="modal" style="width:min(900px,95vw);max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-hdr" style="display:flex;align-items:center;gap:12px">
+      <h3 style="flex:1">Drawing Register</h3>
+      <div style="display:flex;gap:6px">
+        <button class="bg bsm btn" id="regTab1" onclick="setRegTab('type1')" style="font-size:11px">Type 1 — All Revisions</button>
+        <button class="bg bsm btn" id="regTab2" onclick="setRegTab('type2')" style="font-size:11px">Type 2 — Current Only</button>
+      </div>
+    </div>
+    <div id="registerPreview" style="flex:1;overflow-y:auto;padding:16px;font-size:12px"></div>
+    <div class="modal-footer">
+      <button class="btn bg" onclick="closeRegisterModal()">Close</button>
+      <button class="btn bg bsm" onclick="exportRegisterPdf()">⬇ PDF</button>
+      <button class="btn bp bsm" onclick="exportRegisterXlsx()">⬇ Excel</button>
+    </div>
+  </div>
+</div>
+<!-- SETUP REGISTER MODAL -->
+<div class="mo" id="setupRegMo" onclick="if(event.target===this)closeSetupRegModal()">
+  <div class="modal" style="width:min(1000px,96vw);max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-hdr">
+      <h3 style="flex:1">Setup Drawing Register</h3>
+      <div style="display:flex;gap:4px">
+        <button id="srTab1" onclick="setSrTab('excel')" style="padding:5px 14px;border-radius:6px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;background:var(--accent);color:#000">⬆ Excel Upload</button>
+        <button id="srTab2" onclick="setSrTab('manual')" style="padding:5px 14px;border-radius:6px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;background:var(--surface2);color:var(--text2)">✏ Manual Entry</button>
+      </div>
+    </div>
+
+    <!-- EXCEL TAB -->
+    <div id="srTabExcel" style="display:flex;flex-direction:column;flex:1;overflow:hidden;padding:16px;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn bg bsm" onclick="downloadRegisterTemplate()">⬇ Download Template</button>
+        <span style="font-size:12px;color:var(--muted)">Fill in the template then upload it below</span>
+      </div>
+      <div class="drop-zone" id="srDropZone" onclick="document.getElementById('srFileInput').click()" ondragover="srDzOver(event)" ondragleave="srDzLeave(event)" ondrop="srDzDrop(event)">
+        <div style="font-size:28px">📂</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)">Drop Excel file here or click to browse</div>
+        <div style="font-size:11px;color:var(--muted)">.xlsx files only</div>
+        <input type="file" id="srFileInput" accept=".xlsx" style="display:none" onchange="handleSrExcel(this)">
+      </div>
+      <div id="srPreview" style="flex:1;overflow:auto;display:none">
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:8px" id="srPreviewCount"></div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px" id="srPreviewTable"></table>
+      </div>
+    </div>
+
+    <!-- MANUAL TAB -->
+    <div id="srTabManual" style="display:none;flex-direction:column;flex:1;overflow:hidden;padding:16px;gap:10px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn bg bsm" onclick="srAddRow()">+ Add Row</button>
+        <button class="btn bg bsm" onclick="srAdd10Rows()">+ Add 10 Rows</button>
+        <span style="font-size:12px;color:var(--muted);margin-left:4px">Tab between cells — Enter to add row</span>
+      </div>
+      <div style="flex:1;overflow:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px" id="srManualTable">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:7px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">#</th>
+              <th style="padding:7px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">Drawing No. *</th>
+              <th style="padding:7px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">Title</th>
+              <th style="padding:7px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">Discipline</th>
+              <th style="padding:7px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">Group</th>
+              <th style="padding:7px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">Area</th>
+              <th style="padding:7px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">Rev</th>
+              <th style="padding:7px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
+              <th style="padding:7px 10px;border-bottom:1px solid var(--border)"></th>
+            </tr>
+          </thead>
+          <tbody id="srManualBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn bg" onclick="closeSetupRegModal()">Cancel</button>
+      <button class="btn bp" id="srImportBtn" onclick="importRegisterRows()">Import Drawings</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
