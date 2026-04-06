@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 08:24 -->
+<!-- build: 2026-04-06 08:41 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -36,7 +36,7 @@ input[type=number]{-moz-appearance:textfield}
 .sb-group-items .sb-item{padding-left:28px}
 body{padding-left:var(--sb);transition:padding-left .25s}
 body.sb-sm{padding-left:var(--sb-sm)}
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;width:100%;box-sizing:border-box}
 .bc{display:flex;align-items:center;gap:7px;font-size:13px}.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
 .btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
 .bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
@@ -128,7 +128,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
 .sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
 .sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
-.main{margin-left:230px;transition:margin-left .25s}
+.main{margin-left:230px;transition:margin-left .25s;min-height:100vh}
 </style>
 <script src="db.js"></script>
 </head>
@@ -315,7 +315,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
     <div style="overflow-y:auto;flex:1;padding:18px 22px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div><label class="ml">Drawing Number *</label><input class="mi" id="e-num" placeholder="e.g. M-HV-001"/></div>
-        <div><label class="ml">Revision</label><input class="mi" id="e-rev" placeholder="e.g. B"/></div>
+        <div><label class="ml">Revision</label><input class="mi" id="e-rev" readonly style="opacity:.6;cursor:default" placeholder="e.g. B"/></div>
       </div>
       <label class="ml" style="margin-top:10px">Drawing Title *</label>
       <input class="mi" id="e-name" placeholder="e.g. Level 2 HVAC Layout" style="margin-top:4px"/>
@@ -521,7 +521,7 @@ var _uid=100;
 function nid(){return ++_uid;}
 
 async function save(){
-  var toStore=drawings.map(function(d){var c=Object.assign({},d);delete c.pdfData;return c;});
+  var toStore=drawings.map(function(d){var c=Object.assign({},d);c.history=(d.history||[]).map(function(h){return Object.assign({},h);});c.pins=(d.pins||[]).map(function(p){return Object.assign({},p);});delete c.pdfData;return c;});
   try{await dbSetDrawings(_pNum,toStore);}catch(e){console.error('Save error:',e);}
 }
 
@@ -1020,7 +1020,7 @@ function generateTransmittal(){
 var _bulkEditData=[];
 function openBulkEditModal(){
   // Clone current non-superseded drawings
-  _bulkEditData=drawings.filter(function(d){return !d.superseded;}).map(function(d){return Object.assign({},d);});
+  _bulkEditData=drawings.filter(function(d){return !d.superseded;}).map(function(d){var c=Object.assign({},d);c.history=(d.history||[]).slice();c.pins=(d.pins||[]).slice();return c;});
   renderBulkEditTable();
   document.getElementById('bulkEditModal').classList.add('open');
 }
@@ -1175,10 +1175,6 @@ function saveEditDrawing(){
   var oldIdx=(STATUS_LIST||[]).indexOf(d.status);
   var newIdx=(STATUS_LIST||[]).indexOf(newStatus);
   if(oldIdx>=0&&newIdx>=0&&newIdx<oldIdx&&!confirm('Moving status backwards ('+d.status+' to '+newStatus+'). Continue?'))return;
-  if(newRev!==d.rev||newStatus!==d.status||newApproval!==d.approval){
-    if(!d.history)d.history=[];
-    d.history.push({rev:newRev,status:newStatus,approval:newApproval,subDate:newSub,apprDate:newApprDate,recorded:today});
-  }
   var num=document.getElementById('e-num').value.trim();
   var name=document.getElementById('e-name').value.trim();
   if(!num||!name){alert('Drawing Number and Name are required.');return;}
