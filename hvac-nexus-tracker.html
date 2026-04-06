@@ -286,15 +286,34 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
         <label class="ml">Module</label>
         <select class="ms" id="m-module">
           <option value="">— General / Unknown —</option>
-          <option>Drawings</option><option>ITP Templates</option><option>ITP Form</option>
-          <option>Commissioning Tracker</option><option>Equipment Schedule</option>
-          <option>Tech Submissions</option><option>Budget</option><option>Variations</option>
-          <option>Subcontractor Variations</option><option>Progress Claims</option>
-          <option>Procurement Schedule</option><option>Purchase Orders</option>
-          <option>Company Settings</option><option>Pre-Commissioning</option>
-          <option>RFI</option><option>Defects</option><option>NCR</option>
-          <option>Subcontractor ITPs</option><option>Lookahead</option>
-          <option>Handover Package</option><option>General / Cross-module</option>
+          <option>Budget</option>
+          <option>Progress Claims</option>
+          <option>Vendor Invoices</option>
+          <option>Variations</option>
+          <option>Subcontractor Variations</option>
+          <option>Procurement Schedule</option>
+          <option>Purchase Orders</option>
+          <option>Drawings</option>
+          <option>Drawing Viewer</option>
+          <option>Tech Submissions</option>
+          <option>Equipment Schedule</option>
+          <option>ITP</option>
+          <option>ITP Register</option>
+          <option>ITP Templates</option>
+          <option>ITP Form</option>
+          <option>Passive Fire Register</option>
+          <option>Defects</option>
+          <option>Commissioning Tracker</option>
+          <option>Pre-Commissioning</option>
+          <option>User Management</option>
+          <option>Company Settings</option>
+          <option>Project Settings</option>
+          <option>RFI</option>
+          <option>NCR</option>
+          <option>Subcontractor ITPs</option>
+          <option>Handover Package</option>
+          <option>Auth</option>
+          <option>General / Cross-module</option>
         </select>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -444,9 +463,17 @@ function save(){
 async function load(){
   try{
     var s=await dbGetCommissioning(_trkPNum+'_tracker');
-    if(s){items=JSON.parse(s);}
-    else{items=JSON.parse(JSON.stringify(SEED));save();}
-  }catch(e){items=JSON.parse(JSON.stringify(SEED));save();}
+    if(s&&Array.isArray(s)&&s.length){
+      items=s;
+    } else if(s&&typeof s==='string'){
+      try{items=JSON.parse(s);}catch(e2){items=JSON.parse(JSON.stringify(SEED));save();}
+    } else {
+      items=JSON.parse(JSON.stringify(SEED));save();
+    }
+  }catch(e){
+    console.warn('Tracker load failed:',e);
+    items=JSON.parse(JSON.stringify(SEED));save();
+  }
   render();updateBadges();updateStats();
 }
 
