@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 10:06 -->
+<!-- build: 2026-04-06 10:21 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -194,7 +194,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
     <div class="drw-name" id="topName">Loading…</div>
   </div>
   <div class="tb-sep"></div>
-  <button class="tb-btn add-itp" id="addItpBtn" onclick="togglePlaceMode()">📍 Add ITP</button>
+  <button class="tb-btn add-itp" id="addItpBtn" onclick="setPinType('itp')">🔵 ITP</button>
   <button class="tb-btn" id="showDeletedBtn" onclick="toggleShowDeleted()" title="Show deleted pins" style="font-size:11px">🗑 Deleted</button>
   <button class="tb-btn" id="flashPinsBtn" onclick="flashPins()" title="Spotlight pins (10s)">⚡ Spotlight</button>
   <div class="tb-sep"></div>
@@ -234,18 +234,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
   </div>
 
   <!-- PINS SIDE PANEL -->
-  <div id="pinsPanel" style="width:280px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s;overflow:hidden">
-    <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
-      <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex:1">Pins</span>
-      <select id="pinPanelFilter" onchange="renderPinPanel()" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-size:11px;padding:2px 6px;outline:none">
-        <option value="">All</option>
-        <option value="itp">ITP</option>
-        <option value="defect">Defect</option>
-        <option value="fire">Fire</option>
-      </select>
-      <button onclick="togglePinsPanel()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0">◀</button>
+  <div id="pinsPanel" style="width:280px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s;overflow:hidden;position:relative">
+    <button id="pinPanelToggleBtn" onclick="togglePinsPanel()" style="position:absolute;top:8px;left:0;transform:translateX(-100%);background:var(--surface);border:1px solid var(--border);border-right:none;border-radius:6px 0 0 6px;color:var(--muted);cursor:pointer;font-size:12px;padding:6px 5px;z-index:10">◀</button>
+    <div id="pinPanelInner" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex:1">Pins</span>
+        <select id="pinPanelFilter" onchange="renderPinPanel()" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-size:11px;padding:2px 6px;outline:none">
+          <option value="">All</option>
+          <option value="itp">ITP</option>
+          <option value="defect">Defect</option>
+          <option value="fire">Fire</option>
+        </select>
+      </div>
+      <div id="pinPanelList" style="flex:1;overflow-y:auto;padding:8px"></div>
     </div>
-    <div id="pinPanelList" style="flex:1;overflow-y:auto;padding:8px"></div>
   </div>
 </div>
 
@@ -934,25 +936,25 @@ var _pinType = ''; // 'itp', 'defect', 'fire'
 var _layerVisibility = {itp:true, defect:true, fire:true};
 
 function setPinType(type){
-  if(_pinType === type){ // toggle off
-    _pinType = '';
-    ['addItpBtn','addDefBtn','addFireBtn'].forEach(function(id){
-      var el=document.getElementById(id);
-      if(el){el.classList.remove('active-itp','active-defect','active-fire');}
-    });
+  var iBtn=document.getElementById('addItpBtn');
+  var dBtn=document.getElementById('addDefBtn');
+  var fBtn=document.getElementById('addFireBtn');
+  var hint=document.getElementById('placeHintBar');
+  if(_pinType === type){
+    _pinType='';
+    [iBtn,dBtn,fBtn].forEach(function(el){if(el)el.classList.remove('active-itp','active-defect','active-fire');});
     cancelPlaceMode();
-    document.getElementById('placeHintBar').style.display='none';
+    if(hint)hint.style.display='none';
     return;
   }
-  _pinType = type;
-  document.getElementById('addItpBtn').classList.toggle('active-itp', type==='itp');
-  document.getElementById('addDefBtn').classList.toggle('active-defect', type==='defect');
-  document.getElementById('addFireBtn').classList.toggle('active-fire', type==='fire');
-  _placing = true;
-  document.getElementById('viewer').style.cursor='crosshair';
+  _pinType=type;
+  if(iBtn)iBtn.classList.toggle('active-itp',type==='itp');
+  if(dBtn)dBtn.classList.toggle('active-defect',type==='defect');
+  if(fBtn)fBtn.classList.toggle('active-fire',type==='fire');
+  _placing=true;
+  var v=document.getElementById('viewer');if(v)v.style.cursor='crosshair';
   var labels={itp:'🔵 ITP',defect:'🔴 Defect',fire:'🟡 Fire'};
-  document.getElementById('placeHintBar').style.display='block';
-  document.getElementById('placeHintBar').textContent='📍 Click drawing to place '+labels[type]+' pin — Esc to cancel';
+  if(hint){hint.style.display='block';hint.textContent='📍 Click drawing to place '+labels[type]+' pin — Esc to cancel';}
 }
 
 // ── LAYER TOGGLES ──
@@ -960,16 +962,19 @@ function toggleLayer2(type){
   if(type==='all'){
     var allOn=Object.values(_layerVisibility).every(function(v){return v;});
     ['itp','defect','fire'].forEach(function(t){_layerVisibility[t]=!allOn;});
-    ['layer-itp','layer-defect','layer-fire'].forEach(function(id){
+    ['layer-itp','layer-defect','layer-fire','layer-all'].forEach(function(id){
       var el=document.getElementById(id);
-      if(el)el.classList.toggle('off',allOn);
+      if(el){el.classList.toggle('off',allOn);el.classList.toggle('on',!allOn);}
     });
-    var allEl=document.getElementById('layer-all');
-    if(allEl)allEl.classList.toggle('off',allOn);
   } else {
     _layerVisibility[type]=!_layerVisibility[type];
+    var vis=_layerVisibility[type];
     var el=document.getElementById('layer-'+type);
-    if(el)el.classList.toggle('off',!_layerVisibility[type]);
+    if(el){el.classList.toggle('off',!vis);el.classList.toggle('on',vis);}
+    // Update all button
+    var allOn2=Object.values(_layerVisibility).every(function(v){return v;});
+    var allEl=document.getElementById('layer-all');
+    if(allEl){allEl.classList.toggle('off',!allOn2);allEl.classList.toggle('on',allOn2);}
   }
   renderPins();
   renderPinPanel();
@@ -980,10 +985,11 @@ var _panelOpen = true;
 function togglePinsPanel(){
   _panelOpen = !_panelOpen;
   var panel=document.getElementById('pinsPanel');
-  var btn=panel.querySelector('button');
-  if(panel){panel.style.width=_panelOpen?'280px':'0';}
+  var inner=document.getElementById('pinPanelInner');
+  var btn=document.getElementById('pinPanelToggleBtn');
+  if(panel){panel.style.width=_panelOpen?'280px':'36px';}
+  if(inner){inner.style.display=_panelOpen?'flex':'none';}
   if(btn){btn.textContent=_panelOpen?'◀':'▶';}
-  renderPinPanel();
 }
 
 function renderPinPanel(){
