@@ -156,6 +156,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <button class="stab" id="stab-team" onclick="switchTab('team')">&#128101; Team</button>
     <button class="stab" id="stab-subbies" onclick="switchTab('subbies')">&#128295; Subcontractors</button>
     <button class="stab" id="stab-areas" onclick="switchTab('areas')">&#128205; Areas</button>
+    <button class="stab" id="stab-claims" onclick="switchTab('claims')">&#128176; Claims</button>
   </div>
 
   <!-- PROJECT DETAILS TAB -->
@@ -280,6 +281,59 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
       <div class="card-body" id="areaList"></div>
     </div>
   </div>
+<div id="tab-claims" style="display:none">
+    <div class="card">
+      <div class="card-hdr">
+        <div>
+          <div class="card-hdr-title">Progress Claims</div>
+          <div class="card-hdr-sub">Claim schedule and draft invoice request settings</div>
+        </div>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:18px;padding:20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <label class="ml">Progress Claim Date (day of month)</label>
+            <input class="field-input" id="p-claim-day" type="number" min="1" max="28" placeholder="25" oninput="updateClaimDeadline()">
+            <div style="font-size:11px;color:var(--muted);margin-top:5px">Default: 25th of each month</div>
+          </div>
+          <div>
+            <label class="ml">Draft Invoice Deadline</label>
+            <div id="claim-deadline-display" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;color:var(--accent);font-family:DM Mono,monospace">—</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:5px">Auto: claim date minus 5 working days</div>
+          </div>
+        </div>
+        <div>
+          <label class="ml">Company Reply-To Email</label>
+          <input class="field-input" id="p-claim-email" type="email" placeholder="e.g. accounts@yourcompany.com.au">
+        </div>
+        <div>
+          <label class="ml" style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+            <span>Draft Invoice Request Email Template</span>
+            <span style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace">Variables: {vendor_name} {po_number} {po_value} {deadline} {period} {reply_email}</span>
+          </label>
+          <textarea class="field-input" id="p-claim-template" rows="12" style="font-family:DM Mono,monospace;font-size:12px;resize:vertical;line-height:1.6">Dear {vendor_name},
+
+We are preparing our progress claim for {period} and require your draft invoice by COB {deadline}.
+
+Please submit your draft invoice against the following purchase order:
+
+  PO Number:   {po_number}
+  PO Value:    {po_value}
+
+Please ensure your invoice reflects work completed to date and includes a breakdown by area where applicable.
+
+Kindly submit your draft invoice (PDF or Excel) to {reply_email} by the deadline above.
+
+If you have any questions, please do not hesitate to contact us.
+
+Kind regards,
+{sender_name}
+Project Manager</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
 </div>
 
@@ -346,6 +400,12 @@ function loadFields() {
     var el = document.getElementById(f); if(!el) return;
     el.value = data[keys[i]] || '';
   });
+  // Claims settings
+  var claimDay = data.claimDay||'25';
+  var claimEl = document.getElementById('p-claim-day'); if(claimEl) claimEl.value = claimDay;
+  var emailEl = document.getElementById('p-claim-email'); if(emailEl) emailEl.value = data.claimEmail||'';
+  var tmplEl = document.getElementById('p-claim-template'); if(tmplEl && data.claimTemplate) tmplEl.value = data.claimTemplate;
+  updateClaimDeadline();
 }
 
 function saveAll() {
@@ -353,7 +413,9 @@ function saveAll() {
     num:v('p-num'), name:v('p-name'), client:v('p-client'),
     type:v('p-type'), value:v('p-value'), location:v('p-location'),
     start:v('p-start'), end:v('p-end'), margin:v('p-margin'),
-    retention:v('p-retention'), desc:v('p-desc'), status:v('p-status'), defectDays:v('p-defect-days')
+    retention:v('p-retention'), desc:v('p-desc'), status:v('p-status'), defectDays:v('p-defect-days'),
+    claimDay:v('p-claim-day')||'25', claimEmail:v('p-claim-email'),
+    claimTemplate:document.getElementById('p-claim-template')?document.getElementById('p-claim-template').value:''
   };
   // Update in projects list too
   var idx = projects.findIndex(function(p){ return p.id === projectId; });
@@ -365,10 +427,26 @@ function saveAll() {
 
 // TABS
 function switchTab(tab) {
-  ['details','team','subbies','areas'].forEach(function(t) {
+  ['details','team','subbies','areas','claims'].forEach(function(t) {
     document.getElementById('tab-'+t).style.display = t===tab ? '' : 'none';
     document.getElementById('stab-'+t).classList.toggle('active', t===tab);
   });
+}
+
+// CLAIMS
+function updateClaimDeadline(){
+  var dayEl=document.getElementById('p-claim-day');
+  var dispEl=document.getElementById('claim-deadline-display');
+  if(!dayEl||!dispEl)return;
+  var claimDay=parseInt(dayEl.value)||25;
+  // Calculate 5 working days before claimDay in current month
+  var now=new Date();
+  var claimDate=new Date(now.getFullYear(),now.getMonth(),claimDay);
+  var wd=0,d=new Date(claimDate);
+  while(wd<5){d.setDate(d.getDate()-1);var day=d.getDay();if(day!==0&&day!==6)wd++;}
+  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  dispEl.textContent=days[d.getDay()]+' '+d.getDate()+' '+months[d.getMonth()]+' (COB)';
 }
 
 // TEAM

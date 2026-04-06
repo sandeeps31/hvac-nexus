@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Passive Fire Register — HVAC NEXUS</title>
+<link rel="stylesheet" href="theme.css">
+<script src="db.js"></script>
+<style>
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;margin:0;display:flex;min-height:100vh}
+/* ── Sidebar ── */
+.sb{width:var(--sb);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:width .2s}
+.sb.sm{width:var(--sb-sm)}
+.sb-top{display:flex;align-items:center;justify-content:space-between;padding:16px 14px 12px;gap:8px;border-bottom:1px solid var(--border)}
+.sb-brand{display:flex;align-items:center;gap:8px;overflow:hidden}
+.sb-icon{font-size:20px;flex-shrink:0}
+.sb-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--accent);white-space:nowrap}
+.sb-toggle{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0}
+.sb-proj-block{padding:10px 14px 8px;border-bottom:1px solid var(--border)}
+.sb-proj-lbl{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:'DM Mono',monospace}
+.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-group-hdr{display:flex;align-items:center;gap:6px;padding:7px 14px;cursor:pointer;color:var(--muted);font-size:11px;letter-spacing:1px;text-transform:uppercase;font-family:'DM Mono',monospace;user-select:none}
+.sb-group-hdr:hover{color:var(--text2)}
+.sb-group-chev{font-size:10px;transition:transform .2s}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;text-decoration:none}.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-group-hdr,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb-footer{padding:12px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sb-av{width:30px;height:30px;border-radius:50%;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.sb-user-name{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ── Main ── */
+.main{flex:1;display:flex;flex-direction:column;margin-left:var(--sb);transition:margin-left .2s;min-height:100vh}
+.sb.sm~.main{margin-left:var(--sb-sm)}
+.hdr{padding:20px 28px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.hdr-left h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--text);margin:0}
+.hdr-left p{color:var(--text2);font-size:13px;margin:4px 0 0}
+.hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn{height:34px;padding:0 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:all .13s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+.btn.primary:hover{opacity:.88}
+/* ── Stats bar ── */
+.stats-bar{display:flex;gap:12px;padding:16px 28px 0;flex-wrap:wrap}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;display:flex;flex-direction:column;gap:3px;min-width:120px}
+.stat-val{font-family:'DM Mono',monospace;font-size:22px;font-weight:700}
+.stat-lbl{font-size:11px;color:var(--text2)}
+.stat-card.fs .stat-val{color:#ff4444}
+.stat-card.fd .stat-val{color:#ff9500}
+.stat-card.cl .stat-val{color:var(--green)}
+.stat-card.pend .stat-val{color:var(--warn)}
+/* ── Tab bar ── */
+.tab-bar{display:flex;gap:0;padding:16px 28px 0;border-bottom:1px solid var(--border);margin:0 0 0}
+.tab{padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .13s;white-space:nowrap}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:hover:not(.active){color:var(--text)}
+/* ── Toolbar ── */
+.toolbar{display:flex;align-items:center;gap:8px;padding:14px 28px;flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 12px;flex:1;min-width:200px;max-width:360px}
+.search-box input{background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%}
+.filter-sel{height:32px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text2);font-size:12px;padding:0 10px;cursor:pointer;font-family:'DM Sans',sans-serif;outline:none}
+.chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.fchip{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:10px;font-size:11px;font-weight:600;font-family:'DM Mono',monospace;cursor:pointer;border:1.5px solid transparent;transition:all .13s;user-select:none;color:var(--text2);background:var(--surface2);border-color:var(--border)}
+.fchip.on{color:#fff}
+.fchip.fs.on{background:#ff4444;border-color:#ff4444}
+.fchip.fd.on{background:#ff9500;border-color:#ff9500}
+/* ── Table ── */
+.tbl-wrap{padding:0 28px 28px;overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;padding:10px 12px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+.tbl th:hover{color:var(--text2)}
+.tbl th .sort-icon{margin-left:4px;opacity:.4}
+.tbl th.sorted .sort-icon{opacity:1;color:var(--accent)}
+.tbl td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tr:hover td{background:var(--surface)}
+.tbl tr:last-child td{border-bottom:none}
+/* status badges */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Mono',monospace;white-space:nowrap}
+.badge.ns{background:var(--surface3);color:var(--text2)}
+.badge.ip{background:var(--warn-dim);color:var(--warn)}
+.badge.cl{background:var(--green-dim);color:var(--green)}
+.badge.act{background:var(--danger-dim);color:var(--danger)}
+/* service pill */
+.svc-pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:600;font-family:'DM Mono',monospace;white-space:nowrap}
+.svc-pipe{background:rgba(0,200,255,.12);color:var(--accent)}
+.svc-cable{background:rgba(255,184,48,.12);color:var(--warn)}
+.svc-conduit{background:rgba(167,139,250,.12);color:var(--purple)}
+.svc-refrigerant{background:rgba(0,212,170,.12);color:var(--teal)}
+.svc-bms{background:rgba(0,229,160,.12);color:var(--green)}
+.svc-electrical{background:rgba(255,77,109,.12);color:var(--danger)}
+/* type diamond/pentagon */
+.type-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;font-family:'DM Mono',monospace}
+.type-badge.fs{color:#ff4444}
+.type-badge.fd{color:#ff9500}
+/* ref link */
+.ref-link{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;text-decoration:none}
+.ref-link:hover{text-decoration:underline}
+/* photo thumb */
+.photo-thumb{width:36px;height:36px;border-radius:6px;object-fit:cover;border:1px solid var(--border);cursor:pointer}
+.no-photo{width:36px;height:36px;border-radius:6px;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
+/* empty */
+.empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px}
+.empty-icon{font-size:40px;margin-bottom:12px}
+/* ── Modal ── */
+.mo-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:none;align-items:center;justify-content:center}
+.mo-bg.open{display:flex}
+.mo{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:520px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.mo-hdr{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.mo-hdr h3{font-size:15px;font-weight:700;margin:0}
+.mo-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:0 4px}
+.mo-close:hover{color:var(--text)}
+.mo-body{padding:18px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.mo-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.ml{font-size:11px;color:var(--text2);margin-bottom:5px;display:block}
+.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
+.mi:focus{border-color:var(--accent)}
+.mi-row{display:flex;gap:10px}
+.mi-row .mi-group{flex:1}
+.mi-group{display:flex;flex-direction:column}
+/* status buttons in modal */
+.st-row{display:flex;gap:6px}
+.st-btn{flex:1;height:34px;border-radius:7px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;transition:all .13s;font-family:'DM Sans',sans-serif}
+.st-btn.ns.sel{background:var(--surface3);border-color:var(--muted);color:var(--text)}
+.st-btn.ip.sel{background:var(--warn-dim);border-color:var(--warn);color:var(--warn)}
+.st-btn.cl.sel{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+/* photo preview in modal */
+.photo-preview{width:100%;height:140px;border-radius:8px;object-fit:cover;border:1px solid var(--border)}
+/* drawing link */
+.drw-link{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--accent);cursor:pointer;font-family:'DM Mono',monospace}
+.drw-link:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sb" id="sidebar">
+  <div class="sb-top"><div class="sb-brand"><span class="sb-icon">&#10052;</span><span class="sb-name">HVAC NEXUS</span></div><button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">&laquo;</button></div>
+  <div class="sb-proj-block"><div class="sb-proj-lbl">Current Project</div><div class="sb-proj-name" id="sb-proj-name">—</div><div class="sb-proj-num" id="sb-proj-num">—</div></div>
+  <nav class="sb-nav" id="sbNav">
+    <div class="sb-item" onclick="navTo('project.html')" style="border-bottom:1px solid var(--border);margin-bottom:4px"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Dashboard</span></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('financials')" id="ghdr-financials"><span class="sb-group-chev" id="gchev-financials">▾</span><span class="sb-group-name">Financials</span></div>
+      <div class="sb-group-items" id="gitems-financials" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
+        <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span></div>
+        <div class="sb-item"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
+        <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('procurement')" id="ghdr-procurement"><span class="sb-group-chev" id="gchev-procurement">▾</span><span class="sb-group-name">Procurement</span></div>
+      <div class="sb-group-items" id="gitems-procurement" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
+        <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('technical')" id="ghdr-technical"><span class="sb-group-chev" id="gchev-technical">▾</span><span class="sb-group-name">Technical</span></div>
+      <div class="sb-group-items" id="gitems-technical" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-rfi.html')"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span></div>
+        <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span></div>
+        <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></div>
+        <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('commissioning')" id="ghdr-commissioning"><span class="sb-group-chev" id="gchev-commissioning">▾</span><span class="sb-group-name">Commissioning</span></div>
+      <div class="sb-group-items" id="gitems-commissioning" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-precommissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span></div>
+        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
+      <div class="sb-group-items" id="gitems-quality" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
+        <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
+        <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
+        <div class="sb-item active"><span class="sb-item-icon">🔥</span><span class="sb-item-label">Passive Fire</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
+      <div class="sb-group-items" id="gitems-settings" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
+      </div></div>
+  </nav>
+  <div class="sb-footer"><div class="sb-av" id="sb-av">?</div><span class="sb-user-name" id="sb-user">—</span></div>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="mainWrap">
+
+  <div class="hdr">
+    <div class="hdr-left">
+      <h1>🔥 Passive Fire Register</h1>
+      <p id="hdr-sub">Fire seals &amp; fire dampers across all drawings</p>
+    </div>
+    <div class="hdr-right">
+      <button class="btn" onclick="exportCsv()">⬇ Export CSV</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card fs"><div class="stat-val" id="stat-fs">0</div><div class="stat-lbl">Fire Seals</div></div>
+    <div class="stat-card fd"><div class="stat-val" id="stat-fd">0</div><div class="stat-lbl">Fire Dampers</div></div>
+    <div class="stat-card cl"><div class="stat-val" id="stat-cl">0</div><div class="stat-lbl">Closed</div></div>
+    <div class="stat-card pend"><div class="stat-val" id="stat-pend">0</div><div class="stat-lbl">Pending</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <div class="tab active" id="tab-all" onclick="setTab('all')">All</div>
+    <div class="tab" id="tab-fs" onclick="setTab('fs')">&#9670; Fire Seals</div>
+    <div class="tab" id="tab-fd" onclick="setTab('fd')">&#11040; Fire Dampers</div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-box"><span style="color:var(--muted)">&#128269;</span><input type="text" id="searchInp" placeholder="Search ref, drawing, service, tag…" oninput="render()"></div>
+    <select class="filter-sel" id="statusSel" onchange="render()">
+      <option value="">All Statuses</option>
+      <option value="not-started">Not Started</option>
+      <option value="in-progress">In Progress</option>
+      <option value="closed">Closed</option>
+    </select>
+    <select class="filter-sel" id="drawingSel" onchange="render()">
+      <option value="">All Drawings</option>
+    </select>
+    <select class="filter-sel" id="svcSel" onchange="render()">
+      <option value="">All Services</option>
+      <option value="Pipe">Pipe</option>
+      <option value="Cable">Cable</option>
+      <option value="Conduit">Conduit</option>
+      <option value="Refrigerant">Refrigerant</option>
+      <option value="BMS">BMS</option>
+      <option value="Electrical">Electrical</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="tbl-wrap">
+    <table class="tbl" id="mainTbl">
+      <thead id="tblHead"></thead>
+      <tbody id="tblBody"></tbody>
+    </table>
+    <div class="empty" id="emptyMsg" style="display:none">
+      <div class="empty-icon">🔥</div>
+      <div>No passive fire items found.</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">Place Fire Seal or Fire Damper pins on drawings to populate this register.</div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="mo-bg" id="detailMoBg" onclick="if(event.target===this)closeMo()">
+  <div class="mo">
+    <div class="mo-hdr">
+      <h3 id="moTitle">Fire Seal Detail</h3>
+      <button class="mo-close" onclick="closeMo()">&#215;</button>
+    </div>
+    <div class="mo-body" id="moBody"></div>
+    <div class="mo-footer">
+      <button class="btn" onclick="closeMo()">Close</button>
+      <button class="btn primary" id="moSaveBtn" onclick="saveDetail()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO LIGHTBOX -->
+<div class="mo-bg" id="lightboxBg" onclick="closeLightbox()" style="z-index:300">
+  <img id="lightboxImg" style="max-width:94vw;max-height:90vh;border-radius:10px;object-fit:contain">
+</div>
+
+<script>
+'use strict';
+var SBK='hvacnexus_sb_collapsed';
+var proj={},drawings=[],responses={};
+var _tab='all',_sortCol='ref',_sortDir=1;
+var _editPin=null,_editDrawing=null;
+var _editStatus='not-started';
+
+// ── NAV ──
+function navTo(p){var proj=dbGetCurrentProject();window.location.href=p+(proj&&proj.num?'?p='+encodeURIComponent(proj.num):'');}
+
+// ── SIDEBAR ──
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'var(--sb-sm)':'var(--sb)';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function toggleGroup(g){var el=document.getElementById('gitems-'+g);var ch=document.getElementById('gchev-'+g);if(!el)return;var open=el.style.display!=='none';el.style.display=open?'none':'block';if(ch)ch.style.transform=open?'rotate(-90deg)':'';}
+
+// ── INIT ──
+async function init(){
+  applySB(localStorage.getItem(SBK)==='1');
+  proj=dbGetCurrentProject()||{};
+  var pNum=proj.num||proj.number||'';
+  document.getElementById('sb-proj-name').textContent=proj.name||'—';
+  document.getElementById('sb-proj-num').textContent=pNum||'—';
+  // user
+  var u=dbGetCurrentUser();
+  if(u){document.getElementById('sb-av').textContent=(u.name||u.username||'?')[0].toUpperCase();document.getElementById('sb-user').textContent=u.name||u.username||'—';}
+  // load drawings
+  if(pNum){
+    var raw=await dbGetDrawings(pNum)||[];
+    drawings=JSON.parse(JSON.stringify(raw));
+    var rawResp=await dbGetItpResponses(pNum)||{};
+    responses=JSON.parse(JSON.stringify(rawResp));
+  } else {
+    // fallback localStorage
+    var lsKey='hvacnexus_drawings_'+(pNum||'GCT001');
+    try{drawings=JSON.parse(localStorage.getItem(lsKey)||'[]');}catch(e){drawings=[];}
+    var rKey='hvacnexus_itp_responses_'+(pNum||'GCT001');
+    try{responses=JSON.parse(localStorage.getItem(rKey)||'{}');}catch(e){responses={};}
+  }
+  populateDrawingFilter();
+  updateStats();
+  render();
+}
+
+// ── COLLECT ALL FIRE PINS ──
+function getAllPins(){
+  var pins=[];
+  drawings.forEach(function(drw){
+    (drw.pins||[]).forEach(function(p){
+      if(p.type==='fireseal'||p.type==='firedamper'){
+        pins.push({pin:p,drw:drw});
+      }
+    });
+  });
+  return pins;
+}
+
+function getStatus(pin){
+  return (responses[pin.id]||{}).status||'not-started';
+}
+
+// ── STATS ──
+function updateStats(){
+  var all=getAllPins();
+  var fs=all.filter(function(x){return x.pin.type==='fireseal';}).length;
+  var fd=all.filter(function(x){return x.pin.type==='firedamper';}).length;
+  var cl=all.filter(function(x){return getStatus(x.pin)==='closed';}).length;
+  var pend=all.length-cl;
+  document.getElementById('stat-fs').textContent=fs;
+  document.getElementById('stat-fd').textContent=fd;
+  document.getElementById('stat-cl').textContent=cl;
+  document.getElementById('stat-pend').textContent=pend;
+}
+
+// ── DRAWING FILTER ──
+function populateDrawingFilter(){
+  var sel=document.getElementById('drawingSel');
+  var nums=[...new Set(drawings.filter(function(d){
+    return (d.pins||[]).some(function(p){return p.type==='fireseal'||p.type==='firedamper';});
+  }).map(function(d){return d.drawingNo||d.number||'';}))].sort();
+  nums.forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
+}
+
+// ── TAB ──
+function setTab(t){
+  _tab=t;
+  ['all','fs','fd'].forEach(function(x){document.getElementById('tab-'+x).classList.toggle('active',x===t);});
+  var svcSel=document.getElementById('svcSel');
+  svcSel.style.display=(t==='fd')?'none':'';
+  render();
+}
+
+// ── SORT ──
+function sortBy(col){
+  if(_sortCol===col)_sortDir*=-1;
+  else{_sortCol=col;_sortDir=1;}
+  render();
+}
+
+// ── RENDER TABLE ──
+function render(){
+  var q=(document.getElementById('searchInp').value||'').toLowerCase();
+  var stF=document.getElementById('statusSel').value;
+  var drwF=document.getElementById('drawingSel').value;
+  var svcF=document.getElementById('svcSel').value;
+
+  var all=getAllPins().filter(function(x){
+    var p=x.pin,d=x.drw;
+    if(_tab==='fs'&&p.type!=='fireseal')return false;
+    if(_tab==='fd'&&p.type!=='firedamper')return false;
+    if(stF&&getStatus(p)!==stF)return false;
+    if(drwF&&(d.drawingNo||d.number||'')!==drwF)return false;
+    if(svcF&&p.type==='fireseal'&&(p.service||'')!==svcF)return false;
+    if(q){
+      var hay=[p.ref,d.drawingNo,d.number,d.name,p.service,p.tag,p.size,p.assignee,p.createdBy].join(' ').toLowerCase();
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  });
+
+  // sort
+  all.sort(function(a,b){
+    var va='',vb='';
+    if(_sortCol==='ref'){va=a.pin.ref||'';vb=b.pin.ref||'';}
+    else if(_sortCol==='type'){va=a.pin.type;vb=b.pin.type;}
+    else if(_sortCol==='drawing'){va=a.drw.drawingNo||a.drw.number||'';vb=b.drw.drawingNo||b.drw.number||'';}
+    else if(_sortCol==='status'){va=getStatus(a.pin);vb=getStatus(b.pin);}
+    else if(_sortCol==='service'){va=a.pin.service||a.pin.tag||'';vb=b.pin.service||b.pin.tag||'';}
+    else if(_sortCol==='date'){va=a.pin.createdDate||'';vb=b.pin.createdDate||'';}
+    return va<vb?-_sortDir:va>vb?_sortDir:0;
+  });
+
+  // head
+  var cols=_tab==='fd'
+    ?[{k:'ref',l:'Ref'},{k:'type',l:'Type'},{k:'drawing',l:'Drawing'},{k:'service',l:'Tag / Size'},{k:'',l:'Assignee'},{k:'status',l:'Status'},{k:'date',l:'Date'},{k:'',l:''}]
+    :[{k:'ref',l:'Ref'},{k:'type',l:'Type'},{k:'drawing',l:'Drawing'},{k:'service',l:'Service'},{k:'',l:'Photo'},{k:'status',l:'Status'},{k:'date',l:'Date'},{k:'',l:''}];
+  if(_tab==='all'){
+    cols=[{k:'ref',l:'Ref'},{k:'type',l:'Type'},{k:'drawing',l:'Drawing'},{k:'service',l:'Service / Tag'},{k:'',l:'Photo'},{k:'status',l:'Status'},{k:'date',l:'Date'},{k:'',l:''}];
+  }
+
+  document.getElementById('tblHead').innerHTML='<tr>'+cols.map(function(c){
+    var icon=c.k&&_sortCol===c.k?(_sortDir===1?' ▲':' ▼'):'';
+    return'<th'+(c.k?' onclick="sortBy(\''+c.k+'\')" class="'+(c.k&&_sortCol===c.k?'sorted':'')+'"':'')+'>'
+      +c.l+'<span class="sort-icon">'+icon+'</span></th>';
+  }).join('')+'</tr>';
+
+  var tbody=document.getElementById('tblBody');
+  if(!all.length){
+    tbody.innerHTML='';
+    document.getElementById('emptyMsg').style.display='';
+    return;
+  }
+  document.getElementById('emptyMsg').style.display='none';
+
+  tbody.innerHTML=all.map(function(x){
+    var p=x.pin,d=x.drw;
+    var st=getStatus(p);
+    var stBadge={'not-started':'<span class="badge ns">Not Started</span>','in-progress':'<span class="badge ip">In Progress</span>','closed':'<span class="badge cl">&#10003; Closed</span>','action':'<span class="badge act">Action</span>'}[st]||'<span class="badge ns">Not Started</span>';
+    var typeBadge=p.type==='fireseal'
+      ?'<span class="type-badge fs">&#9670; Fire Seal</span>'
+      :'<span class="type-badge fd">&#11040; Fire Damper</span>';
+    var drwNum=escH(d.drawingNo||d.number||'—');
+    var drwName=escH(d.name||'');
+    var drwCell='<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent)">'+drwNum+'</div>'+(drwName?'<div style="font-size:11px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+drwName+'</div>':'');
+
+    var svcCell='—';
+    if(p.type==='fireseal'&&p.service){
+      var svcCls={'Pipe':'svc-pipe','Cable':'svc-cable','Conduit':'svc-conduit','Refrigerant':'svc-refrigerant','BMS':'svc-bms','Electrical':'svc-electrical'}[p.service]||'';
+      svcCell='<span class="svc-pill '+svcCls+'">'+escH(p.service)+'</span>';
+    } else if(p.type==='firedamper'){
+      var parts=[];
+      if(p.tag)parts.push('<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text)">'+escH(p.tag)+'</span>');
+      if(p.size)parts.push('<span style="font-size:11px;color:var(--text2)">'+escH(p.size)+'</span>');
+      svcCell=parts.join(' ');
+    }
+
+    var photoCell='<div class="no-photo">&#128247;</div>';
+    if(p.photo){
+      photoCell='<img class="photo-thumb" src="'+escH(p.photo)+'" onclick="openLightbox(\''+escH(p.photo)+'\')" title="View photo">';
+    }
+
+    var assigneeCell=p.type==='firedamper'?escH(p.assignee||'—'):'';
+    var dateCell=escH(p.createdDate||'—');
+    var createdCell='<span style="font-size:11px;color:var(--text2)">'+escH(p.createdBy||'—')+'</span>';
+
+    var cells;
+    if(_tab==='fd'){
+      cells=[
+        '<a class="ref-link" onclick="openDetail(\''+escH(p.id)+'\',\''+escH(d.drawingNo||d.number||'')+'\')">'+escH(p.ref||'—')+'</a>',
+        typeBadge,drwCell,svcCell,assigneeCell,stBadge,dateCell,
+        '<button class="btn" style="height:28px;padding:0 10px;font-size:11px" onclick="openDetail(\''+escH(p.id)+'\',\''+escH(d.drawingNo||d.number||'')+'\')">Edit</button>'
+      ];
+    } else {
+      cells=[
+        '<a class="ref-link" onclick="openDetail(\''+escH(p.id)+'\',\''+escH(d.drawingNo||d.number||'')+'\')">'+escH(p.ref||'—')+'</a>',
+        typeBadge,drwCell,svcCell,photoCell,stBadge,dateCell,
+        '<button class="btn" style="height:28px;padding:0 10px;font-size:11px" onclick="openDetail(\''+escH(p.id)+'\',\''+escH(d.drawingNo||d.number||'')+'\')">Edit</button>'
+      ];
+    }
+    return'<tr>'+cells.map(function(c){return'<td>'+c+'</td>';}).join('')+'</tr>';
+  }).join('');
+}
+
+// ── DETAIL MODAL ──
+function findPin(pinId,drwNum){
+  for(var i=0;i<drawings.length;i++){
+    var d=drawings[i];
+    if(drwNum&&(d.drawingNo||d.number||'')!==drwNum)continue;
+    var p=(d.pins||[]).find(function(x){return x.id===pinId;});
+    if(p)return{pin:p,drw:d};
+  }
+  return null;
+}
+
+function openDetail(pinId,drwNum){
+  var found=findPin(pinId,drwNum)||findPinAny(pinId);
+  if(!found)return;
+  _editPin=found.pin;
+  _editDrawing=found.drw;
+  _editStatus=getStatus(found.pin);
+  var p=found.pin;
+  var d=found.drw;
+  var isFs=p.type==='fireseal';
+  document.getElementById('moTitle').textContent=isFs?('Fire Seal — '+escH(p.ref||'')):'Fire Damper — '+escH(p.ref||'');
+
+  var svcOpts=['Pipe','Cable','Conduit','Refrigerant','BMS','Electrical'].map(function(s){
+    return'<option value="'+s+'"'+(p.service===s?' selected':'')+'>'+s+'</option>';
+  }).join('');
+
+  var photoHtml='';
+  if(p.photo){photoHtml='<img class="photo-preview" src="'+escH(p.photo)+'" onclick="openLightbox(\''+escH(p.photo)+'\')" style="cursor:pointer" title="View full size">';}
+
+  var stRow=function(v,label,cls){return'<button class="st-btn '+cls+((_editStatus===v)?' sel':'')+'" id="stbtn-'+cls+'" onclick="selStatus(\''+v+'\')">'+label+'</button>';};
+
+  var drwInfo='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">'
+    +'<div><div style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--accent)">'+escH(d.drawingNo||d.number||'—')+'</div><div style="font-size:12px;color:var(--text2)">'+escH(d.name||'')+'</div></div>'
+    +'<a class="drw-link" onclick="openDrawing(\''+escH(p.id)+'\',\''+escH(d.id||'')+'\')">View on drawing &#8599;</a></div>';
+
+  var body='';
+  body+=drwInfo;
+
+  if(isFs){
+    body+='<div class="mi-group"><label class="ml">Service Type</label><select class="mi" id="det-svc"><option value="">— Select —</option>'+svcOpts+'</select></div>';
+    body+='<div class="mi-group"><label class="ml">Notes</label><textarea class="mi" id="det-notes" rows="3" style="resize:vertical">'+escH(p.notes||'')+'</textarea></div>';
+    if(photoHtml)body+='<div>'+photoHtml+'</div>';
+  } else {
+    body+='<div class="mi-row"><div class="mi-group"><label class="ml">Tag</label><input class="mi" id="det-tag" value="'+escH(p.tag||'')+'"></div>'
+      +'<div class="mi-group"><label class="ml">Duct Size</label><input class="mi" id="det-size" value="'+escH(p.size||'')+'"></div></div>';
+    body+='<div class="mi-group"><label class="ml">Assignee</label><input class="mi" id="det-assignee" value="'+escH(p.assignee||'')+'"></div>';
+    body+='<div class="mi-group"><label class="ml">Notes</label><textarea class="mi" id="det-notes" rows="3" style="resize:vertical">'+escH(p.notes||'')+'</textarea></div>';
+  }
+
+  body+='<div class="mi-group"><label class="ml">Status</label><div class="st-row">'
+    +stRow('not-started','Not Started','ns')
+    +stRow('in-progress','In Progress','ip')
+    +stRow('closed','Closed','cl')
+    +'</div></div>';
+
+  body+='<div style="font-size:11px;color:var(--muted)">Created by '+escH(p.createdBy||'—')+' on '+escH(p.createdDate||'—')+'</div>';
+
+  document.getElementById('moBody').innerHTML=body;
+  document.getElementById('detailMoBg').classList.add('open');
+}
+
+function findPinAny(pinId){
+  for(var i=0;i<drawings.length;i++){
+    var d=drawings[i];
+    var p=(d.pins||[]).find(function(x){return x.id===pinId;});
+    if(p)return{pin:p,drw:d};
+  }
+  return null;
+}
+
+function selStatus(v){
+  _editStatus=v;
+  ['ns','ip','cl'].forEach(function(c){var b=document.getElementById('stbtn-'+c);if(b)b.classList.remove('sel');});
+  var map={'not-started':'ns','in-progress':'ip','closed':'cl'};
+  var btn=document.getElementById('stbtn-'+(map[v]||'ns'));
+  if(btn)btn.classList.add('sel');
+}
+
+async function saveDetail(){
+  if(!_editPin||!_editDrawing)return;
+  var p=_editPin;
+  // apply field edits back to pin object
+  if(p.type==='fireseal'){
+    var svcEl=document.getElementById('det-svc');
+    if(svcEl)p.service=svcEl.value;
+  } else {
+    var tagEl=document.getElementById('det-tag');var sizeEl=document.getElementById('det-size');var assEl=document.getElementById('det-assignee');
+    if(tagEl)p.tag=tagEl.value.trim();
+    if(sizeEl)p.size=sizeEl.value.trim();
+    if(assEl)p.assignee=assEl.value.trim();
+  }
+  var notesEl=document.getElementById('det-notes');
+  if(notesEl)p.notes=notesEl.value.trim();
+  // update status in responses
+  if(!responses[p.id])responses[p.id]={};
+  responses[p.id].status=_editStatus;
+  // save back
+  var pNum=proj.num||proj.number||'';
+  if(pNum){
+    await dbSetDrawings(pNum,drawings);
+    await dbSetItpResponses(pNum,responses);
+  } else {
+    try{localStorage.setItem('hvacnexus_drawings_'+(pNum||'GCT001'),JSON.stringify(drawings));}catch(e){}
+    try{localStorage.setItem('hvacnexus_itp_responses_'+(pNum||'GCT001'),JSON.stringify(responses));}catch(e){}
+  }
+  closeMo();
+  updateStats();
+  render();
+}
+
+function closeMo(){document.getElementById('detailMoBg').classList.remove('open');}
+
+function openDrawing(pinId,drwId){
+  var d=drawings.find(function(x){return x.id===drwId;});
+  if(!d)return;
+  window.open('hvac-drawing-viewer.html?id='+encodeURIComponent(d.id)+'&pin='+encodeURIComponent(pinId),'_blank');
+}
+
+// ── PHOTO LIGHTBOX ──
+function openLightbox(url){document.getElementById('lightboxImg').src=url;document.getElementById('lightboxBg').classList.add('open');}
+function closeLightbox(){document.getElementById('lightboxBg').classList.remove('open');}
+
+// ── EXPORT CSV ──
+function exportCsv(){
+  var all=getAllPins();
+  var rows=[['Ref','Type','Drawing No','Drawing Name','Service/Tag','Size','Assignee','Status','Created By','Date','Notes']];
+  all.forEach(function(x){
+    var p=x.pin,d=x.drw,st=getStatus(p);
+    rows.push([
+      p.ref||'',p.type==='fireseal'?'Fire Seal':'Fire Damper',
+      d.drawingNo||d.number||'',d.name||'',
+      p.service||p.tag||'',p.size||'',p.assignee||'',
+      st,p.createdBy||'',p.createdDate||'',p.notes||''
+    ]);
+  });
+  var csv=rows.map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='passive-fire-register.csv';
+  a.click();
+}
+
+// ── HELPERS ──
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+window.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>

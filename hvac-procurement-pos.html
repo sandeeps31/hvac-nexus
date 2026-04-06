@@ -291,6 +291,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
           <div class="mf"><span class="ml">Supplier *</span>
             <input class="mi" id="po-supplier" placeholder="Supplier name…"/>
           </div>
+          <div class="mf"><span class="ml">Vendor Contact Name</span>
+            <input class="mi" id="po-contact" placeholder="e.g. John Smith"/>
+          </div>
+          <div class="mf"><span class="ml">Vendor Email</span>
+            <input class="mi" id="po-email" type="email" placeholder="e.g. invoices@vendor.com.au"/>
+          </div>
           <div class="mf"><span class="ml">Delivery Date</span>
             <input class="mi" id="po-delivery" type="date" onkeydown="if(event.key==='Tab'&&!event.shiftKey){event.preventDefault();var el=document.getElementById('liDesc_0');if(el){el.focus();}}"/>
           </div>
@@ -587,6 +593,8 @@ function openNewPO(){
   document.getElementById('po-page-num').textContent=genPONum();
   document.getElementById('po-page-title').textContent='New Purchase Order';
   document.getElementById('po-supplier').value='';
+  document.getElementById('po-contact').value='';
+  document.getElementById('po-email').value='';
   document.getElementById('po-delivery').value='';
   document.getElementById('po-notes').value='';
   document.getElementById('po-file-lbl').textContent='Attach PDF (optional)';
@@ -605,6 +613,8 @@ function openPO(sid,gid,pid){
   document.getElementById('po-page-num').textContent=po.id;
   document.getElementById('po-page-title').textContent=po.supplier||'Purchase Order';
   document.getElementById('po-supplier').value=po.supplier||'';
+  document.getElementById('po-contact').value=po.contact||'';
+  document.getElementById('po-email').value=po.email||'';
   document.getElementById('po-delivery').value=po.delivery||'';
   document.getElementById('po-notes').value=po.notes||'';
   document.getElementById('po-file-lbl').textContent=po.fileName||'Attach PDF (optional)';
@@ -721,6 +731,8 @@ function doUndo(){
 // ── SAVE ──
 function savePO(){
   const supplier=document.getElementById('po-supplier').value.trim();
+  const contact=document.getElementById('po-contact').value.trim();
+  const email=document.getElementById('po-email').value.trim();
   if(!supplier){const el=document.getElementById('po-supplier');el.classList.add('err');el.focus();setTimeout(()=>el.classList.remove('err'),2000);return;}
   const catVal=document.getElementById('po-cat').value;
   if(!catVal){document.getElementById('po-cat').focus();return;}
@@ -731,7 +743,7 @@ function savePO(){
   const items=lineItems.filter(i=>i.desc||num(i.qty)||num(i.price));
   const poData={
     id:document.getElementById('po-page-num').textContent,
-    supplier,
+    supplier,contact,email,
     lineItems:JSON.parse(JSON.stringify(items)),
     actual:0,
     delivery:document.getElementById('po-delivery').value,

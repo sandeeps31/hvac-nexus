@@ -29,6 +29,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .main{max-width:1100px;margin:0 auto;padding:32px 24px 80px}
 
 /* PROJECT INFO BANNER */
+.notif-banner{background:rgba(255,184,48,.08);border:1px solid var(--warn);border-radius:var(--radius);padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.notif-banner.hidden{display:none}
+.notif-banner-text{flex:1;font-size:13px;color:var(--text)}
 .proj-banner{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:28px;display:flex;align-items:center;gap:32px;flex-wrap:wrap}
 .proj-banner-name{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--text)}
 .proj-banner-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid rgba(0,200,255,.15);padding:3px 9px;border-radius:20px;margin-top:4px;display:inline-block}
@@ -92,6 +95,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 </div>
 
 <div class="main">
+
+  <!-- INVOICE DEADLINE BANNER -->
+  <div class="notif-banner hidden" id="invoiceNotifBanner">
+    <span style="font-size:20px">&#128236;</span>
+    <div class="notif-banner-text"><strong style="color:var(--warn)" id="invoiceNotifText">Draft invoice requests due today</strong> — vendors must submit draft invoices by COB today.</div>
+    <button onclick="window.location.href='hvac-vendor-invoices.html'" style="height:34px;padding:0 14px;border-radius:7px;border:none;background:var(--warn);color:#000;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;white-space:nowrap">Send Requests Now</button>
+    <button onclick="dismissInvoiceBanner()" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:12px;cursor:pointer;height:34px;padding:0 10px;font-family:'DM Sans',sans-serif">Dismiss</button>
+  </div>
 
   <!-- PROJECT BANNER -->
   <div class="proj-banner">
@@ -282,6 +293,23 @@ var projectId=params.get('id')||'gct001';
   if(proj.end)metaHtml+='<div class="pbm"><div class="pbm-label">End</div><div class="pbm-val">'+escH(proj.end)+'</div></div>';
   document.getElementById('bannerMeta').innerHTML=metaHtml;
 
+  // ── INVOICE DEADLINE BANNER ──
+  try{
+    var projSettings=await dbGetProject('proj_settings',proj.id||proj.num||'GCT001');
+    if(projSettings){
+      var claimDay=parseInt(projSettings.claimDay)||25;
+      var deadlineDate=calcInvoiceDeadline(claimDay);
+      var todayStr=new Date().toISOString().split('T')[0];
+      var bannerDismissKey='hvacnexus_vi_banner_'+todayStr;
+      if(deadlineDate===todayStr&&localStorage.getItem(bannerDismissKey)!=='1'){
+        var now=new Date();
+        var monthLabel=now.toLocaleDateString('en-AU',{month:'long',year:'numeric'});
+        document.getElementById('invoiceNotifText').textContent='Draft invoice requests due today (COB) — '+monthLabel;
+        document.getElementById('invoiceNotifBanner').classList.remove('hidden');
+      }
+    }
+  }catch(e){console.warn('Banner check failed:',e);}
+
   // ── SUMMARY CARDS — load from Supabase ──
   var pKey=proj.num||'GCT001';
   var drawingsData=[];var variationsData=[];var cxData=[];var equipData={};
@@ -340,6 +368,18 @@ var projectId=params.get('id')||'gct001';
     }).join('');
   }
 })(); // end async init
+
+function calcInvoiceDeadline(claimDay){
+  var now=new Date();
+  var d=new Date(now.getFullYear(),now.getMonth(),parseInt(claimDay)||25);
+  var wd=0;
+  while(wd<5){d.setDate(d.getDate()-1);var day=d.getDay();if(day!==0&&day!==6)wd++;}
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function dismissInvoiceBanner(){
+  document.getElementById('invoiceNotifBanner').classList.add('hidden');
+  localStorage.setItem('hvacnexus_vi_banner_'+new Date().toISOString().split('T')[0],'1');
+}
 
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 </script>
