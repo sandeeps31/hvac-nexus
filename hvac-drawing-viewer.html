@@ -1,1139 +1,902 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 11:01 -->
+<!-- build: 2026-04-06 -->
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Drawing Viewer — HVAC NEXUS</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<link rel="stylesheet" href="theme.css">
+<script src="db.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;
-  --border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.12);
-  --green:#00e5a0;--green-dim:rgba(0,229,160,.12);
-  --warn:#ffb830;--warn-dim:rgba(255,184,48,.12);
-  --danger:#ff4d6d;--danger-dim:rgba(255,77,109,.12);
-  --purple:#a78bfa;--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a
-}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
-::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
-/* TOPBAR */
-.topbar{height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:20}
-.drw-info{display:flex;flex-direction:column;flex:1;min-width:0}
-.drw-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;line-height:1.2}
-.drw-name{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2}
-.tb-sep{width:1px;height:28px;background:var(--border);flex-shrink:0}
+/* ── TOPBAR ── */
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:8px;flex-shrink:0;z-index:100}
+.drw-info{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;overflow:hidden}
+.drw-num{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drw-name{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
 .tb-btn{height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:all .13s}
 .tb-btn:hover{color:var(--text);border-color:var(--text2)}
-.tb-btn.active{color:#080c12;background:var(--accent);border-color:var(--accent)}
-.tb-btn.add-itp{color:var(--accent);border-color:rgba(0,200,255,.35)}.tb-btn.add-itp:hover{background:var(--accent-dim)}
-.tb-btn.add-itp.placing{background:var(--accent);color:#080c12;animation:pulse .8s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
-.z-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .13s}
-.z-btn:hover{color:var(--accent);border-color:var(--accent)}
+.tb-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0}
+/* Add pin button states */
+.tb-btn.itp-active{background:rgba(167,139,250,.2);color:var(--purple);border-color:var(--purple)}
+.tb-btn.def-active{background:rgba(255,77,109,.2);color:var(--danger);border-color:var(--danger)}
+.tb-btn.fs-active{background:rgba(255,77,109,.15);color:#ff6b6b;border-color:#ff6b6b}
+.tb-btn.fd-active{background:rgba(255,184,48,.2);color:var(--warn);border-color:var(--warn)}
 
-/* FILTER BAR */
-.filter-bar{height:38px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:8px;flex-shrink:0;overflow-x:auto}
+/* ── FILTER BAR ── */
+.filter-bar{height:36px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:6px;flex-shrink:0;overflow-x:auto}
 .filter-bar::-webkit-scrollbar{height:0}
-.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .13s;white-space:nowrap;user-select:none}
-.chip-all{background:var(--surface3);color:var(--text2);border-color:var(--border)}.chip-all.on{background:var(--surface);color:var(--text);border-color:var(--text2)}
-.chip-ns{background:transparent;color:var(--muted);border-color:var(--border)}.chip-ns.on{background:var(--surface3);color:var(--text2);border-color:var(--muted)}
-.chip-ip{background:transparent;color:var(--warn);border-color:rgba(255,184,48,.3)}.chip-ip.on{background:var(--warn-dim);border-color:var(--warn)}
-.chip-act{background:transparent;color:var(--danger);border-color:rgba(255,77,109,.3)}.chip-act.on{background:var(--danger-dim);border-color:var(--danger)}
-.chip-cl{background:transparent;color:var(--green);border-color:rgba(0,229,160,.3)}.chip-cl.on{background:var(--green-dim);border-color:var(--green)}
-.filter-sep{width:1px;height:18px;background:var(--border);flex-shrink:0;margin:0 4px}
-.layer-chip{background:transparent;color:var(--purple);border-color:rgba(167,139,250,.3)}.layer-chip.on{background:rgba(167,139,250,.1);border-color:var(--purple)}
+.filter-sep{width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 4px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .13s;white-space:nowrap;user-select:none}
+/* Layer chips - off by default, on when active */
+.chip-all{color:var(--muted);border-color:var(--border)}.chip-all.on{background:var(--surface3);color:var(--text);border-color:var(--text2)}
+.chip-itp{color:var(--muted);border-color:var(--border)}.chip-itp.on{background:rgba(167,139,250,.15);color:var(--purple);border-color:var(--purple)}
+.chip-def{color:var(--muted);border-color:var(--border)}.chip-def.on{background:rgba(255,77,109,.15);color:var(--danger);border-color:var(--danger)}
+.chip-fs{color:var(--muted);border-color:var(--border)}.chip-fs.on{background:rgba(255,100,100,.12);color:#ff6b6b;border-color:#ff6b6b}
+.chip-fd{color:var(--muted);border-color:var(--border)}.chip-fd.on{background:rgba(255,184,48,.15);color:var(--warn);border-color:var(--warn)}
+/* Status chips */
+.chip-sall{background:var(--surface3);color:var(--text2);border-color:var(--border)}.chip-sall.on{color:var(--text);border-color:var(--text2)}
+.chip-sns{color:var(--muted);border-color:var(--border)}.chip-sns.on{background:var(--surface3);color:var(--text2);border-color:var(--muted)}
+.chip-sip{color:var(--warn);border-color:rgba(255,184,48,.3)}.chip-sip.on{background:var(--warn-dim);border-color:var(--warn)}
+.chip-sact{color:var(--danger);border-color:rgba(255,77,109,.3)}.chip-sact.on{background:var(--danger-dim);border-color:var(--danger)}
+.chip-scl{color:var(--green);border-color:rgba(0,229,160,.3)}.chip-scl.on{background:var(--green-dim);border-color:var(--green)}
 
-/* VIEWER */
-.viewer{flex:1;overflow:hidden;position:relative}
-.viewer.grab{cursor:grab}.viewer.grabbing{cursor:crosshair}
-#pdfStage{position:absolute;transform-origin:top left}
+/* ── VIEWER AREA ── */
+.viewer-wrap{display:flex;flex:1;overflow:hidden;position:relative}
+.viewer{flex:1;overflow:hidden;position:relative;cursor:grab;background:#111420}
+.viewer.crosshair{cursor:crosshair}
+.viewer.grabbing{cursor:grabbing}
+#pdfStage{position:absolute;transform-origin:top left;will-change:transform}
 #pdfCanvas{display:block}
-
-/* ITP PINS */
-.itp-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:30;transition:transform .1s}
-.itp-pin:hover{transform:translate(-50%,-50%) scale(1.2)}
-
-.itp-pin.flashing{transform:translate(-50%,-50%) scale(1.6);z-index:999;transition:transform .3s}
-.itp-pin.flashing .pin-dot{box-shadow:0 0 0 6px rgba(0,200,255,.4),0 4px 16px rgba(0,0,0,.6)!important}
-.pin-dot{height:24px;min-width:24px;padding:0 7px;border-radius:12px;border:2px solid rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 0 2px rgba(0,0,0,.3);transition:all .13s;white-space:nowrap;letter-spacing:0.5px}
-.pin-dot.ns{background:#3d5a7a;border-color:#5a7a9a}
-.pin-dot.ip{background:#cc8800;border-color:var(--warn)}
-.pin-dot.act{background:#cc2244;border-color:var(--danger)}
-.pin-dot.cl{background:#00aa70;border-color:var(--green)}
-.pin-dot.placing-preview{background:var(--accent);border-color:#fff;animation:pulse .6s infinite}
-.pin-label{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:3px;background:rgba(8,12,18,.9);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);white-space:nowrap;pointer-events:none;display:none}
-.itp-pin:hover .pin-label{display:block}
-
-/* PLACE HINT */
-.ctx-menu{position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:2000;min-width:160px;padding:4px;display:none}
-.ctx-item{padding:8px 14px;font-size:13px;cursor:pointer;border-radius:5px;display:flex;align-items:center;gap:8px;color:var(--text)}
-.ctx-item:hover{background:var(--accent-dim);color:var(--accent)}
-.place-hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,200,255,.15);border:1.5px solid var(--accent);color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;padding:8px 18px;border-radius:8px;z-index:100;display:none;pointer-events:none;backdrop-filter:blur(4px)}
-
-/* PIN MODAL */
-.mo{position:fixed;inset:0;background:rgba(4,8,16,.82);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
-.mo.open{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;width:360px;max-width:96vw;max-height:90vh}
-.modal-hdr{padding:16px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
-.modal-hdr h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:800}
-.modal-body{overflow-y:auto;flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
-.modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:7px;justify-content:flex-end;flex-shrink:0}
-.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
-.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
-.mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
-.ms{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer}
-.ms:focus{border-color:var(--accent)}.ms option,.ms optgroup{background:var(--surface2)}
-.sugg-wrap{position:relative}
-.sugg-list{position:fixed;z-index:9999;background:var(--surface2);border:1px solid var(--border);border-radius:7px;max-height:200px;overflow-y:auto;display:none;box-shadow:0 8px 20px rgba(0,0,0,.5);min-width:200px}
-.sugg-item{padding:7px 11px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}.sugg-item:last-child{border-bottom:none}.sugg-item:hover{background:var(--surface3);color:var(--accent)}
-.mbtn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
-.mbp{background:var(--accent);color:#080c12}.mbp:hover{background:#33d4ff}
-.mbg{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}.mbg:hover{color:var(--text);border-color:var(--text2)}
-
-/* STATUS ROW in modal */
-.st-row{display:flex;gap:6px}
-.st-opt{flex:1;padding:6px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;text-align:center;transition:all .13s}
-.st-opt:hover{border-color:var(--text2);color:var(--text2)}
-.st-opt.sel-ns{border-color:var(--muted);background:var(--surface3);color:var(--text2)}
-.st-opt.sel-ip{border-color:var(--warn);background:var(--warn-dim);color:var(--warn)}
-.st-opt.sel-act{border-color:var(--danger);background:var(--danger-dim);color:var(--danger)}
-.st-opt.sel-cl{border-color:var(--green);background:var(--green-dim);color:var(--green)}
-
-/* LOADING */
-.loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--text2);font-size:13px;background:var(--bg);z-index:5}
-.spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+#pinLayer{position:absolute;inset:0;pointer-events:none;z-index:30}
+.loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted)}
+.spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.error-state,.no-pdf{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted)}
+.error-state,.no-pdf{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:13px}
 
+/* ── PIN DOTS ── */
+.drw-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:30;transition:transform .1s;pointer-events:all}
+.drw-pin:hover{transform:translate(-50%,-50%) scale(1.2);z-index:40}
+.drw-pin.hidden{display:none}
+/* ITP - pill */
+.pin-itp{height:22px;min-width:22px;padding:0 7px;border-radius:11px;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);background:#6d4aff;color:#fff;white-space:nowrap}
+.pin-itp.ns{background:#3d5a7a}.pin-itp.ip{background:#cc8800}.pin-itp.act{background:#cc2244}.pin-itp.cl{background:#00aa70}
+/* Defect - circle */
+.pin-def{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);background:var(--danger);color:#fff}
+.pin-def.cl{background:#00aa70}
+/* Fire Seal - diamond */
+.pin-fs-wrap{width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.pin-fs{width:18px;height:18px;background:#ff4444;border:2px solid rgba(255,255,255,.7);transform:rotate(45deg);box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.pin-fs.cl{background:#00aa70}
+/* Fire Damper - pentagon via clip-path */
+.pin-fd{width:22px;height:22px;background:#ff9500;border:2px solid rgba(255,255,255,.7);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);color:#fff;clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%)}
+.pin-fd.cl{background:#00aa70}
+/* Pin label on hover */
+.pin-lbl{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);background:rgba(8,12,18,.92);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);white-space:nowrap;pointer-events:none;display:none;z-index:50}
+.drw-pin:hover .pin-lbl{display:block}
 
-/* ── SIDEBAR STANDARD ── */
-.sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden;overflow-x:hidden}
-.sb.sm{width:52px}
-.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.sb-brand{display:flex;align-items:center;gap:9px;overflow:hidden}.sb-icon{font-size:20px;flex-shrink:0}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
-.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
-.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
-.sb-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0;scrollbar-width:thin}
-.sb-nav::-webkit-scrollbar{width:4px}.sb-nav::-webkit-scrollbar-track{background:transparent}.sb-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;position:relative;overflow:hidden;text-decoration:none}.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
-.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
-.sb-tooltip{position:fixed;background:var(--surface2);color:var(--text);font-size:12px;font-weight:500;padding:5px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.4)}
-.sb-group{}.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}.sb-group-hdr:hover{background:var(--surface2)}
-.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
-.sb-group-items .sb-item{padding-left:28px}
-.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-group-hdr,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
-.sb.sm .sb-group-items{display:block !important}.sb.sm .sb-item{padding:9px 14px;justify-content:center;border-left:none;overflow:visible}
-.sb.sm .sb-top{padding:14px 12px 10px;justify-content:center}.sb.sm .sb-footer{justify-content:center}.sb.sm .sb-item-icon{width:auto}
-.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
-.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
-.main{margin-left:230px;transition:margin-left .25s}
+/* ── PLACE HINT ── */
+.place-hint{position:fixed;top:96px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:7px 18px;font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);z-index:200;display:none;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+
+/* ── ZOOM FAB ── */
+.zoom-fab{position:absolute;bottom:20px;left:20px;z-index:100;display:flex;flex-direction:column;gap:6px;pointer-events:all}
+.z-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .13s;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.z-btn:hover{color:var(--accent);border-color:var(--accent);background:var(--surface2)}
 
 /* ── PINS PANEL ── */
 .pins-panel{width:300px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .2s;flex-shrink:0;position:relative}
 .pins-panel.collapsed{width:16px}
 .pins-panel.collapsed .pp-hide{display:none!important}
-.pp-collapse-tab{position:absolute;top:50%;left:-1px;transform:translateY(-50%);width:16px;height:48px;background:var(--surface2);border:1px solid var(--border);border-right:none;border-radius:6px 0 0 6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px;transition:all .13s;z-index:5}
-.pp-collapse-tab:hover{color:var(--accent);background:var(--surface3)}
-.pp-hdr{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.pp-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.pp-tab{position:absolute;top:50%;left:-1px;transform:translateY(-50%);width:16px;height:48px;background:var(--surface2);border:1px solid var(--border);border-right:none;border-radius:6px 0 0 6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px;z-index:5;transition:all .13s}
+.pp-tab:hover{color:var(--accent);background:var(--surface3)}
+.pp-hdr{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.pp-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex:1}
 .pp-list{flex:1;overflow-y:auto;padding:6px}
-.pin-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;overflow:hidden;cursor:pointer;transition:border-color .13s}
+.pin-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:pointer;transition:border-color .13s;overflow:hidden}
 .pin-item:hover{border-color:var(--muted)}
+.pin-item.itp{border-left:3px solid var(--purple)}
+.pin-item.defect{border-left:3px solid var(--danger)}
+.pin-item.fireseal{border-left:3px solid #ff4444}
+.pin-item.firedamper{border-left:3px solid #ff9500}
 .pi-hdr{display:flex;align-items:center;gap:7px;padding:8px 11px}
 .pi-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.pin-item.itp .pi-dot{background:var(--purple)}.pin-item.defect .pi-dot{background:var(--danger)}.pin-item.fire .pi-dot{background:var(--warn)}
+.pin-item.itp .pi-dot{background:var(--purple)}.pin-item.defect .pi-dot{background:var(--danger)}.pin-item.fireseal .pi-dot{background:#ff4444}.pin-item.firedamper .pi-dot{background:#ff9500}
 .pi-ref{font-family:'DM Mono',monospace;font-size:11px;font-weight:700;flex-shrink:0}
-.pin-item.itp .pi-ref{color:var(--purple)}.pin-item.defect .pi-ref{color:var(--danger)}.pin-item.fire .pi-ref{color:var(--warn)}
+.pin-item.itp .pi-ref{color:var(--purple)}.pin-item.defect .pi-ref{color:var(--danger)}.pin-item.fireseal .pi-ref{color:#ff4444}.pin-item.firedamper .pi-ref{color:#ff9500}
 .pi-desc{flex:1;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pi-st{font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:20px;flex-shrink:0}
-.st-ns{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
-.st-ip{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
-.st-act{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
-.st-cl{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
-.pi-body{display:none;padding:8px 11px 11px;border-top:1px solid var(--border)}
-.pin-item.exp .pi-body{display:block}
-/* ── ZOOM FAB ── */
-.zoom-fab{position:absolute;bottom:20px;left:20px;z-index:100;display:flex;flex-direction:column;gap:6px;pointer-events:all}
-/* ── LAYER CHIPS ── */
-.chip.layer-all{color:var(--muted);border-color:var(--border);background:transparent}
-.chip.layer-all.on{background:var(--surface3);border-color:var(--text2);color:var(--text)}
-.chip.layer-itp{color:var(--muted);border-color:var(--border);background:transparent}
-.chip.layer-itp.on{background:rgba(167,139,250,.15);border-color:var(--purple);color:var(--purple)}
-.chip.layer-def{color:var(--muted);border-color:var(--border);background:transparent}
-.chip.layer-def.on{background:rgba(255,77,109,.15);border-color:var(--danger);color:var(--danger)}
-.chip.layer-fire{color:var(--muted);border-color:var(--border);background:transparent}
-.chip.layer-fire.on{background:rgba(255,184,48,.15);border-color:var(--warn);color:var(--warn)}
-/* ── ADD PIN BUTTON ACTIVE STATES ── */
-.tb-btn.active-itp{background:rgba(167,139,250,.2)!important;color:var(--purple)!important;border-color:var(--purple)!important}
-.tb-btn.active-defect{background:rgba(255,77,109,.2)!important;color:var(--danger)!important;border-color:var(--danger)!important}
-.tb-btn.active-fire{background:rgba(255,184,48,.2)!important;color:var(--warn)!important;border-color:var(--warn)!important}
+.pi-st.ns{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.pi-st.ip{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
+.pi-st.act{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
+.pi-st.cl{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
 
+/* ── MODALS ── */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(2px)}
+.mo.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.modal-hdr h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;flex:1}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+.mi{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%}
+.mi:focus{border-color:var(--accent)}
+.mbtn{padding:7px 16px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:600;transition:all .13s}
+.mbtn:hover{color:var(--text);border-color:var(--text2)}
+.mbtn.primary{background:var(--accent);color:#000;border-color:var(--accent)}
+.mbtn.primary:hover{opacity:.9}
+.mbtn.danger{color:var(--danger);border-color:rgba(255,77,109,.4)}
+/* Service type buttons for Fire Seal */
+.svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.svc-btn{padding:12px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;text-align:center;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px}
+.svc-btn:hover{border-color:var(--accent);color:var(--text)}
+.svc-btn.sel{background:rgba(255,68,68,.15);border-color:#ff4444;color:#ff4444}
+.svc-btn .svc-icon{font-size:20px}
+/* Context menu */
+.ctx-menu{position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:400;display:none;min-width:140px;overflow:hidden}
+.ctx-item{padding:10px 14px;font-size:13px;cursor:pointer;color:var(--text2);transition:background .1s}
+.ctx-item:hover{background:var(--surface3);color:var(--text)}
 </style>
-<script src="db.js"></script>
 </head>
 <body>
-<!-- SIDEBAR -->
-<div class="sb" id="sidebar"><div class="sb-resize-handle" id="sbResize"></div>
-  <div class="sb-top"><div class="sb-brand"><span class="sb-icon">&#10052;</span><span class="sb-name">HVAC NEXUS</span></div><button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">&laquo;</button></div>
-  <div class="sb-proj-block"><div class="sb-proj-lbl">Current Project</div><div class="sb-proj-name" id="sb-proj-name">—</div><div class="sb-proj-num" id="sb-proj-num">—</div></div>
-  <nav class="sb-nav" id="sbNav">
-    <div class="sb-item" onclick="navTo('project.html')" style="border-bottom:1px solid var(--border);margin-bottom:4px"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Dashboard</span></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('financials')" id="ghdr-financials"><span class="sb-group-chev" id="gchev-financials">▾</span><span class="sb-group-name">Financials</span></div>
-      <div class="sb-group-items" id="gitems-financials" style="display:block">
-        <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
-        <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span></div>
-        <div class="sb-item" onclick="navTo('hvac-vendor-invoices.html')"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
-        <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span></div>
-        <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('procurement')" id="ghdr-procurement"><span class="sb-group-chev" id="gchev-procurement">▾</span><span class="sb-group-name">Procurement</span></div>
-      <div class="sb-group-items" id="gitems-procurement" style="display:block">
-        <div class="sb-item" onclick="navTo('hvac-procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
-        <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
-        <div class="sb-item" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('technical')" id="ghdr-technical"><span class="sb-group-chev" id="gchev-technical">▾</span><span class="sb-group-name">Technical</span></div>
-      <div class="sb-group-items" id="gitems-technical" style="display:block">
-        <div class="sb-item" onclick="navTo('hvac-rfi.html')"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span></div>
-        <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span></div>
-        <div class="sb-item active" ><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></div>
-        <div class="sb-item" onclick="navTo('hvac-specifications.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span></div>
-        <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('commissioning')" id="ghdr-commissioning"><span class="sb-group-chev" id="gchev-commissioning">▾</span><span class="sb-group-name">Commissioning</span></div>
-      <div class="sb-group-items" id="gitems-commissioning" style="display:block">
-        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning plan</span></div>
-        <div class="sb-item" onclick="navTo('hvac-precommissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span></div>
-        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
-      <div class="sb-group-items" id="gitems-quality" style="display:block">
-        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
-        <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
-        <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
-      <div class="sb-group-items" id="gitems-settings" style="display:block">
-        <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
-      </div></div>
-  </nav>
-  <div class="sb-footer"><div class="sb-av" id="sb-av">S</div><span class="sb-user-name" id="sb-user">—</span></div>
-</div>
-
-
-<!-- MAIN -->
-<div id="mainWrap" style="position:fixed;top:0;left:230px;right:0;bottom:0;display:flex;flex-direction:column;transition:left .25s;overflow:hidden">
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <button class="tb-btn" onclick="navTo('hvac-drawings.html')" style="font-size:11px">← Drawings</button>
-  <div class="tb-sep"></div>
   <div class="drw-info">
-    <div class="drw-num" id="topNum">—</div>
-    <div class="drw-name" id="topName">Loading…</div>
+    <div class="drw-num" id="topNum">Loading…</div>
+    <div class="drw-name" id="topName"></div>
   </div>
   <div class="tb-sep"></div>
-  <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Add Pin</span>
-  <button class="tb-btn add-itp" id="addItpBtn" onclick="setPinType('itp')" style="color:var(--purple);border-color:rgba(167,139,250,.4)">🔵 ITP</button>
-  <button class="tb-btn" id="addDefBtn" onclick="setPinType('defect')" style="color:var(--danger);border-color:rgba(255,77,109,.4)">🔴 Defect</button>
-  <button class="tb-btn" id="addFireBtn" onclick="setPinType('fire')" style="color:var(--warn);border-color:rgba(255,184,48,.4)">🟡 Fire</button>
+  <span class="tb-lbl">Add Pin</span>
+  <button class="tb-btn" id="btnItp" onclick="startPlace('itp')" style="color:var(--purple);border-color:rgba(167,139,250,.4)">🔵 ITP</button>
+  <button class="tb-btn" id="btnDef" onclick="startPlace('defect')" style="color:var(--danger);border-color:rgba(255,77,109,.4)">🔴 Defect</button>
+  <button class="tb-btn" id="btnFs" onclick="startPlace('fireseal')" style="color:#ff4444;border-color:rgba(255,68,68,.4)">🔶 Fire Seal</button>
+  <button class="tb-btn" id="btnFd" onclick="startPlace('firedamper')" style="color:#ff9500;border-color:rgba(255,149,0,.4)">🟠 Fire Damper</button>
   <div class="tb-sep"></div>
-  <button class="tb-btn" id="flashPinsBtn" onclick="flashPins()" title="Spotlight pins">⚡</button>
-  <button class="tb-btn" onclick="togglePinsPanel()" title="Toggle pins panel">📍</button>
+  <button class="tb-btn" onclick="flashPins()" title="Spotlight">⚡</button>
+  <button class="tb-btn" onclick="togglePanel()" title="Toggle pin panel">📍</button>
 </div>
 
 <!-- FILTER BAR -->
-<div class="filter-bar" id="filterBar">
-  <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0">Layers</span>
-  <div class="chip layer-all on" id="layer-all" onclick="toggleLayer2('all')">👁 All</div>
-  <div class="chip layer-itp on" id="layer-itp" onclick="toggleLayer2('itp')">🔵 ITP</div>
-  <div class="chip layer-def on" id="layer-defect" onclick="toggleLayer2('defect')">🔴 Defect</div>
-  <div class="chip layer-fire on" id="layer-fire" onclick="toggleLayer2('fire')">🟡 Fire</div>
+<div class="filter-bar">
+  <span class="tb-lbl">Layers</span>
+  <div class="chip chip-all on" id="lay-all" onclick="toggleLayer('all')">👁 All</div>
+  <div class="chip chip-itp on" id="lay-itp" onclick="toggleLayer('itp')">🔵 ITP</div>
+  <div class="chip chip-def on" id="lay-def" onclick="toggleLayer('defect')">🔴 Defect</div>
+  <div class="chip chip-fs on" id="lay-fs" onclick="toggleLayer('fireseal')">🔶 Fire Seal</div>
+  <div class="chip chip-fd on" id="lay-fd" onclick="toggleLayer('firedamper')">🟠 Fire Damper</div>
   <div class="filter-sep"></div>
-  <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0">Status</span>
-  <div class="chip chip-all on" id="chip-all" onclick="toggleStatusChip('all')">All</div>
-  <div class="chip chip-ns" id="chip-ns" onclick="toggleStatusChip('not-started')">● Not Started</div>
-  <div class="chip chip-ip" id="chip-ip" onclick="toggleStatusChip('in-progress')">● In Progress</div>
-  <div class="chip chip-act" id="chip-act" onclick="toggleStatusChip('action')">● Action Req.</div>
-  <div class="chip chip-cl" id="chip-cl" onclick="toggleStatusChip('closed')">● Closed</div>
-  <div id="placeHintBar" style="display:none;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);margin-left:auto">📍 Click drawing to place pin — Esc to cancel</div>
+  <span class="tb-lbl">Status</span>
+  <div class="chip chip-sall on" id="st-all" onclick="toggleStatus('all')">All</div>
+  <div class="chip chip-sns" id="st-ns" onclick="toggleStatus('not-started')">● Not Started</div>
+  <div class="chip chip-sip" id="st-ip" onclick="toggleStatus('in-progress')">● In Progress</div>
+  <div class="chip chip-sact" id="st-act" onclick="toggleStatus('action')">● Action</div>
+  <div class="chip chip-scl" id="st-cl" onclick="toggleStatus('closed')">● Closed</div>
+  <div id="placeHintBar" style="display:none;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);margin-left:auto;flex-shrink:0">📍 Click to place — Esc to cancel</div>
 </div>
 
-<!-- VIEWER + SIDE PANEL -->
-<div style="display:flex;flex:1;overflow:hidden;position:relative">
-  <div class="viewer grab" id="viewer" style="flex:1;position:relative">
+<!-- VIEWER + PANEL -->
+<div class="viewer-wrap">
+  <div class="viewer" id="viewer">
     <div id="pdfStage"><canvas id="pdfCanvas"></canvas></div>
-    <div id="pinLayer" style="position:absolute;inset:0;pointer-events:none;z-index:30"></div>
-    <div class="loading" id="loading"><div class="spin"></div><span>Loading drawing…</span></div>
+    <div id="pinLayer"></div>
+    <div class="loading" id="loading"><div class="spin"></div><span style="font-size:13px;color:var(--muted)">Loading drawing…</span></div>
     <div class="error-state" id="errorState"><div style="font-size:36px">⚠️</div><div id="errorMsg">Could not load PDF</div></div>
-    <div class="no-pdf" id="noPdf"><div style="font-size:48px">📄</div><div>No PDF attached to this drawing</div><div style="font-size:11px">Upload a PDF in the Drawings module first</div></div>
-    <!-- Zoom FAB bottom-left -->
+    <div class="no-pdf" id="noPdf"><div style="font-size:40px">📄</div><div>No PDF uploaded for this drawing</div></div>
     <div class="zoom-fab">
       <button class="z-btn" onclick="zoom(1.25)" title="Zoom in">+</button>
       <button class="z-btn" onclick="zoom(0.8)" title="Zoom out">−</button>
-      <button class="z-btn" onclick="fitToScreen()" title="Fit to screen">⊡</button>
+      <button class="z-btn" onclick="fitToScreen()" title="Fit">⊡</button>
     </div>
   </div>
 
-  <!-- PINS SIDE PANEL -->
-  <div class="pins-panel" id="pinsPanel" style="width:300px">
-    <div class="pp-collapse-tab" onclick="togglePinsPanel()" id="ppCollapseTab" title="Toggle pins panel">◀</div>
+  <!-- PINS PANEL -->
+  <div class="pins-panel" id="pinsPanel">
+    <div class="pp-tab" id="ppTab" onclick="togglePanel()">◀</div>
     <div class="pp-hdr pp-hide">
       <span class="pp-title">Pins</span>
-      <select id="pinTypeFilter" onchange="renderPinPanel()" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-size:11px;padding:2px 6px;outline:none">
+      <select id="ppFilter" onchange="renderPanel()" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-size:11px;padding:2px 6px;outline:none;cursor:pointer">
         <option value="">All</option>
         <option value="itp">ITP</option>
         <option value="defect">Defect</option>
-        <option value="fire">Fire</option>
+        <option value="fireseal">Fire Seal</option>
+        <option value="firedamper">Fire Damper</option>
       </select>
     </div>
     <div class="pp-list pp-hide" id="ppList"></div>
   </div>
 </div>
 
-<div id="pinCtxMenu" class="ctx-menu">
-  <div class="ctx-item" onclick="ctxMovePin()">📍 Move Pin</div>
+<!-- PLACE HINT OVERLAY -->
+<div class="place-hint" id="placeHint"></div>
+
+<!-- CONTEXT MENU -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" onclick="ctxMove()">📍 Move Pin</div>
+  <div class="ctx-item" onclick="ctxDelete()" style="color:var(--danger)">🗑 Delete Pin</div>
 </div>
 
-</div><!-- /mainWrap -->
-
-<!-- PIN MODAL -->
-<div class="mo" id="pinMo">
-  <div class="modal">
-    <div class="modal-hdr"><h3 id="pinMoTitle">New ITP Pin</h3></div>
+<!-- ITP PIN MODAL (reuses pdf-viewer modal) -->
+<div class="mo" id="itpMo">
+  <div class="modal" style="width:420px">
+    <div class="modal-hdr"><h3 id="itpMoTitle">New ITP Pin</h3></div>
     <div class="modal-body">
       <div>
-        <label class="ml">ITP TYPE *</label>
-        <select class="mi" id="pinItpType" onchange="onPinTypeInput()" style="cursor:pointer;height:38px;appearance:auto"></select>
+        <label class="ml">ITP Type *</label>
+        <select class="mi" id="itpType" style="height:38px;appearance:auto;cursor:pointer" onchange="onItpTypeChange()"></select>
       </div>
-      <div id="pinEquipField">
-        <label class="ml" id="pinEquipLabel">Equipment ID</label>
-        <div class="sugg-wrap">
-          <input class="mi" id="pinEquipTag" placeholder="e.g. FCU-L02-001" oninput="showEquipSugg()" autocomplete="off">
-          <div class="sugg-list" id="equipSugg"></div>
-        </div>
+      <div id="itpEquipWrap">
+        <label class="ml">Equipment ID</label>
+        <input class="mi" id="itpEquip" placeholder="e.g. FCU-L02-001" autocomplete="off">
       </div>
       <div>
         <label class="ml">Status</label>
-        <div class="st-row">
-          <div class="st-opt sel-ns" id="st-not-started" onclick="setStatus('not-started')">Not Started</div>
-          <div class="st-opt" id="st-in-progress" onclick="setStatus('in-progress')">In Progress</div>
-          <div class="st-opt" id="st-action" onclick="setStatus('action')">Action Req.</div>
-          <div class="st-opt" id="st-closed" onclick="setStatus('closed')">Closed</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="mbtn" id="sopt-ns" onclick="selectStatus('not-started')" style="flex:1;font-size:11px">Not Started</button>
+          <button class="mbtn" id="sopt-ip" onclick="selectStatus('in-progress')" style="flex:1;font-size:11px">In Progress</button>
+          <button class="mbtn" id="sopt-act" onclick="selectStatus('action')" style="flex:1;font-size:11px">Action</button>
+          <button class="mbtn" id="sopt-cl" onclick="selectStatus('closed')" style="flex:1;font-size:11px">Closed</button>
         </div>
       </div>
-      <textarea id="pinNotes" style="display:none"></textarea>
-      <input type="hidden" id="pinRef">
     </div>
     <div class="modal-footer">
-      <button class="mbg mbtn" onclick="closePinMo()">Cancel</button>
-      <button class="mbg mbtn" id="deletePinBtn" onclick="deletePin()" style="color:var(--danger);border-color:rgba(255,77,109,.3);display:none">Delete Pin</button>
-      <button class="mbp mbtn" onclick="savePin()">Save Pin</button>
+      <button class="mbtn" onclick="closeItpMo()">Cancel</button>
+      <button class="mbtn danger" id="itpDelBtn" onclick="deleteCurrentPin()" style="display:none;margin-right:auto">Delete</button>
+      <button class="mbtn primary" onclick="saveItpPin()">Save Pin</button>
     </div>
   </div>
 </div>
 
-<script>
-pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+<!-- FIRE SEAL MODAL -->
+<div class="mo" id="fsMo">
+  <div class="modal" style="width:380px">
+    <div class="modal-hdr"><h3>🔶 Fire Seal Pin</h3><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="fsRef"></span></div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">Service Type *</label>
+        <div class="svc-grid">
+          <button class="svc-btn" id="svc-pipe" onclick="selectSvc('pipe')"><span class="svc-icon">🔧</span>Pipe</button>
+          <button class="svc-btn" id="svc-cable" onclick="selectSvc('cable')"><span class="svc-icon">🔌</span>Cable</button>
+          <button class="svc-btn" id="svc-conduit" onclick="selectSvc('conduit')"><span class="svc-icon">⬛</span>Conduit</button>
+          <button class="svc-btn" id="svc-refrigerant" onclick="selectSvc('refrigerant')"><span class="svc-icon">❄️</span>Refrigerant</button>
+          <button class="svc-btn" id="svc-bms" onclick="selectSvc('bms')"><span class="svc-icon">📡</span>BMS</button>
+          <button class="svc-btn" id="svc-electrical" onclick="selectSvc('electrical')"><span class="svc-icon">⚡</span>Electrical</button>
+        </div>
+      </div>
+      <div>
+        <label class="ml">Photo (optional)</label>
+        <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;background:var(--surface2);border:1.5px dashed var(--border);border-radius:7px;padding:10px 14px;font-size:12px;color:var(--muted);width:100%">
+          <span style="font-size:20px">📷</span><span id="fsPhotoLbl">Tap to add photo</span>
+          <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleFsPhoto(this)">
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn" onclick="closeFsMo()">Cancel</button>
+      <button class="mbtn danger" id="fsDelBtn" onclick="deleteCurrentPin()" style="display:none;margin-right:auto">Delete</button>
+      <button class="mbtn primary" onclick="saveFsPin()">Save</button>
+    </div>
+  </div>
+</div>
 
-// ── DATA KEYS ──
+<!-- FIRE DAMPER MODAL -->
+<div class="mo" id="fdMo">
+  <div class="modal" style="width:420px">
+    <div class="modal-hdr"><h3>🟠 Fire Damper Pin</h3><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="fdRef"></span></div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">Damper Tag</label>
+        <input class="mi" id="fdTag" placeholder="e.g. FD-L02-001">
+      </div>
+      <div>
+        <label class="ml">Duct Size</label>
+        <input class="mi" id="fdSize" placeholder="e.g. 600x300">
+      </div>
+      <div>
+        <label class="ml">Assignee</label>
+        <input class="mi" id="fdAssignee" placeholder="Assigned subcontractor">
+      </div>
+      <div>
+        <label class="ml">Status</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="mbtn" id="fdst-ns" onclick="selectFdStatus('not-started')" style="flex:1;font-size:11px">Not Started</button>
+          <button class="mbtn" id="fdst-ip" onclick="selectFdStatus('in-progress')" style="flex:1;font-size:11px">In Progress</button>
+          <button class="mbtn" id="fdst-cl" onclick="selectFdStatus('closed')" style="flex:1;font-size:11px">Closed</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn" onclick="closeFdMo()">Cancel</button>
+      <button class="mbtn danger" id="fdDelBtn" onclick="deleteCurrentPin()" style="display:none;margin-right:auto">Delete</button>
+      <button class="mbtn primary" onclick="saveFdPin()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- DEFECT PIN MODAL -->
+<div class="mo" id="defMo">
+  <div class="modal" style="width:420px">
+    <div class="modal-hdr"><h3>🔴 Defect Pin</h3><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="defRef"></span></div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">Description *</label>
+        <textarea class="mi" id="defDesc" rows="3" placeholder="Describe the defect…" style="resize:vertical"></textarea>
+      </div>
+      <div>
+        <label class="ml">Priority</label>
+        <select class="mi" id="defPriority" style="height:38px;appearance:auto">
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn" onclick="closeDefMo()">Cancel</button>
+      <button class="mbtn danger" id="defDelBtn" onclick="deleteCurrentPin()" style="display:none;margin-right:auto">Delete</button>
+      <button class="mbtn primary" onclick="saveDefPin()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── PARAMS & STATE ──
 var params=new URLSearchParams(window.location.search);
 var drawingId=params.get('id')||params.get('drawingId')||'';
-var itpTypeFilter=params.get('itpType')||''; // optional pre-filter
-var proj=dbGetCurrentProject();
-var pKey=proj.num||proj.number||'GCT001';
+var pKey=(dbGetCurrentProject()||{}).num||'GCT001';
 
-// ITP MASTER LIST (same as itp register)
-var ITP_MASTER=['AC Single Head - Split','AC Multi Head - Split','AC Multi Head CU - Split','AHU CHW and HHW','Attenuator','Boiler','CRAC Unit','Chiller - Water Cooled','Chiller - Air Cooled','Electric Duct Heater','Expansion Tank','FCU - Water Cooled','Fans','Humidifier','Hot Water Heater','MSSB/DCP','BMS Panel','Plate Heat Exchanger','Pump','VAV','VRF - BP Box','VRF - Indoor Unit','VRF - Outdoor Unit','Auto Refill Unit','Chemical Dosing Pot - Cooling Tower','Side Stream Filtration - Cooling Tower','PAC Unit - Air Cooled','PAC Unit - Water Cooled','Chilled Beams','Energy Recovery Ventilator','Security Grilles','DAHU','Pressure Relief Damper','VSD','Duct Installation Riser','Pipework Pressure Test','Refrigeration Pressure Test & Vacuum','Seismic Install','Flushing','Duct Installation','Duct Pressure Testing','Refrigeration Pipework Install','Mechanical Services Seals','Water Pipework Installation','Fire Seals','Fire Dampers','Penetration ITP'];
-var EQUIP_TYPES=['AC Single Head - Split','AC Multi Head - Split','AC Multi Head CU - Split','AHU CHW and HHW','Attenuator','Boiler','CRAC Unit','Chiller - Water Cooled','Chiller - Air Cooled','Electric Duct Heater','Expansion Tank','FCU - Water Cooled','Fans','Humidifier','Hot Water Heater','MSSB/DCP','BMS Panel','Plate Heat Exchanger','Pump','VAV','VRF - BP Box','VRF - Indoor Unit','VRF - Outdoor Unit','Auto Refill Unit','Chemical Dosing Pot - Cooling Tower','Side Stream Filtration - Cooling Tower','PAC Unit - Air Cooled','PAC Unit - Water Cooled','Chilled Beams','Energy Recovery Ventilator','Security Grilles','DAHU','Pressure Relief Damper','VSD'];
-
-// STATE
-var PDF_BASE_RES=3.0,PDF_FAST_RES=1.5;
 var _scale=1,_offsetX=0,_offsetY=0;
 var _dragging=false,_lastX=0,_lastY=0;
 var _canvasW=0,_canvasH=0;
 var _renderTask=null;
-var _placing=false;
-var _showDeleted=false;
+var _placing=false; // true = click places pin
+var _placeType=''; // 'itp','defect','fireseal','firedamper'
 var _movingPinId=null;
-var _pendingX=0,_pendingY=0; // canvas % position for new pin
+var _ctxPinId=null;
 var _editPinId=null;
-var _pinStatus='not-started';
+var _pendingX=0,_pendingY=0;
+var _fsService='';
+var _fsPhoto=null;
+var _fdStatus='not-started';
+var _itpStatus='not-started';
+var _showDeleted=false;
 
-// FILTERS
-var _activeStatuses=new Set(); // empty = all
-var _activeLayers=new Set();   // empty = all
+// Layer/status visibility
+var _layers={itp:true,defect:true,fireseal:true,firedamper:true};
+var _statusFilter=''; // '' = all
 
 // DATA
 var drawings=[];
-var structure={buildings:[]};
 var responses={};
-var equipData=null;
+var defects=[];
 var templates=[];
 var curDrawing=null;
 
-async function loadData(){
-  try{var d=await dbGetDrawings(pKey);drawings=Array.isArray(d)?d:[];}catch(e){}
-  try{var s=await dbGetItpStructure(pKey);structure=(s&&s.buildings)?s:{buildings:[]};}catch(e){}
-  try{var r=await dbGetItpResponses(pKey);responses=r||{};}catch(e){}
-  try{var eq=await dbGetEquipment(pKey);equipData=eq||null;}catch(e){}
-  try{var pt=await dbGetItpProjectTemplates(pKey);templates=Array.isArray(pt)?pt:[];}catch(e){}
-
-  curDrawing=drawings.find(function(d){return d.id===drawingId;})||null;
-}
-function saveDrawings(){
-  dbSetDrawings(pKey,drawings).catch(function(e){console.error('saveDrawings error:',e);});
-}
-function saveResponses(){
-  dbSetItpResponses(pKey,responses).catch(function(e){console.error('saveResponses error:',e);});
-}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function nid(){return'pin_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);}
+function today(){return new Date().toISOString().split('T')[0];}
+function toast(msg,col){var t=document.createElement('div');t.textContent=msg;t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(col||'var(--surface)')+(col?';color:#000':';color:var(--text)')+';border:1px solid var(--border);padding:8px 20px;border-radius:8px;font-size:12px;z-index:9999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.4)';document.body.appendChild(t);setTimeout(function(){t.remove();},2500);}
+
+// ── LOAD DATA ──
+async function loadData(){
+  try{var d=await dbGetDrawings(pKey);drawings=Array.isArray(d)?d:[];}catch(e){}
+  try{var r=await dbGetItpResponses(pKey);responses=r||{};}catch(e){}
+  try{var df=await dbGetProject('defects',pKey);defects=Array.isArray(df)?df:[];}catch(e){}
+  try{var pt=await dbGetItpProjectTemplates(pKey);templates=Array.isArray(pt)?pt:[];}catch(e){}
+  curDrawing=drawings.find(function(d){return d.id===drawingId;})||null;
+}
+function saveAll(){
+  var toStore=drawings.map(function(d){var c=Object.assign({},d);c.history=(d.history||[]).map(function(h){return Object.assign({},h);});c.pins=(d.pins||[]).map(function(p){return Object.assign({},p);});delete c.pdfData;return c;});
+  dbSetDrawings(pKey,toStore).catch(function(e){console.error(e);});
+  dbSetItpResponses(pKey,responses).catch(function(e){console.error(e);});
+}
+function saveDefects(){
+  dbSetProject('defects',pKey,defects).catch(function(e){console.error(e);});
+}
 
 // ── INIT ──
 (async function(){
   await loadData();
-  if(!drawingId){showError('No drawing ID provided');return;}
+  if(!drawingId){showError('No drawing ID');return;}
   if(!curDrawing){showError('Drawing not found');return;}
   document.title=(curDrawing.num||'Drawing')+' — HVAC NEXUS';
   document.getElementById('topNum').textContent=curDrawing.num||'—';
-  document.getElementById('topName').textContent=curDrawing.name||'Untitled Drawing';
-  buildLayerChips();
-  if(curDrawing.pdfUrl&&!curDrawing.pdfData){loadFromUrl(curDrawing.pdfUrl);}
+  document.getElementById('topName').textContent=curDrawing.name||'';
+  populateItpTypes();
+  if(curDrawing.pdfUrl){loadFromUrl(curDrawing.pdfUrl);}
   else if(curDrawing.pdfData){loadFromData(curDrawing.pdfData);}
   else{showNoPdf();}
-  // Auto-start move pin mode if URL param present
-  var movePinId=params.get('movePin')||'';
-  if(movePinId){
-    setTimeout(function(){startMovePin(movePinId);},800);
-  }
-
+  // highlightDefect param
+  var hd=params.get('highlightDefect');
+  if(hd){setTimeout(function(){highlightPin(hd);},1000);}
 })();
 
-// ── LAYER CHIPS ──
-function getLinkedItpTypes(){
-  // Get all ITP types linked to this drawing from structure
-  var types=new Set();
-  (structure.buildings||[]).forEach(function(b){
-    (b.locations||[]).forEach(function(l){
-      (l.itpTypes||[]).forEach(function(t){
-        var linked=(t.drawings||[]).find(function(d){return d.id===drawingId;});
-        if(linked)types.add(t.name);
-      });
-    });
-  });
-  // Also add any types already pinned on this drawing
-  (curDrawing&&curDrawing.pins||[]).forEach(function(p){if(p.itpTypeLabel)types.add(p.itpTypeLabel);});
-  return[...types].sort();
-}
-function buildLayerChips(){
-  // Layer chips are now static buttons in filter bar - nothing to build dynamically
-}
-function toggleLayer(type){
-  if(_activeLayers.has(type)){_activeLayers.delete(type);}else{_activeLayers.add(type);}
-  // Update chip UI
-  var id='layer-'+type.replace(/[^a-zA-Z0-9]/g,'_');
-  var el=document.getElementById(id);
-  if(el)el.classList.toggle('on',!_activeLayers.has(type));
-  // If nothing deselected, show all
-  renderPins();
-}
-function toggleStatusChip(status){
-  if(status==='all'){
-    _activeStatuses.clear();
-    ['all','ns','ip','act','cl'].forEach(function(s){document.getElementById('chip-'+s).classList.remove('on');});
-    document.getElementById('chip-all').classList.add('on');
-  } else {
-    document.getElementById('chip-all').classList.remove('on');
-    var map={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
-    var chipId='chip-'+map[status];
-    if(_activeStatuses.has(status)){_activeStatuses.delete(status);document.getElementById(chipId).classList.remove('on');}
-    else{_activeStatuses.add(status);document.getElementById(chipId).classList.add('on');}
-    if(!_activeStatuses.size)document.getElementById('chip-all').classList.add('on');
-  }
-  renderPins();
-}
-
-// ── PIN STATUS ──
-function getPinStatus(pin){
-  var r=responses[pin.id];
-  return(r&&r.status)||pin.itpStatus||'not-started';
-}
-function pinVisible(pin){
-  var st=getPinStatus(pin);
-  var type=pin.itpTypeLabel||'';
-  if(_activeStatuses.size&&!_activeStatuses.has(st))return false;
-  if(_activeLayers.size&&!_activeLayers.has(type))return false; // hidden = deselected
-  return pin.type==='itp';
-}
-
-// ── RENDER PINS ──
-var ST_COLOR={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
-function renderPins(){
-  if(!curDrawing||!_canvasW)return;
-  var layer=document.getElementById('pinLayer');
-  layer.innerHTML='';
-  layer.style.pointerEvents='none';
-  var stage=document.getElementById('pdfStage');
-  var sr=stage.getBoundingClientRect();
-  var vr=document.getElementById('viewer').getBoundingClientRect();
-  (curDrawing.pins||[]).filter(function(p){return p.type==='itp';}).forEach(function(pin){
-    if(!pinVisible(pin))return;
-    var st=getPinStatus(pin);
-    var el=document.createElement('div');
-    el.className='itp-pin';
-    el.dataset.pinType=pin.type||'itp';
-    el.style.left=(sr.left-vr.left+pin.x/100*sr.width)+'px';
-    el.style.top=(sr.top-vr.top+pin.y/100*sr.height)+'px';
-    el.style.pointerEvents='all';
-    var label=pin.equip||pin.ref||pin.itpTypeLabel||'ITP';
-    var resp=responses[pin.id]||{};
-    var isDeleted=resp.deleted||false;
-    if(isDeleted&&!_showDeleted)return;
-    var dotCls=isDeleted?'':ST_COLOR[st]||'ns';
-    var dotStyle=isDeleted?' style="background:#1a1a1a;border-color:#666;color:#fff;opacity:0.9"':'';
-    // Show ITP ref number (last 4 digits) or equip initials as fallback
-    var refNum=pin.ref?(pin.ref.replace(/^ITP-/,'')||pin.ref):'';
-    var pinText=refNum||(pin.equip?(pin.equip.slice(0,4)):'ITP');
-    el.innerHTML='<div class="pin-dot '+dotCls+'"'+dotStyle+'>'+escH(pinText)+'</div>'
-      +'<div class="pin-label">'+(pin.equip?escH(pin.equip):'—')+(pin.itpTypeLabel?' · '+escH(pin.itpTypeLabel):'')+'</div>';
-    el.addEventListener('click',function(e){e.stopPropagation();openItpDetail(pin);});
-    (function(pid){el.addEventListener('contextmenu',function(e){
-      e.preventDefault();e.stopPropagation();
-      var menu=document.getElementById('pinCtxMenu');
-      menu._pinId=pid;
-      menu.style.left=e.clientX+'px';menu.style.top=e.clientY+'px';menu.style.display='block';
-    });})(pin.id);
-    layer.appendChild(el);
-  });
-
-}
-
-// ── PLACE MODE ──
-function togglePlaceMode(){
-  setPinType(_pinType?'':'itp');
-}
-
-function startMovePin(pinId){
-  _movingPinId=pinId;
-  _placing=false; // cancel any add mode
-  var btn=document.getElementById('addItpBtn');
-  btn.classList.remove('placing');
-  btn.textContent='📍 Add ITP';
-  var hint=document.getElementById('placeHint');
-  hint.textContent='📍 Click new position for pin — Esc to cancel';
-  hint.style.display='block';
-  var viewer=document.getElementById('viewer');
-  viewer.style.cursor='crosshair';
-  viewer.classList.add('grabbing');
-}
-function ctxMovePin(){
-  var menu=document.getElementById('pinCtxMenu');
-  var pinId=menu._pinId;
-  menu.style.display='none';
-  startMovePin(pinId);
-}
-document.addEventListener('click',function(){document.getElementById('pinCtxMenu').style.display='none';});
-function cancelMoveMode(){
-  if(!_movingPinId)return;
-  _movingPinId=null;
-  document.getElementById('placeHint').style.display='none';
-  var viewer=document.getElementById('viewer');
-  viewer.style.cursor='grab';
-  viewer.classList.remove('grabbing');
-}
-function commitMovePin(xPct,yPct){
-  var pin=(curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===_movingPinId;});
-  if(pin){pin.x=xPct;pin.y=yPct;saveDrawings();renderPins();}
-  cancelMoveMode();
-  toast('Pin moved ✓');
-}
-function cancelPlaceMode(){
-  if(!_placing)return;
-  _placing=false;
-  var btn=document.getElementById('addItpBtn');
-  btn.classList.remove('placing');
-  btn.textContent='📍 Add ITP';
-  document.getElementById('placeHint').style.display='none';
-  document.getElementById('viewer').style.cursor='grab';
-}
-
-// ── PIN MODAL ──
-function openNewPin(xPct,yPct){
-  _editPinId=null;_pendingX=xPct;_pendingY=yPct;_pinStatus='not-started';
-  document.getElementById('pinMoTitle').textContent='New ITP Pin';
-  document.getElementById('pinItpType').value='';
-  document.getElementById('pinItpType').removeAttribute('readonly');
-  document.getElementById('pinEquipTag').value='';
-  document.getElementById('pinRef').value='';
-  document.getElementById('pinNotes').value='';
-  document.getElementById('deletePinBtn').style.display='none';
-  document.getElementById('pinEquipField').style.display='';
-  setStatus('not-started');
-  populateTypeSelect('');
-  document.getElementById('pinMo').classList.add('open');
-  setTimeout(function(){document.getElementById('pinItpType').focus();},80);
-}
-function openEditPin(pinId){
-  var pin=(curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===pinId;});if(!pin)return;
-  _editPinId=pinId;_pinStatus=getPinStatus(pin);
-  document.getElementById('pinMoTitle').textContent='Edit ITP Pin';
-  document.getElementById('pinItpType').value=pin.itpTypeLabel||'';
-  document.getElementById('pinEquipTag').value=pin.equip||'';
-  document.getElementById('pinRef').value=pin.ref||'';
-  document.getElementById('pinNotes').value=pin.notes||'';
-  document.getElementById('deletePinBtn').style.display='';
-  onPinTypeInput();
-  setStatus(_pinStatus);
-  populateTypeSelect(pin.itpTypeLabel||'');
-  document.getElementById('pinMo').classList.add('open');
-}
-function closePinMo(){document.getElementById('pinMo').classList.remove('open');_editPinId=null;}
-
-function setStatus(st){
-  _pinStatus=st;
-  ['not-started','in-progress','action','closed'].forEach(function(s){
-    var el=document.getElementById('st-'+s);
-    var map={'not-started':'sel-ns','in-progress':'sel-ip','action':'sel-act','closed':'sel-cl'};
-    el.className='st-opt'+(s===st?' '+map[s]:'');
-  });
-}
-
-function savePin(){
-  var type=document.getElementById('pinItpType').value.trim();
-  if(!type){alert('Please enter an ITP type');return;}
-  var equip=document.getElementById('pinEquipTag').value.trim();
-  var ref=document.getElementById('pinRef').value.trim();
-  var notes=document.getElementById('pinNotes').value.trim();
-  if(!ref){
-    // Auto-generate ITP-XXXX ref — find highest across ALL drawings in project
-    var maxSeq=0;
-    drawings.forEach(function(d){
-      (d.pins||[]).forEach(function(p){
-        var m=(p.ref||'').match(/^ITP-(\d+)$/);
-        if(m){var n=parseInt(m[1]);if(n>maxSeq)maxSeq=n;}
-      });
-    });
-    ref='ITP-'+String(maxSeq+1).padStart(4,'0');
-  }
-  if(_editPinId){
-    var pin=(curDrawing.pins||[]).find(function(p){return p.id===_editPinId;});
-    if(pin){pin.itpTypeLabel=type;pin.equip=equip;pin.ref=ref;pin.notes=notes;pin.itpStatus=_pinStatus;}
-    // Update response status
-    if(!responses[_editPinId])responses[_editPinId]={rows:{},signoffs:{}};
-    responses[_editPinId].status=_pinStatus;
-    saveResponses();
-  } else {
-    var pinId=nid();
-    if(!curDrawing.pins)curDrawing.pins=[];
-    var u=dbGetCurrentUser();
-    curDrawing.pins.push({id:pinId,type:'itp',itpTypeLabel:type,equip:equip,ref:ref,notes:'',itpStatus:_pinStatus,x:_pendingX,y:_pendingY});
-    responses[pinId]={status:_pinStatus,rows:{},signoffs:{},equipId:equip,raisedBy:u?(u.name||u.username||'Unknown'):'Unknown',raisedDate:new Date().toISOString().split('T')[0]};
-    saveResponses();
-    // Update layer chips
-    buildLayerChips();
-  }
-  saveDrawings();
-  closePinMo();
-  renderPins();
-  toast('Pin saved ✓');
-}
-
-function deletePin(){
-  if(!_editPinId)return;
-  if(!confirm('Delete this ITP pin? It will be hidden but recoverable from the ITP Register.'))return;
-  // Soft delete - mark in responses, keep pin data
-  if(!responses[_editPinId])responses[_editPinId]={rows:{},signoffs:{}};
-  responses[_editPinId].deleted=true;
-  responses[_editPinId].deletedDate=new Date().toISOString().split('T')[0];
-  var u=dbGetCurrentUser();
-  responses[_editPinId].deletedBy=u?(u.name||u.username||'Unknown'):'Unknown';
-  saveResponses();
-  closePinMo();renderPins();buildLayerChips();
-  toast('ITP hidden — recoverable from ITP Register');
-}
-
-// ── TYPE SUGGESTIONS ──
-var _flashTimer=null;
-function flashPins(){
-  var btn=document.getElementById('flashPinsBtn');
-  if(_flashTimer){clearTimeout(_flashTimer);document.querySelectorAll('.itp-pin').forEach(function(el){el.classList.remove('flashing');});_flashTimer=null;btn.style.color='';return;}
-  document.querySelectorAll('.itp-pin').forEach(function(el){el.classList.add('flashing');});
-  btn.style.color='var(--accent)';
-  _flashTimer=setTimeout(function(){
-    document.querySelectorAll('.itp-pin').forEach(function(el){el.classList.remove('flashing');});
-    _flashTimer=null;btn.style.color='';
-  },10000);
-}
-function toggleShowDeleted(){
-  _showDeleted=!_showDeleted;
-  var btn=document.getElementById('showDeletedBtn');
-  if(btn){btn.style.color=_showDeleted?'var(--danger)':'';btn.style.borderColor=_showDeleted?'var(--danger)':'';}
-  var chip=document.getElementById('chip-del');
-  if(chip){chip.style.color=_showDeleted?'var(--danger)':'var(--muted)';chip.style.borderColor=_showDeleted?'var(--danger)':'var(--border)';}
-  renderPins();
-}
-function populateTypeSelect(selectedVal){
-  var sel=document.getElementById('pinItpType');
-  var types=getTemplateTypes();
-  sel.innerHTML='<option value="">— Select ITP Type —</option>'
-    +types.map(function(t){
-      return '<option value="'+escH(t.name)+'"'+(t.name===selectedVal?' selected':'')+'>'+escH(t.name)+(t.itpNo?' ('+escH(t.itpNo)+')':'')+'</option>';
-    }).join('');
-}
-function showTypeSugg(){}
-function getTemplateTypes(){
-  // Use templates loaded from Supabase at init (project level)
-  var result=[];
-  templates.forEach(function(t){if(t.itpType)result.push({itpNo:t.itpNo||'',name:t.itpType});});
-  if(!result.length)result=ITP_MASTER.map(function(n){return{itpNo:'',name:n};});
-  return result;
-}
-function renderTypeSugg(v){
-  var linked=getLinkedItpTypes();
-  var all=getTemplateTypes();
-  var list=document.getElementById('typeSugg');
-  var inp=document.getElementById('pinItpType');
-  // Position fixed dropdown below the input
-  if(inp){
-    var r=inp.getBoundingClientRect();
-    list.style.top=(r.bottom+3)+'px';
-    list.style.left=r.left+'px';
-    list.style.width=r.width+'px';
-  }
-  // No project templates set up yet
-  if(!all.length){
-    list.innerHTML='<div class="sugg-item" style="color:var(--muted);pointer-events:none;font-size:11px">No project templates — import from ITP Templates first</div>';
-    list.style.display='';
-    return;
-  }
-  var filtered=v
-    ?all.filter(function(t){return t.name.toLowerCase().includes(v.toLowerCase())||(t.itpNo||'').toLowerCase().includes(v.toLowerCase());})
-    :all;
-  var linkedItems=filtered.filter(function(t){return linked.includes(t.name);});
-  var otherItems=filtered.filter(function(t){return !linked.includes(t.name);});
-  var items=[...linkedItems,...otherItems].slice(0,12);
-  if(!items.length){list.style.display='none';return;}
-  list.innerHTML=items.map(function(t){
-    var isLinked=linked.includes(t.name);
-    return'<div class="sugg-item" onmousedown="pickType(\''+escH(t.name)+'\')" style="display:flex;align-items:center;justify-content:space-between">'
-      +'<span>'+escH(t.name)+'</span>'
-      +'<span style="font-family:DM Mono,monospace;font-size:9px;color:'+(isLinked?'var(--accent)':'var(--muted)')+';">'
-        +(isLinked?'linked ':'')+escH(t.itpNo||'')
-      +'</span>'
-      +'</div>';
-  }).join('');
-  list.style.display='';
-}
-function pickType(t){
-  var inp=document.getElementById('pinItpType');
-  inp.value=t;
-  inp.setAttribute('readonly','');
-  document.getElementById('typeSugg').style.display='none';
-  onPinTypeInput();
-}
-function onPinTypeInput(){
-  var t=document.getElementById('pinItpType').value;
-  var isEquip=EQUIP_TYPES.includes(t);
-  document.getElementById('pinEquipField').style.display='';
-  if(t==='Penetration ITP'){document.getElementById('pinEquipLabel').textContent='Penetration ID *';document.getElementById('pinEquipField').style.display='';}
-  else{document.getElementById('pinEquipLabel').textContent='Equipment ID';}
-}
-
-// ── EQUIP SUGGESTIONS ──
-function showEquipSugg(){
-  var v=document.getElementById('pinEquipTag').value.trim().toLowerCase();
-  var list=document.getElementById('equipSugg');
-  if(!v||!equipData||!equipData.tabs){list.style.display='none';return;}
-  var matches=[];
-  equipData.tabs.forEach(function(tab){(tab.rows||[]).forEach(function(r){var tag=(r.tag||r.equipId||'');if(tag.toLowerCase().includes(v))matches.push(r);});});
-  if(!matches.length){list.style.display='none';return;}
-  list.innerHTML=matches.slice(0,8).map(function(r){var t=escH(r.tag||r.equipId||''),n=escH(r.description||r.name||'');return'<div class="sugg-item" onmousedown="document.getElementById(\'pinEquipTag\').value=\''+t+'\';document.getElementById(\'equipSugg\').style.display=\'none\'"><span style="font-family:DM Mono,monospace;color:var(--accent)">'+t+'</span>'+(n?'<span style="color:var(--muted);margin-left:8px;font-size:11px">'+n+'</span>':'')+'</div>';}).join('');
-  list.style.display='';
-}
-
-// ── PDF LOAD ──
+// ── PDF RENDER ──
 function loadFromUrl(url){pdfjsLib.getDocument(url).promise.then(renderPdf).catch(function(e){showError('Could not load PDF: '+e.message);});}
 function loadFromData(dataUrl){
-  try{
-    var b64=dataUrl.split(',')[1];var bin=atob(b64);var arr=new Uint8Array(bin.length);
-    for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
-    pdfjsLib.getDocument({data:arr}).promise.then(renderPdf).catch(function(e){showError('PDF render error: '+e.message);});
-  }catch(e){showError('Invalid PDF data');}
+  var bin=atob(dataUrl.split(',')[1]||dataUrl);
+  var arr=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  pdfjsLib.getDocument({data:arr}).promise.then(renderPdf).catch(function(e){showError('PDF error: '+e.message);});
 }
 function renderPdf(pdf){
   pdf.getPage(1).then(function(page){
-    var vpFast=page.getViewport({scale:PDF_FAST_RES});
-    var fast=document.createElement('canvas');fast.width=vpFast.width;fast.height=vpFast.height;
-    page.render({canvasContext:fast.getContext('2d'),viewport:vpFast}).promise.then(function(){
-      var canvas=document.getElementById('pdfCanvas');
-      canvas.width=fast.width;canvas.height=fast.height;
-      canvas.getContext('2d').drawImage(fast,0,0);
-      _canvasW=fast.width;_canvasH=fast.height;
+    var vp=page.getViewport({scale:1});
+    _canvasW=vp.width;_canvasH=vp.height;
+    var canvas=document.getElementById('pdfCanvas');
+    canvas.width=_canvasW;canvas.height=_canvasH;
+    var ctx=canvas.getContext('2d');
+    page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
       document.getElementById('loading').style.display='none';
       fitToScreen();
       renderPins();
-      var vpHi=page.getViewport({scale:PDF_BASE_RES});
-      var hi=document.createElement('canvas');hi.width=vpHi.width;hi.height=vpHi.height;
-      if(_renderTask){try{_renderTask.cancel();}catch(e){}}
-      _renderTask=page.render({canvasContext:hi.getContext('2d'),viewport:vpHi});
-      _renderTask.promise.then(function(){
-        canvas.width=vpHi.width;canvas.height=vpHi.height;
-        canvas.getContext('2d').drawImage(hi,0,0);
-        _canvasW=vpHi.width;_canvasH=vpHi.height;
-        fitToScreen();renderPins();
-      }).catch(function(){});
+      renderPanel();
     });
   });
 }
-
-// ── TRANSFORM ──
 function applyTransform(){
   document.getElementById('pdfStage').style.transform='translate('+_offsetX+'px,'+_offsetY+'px) scale('+_scale+')';
-  renderPins();
 }
 function fitToScreen(){
   var v=document.getElementById('viewer');
-  if(!_canvasW||!_canvasH)return;
-  var sx=v.clientWidth/_canvasW,sy=v.clientHeight/_canvasH;
-  _scale=Math.min(sx,sy)*0.96;
-  _offsetX=(v.clientWidth-_canvasW*_scale)/2;
-  _offsetY=(v.clientHeight-_canvasH*_scale)/2;
+  var vw=v.clientWidth,vh=v.clientHeight;
+  var sx=vw/_canvasW,sy=vh/_canvasH;
+  _scale=Math.min(sx,sy)*0.92;
+  _offsetX=(vw-_canvasW*_scale)/2;
+  _offsetY=(vh-_canvasH*_scale)/2;
   applyTransform();
 }
 function zoom(f){
   var v=document.getElementById('viewer');
   var cx=v.clientWidth/2,cy=v.clientHeight/2;
-  _offsetX=cx-(cx-_offsetX)*f;_offsetY=cy-(cy-_offsetY)*f;_scale*=f;
+  var ns=Math.max(0.05,Math.min(10,_scale*f));
+  _offsetX=cx-(cx-_offsetX)*ns/_scale;
+  _offsetY=cy-(cy-_offsetY)*ns/_scale;
+  _scale=ns;
   applyTransform();
 }
 
-// ── VIEWER INTERACTIONS ──
-var viewer=document.getElementById('viewer');
-viewer.addEventListener('mousedown',function(e){
-  if(_placing)return;
-  _dragging=true;_lastX=e.clientX;_lastY=e.clientY;viewer.classList.add('grabbing');viewer.style.cursor='grabbing';
-});
-viewer.addEventListener('mousemove',function(e){
-  if(!_dragging)return;
-  _offsetX+=e.clientX-_lastX;_offsetY+=e.clientY-_lastY;_lastX=e.clientX;_lastY=e.clientY;applyTransform();
-});
-viewer.addEventListener('mouseup',function(){if(_dragging){_dragging=false;viewer.classList.remove('grabbing');viewer.style.cursor=_placing?'crosshair':'grab';}});
-viewer.addEventListener('mouseleave',function(){if(_dragging){_dragging=false;viewer.classList.remove('grabbing');}});
-viewer.addEventListener('wheel',function(e){
-  e.preventDefault();
-  var f=e.deltaY<0?1.1:0.9;
-  var r=viewer.getBoundingClientRect();
-  var cx=e.clientX-r.left,cy=e.clientY-r.top;
-  _offsetX=cx-(cx-_offsetX)*f;_offsetY=cy-(cy-_offsetY)*f;_scale*=f;
-  applyTransform();
-},{passive:false});
+// ── RENDER PINS ──
+var PIN_STATUS_CLS={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
+var PIN_STATUS_LBL={'not-started':'Not Started','in-progress':'In Progress','action':'Action','closed':'Closed'};
 
-viewer.addEventListener('click',function(e){
-  var stage=document.getElementById('pdfStage');
-  var sr=stage.getBoundingClientRect();
-  var xPct=((e.clientX-sr.left)/sr.width)*100;
-  var yPct=((e.clientY-sr.top)/sr.height)*100;
-  xPct=Math.max(0,Math.min(100,xPct));
-  yPct=Math.max(0,Math.min(100,yPct));
-  if(_movingPinId){commitMovePin(xPct,yPct);return;}
-  if(!_placing)return;
-  cancelPlaceMode();
-  openNewPin(xPct,yPct);
-});
+function pinVisible(p){
+  if(!_layers[p.type])return false;
+  var resp=responses[p.id]||{};
+  if(resp.deleted&&!_showDeleted)return false;
+  if(_statusFilter&&resp.status!==_statusFilter)return false;
+  return true;
+}
 
-// Touch
-var _touches={};
-viewer.addEventListener('touchstart',function(e){e.preventDefault();Array.from(e.changedTouches).forEach(function(t){_touches[t.identifier]={x:t.clientX,y:t.clientY};});},{passive:false});
-viewer.addEventListener('touchmove',function(e){e.preventDefault();
-  var tArr=Array.from(e.touches);
-  if(tArr.length===1&&!_placing){
-    var t=tArr[0],prev=_touches[t.identifier];
-    if(prev){_offsetX+=t.clientX-prev.x;_offsetY+=t.clientY-prev.y;applyTransform();}
-    _touches[t.identifier]={x:t.clientX,y:t.clientY};
-  } else if(tArr.length===2){
-    var t1=tArr[0],t2=tArr[1],p1=_touches[t1.identifier],p2=_touches[t2.identifier];
-    if(p1&&p2){
-      var od=Math.hypot(p1.x-p2.x,p1.y-p2.y),nd=Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
-      var f=nd/od;var cx=(t1.clientX+t2.clientX)/2,cy=(t1.clientY+t2.clientY)/2;
-      var r=viewer.getBoundingClientRect();cx-=r.left;cy-=r.top;
-      _offsetX=cx-(cx-_offsetX)*f;_offsetY=cy-(cy-_offsetY)*f;_scale*=f;applyTransform();
+function renderPins(){
+  var layer=document.getElementById('pinLayer');
+  layer.innerHTML='';
+  if(!curDrawing||!_canvasW)return;
+  (curDrawing.pins||[]).forEach(function(p){
+    if(!pinVisible(p))return;
+    var resp=responses[p.id]||{};
+    var st=resp.status||'not-started';
+    var stCls=PIN_STATUS_CLS[st]||'ns';
+    var el=document.createElement('div');
+    el.className='drw-pin';
+    el.dataset.pinId=p.id;
+    el.dataset.pinType=p.type;
+    el.style.left=(p.x/100*_canvasW)+'px';
+    el.style.top=(p.y/100*_canvasH)+'px';
+    var inner='';
+    if(p.type==='itp'){
+      var txt=(p.ref||'').replace('ITP-','');
+      inner='<div class="pin-itp '+stCls+'">'+escH(txt)+'</div>';
+    } else if(p.type==='defect'){
+      var dtxt=(p.ref||'').replace('DEF-','');
+      inner='<div class="pin-def '+stCls+'">'+escH(dtxt.slice(-3))+'</div>';
+    } else if(p.type==='fireseal'){
+      inner='<div class="pin-fs-wrap"><div class="pin-fs '+stCls+'"></div></div>';
+    } else if(p.type==='firedamper'){
+      inner='<div class="pin-fd '+stCls+'">FD</div>';
     }
-    _touches[t1.identifier]={x:t1.clientX,y:t1.clientY};
-    _touches[t2.identifier]={x:t2.clientX,y:t2.clientY};
-  }
-},{passive:false});
-viewer.addEventListener('touchend',function(e){
-  if(_placing&&e.changedTouches.length===1){
-    var t=e.changedTouches[0];
-    var stage=document.getElementById('pdfStage');var sr=stage.getBoundingClientRect();
-    var xPct=((t.clientX-sr.left)/sr.width)*100,yPct=((t.clientY-sr.top)/sr.height)*100;
-    cancelPlaceMode();openNewPin(Math.max(0,Math.min(100,xPct)),Math.max(0,Math.min(100,yPct)));
-  }
-  Array.from(e.changedTouches).forEach(function(t){delete _touches[t.identifier];});
-});
-
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){cancelMoveMode();cancelPlaceMode();closePinMo();}});
-
-document.addEventListener('click',function(e){
-  ['typeSugg','equipSugg'].forEach(function(id){var el=document.getElementById(id);if(el&&!e.target.closest('#'+id))el.style.display='none';});
-});
-
-window.addEventListener('resize',function(){fitToScreen();});
-
-function showError(msg){document.getElementById('loading').style.display='none';var el=document.getElementById('errorState');el.style.display='flex';el.querySelector('#errorMsg').textContent=msg;}
-function showNoPdf(){document.getElementById('loading').style.display='none';document.getElementById('noPdf').style.display='flex';}
-
-function toast(msg){
-  var t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:9px 18px;border-radius:8px;z-index:9999;white-space:nowrap;pointer-events:none';
-  t.textContent=msg;document.body.appendChild(t);
-  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .4s';setTimeout(function(){t.remove();},400);},2200);
-}
-
-// ── SIDEBAR ──
-var SBK='hvacnexus_sb_collapsed';
-function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
-function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
-function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.left=c?'52px':'230px';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
-function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
-(function(){
-  applySB(localStorage.getItem(SBK)==='1');
-  localStorage.removeItem('hvacnexus_sb_groups');
-  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
-  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
-  var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
-  if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
-    handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});
-    document.addEventListener('mousemove',function(e){if(!dragging)return;var w=Math.min(MAX_W,Math.max(MIN_W,startW+(e.clientX-startX)));sb.style.width=w+'px';});
-    document.addEventListener('mouseup',function(){if(!dragging)return;dragging=false;document.body.style.userSelect='';document.body.style.cursor='';});
-  }
-  var tip=document.createElement('div');tip.className='sb-tooltip';document.body.appendChild(tip);
-  document.querySelectorAll('.sb-item').forEach(function(item){
-    var lbl=item.querySelector('.sb-item-label');
-    var label=lbl?lbl.textContent:'';
-    item.addEventListener('mouseenter',function(){
-      if(!label)return;
-      var r=item.getBoundingClientRect();var sbEl=document.getElementById('sidebar');var sbW=sbEl?sbEl.offsetWidth:230;
-      tip.textContent=label;tip.style.left=(sbW+8)+'px';tip.style.top=(r.top+r.height/2)+'px';tip.style.transform='translateY(-50%)';tip.style.opacity='1';
-    });
-    item.addEventListener('mouseleave',function(){tip.style.opacity='0';});
-  });
-})();
-
-</script>
-<!-- ITP DETAIL MODAL -->
-<div id="itpDetailMo" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(4,8,16,.88);align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="width:92vw;height:92vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.7)">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div>
-        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800" id="itpDetailTitle">ITP Form</div>
-        <div style="font-size:11px;color:var(--muted)" id="itpDetailSub"></div>
-      </div>
-      <button onclick="closeItpDetail()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 14px;cursor:pointer;font-size:13px">✕ Close</button>
-    </div>
-    <iframe id="itpDetailFrame" src="" style="flex:1;border:none;width:100%"></iframe>
-  </div>
-</div>
-
-<script>
-function openItpDetail(pin){
-  document.getElementById('itpDetailTitle').textContent=(pin.itpTypeLabel||'ITP Form');
-  document.getElementById('itpDetailSub').textContent=(pin.ref?'Ref: '+pin.ref:'')+(pin.equip?' · '+pin.equip:'');
-  var base=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
-  document.getElementById('itpDetailFrame').src=base+'hvac-itp-form.html?drawingId='+encodeURIComponent(drawingId)+'&pinId='+encodeURIComponent(pin.id);
-  var mo=document.getElementById('itpDetailMo');
-  mo.style.display='flex';
-}
-function updatePinEquip(pinId, newEquip){
-  // Called from itp-form iframe when equipment ID changes
-  if(curDrawing&&curDrawing.pins){
-    var pin=curDrawing.pins.find(function(p){return p.id===pinId;});
-    if(pin){pin.equip=newEquip;renderPins();}
-  }
-}
-function closeItpDetail(){
-  document.getElementById('itpDetailMo').style.display='none';
-  document.getElementById('itpDetailFrame').src='';
-  // Reload data and sync equipId from responses back to pin
-  loadData().then(function(){
-    // Sync equipId from responses into pin.equip for label display
-    if(curDrawing&&curDrawing.pins){
-      curDrawing.pins.forEach(function(pin){
-        var resp=responses[pin.id];
-        if(resp&&resp.equipId&&resp.equipId!==pin.equip){
-          pin.equip=resp.equipId;
-        }
-      });
-    }
-    renderPins();
+    var lbl=p.ref||(p.itpTypeLabel||p.type);
+    var desc=p.equip||(p.service||p.tag||'');
+    inner+='<div class="pin-lbl">'+escH(lbl)+(desc?' · '+escH(desc):'')+'</div>';
+    el.innerHTML=inner;
+    (function(pin){
+      el.addEventListener('click',function(e){e.stopPropagation();if(_movingPinId){commitMove(pin.x,pin.y);return;}openPinModal(pin);});
+      el.addEventListener('contextmenu',function(e){e.preventDefault();e.stopPropagation();showCtx(e,pin.id);});
+    })(p);
+    layer.appendChild(el);
   });
 }
-// Close on backdrop click
-document.getElementById('itpDetailMo').addEventListener('click',function(e){
-  if(e.target===this)closeItpDetail();
-});
-// ── PIN TYPE SYSTEM ──
-var _pinType = ''; // 'itp', 'defect', 'fire'
-var _layerVisibility = {itp:true, defect:true, fire:true};
 
-function setPinType(type){
-  var iBtn=document.getElementById('addItpBtn');
-  var dBtn=document.getElementById('addDefBtn');
-  var fBtn=document.getElementById('addFireBtn');
-  var hint=document.getElementById('placeHintBar');
-  if(_pinType === type){
-    _pinType='';
-    [iBtn,dBtn,fBtn].forEach(function(el){if(el)el.classList.remove('active-itp','active-defect','active-fire');});
-    cancelPlaceMode();
-    if(hint)hint.style.display='none';
-    return;
-  }
-  _pinType=type;
-  if(iBtn)iBtn.classList.toggle('active-itp',type==='itp');
-  if(dBtn)dBtn.classList.toggle('active-defect',type==='defect');
-  if(fBtn)fBtn.classList.toggle('active-fire',type==='fire');
-  _placing=true;
-  var v=document.getElementById('viewer');if(v)v.style.cursor='crosshair';
-  var labels={itp:'🔵 ITP',defect:'🔴 Defect',fire:'🟡 Fire'};
-  if(hint){hint.style.display='block';hint.textContent='📍 Click drawing to place '+labels[type]+' pin — Esc to cancel';}
-}
+// Update pin positions after zoom (pins are in canvas %, stage handles transform)
+function updatePinPositions(){renderPins();}
 
-// ── LAYER TOGGLES ──
-function toggleLayer2(type){
+// ── LAYER / STATUS FILTER ──
+function toggleLayer(type){
   if(type==='all'){
-    var allOn=Object.values(_layerVisibility).every(function(v){return v;});
-    ['itp','defect','fire'].forEach(function(t){_layerVisibility[t]=!allOn;});
-    ['layer-itp','layer-defect','layer-fire','layer-all'].forEach(function(id){
-      var el=document.getElementById(id);if(el){el.classList.toggle('on',!allOn);}
-    });
+    var allOn=Object.values(_layers).every(function(v){return v;});
+    ['itp','defect','fireseal','firedamper'].forEach(function(t){_layers[t]=!allOn;});
+    document.getElementById('lay-all').classList.toggle('on',!allOn);
+    document.getElementById('lay-itp').classList.toggle('on',!allOn);
+    document.getElementById('lay-def').classList.toggle('on',!allOn);
+    document.getElementById('lay-fs').classList.toggle('on',!allOn);
+    document.getElementById('lay-fd').classList.toggle('on',!allOn);
   } else {
-    _layerVisibility[type]=!_layerVisibility[type];
-    var vis=_layerVisibility[type];
-    var el=document.getElementById('layer-'+type);
-    if(el)el.classList.toggle('on',vis);
-    var allOn2=Object.values(_layerVisibility).every(function(v){return v;});
-    var allEl=document.getElementById('layer-all');
-    if(allEl)allEl.classList.toggle('on',allOn2);
+    _layers[type]=!_layers[type];
+    var chipId={'itp':'lay-itp','defect':'lay-def','fireseal':'lay-fs','firedamper':'lay-fd'}[type];
+    if(chipId)document.getElementById(chipId).classList.toggle('on',_layers[type]);
+    var allOn2=Object.values(_layers).every(function(v){return v;});
+    document.getElementById('lay-all').classList.toggle('on',allOn2);
   }
-  renderPins();
-  applyLayerVisibility();
-  renderPinPanel();
+  renderPins();renderPanel();
+}
+function toggleStatus(st){
+  _statusFilter=(st==='all'||_statusFilter===st)?'':st;
+  ['all','ns','ip','act','cl'].forEach(function(s){document.getElementById('st-'+s).classList.remove('on');});
+  if(!_statusFilter)document.getElementById('st-all').classList.add('on');
+  else{var m={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};if(m[_statusFilter])document.getElementById('st-'+m[_statusFilter]).classList.add('on');}
+  renderPins();renderPanel();
 }
 
-// ── PINS SIDE PANEL ──
-var _panelOpen = true;
-function togglePinsPanel(){
-  var panel=document.getElementById('pinsPanel');
-  var tab=document.getElementById('ppCollapseTab');
-  if(!panel)return;
-  var collapsed=panel.classList.toggle('collapsed');
-  if(tab)tab.textContent=collapsed?'▶':'◀';
-  renderPinPanel();
+// ── PLACE MODE ──
+function startPlace(type){
+  if(_placeType===type){cancelPlace();return;}
+  _placing=true;_placeType=type;
+  document.getElementById('viewer').classList.add('crosshair');
+  var labels={itp:'ITP',defect:'Defect',fireseal:'Fire Seal',firedamper:'Fire Damper'};
+  document.getElementById('placeHint').style.display='block';
+  document.getElementById('placeHint').textContent='📍 Click drawing to place '+labels[type]+' pin — Esc to cancel';
+  document.getElementById('placeHintBar').style.display='block';
+  // Update button active state
+  ['btnItp','btnDef','btnFs','btnFd'].forEach(function(id){document.getElementById(id).className='tb-btn';});
+  var map={itp:'btnItp',defect:'btnDef',fireseal:'btnFs',firedamper:'btnFd'};
+  var cls={itp:'itp-active',defect:'def-active',fireseal:'fs-active',firedamper:'fd-active'};
+  if(map[type]){document.getElementById(map[type]).className='tb-btn '+cls[type];}
+}
+function cancelPlace(){
+  _placing=false;_placeType='';_movingPinId=null;
+  document.getElementById('viewer').classList.remove('crosshair');
+  document.getElementById('placeHint').style.display='none';
+  document.getElementById('placeHintBar').style.display='none';
+  ['btnItp','btnDef','btnFs','btnFd'].forEach(function(id){document.getElementById(id).className='tb-btn';});
+  var btnStyles={btnItp:'color:var(--purple);border-color:rgba(167,139,250,.4)',btnDef:'color:var(--danger);border-color:rgba(255,77,109,.4)',btnFs:'color:#ff4444;border-color:rgba(255,68,68,.4)',btnFd:'color:#ff9500;border-color:rgba(255,149,0,.4)'};
+  Object.keys(btnStyles).forEach(function(id){document.getElementById(id).style.cssText=btnStyles[id];});
+}
+function onPlace(xPct,yPct){
+  _pendingX=xPct;_pendingY=yPct;
+  var type=_placeType;
+  cancelPlace();
+  if(type==='itp')openItpMo(null);
+  else if(type==='defect')openDefMo(null);
+  else if(type==='fireseal')openFsMo(null);
+  else if(type==='firedamper')openFdMo(null);
 }
 
-function renderPinsWithLayers(){
-  renderPins();
-  // Hide pins based on layer visibility
-  document.querySelectorAll('.itp-pin').forEach(function(el){
-    var type=el.dataset.pinType||'itp';
-    el.style.display=(_layerVisibility[type]!==false)?'':'none';
+// ── NEXT REF ──
+function nextRef(prefix,field){
+  var pins=curDrawing?curDrawing.pins||[]:[];
+  var max=0;
+  pins.forEach(function(p){
+    var m=(p.ref||'').match(new RegExp('^'+prefix+'-(\\d+)$'));
+    if(m){var n=parseInt(m[1]);if(n>max)max=n;}
   });
-  renderPinPanel();
+  // Also check defects table for DEF refs
+  if(prefix==='DEF'){
+    defects.forEach(function(d){var m=(d.ref||'').match(/^DEF-(\d+)$/);if(m){var n=parseInt(m[1]);if(n>max)max=n;}});
+  }
+  return prefix+'-'+String(max+1).padStart(4,'0');
 }
 
-// Esc cancels pin type too
-document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'){
-    setPinType('');
-    cancelPlaceMode();
-    cancelMoveMode();
-    closePinMo();
+// ── ITP PIN MODAL ──
+var _itpPinCache=null;
+function populateItpTypes(){
+  var sel=document.getElementById('itpType');
+  sel.innerHTML='<option value="">— Select ITP Type —</option>'+(templates||[]).map(function(t){return'<option value="'+escH(t.itpType)+'">'+escH(t.itpType)+'</option>';}).join('');
+}
+function onItpTypeChange(){}
+function selectStatus(st){
+  _itpStatus=st;
+  ['ns','ip','act','cl'].forEach(function(s){document.getElementById('sopt-'+s).classList.remove('primary');});
+  var map={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
+  if(map[st])document.getElementById('sopt-'+map[st]).classList.add('primary');
+}
+function openItpMo(pin){
+  _itpPinCache=pin;
+  _itpStatus=pin?(responses[pin.id]||{}).status||'not-started':'not-started';
+  document.getElementById('itpMoTitle').textContent=pin?'Edit ITP Pin':'New ITP Pin';
+  document.getElementById('itpType').value=pin?(pin.itpTypeLabel||''):'';
+  document.getElementById('itpEquip').value=pin?(pin.equip||''):'';
+  document.getElementById('itpDelBtn').style.display=pin?'':'none';
+  selectStatus(_itpStatus);
+  document.getElementById('itpMo').classList.add('open');
+}
+function closeItpMo(){document.getElementById('itpMo').classList.remove('open');_itpPinCache=null;}
+function saveItpPin(){
+  var type=document.getElementById('itpType').value;
+  if(!type){toast('Select an ITP type');return;}
+  if(!curDrawing.pins)curDrawing.pins=[];
+  var u=dbGetCurrentUser();
+  if(_itpPinCache){
+    _itpPinCache.itpTypeLabel=type;
+    _itpPinCache.equip=document.getElementById('itpEquip').value.trim();
+    responses[_itpPinCache.id]=responses[_itpPinCache.id]||{};
+    responses[_itpPinCache.id].status=_itpStatus;
+  } else {
+    var ref=nextRef('ITP');
+    var pin={id:nid(),type:'itp',ref:ref,itpTypeLabel:type,equip:document.getElementById('itpEquip').value.trim(),x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    curDrawing.pins.push(pin);
+    responses[pin.id]={status:_itpStatus};
   }
-});
+  saveAll();renderPins();renderPanel();closeItpMo();toast('ITP pin saved');
+}
 
-function renderPinPanel(){
+// ── FIRE SEAL MODAL ──
+var _fsPinCache=null;
+function selectSvc(svc){
+  _fsService=svc;
+  document.querySelectorAll('.svc-btn').forEach(function(b){b.classList.remove('sel');});
+  var el=document.getElementById('svc-'+svc);if(el)el.classList.add('sel');
+}
+function handleFsPhoto(inp){
+  if(!inp.files[0])return;
+  _fsPhoto=inp.files[0];
+  document.getElementById('fsPhotoLbl').textContent=inp.files[0].name+' ✓';
+}
+function openFsMo(pin){
+  _fsPinCache=pin;
+  _fsService='';_fsPhoto=null;
+  document.querySelectorAll('.svc-btn').forEach(function(b){b.classList.remove('sel');});
+  document.getElementById('fsPhotoLbl').textContent='Tap to add photo';
+  document.getElementById('fsRef').textContent=pin?pin.ref:'';
+  document.getElementById('fsDelBtn').style.display=pin?'':'none';
+  if(pin&&pin.service)selectSvc(pin.service);
+  document.getElementById('fsMo').classList.add('open');
+}
+function closeFsMo(){document.getElementById('fsMo').classList.remove('open');_fsPinCache=null;}
+async function saveFsPin(){
+  if(!_fsService&&!_fsPinCache){toast('Select a service type');return;}
+  if(!curDrawing.pins)curDrawing.pins=[];
+  var u=dbGetCurrentUser();
+  var photoUrl=null;
+  if(_fsPhoto){try{photoUrl=await uploadPhoto(_fsPhoto,'fireseal');}catch(e){console.error(e);}}
+  if(_fsPinCache){
+    if(_fsService)_fsPinCache.service=_fsService;
+    if(photoUrl){responses[_fsPinCache.id]=responses[_fsPinCache.id]||{};responses[_fsPinCache.id].photos=[{url:photoUrl,date:today()}];}
+  } else {
+    var ref=nextRef('FS');
+    var pin={id:nid(),type:'fireseal',ref:ref,service:_fsService,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    curDrawing.pins.push(pin);
+    var resp={status:'not-started'};
+    if(photoUrl)resp.photos=[{url:photoUrl,date:today()}];
+    responses[pin.id]=resp;
+  }
+  saveAll();renderPins();renderPanel();closeFsMo();toast('Fire seal pin saved');
+}
+
+// ── FIRE DAMPER MODAL ──
+var _fdPinCache=null;
+function selectFdStatus(st){
+  _fdStatus=st;
+  ['ns','ip','cl'].forEach(function(s){document.getElementById('fdst-'+s).classList.remove('primary');});
+  var m={'not-started':'ns','in-progress':'ip','closed':'cl'};
+  if(m[st])document.getElementById('fdst-'+m[st]).classList.add('primary');
+}
+function openFdMo(pin){
+  _fdPinCache=pin;
+  _fdStatus=pin?(responses[pin.id]||{}).status||'not-started':'not-started';
+  document.getElementById('fdTag').value=pin?(pin.tag||''):'';
+  document.getElementById('fdSize').value=pin?(pin.size||''):'';
+  document.getElementById('fdAssignee').value=pin?(pin.assignee||''):'';
+  document.getElementById('fdRef').textContent=pin?pin.ref:'';
+  document.getElementById('fdDelBtn').style.display=pin?'':'none';
+  selectFdStatus(_fdStatus);
+  document.getElementById('fdMo').classList.add('open');
+}
+function closeFdMo(){document.getElementById('fdMo').classList.remove('open');_fdPinCache=null;}
+function saveFdPin(){
+  if(!curDrawing.pins)curDrawing.pins=[];
+  var u=dbGetCurrentUser();
+  if(_fdPinCache){
+    _fdPinCache.tag=document.getElementById('fdTag').value.trim();
+    _fdPinCache.size=document.getElementById('fdSize').value.trim();
+    _fdPinCache.assignee=document.getElementById('fdAssignee').value.trim();
+    responses[_fdPinCache.id]=responses[_fdPinCache.id]||{};
+    responses[_fdPinCache.id].status=_fdStatus;
+  } else {
+    var ref=nextRef('FD');
+    var pin={id:nid(),type:'firedamper',ref:ref,tag:document.getElementById('fdTag').value.trim(),size:document.getElementById('fdSize').value.trim(),assignee:document.getElementById('fdAssignee').value.trim(),x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    curDrawing.pins.push(pin);
+    responses[pin.id]={status:_fdStatus};
+  }
+  saveAll();renderPins();renderPanel();closeFdMo();toast('Fire damper pin saved');
+}
+
+// ── DEFECT PIN MODAL (syncs with defects table) ──
+var _defPinCache=null;
+function openDefMo(pin){
+  _defPinCache=pin;
+  var defRecord=pin?defects.find(function(d){return d.pinId===pin.id;}):null;
+  document.getElementById('defDesc').value=defRecord?(defRecord.desc||''):'';
+  document.getElementById('defPriority').value=defRecord?(defRecord.priority||'medium'):'medium';
+  document.getElementById('defRef').textContent=pin?pin.ref:'';
+  document.getElementById('defDelBtn').style.display=pin?'':'none';
+  document.getElementById('defMo').classList.add('open');
+}
+function closeDefMo(){document.getElementById('defMo').classList.remove('open');_defPinCache=null;}
+function saveDefPin(){
+  var desc=document.getElementById('defDesc').value.trim();
+  if(!desc){toast('Description required');return;}
+  if(!curDrawing.pins)curDrawing.pins=[];
+  var u=dbGetCurrentUser();
+  var pin,defRecord;
+  if(_defPinCache){
+    pin=_defPinCache;
+    defRecord=defects.find(function(d){return d.pinId===pin.id;});
+    if(defRecord){defRecord.desc=desc;defRecord.priority=document.getElementById('defPriority').value;}
+  } else {
+    // Generate DEF ref globally
+    var maxDef=0;
+    defects.forEach(function(d){var m=(d.ref||'').match(/^DEF-(\d+)$/);if(m&&parseInt(m[1])>maxDef)maxDef=parseInt(m[1]);});
+    var defRef='DEF-'+String(maxDef+1).padStart(4,'0');
+    var ref=nextRef('DEF');
+    pin={id:nid(),type:'defect',ref:defRef,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    curDrawing.pins.push(pin);
+    responses[pin.id]={status:'not-started'};
+    defRecord={id:'def_'+Date.now(),ref:defRef,pinId:pin.id,drawingId:drawingId,desc:desc,priority:document.getElementById('defPriority').value,status:'open',issueDate:today(),raisedBy:(u&&(u.name||u.username))||'',createdAt:new Date().toISOString()};
+    defects.push(defRecord);
+  }
+  saveAll();saveDefects();renderPins();renderPanel();closeDefMo();toast('Defect pin saved');
+}
+
+// ── OPEN PIN MODAL (click existing pin) ──
+function openPinModal(pin){
+  if(pin.type==='itp')openItpMo(pin);
+  else if(pin.type==='fireseal')openFsMo(pin);
+  else if(pin.type==='firedamper')openFdMo(pin);
+  else if(pin.type==='defect')openDefMo(pin);
+}
+
+// ── DELETE PIN ──
+function deleteCurrentPin(){
+  var pin=_itpPinCache||_fsPinCache||_fdPinCache||_defPinCache;
+  if(!pin||!confirm('Delete this pin?'))return;
+  if(pin.type==='defect'){
+    defects=defects.filter(function(d){return d.pinId!==pin.id;});
+    saveDefects();
+  }
+  curDrawing.pins=(curDrawing.pins||[]).filter(function(p){return p.id!==pin.id;});
+  delete responses[pin.id];
+  saveAll();renderPins();renderPanel();
+  closeItpMo();closeFsMo();closeFdMo();closeDefMo();
+  toast('Pin deleted');
+}
+
+// ── CONTEXT MENU ──
+function showCtx(e,pinId){
+  _ctxPinId=pinId;
+  var menu=document.getElementById('ctxMenu');
+  menu.style.display='block';
+  menu.style.left=Math.min(e.clientX,window.innerWidth-160)+'px';
+  menu.style.top=Math.min(e.clientY,window.innerHeight-80)+'px';
+}
+function hideCtx(){document.getElementById('ctxMenu').style.display='none';}
+function ctxMove(){
+  hideCtx();
+  _movingPinId=_ctxPinId;
+  _placing=true;
+  document.getElementById('viewer').classList.add('crosshair');
+  document.getElementById('placeHint').style.display='block';
+  document.getElementById('placeHint').textContent='📍 Click new position — Esc to cancel';
+}
+function ctxDelete(){
+  hideCtx();
+  if(!confirm('Delete this pin?'))return;
+  var pin=(curDrawing.pins||[]).find(function(p){return p.id===_ctxPinId;});
+  if(!pin)return;
+  if(pin.type==='defect'){defects=defects.filter(function(d){return d.pinId!==pin.id;});saveDefects();}
+  curDrawing.pins=(curDrawing.pins||[]).filter(function(p){return p.id!==_ctxPinId;});
+  delete responses[_ctxPinId];
+  saveAll();renderPins();renderPanel();toast('Pin deleted');
+}
+function commitMove(xPct,yPct){
+  var pin=(curDrawing.pins||[]).find(function(p){return p.id===_movingPinId;});
+  if(pin){pin.x=xPct;pin.y=yPct;saveAll();renderPins();}
+  cancelPlace();
+}
+
+// ── PINS PANEL ──
+function togglePanel(){
+  var panel=document.getElementById('pinsPanel');
+  var tab=document.getElementById('ppTab');
+  panel.classList.toggle('collapsed');
+  tab.textContent=panel.classList.contains('collapsed')?'▶':'◀';
+  if(!panel.classList.contains('collapsed'))renderPanel();
+}
+function renderPanel(){
   var list=document.getElementById('ppList');
   if(!list||!curDrawing)return;
-  var tf=(document.getElementById('pinTypeFilter')||{}).value||'';
-  var pins=(curDrawing.pins||[]);
-  var filtered=pins.filter(function(p){
+  var panel=document.getElementById('pinsPanel');
+  if(panel.classList.contains('collapsed'))return;
+  var tf=(document.getElementById('ppFilter')||{}).value||'';
+  var pins=(curDrawing.pins||[]).filter(function(p){
     var resp=responses[p.id]||{};
     if(resp.deleted&&!_showDeleted)return false;
     if(tf&&p.type!==tf)return false;
+    if(!_layers[p.type])return false;
     return true;
   });
-  var pinCountEl=document.getElementById('pinCount');
-  if(pinCountEl)pinCountEl.textContent=pins.length;
-  if(!filtered.length){
-    list.innerHTML='<div style="text-align:center;padding:28px;color:var(--muted);font-size:12px">'+(pins.length?'No pins match filter':'Click a pin type button then click the drawing')+'</div>';
+  if(!pins.length){
+    list.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">No pins on this drawing</div>';
     return;
   }
-  var stMap={'not-started':['st-ns','Not Started'],'in-progress':['st-ip','In Progress'],'action':['st-act','Action Req.'],'closed':['st-cl','Closed']};
-  list.innerHTML='';
-  filtered.forEach(function(p){
+  var html='';
+  pins.forEach(function(p){
     var resp=responses[p.id]||{};
     var st=resp.status||'not-started';
-    var stArr=stMap[st]||['st-ns','Not Started'];
-    var lbl=p.ref||(p.itpTypeLabel?p.itpTypeLabel.slice(0,20):'Pin');
-    var dsc=p.equip||(p.itpTypeLabel||p.type||'');
-    var item=document.createElement('div');
-    item.className='pin-item '+(p.type||'itp');
-    item.id='pi-'+p.id;
-    var hdr=document.createElement('div');
-    hdr.className='pi-hdr';
-    hdr.innerHTML='<div class="pi-dot"></div>'
-      +'<span class="pi-ref">'+escH(lbl)+'</span>'
-      +'<span class="pi-desc" title="'+escH(dsc)+'">'+escH(dsc)+'</span>'
-      +'<span class="pi-st '+stArr[0]+'">'+stArr[1]+'</span>';
-    (function(pid){hdr.addEventListener('click',function(){expandPinItem(pid);});})(p.id);
-    var body=document.createElement('div');
-    body.className='pi-body';
-    if(dsc){var eq=document.createElement('div');eq.style.cssText='font-family:DM Mono,monospace;font-size:10px;color:var(--accent);margin-bottom:8px';eq.textContent=dsc;body.appendChild(eq);}
-    var del=document.createElement('button');
-    del.textContent='🗑 Delete pin';
-    del.style.cssText='background:none;border:1px solid rgba(255,77,109,.3);color:var(--danger);border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;margin-top:8px';
-    (function(pid){del.addEventListener('click',function(e){
-      e.stopPropagation();
-      if(!confirm('Delete this pin?'))return;
-      if(!curDrawing)return;
-      var resp=responses[pid]||{};
-      resp.deleted=true;
-      responses[pid]=resp;
-      saveResponses();renderPins();renderPinPanel();
-    });})(p.id);
-    body.appendChild(del);
-    item.appendChild(hdr);item.appendChild(body);
-    list.appendChild(item);
+    var stCls=PIN_STATUS_CLS[st]||'ns';
+    var stLbl=PIN_STATUS_LBL[st]||st;
+    var desc='';
+    if(p.type==='itp')desc=p.itpTypeLabel||(p.equip||'');
+    else if(p.type==='defect'){var dr=defects.find(function(d){return d.pinId===p.id;});desc=dr?dr.desc:'';}
+    else if(p.type==='fireseal')desc=p.service||'';
+    else if(p.type==='firedamper')desc=p.tag||(p.size||'');
+    html+='<div class="pin-item '+p.type+'" onclick="highlightPin("'+p.id+'")'+'">'';
+    html+='<div class="pi-hdr"><div class="pi-dot"></div>';
+    html+='<span class="pi-ref">'+escH(p.ref||'')+'</span>';
+    html+='<span class="pi-desc" title="'+escH(desc)+'">'+escH(desc)+'</span>';
+    html+='<span class="pi-st '+stCls+'">'+escH(stLbl)+'</span></div></div>';
   });
+  list.innerHTML=html;
+}
+function highlightPin(pinId){
+  document.querySelectorAll('.drw-pin').forEach(function(el){el.style.transform='translate(-50%,-50%)';el.style.zIndex='30';});
+  var el=document.querySelector('[data-pin-id="'+pinId+'"]');
+  if(el){el.style.transform='translate(-50%,-50%) scale(2)';el.style.zIndex='99';setTimeout(function(){el.style.transform='';el.style.zIndex='30';},1500);}
+}
+function flashPins(){
+  document.querySelectorAll('.drw-pin').forEach(function(el){el.style.transform='translate(-50%,-50%) scale(1.8)';});
+  setTimeout(function(){document.querySelectorAll('.drw-pin').forEach(function(el){el.style.transform='';});},1500);
 }
 
-function expandPinItem(pinId){
-  document.querySelectorAll('.pin-item').forEach(function(el){
-    el.classList.toggle('exp',el.id==='pi-'+pinId&&!el.classList.contains('exp'));
+// ── MOUSE / TOUCH EVENTS ──
+(function(){
+  var viewer=document.getElementById('viewer');
+  viewer.addEventListener('mousedown',function(e){
+    if(e.button!==0)return;
+    hideCtx();
+    if(_placing){return;} // don't start drag in place mode
+    _dragging=true;_lastX=e.clientX;_lastY=e.clientY;
+    viewer.classList.add('grabbing');
   });
-  var el=document.getElementById('pi-'+pinId);
-  if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-
-function flashPin(pinId){
-  expandPinItem(pinId);
-  var el=document.getElementById('pi-'+pinId);
-  if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-
-function applyLayerVisibility(){
-  // Apply layer visibility to rendered pin elements
-  document.querySelectorAll('.itp-pin').forEach(function(el){
-    var type=el.dataset.pinType||'itp';
-    el.style.display=(_layerVisibility[type]!==false)?'':'none';
+  viewer.addEventListener('mousemove',function(e){
+    if(!_dragging)return;
+    _offsetX+=e.clientX-_lastX;_offsetY+=e.clientY-_lastY;
+    _lastX=e.clientX;_lastY=e.clientY;
+    applyTransform();
   });
-}
+  viewer.addEventListener('mouseup',function(e){
+    if(_dragging){_dragging=false;viewer.classList.remove('grabbing');return;}
+    // click to place
+    if(!_placing)return;
+    var rect=document.getElementById('pdfStage').getBoundingClientRect();
+    var xPct=(e.clientX-rect.left)/rect.width*100;
+    var yPct=(e.clientY-rect.top)/rect.height*100;
+    if(_movingPinId){commitMove(xPct,yPct);}
+    else{onPlace(xPct,yPct);}
+  });
+  viewer.addEventListener('wheel',function(e){e.preventDefault();zoom(e.deltaY<0?1.1:0.9);},{passive:false});
+  document.addEventListener('click',function(e){if(!e.target.closest('#ctxMenu'))hideCtx();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')cancelPlace();});
+})();
 
+function showError(msg){document.getElementById('loading').style.display='none';var el=document.getElementById('errorState');el.style.display='flex';el.querySelector('#errorMsg').textContent=msg;}
+function showNoPdf(){document.getElementById('loading').style.display='none';document.getElementById('noPdf').style.display='flex';}
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
 </script>
 </body>
 </html>
