@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 10:21 -->
+<!-- build: 2026-04-06 10:36 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -195,6 +195,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
   </div>
   <div class="tb-sep"></div>
   <button class="tb-btn add-itp" id="addItpBtn" onclick="setPinType('itp')">🔵 ITP</button>
+  <button class="tb-btn" id="addDefBtn" onclick="setPinType('defect')" style="color:var(--danger);border-color:rgba(255,77,109,.4)">🔴 Defect</button>
+  <button class="tb-btn" id="addFireBtn" onclick="setPinType('fire')" style="color:var(--warn);border-color:rgba(255,184,48,.4)">🟡 Fire</button>
   <button class="tb-btn" id="showDeletedBtn" onclick="toggleShowDeleted()" title="Show deleted pins" style="font-size:11px">🗑 Deleted</button>
   <button class="tb-btn" id="flashPinsBtn" onclick="flashPins()" title="Spotlight pins (10s)">⚡ Spotlight</button>
   <div class="tb-sep"></div>
@@ -208,10 +210,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 <!-- FILTER BAR -->
 <div class="filter-bar" id="filterBar">
   <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0">Layers</span>
-  <div class="chip on" id="layer-all" onclick="toggleLayer2('all')" style="color:var(--text2);border-color:var(--border)">👁 All</div>
-  <div class="chip on" id="layer-itp" onclick="toggleLayer2('itp')" style="color:var(--purple);border-color:rgba(167,139,250,.4)">🔵 ITP</div>
-  <div class="chip on" id="layer-defect" onclick="toggleLayer2('defect')" style="color:var(--danger);border-color:rgba(255,77,109,.4)">🔴 Defect</div>
-  <div class="chip on" id="layer-fire" onclick="toggleLayer2('fire')" style="color:var(--warn);border-color:rgba(255,184,48,.4)">🟡 Fire</div>
+  <div class="chip on" id="layer-all" class="chip layer-all on" onclick="toggleLayer2('all')" style="color:var(--text2);border-color:var(--border)">👁 All</div>
+  <div class="chip on" id="layer-itp" class="chip layer-itp on" onclick="toggleLayer2('itp')" style="color:var(--purple);border-color:rgba(167,139,250,.4)">🔵 ITP</div>
+  <div class="chip on" id="layer-defect" class="chip layer-def on" onclick="toggleLayer2('defect')" style="color:var(--danger);border-color:rgba(255,77,109,.4)">🔴 Defect</div>
+  <div class="chip on" id="layer-fire" class="chip layer-fire on" onclick="toggleLayer2('fire')" style="color:var(--warn);border-color:rgba(255,184,48,.4)">🟡 Fire</div>
   <div class="filter-sep"></div>
   <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0">Status</span>
   <div class="chip chip-all on" id="chip-all" onclick="toggleStatusChip('all')">All</div>
@@ -225,29 +227,33 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 
 <!-- VIEWER + SIDE PANEL -->
 <div style="display:flex;flex:1;overflow:hidden;position:relative">
-  <div class="viewer grab" id="viewer" style="flex:1">
+  <div class="viewer grab" id="viewer" style="flex:1;position:relative">
     <div id="pdfStage"><canvas id="pdfCanvas"></canvas></div>
     <div id="pinLayer" style="position:absolute;inset:0;pointer-events:none;z-index:30"></div>
     <div class="loading" id="loading"><div class="spin"></div><span>Loading drawing…</span></div>
     <div class="error-state" id="errorState"><div style="font-size:36px">⚠️</div><div id="errorMsg">Could not load PDF</div></div>
     <div class="no-pdf" id="noPdf"><div style="font-size:48px">📄</div><div>No PDF attached to this drawing</div><div style="font-size:11px">Upload a PDF in the Drawings module first</div></div>
+    <!-- Zoom FAB bottom-left -->
+    <div class="zoom-fab">
+      <button class="z-btn" onclick="zoom(1.25)" title="Zoom in">+</button>
+      <button class="z-btn" onclick="zoom(0.8)" title="Zoom out">−</button>
+      <button class="z-btn" onclick="fitToScreen()" title="Fit to screen">⊡</button>
+    </div>
   </div>
 
   <!-- PINS SIDE PANEL -->
-  <div id="pinsPanel" style="width:280px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s;overflow:hidden;position:relative">
-    <button id="pinPanelToggleBtn" onclick="togglePinsPanel()" style="position:absolute;top:8px;left:0;transform:translateX(-100%);background:var(--surface);border:1px solid var(--border);border-right:none;border-radius:6px 0 0 6px;color:var(--muted);cursor:pointer;font-size:12px;padding:6px 5px;z-index:10">◀</button>
-    <div id="pinPanelInner" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
-      <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex:1">Pins</span>
-        <select id="pinPanelFilter" onchange="renderPinPanel()" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-size:11px;padding:2px 6px;outline:none">
-          <option value="">All</option>
-          <option value="itp">ITP</option>
-          <option value="defect">Defect</option>
-          <option value="fire">Fire</option>
-        </select>
-      </div>
-      <div id="pinPanelList" style="flex:1;overflow-y:auto;padding:8px"></div>
+  <div class="pins-panel" id="pinsPanel">
+    <div class="pp-collapse-tab" onclick="togglePinsPanel()" id="ppCollapseTab" title="Toggle pins panel">◀</div>
+    <div class="pp-hdr pp-hide">
+      <span class="pp-title">Pins</span>
+      <select id="pinTypeFilter" onchange="renderPinPanel()" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-size:11px;padding:2px 6px;outline:none">
+        <option value="">All</option>
+        <option value="itp">ITP</option>
+        <option value="defect">Defect</option>
+        <option value="fire">Fire</option>
+      </select>
     </div>
+    <div class="pp-list pp-hide" id="ppList"></div>
   </div>
 </div>
 
@@ -963,18 +969,17 @@ function toggleLayer2(type){
     var allOn=Object.values(_layerVisibility).every(function(v){return v;});
     ['itp','defect','fire'].forEach(function(t){_layerVisibility[t]=!allOn;});
     ['layer-itp','layer-defect','layer-fire','layer-all'].forEach(function(id){
-      var el=document.getElementById(id);
-      if(el){el.classList.toggle('off',allOn);el.classList.toggle('on',!allOn);}
+      var el=document.getElementById(id);if(el){el.classList.toggle('on',!allOn);}
     });
   } else {
     _layerVisibility[type]=!_layerVisibility[type];
     var vis=_layerVisibility[type];
-    var el=document.getElementById('layer-'+type);
-    if(el){el.classList.toggle('off',!vis);el.classList.toggle('on',vis);}
-    // Update all button
+    var layId=type==='defect'?'layer-defect':('layer-'+type);
+    var el=document.getElementById(layId);
+    if(el)el.classList.toggle('on',vis);
     var allOn2=Object.values(_layerVisibility).every(function(v){return v;});
     var allEl=document.getElementById('layer-all');
-    if(allEl){allEl.classList.toggle('off',!allOn2);allEl.classList.toggle('on',allOn2);}
+    if(allEl)allEl.classList.toggle('on',allOn2);
   }
   renderPins();
   renderPinPanel();
@@ -983,77 +988,14 @@ function toggleLayer2(type){
 // ── PINS SIDE PANEL ──
 var _panelOpen = true;
 function togglePinsPanel(){
-  _panelOpen = !_panelOpen;
   var panel=document.getElementById('pinsPanel');
-  var inner=document.getElementById('pinPanelInner');
-  var btn=document.getElementById('pinPanelToggleBtn');
-  if(panel){panel.style.width=_panelOpen?'280px':'36px';}
-  if(inner){inner.style.display=_panelOpen?'flex':'none';}
-  if(btn){btn.textContent=_panelOpen?'◀':'▶';}
+  var tab=document.getElementById('ppCollapseTab');
+  if(!panel)return;
+  panel.classList.toggle('collapsed');
+  var collapsed=panel.classList.contains('collapsed');
+  if(tab)tab.textContent=collapsed?'▶':'◀';
 }
 
-function renderPinPanel(){
-  var list=document.getElementById('pinPanelList');
-  if(!list||!curDrawing)return;
-  var tf=(document.getElementById('pinPanelFilter')||{}).value||'';
-  var pins=(curDrawing.pins||[]).filter(function(p){
-    var resp=responses[p.id]||{};
-    if(resp.deleted)return false;
-    if(tf&&p.type!==tf)return false;
-    return true;
-  });
-  if(!pins.length){
-    list.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">No pins on this drawing</div>';
-    return;
-  }
-  var SL={'not-started':'Not Started','in-progress':'In Progress','action':'Action Req.','closed':'Closed'};
-  var h='';
-  pins.forEach(function(p){
-    var resp=responses[p.id]||{};
-    var st=resp.status||'not-started';
-    var lbl=p.ref||(p.itpTypeLabel?p.itpTypeLabel.slice(0,20):'Pin');
-    var dsc=p.equip||(p.itpTypeLabel||p.type||'');
-    var tp=p.type||'itp';
-    var onclick='flashPin("'+escH(p.id)+'")';
-    h+='<div class="pin-card '+tp+'" onclick="'+onclick+'">';
-    h+='<div class="pin-card-ref">'+escH(lbl)+'</div>';
-    h+='<div class="pin-card-desc">'+escH(dsc)+'</div>';
-    h+='<div style="font-size:10px;color:var(--muted);margin-top:4px">'+escH(SL[st]||st)+'</div>';
-    h+='</div>';
-  });
-  list.innerHTML=h;
-}
-
-function flashPin(pinId){
-  // Find and flash the pin on canvas
-  var el=document.querySelector('[data-pin-id="'+pinId+'"]');
-  if(!el)return;
-  el.style.transform='scale(2)';
-  el.style.zIndex='999';
-  setTimeout(function(){el.style.transform='';el.style.zIndex='';},1500);
-}
-
-// ── OVERRIDE openNewPin TO USE _pinType ──
-function openNewPinDrw(xPct, yPct){
-  if(_pinType === 'defect' || _pinType === 'fire'){
-    // Create simple pin directly
-    var id=nid();
-    var label=_pinType==='defect'?'DEF':'FIRE';
-    if(!curDrawing.pins)curDrawing.pins=[];
-    curDrawing.pins.push({id:id,type:_pinType,ref:label+'-'+curDrawing.pins.length.toString().padStart(3,'0'),x:xPct,y:yPct});
-    responses[id]={status:'not-started'};
-    saveDrawings();saveResponses();
-    renderPins();renderPinPanel();
-    setPinType(''); // reset
-    _placing=false;
-    document.getElementById('viewer').style.cursor='';
-    return;
-  }
-  // Default ITP behaviour
-  openNewPin(xPct, yPct);
-}
-
-// ── EXTEND renderPins TO RESPECT LAYER VISIBILITY ──
 function renderPinsWithLayers(){
   renderPins();
   // Hide pins based on layer visibility
@@ -1073,6 +1015,76 @@ document.addEventListener('keydown',function(e){
     closePinMo();
   }
 });
+
+function renderPinPanel(){
+  var list=document.getElementById('ppList');
+  if(!list||!curDrawing)return;
+  var tf=(document.getElementById('pinTypeFilter')||{}).value||'';
+  var pins=(curDrawing.pins||[]);
+  var filtered=pins.filter(function(p){
+    var resp=responses[p.id]||{};
+    if(resp.deleted&&!_showDeleted)return false;
+    if(tf&&p.type!==tf)return false;
+    return true;
+  });
+  var pinCountEl=document.getElementById('pinCount');
+  if(pinCountEl)pinCountEl.textContent=pins.length;
+  if(!filtered.length){
+    list.innerHTML='<div style="text-align:center;padding:28px;color:var(--muted);font-size:12px">'+(pins.length?'No pins match filter':'Click a pin type button then click the drawing')+'</div>';
+    return;
+  }
+  var stMap={'not-started':['st-ns','Not Started'],'in-progress':['st-ip','In Progress'],'action':['st-act','Action Req.'],'closed':['st-cl','Closed']};
+  list.innerHTML='';
+  filtered.forEach(function(p){
+    var resp=responses[p.id]||{};
+    var st=resp.status||'not-started';
+    var stArr=stMap[st]||['st-ns','Not Started'];
+    var lbl=p.ref||(p.itpTypeLabel?p.itpTypeLabel.slice(0,20):'Pin');
+    var dsc=p.equip||(p.itpTypeLabel||p.type||'');
+    var item=document.createElement('div');
+    item.className='pin-item '+(p.type||'itp');
+    item.id='pi-'+p.id;
+    var hdr=document.createElement('div');
+    hdr.className='pi-hdr';
+    hdr.innerHTML='<div class="pi-dot"></div>'
+      +'<span class="pi-ref">'+escH(lbl)+'</span>'
+      +'<span class="pi-desc" title="'+escH(dsc)+'">'+escH(dsc)+'</span>'
+      +'<span class="pi-st '+stArr[0]+'">'+stArr[1]+'</span>';
+    (function(pid){hdr.addEventListener('click',function(){expandPinItem(pid);});})(p.id);
+    var body=document.createElement('div');
+    body.className='pi-body';
+    if(dsc){var eq=document.createElement('div');eq.style.cssText='font-family:DM Mono,monospace;font-size:10px;color:var(--accent);margin-bottom:8px';eq.textContent=dsc;body.appendChild(eq);}
+    var del=document.createElement('button');
+    del.textContent='🗑 Delete pin';
+    del.style.cssText='background:none;border:1px solid rgba(255,77,109,.3);color:var(--danger);border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;margin-top:8px';
+    (function(pid){del.addEventListener('click',function(e){
+      e.stopPropagation();
+      if(!confirm('Delete this pin?'))return;
+      if(!curDrawing)return;
+      var resp=responses[pid]||{};
+      resp.deleted=true;
+      responses[pid]=resp;
+      saveResponses();renderPins();renderPinPanel();
+    });})(p.id);
+    body.appendChild(del);
+    item.appendChild(hdr);item.appendChild(body);
+    list.appendChild(item);
+  });
+}
+
+function expandPinItem(pinId){
+  document.querySelectorAll('.pin-item').forEach(function(el){
+    el.classList.toggle('exp',el.id==='pi-'+pinId&&!el.classList.contains('exp'));
+  });
+  var el=document.getElementById('pi-'+pinId);
+  if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function flashPin(pinId){
+  expandPinItem(pinId);
+  var el=document.getElementById('pi-'+pinId);
+  if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 
 </script>
 </body>
