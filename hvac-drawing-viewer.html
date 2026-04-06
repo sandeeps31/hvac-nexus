@@ -62,17 +62,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 .drw-pin:hover{transform:translate(-50%,-50%) scale(1.2);z-index:40}
 .drw-pin.hidden{display:none}
 /* ITP - pill */
-.pin-itp{height:32px;min-width:32px;padding:0 10px;border-radius:16px;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 10px rgba(0,0,0,.6);background:#6d4aff;color:#fff;white-space:nowrap}
+.pin-itp{height:48px;min-width:48px;padding:0 14px;border-radius:24px;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 10px rgba(0,0,0,.6);background:#6d4aff;color:#fff;white-space:nowrap}
 .pin-itp.ns{background:#3d5a7a}.pin-itp.ip{background:#cc8800}.pin-itp.act{background:#cc2244}.pin-itp.cl{background:#00aa70}
 /* Defect - circle */
-.pin-def{width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 10px rgba(0,0,0,.6);background:var(--danger);color:#fff}
+.pin-def{width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 10px rgba(0,0,0,.6);background:var(--danger);color:#fff}
 .pin-def.cl{background:#00aa70}
 /* Fire Seal - diamond */
-.pin-fs-wrap{width:32px;height:32px;display:flex;align-items:center;justify-content:center}
-.pin-fs{width:24px;height:24px;background:#ff4444;border:2px solid rgba(255,255,255,.7);transform:rotate(45deg);box-shadow:0 2px 10px rgba(0,0,0,.6)}
+.pin-fs-wrap{width:48px;height:48px;display:flex;align-items:center;justify-content:center}
+.pin-fs{width:36px;height:36px;background:#ff4444;border:2px solid rgba(255,255,255,.7);transform:rotate(45deg);box-shadow:0 2px 10px rgba(0,0,0,.6)}
 .pin-fs.cl{background:#00aa70}
 /* Fire Damper - pentagon via clip-path */
-.pin-fd{width:32px;height:32px;background:#ff9500;border:2px solid rgba(255,255,255,.7);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 10px rgba(0,0,0,.6);color:#fff;clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%)}
+.pin-fd{width:48px;height:48px;background:#ff9500;border:2px solid rgba(255,255,255,.7);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 10px rgba(0,0,0,.6);color:#fff;clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%)}
 .pin-fd.cl{background:#00aa70}
 /* Pin label on hover */
 .pin-lbl{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);background:rgba(8,12,18,.92);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);white-space:nowrap;pointer-events:none;display:none;z-index:50}
@@ -353,6 +353,7 @@ var pKey=(dbGetCurrentProject()||{}).num||'GCT001';
 var _scale=1,_offsetX=0,_offsetY=0;
 var _dragging=false,_lastX=0,_lastY=0;
 var _canvasW=0,_canvasH=0;
+var PDF_FAST_RES=1.5,PDF_BASE_RES=3.0,_renderTask=null;
 var _renderTask=null;
 var _placing=false; // true = click places pin
 var _placeType=''; // 'itp','defect','fireseal','firedamper'
@@ -426,16 +427,26 @@ function loadFromData(dataUrl){
 }
 function renderPdf(pdf){
   pdf.getPage(1).then(function(page){
-    var vp=page.getViewport({scale:1});
-    _canvasW=vp.width;_canvasH=vp.height;
-    var canvas=document.getElementById('pdfCanvas');
-    canvas.width=_canvasW;canvas.height=_canvasH;
-    var ctx=canvas.getContext('2d');
-    page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
+    var vpFast=page.getViewport({scale:PDF_FAST_RES});
+    var fast=document.createElement('canvas');fast.width=vpFast.width;fast.height=vpFast.height;
+    page.render({canvasContext:fast.getContext('2d'),viewport:vpFast}).promise.then(function(){
+      var canvas=document.getElementById('pdfCanvas');
+      canvas.width=fast.width;canvas.height=fast.height;
+      canvas.getContext('2d').drawImage(fast,0,0);
+      _canvasW=fast.width;_canvasH=fast.height;
       document.getElementById('loading').style.display='none';
       fitToScreen();
-      renderPins();
-      renderPanel();
+      renderPins();renderPanel();
+      var vpHi=page.getViewport({scale:PDF_BASE_RES});
+      var hi=document.createElement('canvas');hi.width=vpHi.width;hi.height=vpHi.height;
+      if(_renderTask){try{_renderTask.cancel();}catch(e){}}
+      _renderTask=page.render({canvasContext:hi.getContext('2d'),viewport:vpHi});
+      _renderTask.promise.then(function(){
+        canvas.width=vpHi.width;canvas.height=vpHi.height;
+        canvas.getContext('2d').drawImage(hi,0,0);
+        _canvasW=vpHi.width;_canvasH=vpHi.height;
+        fitToScreen();renderPins();renderPanel();
+      }).catch(function(){});
     });
   });
 }
