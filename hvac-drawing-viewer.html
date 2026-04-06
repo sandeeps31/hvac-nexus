@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 -->
+<!-- build: 2026-04-06 12:37 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -834,7 +834,7 @@ function renderPanel(){
     list.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">No pins on this drawing</div>';
     return;
   }
-  var html='';
+  list.innerHTML='';
   pins.forEach(function(p){
     var resp=responses[p.id]||{};
     var st=resp.status||'not-started';
@@ -845,14 +845,21 @@ function renderPanel(){
     else if(p.type==='defect'){var dr=defects.find(function(d){return d.pinId===p.id;});desc=dr?dr.desc:'';}
     else if(p.type==='fireseal')desc=p.service||'';
     else if(p.type==='firedamper')desc=p.tag||(p.size||'');
-    html+='<div class="pin-item '+p.type+'" onclick="highlightPin("'+p.id+'")'+'">'';
-    html+='<div class="pi-hdr"><div class="pi-dot"></div>';
-    html+='<span class="pi-ref">'+escH(p.ref||'')+'</span>';
-    html+='<span class="pi-desc" title="'+escH(desc)+'">'+escH(desc)+'</span>';
-    html+='<span class="pi-st '+stCls+'">'+escH(stLbl)+'</span></div></div>';
+    var item=document.createElement('div');
+    item.className='pin-item '+p.type;
+    item.dataset.pid=p.id;
+    item.addEventListener('click',function(){highlightPin(this.dataset.pid);});
+    var hdr=document.createElement('div');
+    hdr.className='pi-hdr';
+    hdr.innerHTML='<div class="pi-dot"></div>'
+      +'<span class="pi-ref">'+escH(p.ref||'')+'</span>'
+      +'<span class="pi-desc" title="'+escH(desc)+'">'+escH(desc)+'</span>'
+      +'<span class="pi-st '+stCls+'">'+escH(stLbl)+'</span>';
+    item.appendChild(hdr);
+    list.appendChild(item);
   });
-  list.innerHTML=html;
 }
+
 function highlightPin(pinId){
   document.querySelectorAll('.drw-pin').forEach(function(el){el.style.transform='translate(-50%,-50%)';el.style.zIndex='30';});
   var el=document.querySelector('[data-pin-id="'+pinId+'"]');
