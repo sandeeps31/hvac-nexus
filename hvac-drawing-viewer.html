@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 09:31 -->
+<!-- build: 2026-04-06 09:46 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -998,7 +998,7 @@ function togglePinsPanel(){
 function renderPinPanel(){
   var list=document.getElementById('pinPanelList');
   if(!list||!curDrawing)return;
-  var typeFilter=document.getElementById('pinPanelFilter').value;
+  var typeFilter=(document.getElementById('pinPanelFilter')||{}).value||'';
   var pins=(curDrawing.pins||[]).filter(function(p){
     var resp=responses[p.id]||{};
     if(resp.deleted)return false;
@@ -1010,13 +1010,20 @@ function renderPinPanel(){
     return;
   }
   var STATUS_LBL={'not-started':'Not Started','in-progress':'In Progress','action':'Action Req.','closed':'Closed'};
-  list.innerHTML=pins.map(function(p){
+  var html='';
+  pins.forEach(function(p){
     var resp=responses[p.id]||{};
     var status=resp.status||'not-started';
     var label=p.ref||(p.itpTypeLabel?p.itpTypeLabel.slice(0,20):'Pin');
     var desc=p.equip||(p.itpTypeLabel||p.type||'');
-    return '<div class="pin-card '+escH(p.type||'itp')+'" onclick="flashPin(''+escH(p.id)+'')">'      +'<div class="pin-card-ref">'+escH(label)+'</div>'      +'<div class="pin-card-desc">'+escH(desc)+'</div>'      +'<div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:DM Mono,monospace">'+escH(STATUS_LBL[status]||status)+'</div>'      +'</div>';
-  }).join('');
+    var t=p.type||'itp';
+    html+='<div class="pin-card '+t+'" onclick="flashPin(''+escH(p.id)+'')">';
+    html+='<div class="pin-card-ref">'+escH(label)+'</div>';
+    html+='<div class="pin-card-desc">'+escH(desc)+'</div>';
+    html+='<div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:DM Mono,monospace">'+escH(STATUS_LBL[status]||status)+'</div>';
+    html+='</div>';
+  });
+  list.innerHTML=html;
 }
 
 function flashPin(pinId){
