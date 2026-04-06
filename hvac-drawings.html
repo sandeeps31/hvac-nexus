@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 07:45 -->
+<!-- build: 2026-04-06 07:57 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -650,14 +650,14 @@ function buildDrawingRow(d){
   if(d.status==='Obsolete')tr.style.opacity='0.5';
   var hasPdf=!!(d.pdfUrl||d.pdfData);
   tr.innerHTML=
-    '<td style="text-align:center;font-size:16px" title="'+(hasPdf?'PDF uploaded':'No PDF')+'">'+(hasPdf?'<span style="color:var(--danger)">📄</span>':'<span style="color:var(--border)">—</span>')+'</td>'
+    (hasPdf?'<td style="text-align:center;font-size:16px;cursor:pointer" title="Download PDF" onclick="event.stopPropagation();downloadPdf(this,\''+d.id+'\')">​<span style="color:var(--danger)">📄</span></td>':'<td style="text-align:center;color:var(--border)">—</td>')
     +'<td class="drw-num" style="cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(d.num||'')+'</td>'
     +'<td style="color:var(--text);font-weight:500;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(d.name||'')+'</td>'
     +'<td style="white-space:nowrap"><span class="drw-rev">'+escH(d.rev||'-')+'</span></td>'
     +'<td style="white-space:nowrap"><span class="drw-status '+(ST_CLS[d.status]||'st-p')+'">'+escH(d.status||'-')+'</span></td>'
     +'<td style="white-space:nowrap"><span class="drw-status '+apprCls+'" style="font-size:9.5px">'+escH(d.approval||'Pending')+'</span></td>'
     +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);white-space:nowrap">'+escH(d.subDate||'-')+'</td>'
-    +'<td>'+(pc?'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">&#128205;'+pc+'</span>':'')+'</td>'
+    
     +'<td onclick="event.stopPropagation()">'
       +'<div class="drw-actions">'
         +'<button class="drw-act-btn" onclick="openEditModal(\''+d.id+'\')"><span class="tip">Edit</span>&#9998;</button>'
@@ -715,7 +715,7 @@ function renderList(){
     var card=document.createElement('div');card.className='cat-group';
     var cardHdr=document.createElement('div');cardHdr.className='cat-hdr';
     cardHdr.innerHTML='<span class="cat-name">'+escH(disc.toUpperCase())+'</span>'
-      +'<span class="cat-count">'+discTotal+'</span>'
+      +'<span class="cat-count">'+discTotal+' Drawing'+(discTotal!==1?'s':'')+'</span>'
       +'<span class="cat-chev">&#9662;</span>';
     var cardBody=document.createElement('div');cardBody.className='cat-body';
     var cardRows=[];
@@ -737,14 +737,13 @@ function renderList(){
       +'<col style="width:85px">'
       +'<col style="width:140px">'
       +'<col style="width:95px">'
-      +'<col style="width:44px">'
-      +'<col style="width:110px">'
+      +'<col style="width:120px">'
       +'</colgroup>'
       +'<thead><tr>'
       +'<th style="width:32px;text-align:center">PDF</th><th>Drawing No.</th><th>Drawing Name</th>'
       +'<th>Rev</th><th>Status</th>'
       +'<th>Approval</th><th>Sub Date</th>'
-      +'<th style="text-align:center">Pins</th><th style="text-align:right">Actions</th>'
+      +'<th style="text-align:right;padding-right:14px">Actions</th>'
       +'</tr></thead>';
     var tbody=document.createElement('tbody');
 
@@ -793,9 +792,9 @@ function renderList(){
           var areaRow=document.createElement('tr');
           areaRow.innerHTML='<td colspan="8" style="padding:5px 16px 5px 32px;background:var(--surface3);cursor:pointer;user-select:none;border-bottom:1px solid var(--border)">'
             +'<span class="area-chev-inner" style="font-size:10px;color:var(--accent);transition:transform .2s;display:inline-block;margin-right:5px">&#9662;</span>'
-            +'<span style="font-size:9px;color:var(--accent);margin-right:4px">&#128205;</span>'
+            +''
             +'<span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent)">'+escH(area)+'</span>'
-            +'<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);margin-left:6px">'+items.length+'</span>'
+            +'<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);margin-left:6px">'+items.length+' drawing'+(items.length!==1?'s':'')+'</span>'
             +'</td>';
           (function(ar){
             ar.cells[0].addEventListener('click',function(){
@@ -1468,8 +1467,18 @@ function toggleApprovalField(wrapperId){
 }
 function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
-function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main){main.style.marginLeft=c?'52px':'';main.style.left=c?'52px':'230px';}if(btn)btn.textContent=c?'>>':'<<';}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main){main.style.left=c?'52px':'230px';main.style.right='0';}if(btn)btn.textContent=c?'>>':'<<';}
 function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'>':'v';}
+function downloadPdf(id){
+  var d=drawings.find(function(x){return x.id===id;});
+  if(!d)return;
+  if(d.pdfUrl){
+    var a=document.createElement('a');a.href=d.pdfUrl;a.download=(d.num||'drawing')+'.pdf';a.target='_blank';a.click();
+  } else if(d.pdfData){
+    var a=document.createElement('a');a.href=d.pdfData;a.download=(d.num||'drawing')+'.pdf';a.click();
+  }
+}
+
 // ── SETUP REGISTER ──
 var _srRows=[];var _srTab='excel';
 function openSetupRegisterModal(){_srRows=[];document.getElementById('srPreview').style.display='none';document.getElementById('srDropZone').classList.remove('has-file');renderSrManualTable();document.getElementById('setupRegMo').classList.add('open');setSrTab('excel');}
@@ -1600,6 +1609,22 @@ async function importRegisterRows(){var rows=_srRows.filter(function(r){return r
       <button class="btn bg" onclick="closeSetupRegModal()">Cancel</button>
       <button class="btn bp" id="srImportBtn" onclick="importRegisterRows()">Import Drawings</button>
     </div>
+  </div>
+</div>
+<div class="mo" id="manageAreasModal" onclick="if(event.target===this)closeManageAreas()">
+  <div class="modal" style="width:420px;max-width:96vw;max-height:80vh;display:flex;flex-direction:column;padding:0">
+    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text)">📍 Manage Areas</div>
+        <div style="color:var(--text2);font-size:12px;margin-top:3px">Add custom areas for your project</div>
+      </div>
+      <button class="bg bsm btn" onclick="closeManageAreas()">✕ Close</button>
+    </div>
+    <div style="padding:14px 22px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-shrink:0">
+      <input class="mi" id="newAreaInput" placeholder="New area name…" style="flex:1" onkeydown="if(event.key==='Enter')addArea()"/>
+      <button class="bp bsm btn" onclick="addArea()">＋ Add</button>
+    </div>
+    <div id="areaListEl" style="padding:8px 22px;flex:1;overflow-y:auto"></div>
   </div>
 </div>
 </body>
