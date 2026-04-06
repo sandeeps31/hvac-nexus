@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 10:53 -->
+<!-- build: 2026-04-06 11:01 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -359,6 +359,7 @@ var _canvasW=0,_canvasH=0;
 var _renderTask=null;
 var _placing=false;
 var _showDeleted=false;
+var _movingPinId=null;
 var _pendingX=0,_pendingY=0; // canvas % position for new pin
 var _editPinId=null;
 var _pinStatus='not-started';
@@ -485,6 +486,7 @@ function renderPins(){
     var st=getPinStatus(pin);
     var el=document.createElement('div');
     el.className='itp-pin';
+    el.dataset.pinType=pin.type||'itp';
     el.style.left=(sr.left-vr.left+pin.x/100*sr.width)+'px';
     el.style.top=(sr.top-vr.top+pin.y/100*sr.height)+'px';
     el.style.pointerEvents='all';
@@ -1019,6 +1021,7 @@ function toggleLayer2(type){
     if(allEl)allEl.classList.toggle('on',allOn2);
   }
   renderPins();
+  applyLayerVisibility();
   renderPinPanel();
 }
 
@@ -1121,6 +1124,14 @@ function flashPin(pinId){
   expandPinItem(pinId);
   var el=document.getElementById('pi-'+pinId);
   if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function applyLayerVisibility(){
+  // Apply layer visibility to rendered pin elements
+  document.querySelectorAll('.itp-pin').forEach(function(el){
+    var type=el.dataset.pinType||'itp';
+    el.style.display=(_layerVisibility[type]!==false)?'':'none';
+  });
 }
 
 </script>
