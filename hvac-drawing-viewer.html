@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<!-- build:"en">
+<!-- build: 2026-04-06 00:13 -->
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Drawing Viewer — HVAC NEXUS</title>
 <link rel="stylesheet" href="theme.css">
+<script src="db.js"></script>
 <style>
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex}
 /* ── SIDEBAR STANDARD ── */
@@ -29,8 +31,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 .sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
-
-<body>
 
 <!-- SIDEBAR -->
 
@@ -175,11 +175,6 @@ canvas#pdfCanvas{display:block}
 .view{display:flex;flex-direction:column;flex:1;overflow:hidden}
 .fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;cursor:pointer;flex-shrink:0}
 .fsel:focus{border-color:var(--accent);color:var(--text)}
-</style>
-<script src="db.js"></script>
-</head>
-<body>
-
 <!-- SIDEBAR -->
 <div class="sb" id="sidebar"><div class="sb-resize-handle" id="sbResize"></div>
   <div class="sb-top"><div class="sb-brand"><span class="sb-icon">&#10052;</span><span class="sb-name">HVAC NEXUS</span></div><button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">&laquo;</button></div>
@@ -254,7 +249,8 @@ canvas#pdfCanvas{display:block}
     </div>
     <button class="btn bg bsm" onclick="navTo('hvac-drawings.html')">← Back to Drawings</button>
   </div>
-  <!-- DETAIL VIEW -->
+
+<!-- DETAIL VIEW -->
 <div class="view" id="view-detail">
   <div class="detail-topbar">
     <div class="detail-title-wrap">
@@ -392,10 +388,25 @@ canvas#pdfCanvas{display:block}
   </div>
 </div>
 
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
-if(typeof pdfjsLib!=="undefined")pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+var SBK='hvacnexus_sb_collapsed';
+var pdfDoc=null,pdfScale=1.5,pdfBaseScale=1.5,pinMode='',activeLayer='all';
+var _renderTask=null,_prevScale=1.5,_panX=0,_panY=0;
+var drawings=[],curId='',templates=[];
+var _uid=0;function nid(){return ++_uid;}
+
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main){main.style.marginLeft=c?'52px':'';main.style.left=c?'52px':'230px';}if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
+function showView(){}
+function goList(){navTo('hvac-drawings.html');}
+function showToast(msg){var t=document.createElement('div');t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;white-space:nowrap;pointer-events:none';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .5s';setTimeout(function(){t.remove();},500);},2500);}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
 // ── INIT ──
 var params = new URLSearchParams(window.location.search);
 var _drawingId = params.get('id') || '';
@@ -434,6 +445,8 @@ async function deletePdfFromSupabase(url){
 // ── DATA ──
 var _proj=dbGetCurrentProject();
 var _pNum=_proj.num||_proj.number||'GCT001';
+var drawings=[];
+var _uid=100;
 function nid(){return ++_uid;}
 
 function save(){
@@ -590,24 +603,6 @@ function buildDrawingRow(d){
 var drawings = [];
 var curId = _drawingId;
 
-var pdfDoc=null,pdfScale=1.5,pdfBaseScale=1.5,pinMode='',activeLayer='all';
-var _renderTask=null,_prevScale=1.5,_panX=0,_panY=0;
-var templates=[];
-
-function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
-function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
-function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main){main.style.marginLeft=c?'52px':'';main.style.left=c?'52px':'230px';}if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
-function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
-function showView(){} // no-op in viewer
-function goList(){navTo('hvac-drawings.html');}
-function showToast(msg){
-  var t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;white-space:nowrap;pointer-events:none';
-  t.textContent=msg;document.body.appendChild(t);
-  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .5s';setTimeout(function(){t.remove();},500);},2500);
-}
-
-}
 (async function(){
   applySB(localStorage.getItem(SBK) === '1');
   var p = dbGetCurrentProject();
@@ -1414,6 +1409,12 @@ var _addTab='single';
 var _bulkFiles=[];
 
 
-</script>
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main){main.style.marginLeft=c?'52px':'';main.style.left=c?'52px':'230px';}if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
+function showView(){} // no-op in viewer
+function goList(){navTo('hvac-drawings.html');}
+}</script>
 </body>
 </html>
