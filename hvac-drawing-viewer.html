@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 01:47 -->
+<!-- build: 2026-04-06 09:07 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1215,6 +1215,61 @@ function setLayer(layer){
   renderPinOverlay();renderPins();
 }
 
-// ── PIN OVERLAY ──</script>
+// ── PIN OVERLAY ──
+function renderPins(){
+  var d=drawings.find(function(x){return x.id===curId;});
+  var list=document.getElementById('ppList');
+  var tf=(document.getElementById('pinTypeFilter').value||'');
+  list.innerHTML='';
+  var pins=(d&&d.pins)||[];
+  var filtered=pins.filter(function(p){return!tf||p.type===tf;});
+  document.getElementById('pinCount').textContent=pins.length;
+  if(!filtered.length){
+    list.innerHTML='<div style="text-align:center;padding:28px;color:var(--muted);font-size:12px">'+(pins.length?'No pins match filter':'Select pin type then click on drawing')+'</div>';
+    return;
+  }
+  filtered.forEach(function(pin){
+    var item=document.createElement('div');item.className='pin-item '+pin.type;item.id='pi-'+pin.id;
+    var stcls={open:'st-open',inprogress:'st-inprogress',closed:'st-closed'}[pin.status]||'st-open';
+    var stlbl={open:'Open',inprogress:'In Progress',closed:'Closed'}[pin.status]||'Open';
+    var hdr=document.createElement('div');hdr.className='pi-hdr';
+    hdr.innerHTML='<div class="pi-dot"></div><span class="pi-ref">'+escH(pin.ref||'')+'</span><span class="pi-desc" title="'+escH(pin.desc||'')+'">'+escH(pin.desc||'')+'</span><span class="pi-st '+stcls+'">'+stlbl+'</span>';
+    (function(p){hdr.addEventListener('click',function(){expandPin(p.id);});})(pin);
+    var body=document.createElement('div');body.className='pi-body';
+    if(pin.equip){var eq=document.createElement('div');eq.style.cssText='font-family:DM Mono,monospace;font-size:10px;color:var(--accent);margin-top:8px';eq.textContent='Equipment: '+pin.equip;body.appendChild(eq);}
+    // ITP Checklist
+    if(pin.type==='itp'&&pin.checklist&&pin.checklist.length){
+      var cl=document.createElement('div');cl.className='itp-cl';
+      pin.checklist.forEach(function(ci,ci_i){
+        var row=document.createElement('div');row.className='itp-ci';
+        var chk=document.createElement('div');chk.className='ci-chk'+(ci.checked?' on':'');if(ci.checked)chk.textContent='✓';
+        (function(p2,idx,c2){chk.addEventListener('click',function(e){e.stopPropagation();p2.checklist[idx].checked=!p2.checklist[idx].checked;c2.className='ci-chk'+(p2.checklist[idx].checked?' on':'');c2.textContent=p2.checklist[idx].checked?'✓':'';save();});})(pin,ci_i,chk);
+        var txt=document.createElement('span');txt.className='ci-txt'+(ci.checked?' done':'');txt.textContent=ci.text;
+        row.appendChild(chk);row.appendChild(txt);cl.appendChild(row);
+      });
+      body.appendChild(cl);
+    }
+    // Status select
+    var ss=document.createElement('select');ss.className='pi-sel';
+    [{v:'open',l:'Open'},{v:'inprogress',l:'In Progress'},{v:'closed',l:'Closed'}].forEach(function(opt){var o=document.createElement('option');o.value=opt.v;o.textContent=opt.l;if(opt.v===pin.status)o.selected=true;ss.appendChild(o);});
+    (function(p){ss.addEventListener('change',function(){p.status=this.value;save();renderPins();renderPinOverlay();});})(pin);
+    body.appendChild(ss);
+    // Delete
+    var del=document.createElement('button');del.className='pi-del';del.textContent='🗑 Delete pin';
+    (function(p){del.addEventListener('click',function(e){e.stopPropagation();if(!confirm('Delete this pin?'))return;var d=drawings.find(function(x){return x.id===curId;});if(d){d.pins=d.pins.filter(function(x){return x.id!==p.id;});save();renderPins();renderPinOverlay();}});})(pin);
+    body.appendChild(del);
+    item.appendChild(hdr);item.appendChild(body);list.appendChild(item);
+  });
+}
+
+function expandPin(pinId){
+  document.querySelectorAll('.pin-item').forEach(function(el){el.classList.toggle('exp',el.id==='pi-'+pinId&&!el.classList.contains('exp'));});
+  var el=document.getElementById('pi-'+pinId);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+var ITP_TYPES={
+  'fcu-water-cooled':{label:'FCU — Water Cooled',itpNum:'ITP-001',requiresEquip:true}
+};>l
+</script>
 </body>
 </html>
