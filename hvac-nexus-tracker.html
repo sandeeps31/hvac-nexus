@@ -264,7 +264,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 </div>
 
 <!-- ADD/EDIT MODAL -->
-<div class="mo" id="addModal" onclick="if(event.target===this)closeModal()">
+<div class="mo" id="addModal">
   <div class="modal">
     <div class="modal-hdr">
       <h3 id="modalTitle">Add Item</h3>
@@ -285,35 +285,60 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <div>
         <label class="ml">Module</label>
         <select class="ms" id="m-module">
-          <option value="">— General / Unknown —</option>
-          <option>Budget</option>
-          <option>Progress Claims</option>
-          <option>Vendor Invoices</option>
-          <option>Variations</option>
-          <option>Subcontractor Variations</option>
-          <option>Procurement Schedule</option>
-          <option>Purchase Orders</option>
-          <option>Drawings</option>
-          <option>Drawing Viewer</option>
-          <option>Tech Submissions</option>
-          <option>Equipment Schedule</option>
-          <option>ITP</option>
-          <option>ITP Register</option>
-          <option>ITP Templates</option>
-          <option>ITP Form</option>
-          <option>Passive Fire Register</option>
-          <option>Defects</option>
-          <option>Commissioning Tracker</option>
-          <option>Pre-Commissioning</option>
-          <option>User Management</option>
-          <option>Company Settings</option>
-          <option>Project Settings</option>
-          <option>RFI</option>
-          <option>NCR</option>
-          <option>Subcontractor ITPs</option>
-          <option>Handover Package</option>
-          <option>Auth</option>
-          <option>General / Cross-module</option>
+          <option value="">— Select Module —</option>
+          <optgroup label="💰 Financials">
+            <option>Budget</option>
+            <option>Progress Claims</option>
+            <option>Vendor Invoices</option>
+            <option>Variations</option>
+            <option>Subcontractor Variations</option>
+          </optgroup>
+          <optgroup label="📦 Procurement">
+            <option>Procurement Schedule</option>
+            <option>Purchase Orders</option>
+          </optgroup>
+          <optgroup label="📐 Technical">
+            <option>Drawings</option>
+            <option>Drawing Viewer</option>
+            <option>Tech Submissions</option>
+            <option>Equipment Schedule</option>
+            <option>RFI</option>
+            <option>Specifications</option>
+          </optgroup>
+          <optgroup label="⚙️ Commissioning">
+            <option>Pre-Commissioning</option>
+            <option>Commissioning Tracker</option>
+          </optgroup>
+          <optgroup label="📋 Quality">
+            <option>ITP</option>
+            <option>ITP Register</option>
+            <option>ITP Templates</option>
+            <option>ITP Form</option>
+            <option>Passive Fire Register</option>
+            <option>Defects</option>
+            <option>NCR</option>
+            <option>Installation Defects</option>
+          </optgroup>
+          <optgroup label="⚙️ Settings &amp; Platform">
+            <option>Company Settings</option>
+            <option>Project Settings</option>
+            <option>User Management</option>
+            <option>Auth</option>
+          </optgroup>
+          <optgroup label="🔮 Future Modules">
+            <option>Subcontractor ITPs</option>
+            <option>Subcontractor Agreements</option>
+            <option>Pressure Test Register</option>
+            <option>Lookahead</option>
+            <option>Handover Package</option>
+            <option>O&amp;M Document Register</option>
+            <option>Safety</option>
+            <option>Documents</option>
+            <option>Photos</option>
+          </optgroup>
+          <optgroup label="🔧 General">
+            <option>General / Cross-module</option>
+          </optgroup>
         </select>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -359,6 +384,7 @@ var _trkProj=dbGetCurrentProject();var _trkPNum=_trkProj.num||_trkProj.number||'
 var SK='hvacnexus_tracker_v1';
 var activeTab='bugs';
 var editingId=null;
+var _hideCompleted=false;
 var items=[];
 var _uid=0;function nid(){return 'i'+(++_uid)+Date.now();}
 
@@ -421,7 +447,7 @@ var SEED=[
   {id:'f033',type:'feature',title:'Auto-detect logged-in user on module load',module:'User Management',priority:'high',status:'backlog',desc:'Each module should auto-resolve current user from hvacnexus_current_user → fall back to first admin in users list → never show Unknown. Already fixed in ITP register, needs applying everywhere.',notes:'loadCurrentUser() pattern from hvac-itp.html to be shared across all modules.',created:'2026-04-03'},
   {id:'f038',type:'feature',title:'Budget — permission-restricted budget column',module:'Budget',priority:'high',status:'planned',desc:'Budget column should be editable only by Admin, Director, and Estimator roles. PM and all other roles see it as read-only with a lock icon. Implementation: (1) resolve _canEditBudget from dbGetCurrentUser() role on init, (2) render budget cell as inline input (onblur saves) for permitted roles, or read-only span with lock icon for PM, (3) add lock indicator on Budget column header when user is read-only. Permitted roles: Admin, Director, Estimator. Read-only roles: PM, Engineer, Subcontractor, Witness.',notes:'_pNum is not explicitly declared in hvac-budget.html — resolve via dbGetCurrentProject() in async init before applying role check. Budget input should match existing .margin-input CSS style.',created:'2026-04-07'},
   {id:'f039',type:'feature',title:'PM personal template library',module:'User Management',priority:'medium',status:'backlog',desc:'A PM can maintain their own private library of reusable templates (budget structures, ITP checklists, email templates, etc.) stored against their user account on the server. Templates are portable across projects and companies. PM can deploy any personal template into the current project with one click. Library is private — not visible to other users.',notes:'Requires Supabase auth to be working first — needs a real user_id to scope templates to a specific person. Do not build against localStorage as templates must be cross-device. Build immediately after auth is complete. Table: pm_templates (user_id, type, name, data). Types: budget, itp, email, procurement.',created:'2026-04-07'},
-  {id:'b008',type:'bug',title:'Modal backdrop dismiss — block accidental close on all modals',module:'General / Cross-module',priority:'medium',status:'backlog',desc:'All modals across the project should NOT close when clicking the backdrop. User must click Save or Cancel explicitly to prevent accidental data loss. Currently many modals dismiss on backdrop click.',notes:'Fixed in hvac-pdf-viewer.html pin modal. Needs rolling out to all other modules.',created:'2026-04-03'},
+  {id:'b008',type:'bug',title:'Modal backdrop dismiss — block accidental close on all modals',module:'General / Cross-module',priority:'medium',status:'in-progress',desc:'All modals across the project should NOT close when clicking the backdrop. User must click Save or Cancel explicitly to prevent accidental data loss. Currently many modals dismiss on backdrop click.',notes:'Fixed in hvac-pdf-viewer.html pin modal. Needs rolling out to all other modules.',created:'2026-04-03'},
   {id:'b009',type:'bug',title:'Sidebar horizontal scrollbar — remove, drag resize, fixed tooltips',module:'General / Cross-module',priority:'medium',status:'backlog',desc:'Sidebar shows horizontal scrollbar when item labels are long. Standard fix for all modules: (1) overflow-x:hidden on .sb and .sb-nav, (2) text-overflow:ellipsis on .sb-item-label, (3) drag-to-resize handle on right edge capped at 276px (230+20%), (4) tooltips use position:fixed + JS mouseenter to escape overflow:hidden — CSS hover tooltips do not work inside overflow:hidden containers.',notes:'Fixed in hvac-variations.html. Needs rolling out to all other modules. Tooltip JS pattern: getBoundingClientRect on mouseenter, set fixed left=(sbWidth+8)px, top=midpoint of item.',created:'2026-04-03'},
 ];
 
@@ -475,6 +501,7 @@ async function load(){
     items=JSON.parse(JSON.stringify(SEED));save();
   }
   render();updateBadges();updateStats();
+  document.getElementById('badge-modules').textContent=MODULES.length;
 }
 
 // ── TABS ──
@@ -500,6 +527,7 @@ function render(){
   var mf=document.getElementById('filterModule').value;
   var filtered=items.filter(function(it){
     if(it.type!==activeTab.replace('s',''))return false;
+    if(_hideCompleted&&(it.status==='done'||it.status==='wont-fix'))return false;
     if(sf&&it.status!==sf)return false;
     if(pf&&it.priority!==pf)return false;
     if(mf&&it.module!==mf)return false;
@@ -759,7 +787,22 @@ function saveItem(){
       created:today
     });
   }
-  save();closeModal();render();
+  var newType=editingId?null:document.getElementById('m-type').value;
+  save();closeModal();
+  if(newType&&newType==='feature'&&activeTab!=='features')switchTab('features');
+  else if(newType&&newType==='bug'&&activeTab!=='bugs')switchTab('bugs');
+  else render();
+}
+
+function toggleHideCompleted(){
+  _hideCompleted=!_hideCompleted;
+  var btn=document.getElementById('hideCompBtn');
+  if(btn){
+    btn.style.color=_hideCompleted?'var(--accent)':'';
+    btn.style.borderColor=_hideCompleted?'var(--accent)':'';
+    btn.textContent=_hideCompleted?'\u25cf Show Completed':'\u2713 Hide Completed';
+  }
+  render();
 }
 
 function clearFilters(){
@@ -767,6 +810,9 @@ function clearFilters(){
   document.getElementById('filterStatus').value='';
   document.getElementById('filterPriority').value='';
   document.getElementById('filterModule').value='';
+  _hideCompleted=false;
+  var btn=document.getElementById('hideCompBtn');
+  if(btn){btn.style.color='';btn.style.borderColor='';btn.textContent='\u2713 Hide Completed';}
   render();
 }
 
