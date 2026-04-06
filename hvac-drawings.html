@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 08:11 -->
+<!-- build: 2026-04-06 08:24 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -36,7 +36,7 @@ input[type=number]{-moz-appearance:textfield}
 .sb-group-items .sb-item{padding-left:28px}
 body{padding-left:var(--sb);transition:padding-left .25s}
 body.sb-sm{padding-left:var(--sb-sm)}
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;transition:none}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
 .bc{display:flex;align-items:center;gap:7px;font-size:13px}.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
 .btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
 .bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
@@ -207,7 +207,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
     <select class="fsel" id="areaFilter" onchange="renderList()"><option value="">All Areas</option></select>
     <select class="fsel" id="stFilter" onchange="renderList()">
       <option value="">All Statuses</option>
-      <option value='IFR'>IFR</option><option value='IFA'>IFA</option><option value='IFC'>IFC</option><option value='AB'>AB</option><option value='Obsolete'>Obsolete</option>
+      <option value='IFR'>IFR</option><option value='IFA'>IFA</option><option value='IFC'>IFC</option><option value='AB'>AB</option>
     </select>
     <button class="bg bsm btn" onclick="openManageAreas()" style="flex-shrink:0;color:var(--text2)">⚙ Areas</button>
     <button class="bg bsm btn" id="obsToggleBtn" onclick="toggleShowObsolete()" style="flex-shrink:0;color:var(--muted);gap:5px">⊘ Show Obsolete</button>
@@ -255,14 +255,14 @@ body.sb-sm{padding-left:var(--sb-sm)}
           <div><label class="ml">Status</label>
             <select class="ms" id="f-status" onchange="toggleApprovalField('f-approval-wrap')">
               <option value='IFR'>IFR — Issued for Review</option><option value='IFA'>IFA — Issued for Approval</option>
-              <option value='IFC'>IFC — Issued for Construction</option><option value='AB'>AB — As Built</option><option value='Obsolete'>Obsolete</option>
+              <option value='IFC'>IFC — Issued for Construction</option><option value='AB'>AB — As Built</option>
             </select>
           </div>
           <div id="f-approval-wrap"><label class="ml">Approval Status</label>
             <select class="ms" id="f-approval">
               <option value='Pending'>Pending</option><option value='Approved'>Approved</option>
               <option value='Approved with Comments'>Approved with Comments</option>
-              <option value='Rejected'>Rejected</option><option value='Obsolete'>Obsolete</option>
+              <option value='Rejected'>Rejected</option>
             </select>
           </div>
         </div>
@@ -336,14 +336,14 @@ body.sb-sm{padding-left:var(--sb-sm)}
             <option value='IFR'>IFR - Issued for Review</option>
             <option value='IFA'>IFA - Issued for Approval</option>
             <option value='IFC'>IFC - Issued for Construction</option>
-            <option value='AB'>AB - As Built</option><option value='Obsolete'>Obsolete</option>
+            <option value='AB'>AB - As Built</option>
           </select>
         </div>
         <div id="e-approval-wrap"><label class="ml">Approval Status</label>
           <select class="ms" id="e-approval">
             <option value='Pending'>Pending</option><option value='Approved'>Approved</option>
             <option value='Approved with Comments'>Approved with Comments</option>
-            <option value='Rejected'>Rejected</option><option value='Obsolete'>Obsolete</option>
+            <option value='Rejected'>Rejected</option>
           </select>
         </div>
       </div>
@@ -353,7 +353,6 @@ body.sb-sm{padding-left:var(--sb-sm)}
       </div>
     </div>
     <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-shrink:0">
-      <button class="bg bsm btn" onclick="markDrawingObsolete()" style="color:var(--danger);border-color:rgba(255,77,109,.4);margin-right:auto">⊘ Mark Obsolete</button>
       <button class="bg bsm btn" onclick="closeEditModal()">Cancel</button>
       <button class="bp bsm btn" onclick="saveEditDrawing()">Save Changes</button>
     </div>
@@ -448,6 +447,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
       </div>
     </div>
     <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
+      <button class="btn bsm" onclick="markSupersedeObsolete()" style="color:var(--danger);border:1px solid rgba(255,77,109,.4);background:transparent;margin-right:auto">⊘ Mark as Obsolete</button>
       <button class="bg bsm btn" onclick="closeSupersedeModal()">Cancel</button>
       <button class="btn bsm" style="background:var(--warn);color:#080c12;font-weight:600;white-space:nowrap" onclick="confirmSupersede()">Supersede &amp; Save New Revision</button>
     </div>
@@ -1098,10 +1098,6 @@ function saveBulkEdit(){
       ||edited.cat!==orig.cat||edited.subcat!==orig.subcat||edited.area!==orig.area
       ||edited.status!==orig.status||edited.approval!==orig.approval||edited.subDate!==orig.subDate;
     if(changed){
-      if(edited.rev!==orig.rev||edited.status!==orig.status||edited.approval!==orig.approval){
-        if(!orig.history)orig.history=[];
-        orig.history.push({rev:edited.rev,status:edited.status,approval:edited.approval,subDate:edited.subDate,apprDate:orig.apprDate||'',recorded:today});
-      }
       Object.assign(orig,{num:edited.num,name:edited.name,rev:edited.rev,cat:edited.cat,subcat:edited.subcat,area:edited.area,status:edited.status,approval:edited.approval,subDate:edited.subDate});
     }
   });
@@ -1262,6 +1258,19 @@ function openSupersedeConfirm(id){
   toggleApprovalField('sup-approval-wrap');
   document.getElementById('supersedeModal').classList.add('open');
 }
+function markSupersedeObsolete(){
+  if(!_supersedeId)return;
+  if(!confirm('Mark this drawing as Obsolete? It will be hidden from the drawing list.'))return;
+  var d=drawings.find(function(x){return x.id===_supersedeId;});
+  if(!d)return;
+  var today=new Date().toISOString().split('T')[0];
+  d.status='Obsolete';
+  if(!d.history)d.history=[];
+  d.history.push({rev:d.rev,status:'Obsolete',approval:d.approval||'',subDate:d.subDate||'',apprDate:d.apprDate||'',recorded:today,note:'Marked obsolete'});
+  save();closeSupersedeModal();renderList();
+  showToast('Drawing marked as Obsolete');
+}
+
 function closeSupersedeModal(){
   document.getElementById('supersedeModal').classList.remove('open');
   _supersedeId=null;_supersedePdfData=null;
