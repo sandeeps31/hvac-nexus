@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 10:36 -->
+<!-- build: 2026-04-06 10:46 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -189,31 +189,29 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 
 <!-- TOPBAR -->
 <div class="topbar">
+  <button class="tb-btn" onclick="navTo('hvac-drawings.html')" style="font-size:11px">← Drawings</button>
+  <div class="tb-sep"></div>
   <div class="drw-info">
     <div class="drw-num" id="topNum">—</div>
     <div class="drw-name" id="topName">Loading…</div>
   </div>
   <div class="tb-sep"></div>
-  <button class="tb-btn add-itp" id="addItpBtn" onclick="setPinType('itp')">🔵 ITP</button>
+  <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Add Pin</span>
+  <button class="tb-btn add-itp" id="addItpBtn" onclick="setPinType('itp')" style="color:var(--purple);border-color:rgba(167,139,250,.4)">🔵 ITP</button>
   <button class="tb-btn" id="addDefBtn" onclick="setPinType('defect')" style="color:var(--danger);border-color:rgba(255,77,109,.4)">🔴 Defect</button>
   <button class="tb-btn" id="addFireBtn" onclick="setPinType('fire')" style="color:var(--warn);border-color:rgba(255,184,48,.4)">🟡 Fire</button>
-  <button class="tb-btn" id="showDeletedBtn" onclick="toggleShowDeleted()" title="Show deleted pins" style="font-size:11px">🗑 Deleted</button>
-  <button class="tb-btn" id="flashPinsBtn" onclick="flashPins()" title="Spotlight pins (10s)">⚡ Spotlight</button>
   <div class="tb-sep"></div>
-  <button class="z-btn" onclick="zoom(1.25)" title="Zoom in">+</button>
-  <button class="z-btn" onclick="zoom(0.8)" title="Zoom out">−</button>
-  <button class="z-btn" onclick="fitToScreen()" title="Fit to screen">⊡</button>
-  <div class="tb-sep"></div>
-  <button class="tb-btn" onclick="window.close()">✕ Close</button>
+  <button class="tb-btn" id="flashPinsBtn" onclick="flashPins()" title="Spotlight pins">⚡</button>
+  <button class="tb-btn" onclick="togglePinsPanel()" title="Toggle pins panel">📍</button>
 </div>
 
 <!-- FILTER BAR -->
 <div class="filter-bar" id="filterBar">
   <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0">Layers</span>
-  <div class="chip on" id="layer-all" class="chip layer-all on" onclick="toggleLayer2('all')" style="color:var(--text2);border-color:var(--border)">👁 All</div>
-  <div class="chip on" id="layer-itp" class="chip layer-itp on" onclick="toggleLayer2('itp')" style="color:var(--purple);border-color:rgba(167,139,250,.4)">🔵 ITP</div>
-  <div class="chip on" id="layer-defect" class="chip layer-def on" onclick="toggleLayer2('defect')" style="color:var(--danger);border-color:rgba(255,77,109,.4)">🔴 Defect</div>
-  <div class="chip on" id="layer-fire" class="chip layer-fire on" onclick="toggleLayer2('fire')" style="color:var(--warn);border-color:rgba(255,184,48,.4)">🟡 Fire</div>
+  <div class="chip layer-all on" id="layer-all" onclick="toggleLayer2('all')">👁 All</div>
+  <div class="chip layer-itp on" id="layer-itp" onclick="toggleLayer2('itp')">🔵 ITP</div>
+  <div class="chip layer-def on" id="layer-defect" onclick="toggleLayer2('defect')">🔴 Defect</div>
+  <div class="chip layer-fire on" id="layer-fire" onclick="toggleLayer2('fire')">🟡 Fire</div>
   <div class="filter-sep"></div>
   <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0">Status</span>
   <div class="chip chip-all on" id="chip-all" onclick="toggleStatusChip('all')">All</div>
@@ -221,7 +219,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
   <div class="chip chip-ip" id="chip-ip" onclick="toggleStatusChip('in-progress')">● In Progress</div>
   <div class="chip chip-act" id="chip-act" onclick="toggleStatusChip('action')">● Action Req.</div>
   <div class="chip chip-cl" id="chip-cl" onclick="toggleStatusChip('closed')">● Closed</div>
-  <div class="chip" id="chip-del" onclick="toggleShowDeleted()" style="color:var(--muted);border-color:var(--border)">🗑 Deleted</div>
   <div id="placeHintBar" style="display:none;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);margin-left:auto">📍 Click drawing to place pin — Esc to cancel</div>
 </div>
 
@@ -242,7 +239,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
   </div>
 
   <!-- PINS SIDE PANEL -->
-  <div class="pins-panel" id="pinsPanel">
+  <div class="pins-panel" id="pinsPanel" style="width:300px">
     <div class="pp-collapse-tab" onclick="togglePinsPanel()" id="ppCollapseTab" title="Toggle pins panel">◀</div>
     <div class="pp-hdr pp-hide">
       <span class="pp-title">Pins</span>
@@ -974,8 +971,7 @@ function toggleLayer2(type){
   } else {
     _layerVisibility[type]=!_layerVisibility[type];
     var vis=_layerVisibility[type];
-    var layId=type==='defect'?'layer-defect':('layer-'+type);
-    var el=document.getElementById(layId);
+    var el=document.getElementById('layer-'+type);
     if(el)el.classList.toggle('on',vis);
     var allOn2=Object.values(_layerVisibility).every(function(v){return v;});
     var allEl=document.getElementById('layer-all');
@@ -991,9 +987,9 @@ function togglePinsPanel(){
   var panel=document.getElementById('pinsPanel');
   var tab=document.getElementById('ppCollapseTab');
   if(!panel)return;
-  panel.classList.toggle('collapsed');
-  var collapsed=panel.classList.contains('collapsed');
+  var collapsed=panel.classList.toggle('collapsed');
   if(tab)tab.textContent=collapsed?'▶':'◀';
+  renderPinPanel();
 }
 
 function renderPinsWithLayers(){
