@@ -1,14 +1,114 @@
 <!DOCTYPE html>
-<!-- build: 2026-04-06 09:07 -->
+<!-- build: 2026-04-05 03:27 -->
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Drawing Viewer — HVAC NEXUS</title>
-<link rel="stylesheet" href="theme.css">
-<script src="db.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 <style>
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex}
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;
+  --border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.12);
+  --green:#00e5a0;--green-dim:rgba(0,229,160,.12);
+  --warn:#ffb830;--warn-dim:rgba(255,184,48,.12);
+  --danger:#ff4d6d;--danger-dim:rgba(255,77,109,.12);
+  --purple:#a78bfa;--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* TOPBAR */
+.topbar{height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:20}
+.drw-info{display:flex;flex-direction:column;flex:1;min-width:0}
+.drw-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;line-height:1.2}
+.drw-name{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2}
+.tb-sep{width:1px;height:28px;background:var(--border);flex-shrink:0}
+.tb-btn{height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:all .13s}
+.tb-btn:hover{color:var(--text);border-color:var(--text2)}
+.tb-btn.active{color:#080c12;background:var(--accent);border-color:var(--accent)}
+.tb-btn.add-itp{color:var(--accent);border-color:rgba(0,200,255,.35)}.tb-btn.add-itp:hover{background:var(--accent-dim)}
+.tb-btn.add-itp.placing{background:var(--accent);color:#080c12;animation:pulse .8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+.z-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .13s}
+.z-btn:hover{color:var(--accent);border-color:var(--accent)}
+
+/* FILTER BAR */
+.filter-bar{height:38px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:8px;flex-shrink:0;overflow-x:auto}
+.filter-bar::-webkit-scrollbar{height:0}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .13s;white-space:nowrap;user-select:none}
+.chip-all{background:var(--surface3);color:var(--text2);border-color:var(--border)}.chip-all.on{background:var(--surface);color:var(--text);border-color:var(--text2)}
+.chip-ns{background:transparent;color:var(--muted);border-color:var(--border)}.chip-ns.on{background:var(--surface3);color:var(--text2);border-color:var(--muted)}
+.chip-ip{background:transparent;color:var(--warn);border-color:rgba(255,184,48,.3)}.chip-ip.on{background:var(--warn-dim);border-color:var(--warn)}
+.chip-act{background:transparent;color:var(--danger);border-color:rgba(255,77,109,.3)}.chip-act.on{background:var(--danger-dim);border-color:var(--danger)}
+.chip-cl{background:transparent;color:var(--green);border-color:rgba(0,229,160,.3)}.chip-cl.on{background:var(--green-dim);border-color:var(--green)}
+.filter-sep{width:1px;height:18px;background:var(--border);flex-shrink:0;margin:0 4px}
+.layer-chip{background:transparent;color:var(--purple);border-color:rgba(167,139,250,.3)}.layer-chip.on{background:rgba(167,139,250,.1);border-color:var(--purple)}
+
+/* VIEWER */
+.viewer{flex:1;overflow:hidden;position:relative}
+.viewer.grab{cursor:grab}.viewer.grabbing{cursor:crosshair}
+#pdfStage{position:absolute;transform-origin:top left}
+#pdfCanvas{display:block}
+
+/* ITP PINS */
+.itp-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:30;transition:transform .1s}
+.itp-pin:hover{transform:translate(-50%,-50%) scale(1.2)}
+
+.itp-pin.flashing{transform:translate(-50%,-50%) scale(1.6);z-index:999;transition:transform .3s}
+.itp-pin.flashing .pin-dot{box-shadow:0 0 0 6px rgba(0,200,255,.4),0 4px 16px rgba(0,0,0,.6)!important}
+.pin-dot{height:24px;min-width:24px;padding:0 7px;border-radius:12px;border:2px solid rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 0 2px rgba(0,0,0,.3);transition:all .13s;white-space:nowrap;letter-spacing:0.5px}
+.pin-dot.ns{background:#3d5a7a;border-color:#5a7a9a}
+.pin-dot.ip{background:#cc8800;border-color:var(--warn)}
+.pin-dot.act{background:#cc2244;border-color:var(--danger)}
+.pin-dot.cl{background:#00aa70;border-color:var(--green)}
+.pin-dot.placing-preview{background:var(--accent);border-color:#fff;animation:pulse .6s infinite}
+.pin-label{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:3px;background:rgba(8,12,18,.9);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);white-space:nowrap;pointer-events:none;display:none}
+.itp-pin:hover .pin-label{display:block}
+
+/* PLACE HINT */
+.ctx-menu{position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:2000;min-width:160px;padding:4px;display:none}
+.ctx-item{padding:8px 14px;font-size:13px;cursor:pointer;border-radius:5px;display:flex;align-items:center;gap:8px;color:var(--text)}
+.ctx-item:hover{background:var(--accent-dim);color:var(--accent)}
+.place-hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,200,255,.15);border:1.5px solid var(--accent);color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;padding:8px 18px;border-radius:8px;z-index:100;display:none;pointer-events:none;backdrop-filter:blur(4px)}
+
+/* PIN MODAL */
+.mo{position:fixed;inset:0;background:rgba(4,8,16,.82);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.mo.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;width:360px;max-width:96vw;max-height:90vh}
+.modal-hdr{padding:16px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-hdr h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:800}
+.modal-body{overflow-y:auto;flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:7px;justify-content:flex-end;flex-shrink:0}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
+.mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
+.ms{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer}
+.ms:focus{border-color:var(--accent)}.ms option,.ms optgroup{background:var(--surface2)}
+.sugg-wrap{position:relative}
+.sugg-list{position:fixed;z-index:9999;background:var(--surface2);border:1px solid var(--border);border-radius:7px;max-height:200px;overflow-y:auto;display:none;box-shadow:0 8px 20px rgba(0,0,0,.5);min-width:200px}
+.sugg-item{padding:7px 11px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}.sugg-item:last-child{border-bottom:none}.sugg-item:hover{background:var(--surface3);color:var(--accent)}
+.mbtn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.mbp{background:var(--accent);color:#080c12}.mbp:hover{background:#33d4ff}
+.mbg{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}.mbg:hover{color:var(--text);border-color:var(--text2)}
+
+/* STATUS ROW in modal */
+.st-row{display:flex;gap:6px}
+.st-opt{flex:1;padding:6px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;text-align:center;transition:all .13s}
+.st-opt:hover{border-color:var(--text2);color:var(--text2)}
+.st-opt.sel-ns{border-color:var(--muted);background:var(--surface3);color:var(--text2)}
+.st-opt.sel-ip{border-color:var(--warn);background:var(--warn-dim);color:var(--warn)}
+.st-opt.sel-act{border-color:var(--danger);background:var(--danger-dim);color:var(--danger)}
+.st-opt.sel-cl{border-color:var(--green);background:var(--green-dim);color:var(--green)}
+
+/* LOADING */
+.loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--text2);font-size:13px;background:var(--bg);z-index:5}
+.spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-state,.no-pdf{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted)}
+
+
 /* ── SIDEBAR STANDARD ── */
 .sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden;overflow-x:hidden}
 .sb.sm{width:52px}
@@ -31,150 +131,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 .sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
-
-<!-- SIDEBAR -->
-
-/* DETAIL */
-.detail-topbar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
-.detail-title-wrap{flex:1;min-width:0}
-.detail-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.detail-meta{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:1px}
-.detail-actions{display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap}
-.layer-btn{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;border:1px solid var(--border);cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;background:transparent;color:var(--text2);transition:all .15s;white-space:nowrap}
-.layer-btn:hover{border-color:var(--muted);color:var(--text)}.layer-btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
-.layer-btn.itp.on{border-color:var(--purple);color:var(--purple);background:var(--purple-dim)}
-.layer-btn.defect.on{border-color:var(--danger);color:var(--danger);background:var(--danger-dim)}
-.layer-btn.fire.on{border-color:var(--warn);color:var(--warn);background:var(--warn-dim)}
-.vdiv{width:1px;height:20px;background:var(--border);flex-shrink:0}
-.zoom-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all .13s;position:relative;flex-shrink:0}
-.zoom-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
-.zoom-btn .ztip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface2);color:var(--text);font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:500;font-family:'DM Sans',sans-serif}
-.zoom-btn:hover .ztip{opacity:1}
-.drawing-area{flex:1;display:flex;overflow:hidden;position:relative}
-/* pdf-wrap: no scrollbars — pan/zoom via CSS transform only */
-.pdf-wrap{flex:1;overflow:hidden;background:#111420;position:relative;cursor:grab}
-.pdf-wrap.pin-mode{cursor:crosshair}
-.pdf-wrap.panning{cursor:grabbing}
-.pdf-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#111420;z-index:30;pointer-events:none}
-.pdf-loading-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
-.pdf-loading-text{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:1px}
-@keyframes spin{to{transform:rotate(360deg)}}
-/* pdf-stage: positioned absolutely so translate can go anywhere */
-#pdfStage{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;display:inline-block;transition:opacity .15s}
-canvas#pdfCanvas{display:block}
-.pin-overlay{position:absolute;top:0;left:0;pointer-events:none;width:100%;height:100%}
-.drw-pin{position:absolute;transform:translate(-50%,-100%);pointer-events:all;cursor:pointer;display:flex;flex-direction:column;align-items:center;z-index:10;transition:transform .1s}
-.drw-pin.dragging{cursor:grabbing;z-index:50;transition:none;opacity:0.8}
-.drw-pin:hover{z-index:20}
-.pin-marker{width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.25);box-shadow:0 2px 10px rgba(0,0,0,.6)}
-.drw-pin:hover .pin-marker{transform:rotate(-45deg) scale(1.2)}
-.pin-marker-inner{transform:rotate(45deg);font-size:10px;font-weight:700;font-family:'DM Mono',monospace;color:#fff;line-height:1}
-.drw-pin.itp .pin-marker{background:var(--purple)}
-.drw-pin.defect .pin-marker{background:var(--danger)}
-.drw-pin.fire .pin-marker{background:var(--warn)}
-.pin-lbl{margin-top:3px;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;color:#fff;background:rgba(0,0,0,.75);padding:1px 5px;border-radius:3px;white-space:nowrap}
-/* PIN TOOLBAR */
-/* pin-toolbar removed - now inline bar */
-.pmode-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;transition:all .15s;background:transparent;color:var(--text2)}
-.pmode-btn:hover{background:var(--surface2);color:var(--text)}
-.pmode-btn.on{color:#fff}
-.pmode-btn.itp.on{background:var(--purple)}
-.pmode-btn.defect.on{background:var(--danger)}
-.pmode-btn.fire.on{background:var(--warn);color:#080c12}
-.pmode-btn.off.on{background:var(--surface3);color:var(--text2)}
-/* PINS PANEL */
-.pins-panel{width:310px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .25s;flex-shrink:0;position:relative}
-.pins-panel.collapsed{width:32px}
-.pins-panel.collapsed .pp-hide{display:none !important}
-.pp-collapse-tab{position:absolute;top:50%;left:-1px;transform:translateY(-50%);width:16px;height:48px;background:var(--surface2);border:1px solid var(--border);border-right:none;border-radius:6px 0 0 6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px;transition:all .13s;z-index:5}
-.pp-collapse-tab:hover{color:var(--accent);background:var(--surface3)}
-.pp-hdr{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.pp-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text)}
-.pp-list{flex:1;overflow-y:auto;padding:6px}
-.pin-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;overflow:hidden;cursor:pointer;transition:border-color .13s}
-.pin-item:hover{border-color:var(--muted)}
-.pi-hdr{display:flex;align-items:center;gap:7px;padding:8px 11px}
-.pi-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.pin-item.itp .pi-dot{background:var(--purple)}.pin-item.defect .pi-dot{background:var(--danger)}.pin-item.fire .pi-dot{background:var(--warn)}
-.pi-ref{font-family:'DM Mono',monospace;font-size:11px;font-weight:700;flex-shrink:0}
-.pin-item.itp .pi-ref{color:var(--purple)}.pin-item.defect .pi-ref{color:var(--danger)}.pin-item.fire .pi-ref{color:var(--warn)}
-.pi-desc{flex:1;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pi-st{font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:20px;flex-shrink:0}
-.st-open{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
-.st-inprogress{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
-.st-closed{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
-.pi-body{display:none;padding:0 11px 11px;border-top:1px solid var(--border)}
-.pin-item.exp .pi-body{display:block}
-.itp-cl{margin-top:9px}
-.itp-ci{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border)}
-.itp-ci:last-child{border-bottom:none}
-.ci-chk{width:15px;height:15px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:9px;transition:all .15s}
-.ci-chk.on{background:var(--purple);border-color:var(--purple);color:#fff}
-.ci-txt{font-size:11.5px;color:var(--text2);flex:1}
-.ci-txt.done{color:var(--muted);text-decoration:line-through}
-.pi-field{width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 8px;outline:none;margin-top:7px;transition:border-color .15s}
-.pi-field:focus{border-color:var(--accent)}.pi-field::placeholder{color:var(--muted)}
-.pi-sel{width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;padding:5px 8px;outline:none;margin-top:7px;cursor:pointer}
-.pi-sel:focus{border-color:var(--accent)}.pi-sel option{background:var(--surface2)}
-.pi-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0;margin-top:8px;transition:color .13s;display:block}
-.pi-del:hover{color:var(--danger)}
-.no-pdf{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:14px;color:var(--muted)}
-.no-pdf-icon{font-size:48px;opacity:.3}
-/* MODAL */
-.mo{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
-.mo.bulk-mode{padding:16px}
-.mo.open{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:460px;max-width:96vw;max-height:90vh;overflow-y:auto}
-.mo.open .modal{}
-.modal h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px;color:var(--text)}
-.msub{color:var(--text2);font-size:12.5px;margin-bottom:14px}
-.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;margin-top:12px}
-.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;transition:border-color .2s}
-.mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
-.ms{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;cursor:pointer}
-.ms:focus{border-color:var(--accent)}.ms option{background:var(--surface2)}
-.mac{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
-.upload-zone{display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface3);border:2px dashed var(--border);border-radius:8px;cursor:pointer;transition:all .15s;margin-top:6px}
-.upload-zone:hover{border-color:var(--accent);background:var(--accent-dim)}.upload-zone input{display:none}
-.upload-zone-text{font-size:13px;color:var(--text2)}
-.itp-cl-editor{background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:8px;margin-top:4px;max-height:140px;overflow-y:auto}
-::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-
-
-/* MODAL */
-.mo{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
-.mo.bulk-mode{padding:16px}
-.mo.open{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:460px;max-width:96vw;max-height:90vh;overflow-y:auto}
-.mo.open .modal{}
-.modal h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px;color:var(--text)}
-.msub{color:var(--text2);font-size:12.5px;margin-bottom:14px}
-.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;margin-top:12px}
-.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;transition:border-color .2s}
-.mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
-.ms{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;cursor:pointer}
-.ms:focus{border-color:var(--accent)}.ms option{background:var(--surface2)}
-.mac{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
-.upload-zone{display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface3);border:2px dashed var(--border);border-radius:8px;cursor:pointer;transition:all .15s;margin-top:6px}
-.upload-zone:hover{border-color:var(--accent);background:var(--accent-dim)}.upload-zone input{display:none}
-.upload-zone-text{font-size:13px;color:var(--text2)}
-.itp-cl-editor{background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:8px;margin-top:4px;max-height:140px;overflow-y:auto}
-::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-
-
-/* ── SIDEBAR STANDARD ── */
-
-.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
-.bp{background:var(--accent);color:#080c12}.bg{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--text2)}
-.bsm{padding:5px 12px;font-size:12px}
-.main{position:fixed;top:0;left:230px;right:0;bottom:0;display:flex;flex-direction:column;transition:left .25s;overflow:hidden}
-.topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;background:var(--surface)}
-.bc{display:flex;align-items:center;gap:6px;font-size:13px;flex:1;min-width:0}
-.bcl{color:var(--text2);cursor:pointer;white-space:nowrap}.bcl:hover{color:var(--accent)}
-.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.view{display:flex;flex-direction:column;flex:1;overflow:hidden}
-.fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;cursor:pointer;flex-shrink:0}
-.fsel:focus{border-color:var(--accent);color:var(--text)}
+</style>
+<script src="db.js"></script>
+</head>
+<body>
 <!-- SIDEBAR -->
 <div class="sb" id="sidebar"><div class="sb-resize-handle" id="sbResize"></div>
   <div class="sb-top"><div class="sb-brand"><span class="sb-icon">&#10052;</span><span class="sb-name">HVAC NEXUS</span></div><button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">&laquo;</button></div>
@@ -224,1052 +184,747 @@ canvas#pdfCanvas{display:block}
 </div>
 
 
+<!-- MAIN -->
+<div id="mainWrap" style="position:fixed;top:0;left:230px;right:0;bottom:0;display:flex;flex-direction:column;transition:left .25s;overflow:hidden">
+
+<!-- TOPBAR -->
 <div class="topbar">
-  <div class="bc">
-    <span class="bcl" onclick="goList()">My Projects</span><span class="bcs">›</span>
-    <span class="bcl" onclick="goList()" onclick="navTo(\'project.html\')">Greenfield Commercial Tower</span><span class="bcs">›</span>
-    <span class="bcc" id="bcCurr">Drawings</span>
+  <div class="drw-info">
+    <div class="drw-num" id="topNum">—</div>
+    <div class="drw-name" id="topName">Loading…</div>
   </div>
-  <div style="display:flex;gap:8px">
-    <button class="bg bsm btn" id="backBtn" style="display:none" onclick="goList()">← Back</button>
-    <button class="bg bsm btn" id="bulkEditBtn" onclick="openBulkEditModal()" style="color:var(--text2)">✏ Bulk Edit</button>
-    <button class="bp bsm btn" id="addBtn" onclick="openAddModal()">＋ Add Drawing</button>
-  </div>
+  <div class="tb-sep"></div>
+  <button class="tb-btn add-itp" id="addItpBtn" onclick="togglePlaceMode()">📍 Add ITP</button>
+  <button class="tb-btn" id="showDeletedBtn" onclick="toggleShowDeleted()" title="Show deleted pins" style="font-size:11px">🗑 Deleted</button>
+  <button class="tb-btn" id="flashPinsBtn" onclick="flashPins()" title="Spotlight pins (10s)">⚡ Spotlight</button>
+  <div class="tb-sep"></div>
+  <button class="z-btn" onclick="zoom(1.25)" title="Zoom in">+</button>
+  <button class="z-btn" onclick="zoom(0.8)" title="Zoom out">−</button>
+  <button class="z-btn" onclick="fitToScreen()" title="Fit to screen">⊡</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="window.close()">✕ Close</button>
 </div>
 
-
-
-<div class="main" id="mainWrap">
-  <div class="topbar">
-    <div class="bc">
-      <span class="bcl" onclick="navTo('project.html')">My Projects</span><span class="bcs">›</span>
-      <span class="bcl" id="bc-proj">Project</span><span class="bcs">›</span>
-      <span class="bcl" onclick="navTo('hvac-drawings.html')">Drawings</span><span class="bcs">›</span>
-      <span class="bcc" id="bcDrawingNum">Loading…</span>
-    </div>
-    <button class="btn bg bsm" onclick="navTo('hvac-drawings.html')">← Back to Drawings</button>
-  </div>
-
-<!-- DETAIL VIEW -->
-<div class="view" id="view-detail">
-  <div class="detail-topbar">
-    <div class="detail-title-wrap">
-      <div class="detail-title" id="detailTitle"></div>
-      <div class="detail-meta" id="detailMeta"></div>
-    </div>
-    <div class="detail-actions">
-      <div class="vdiv"></div>
-      <!-- Layer toggles -->
-      <button class="layer-btn on" id="lyrAll" onclick="setLayer('all')">👁 All</button>
-      <button class="layer-btn itp" id="lyrItp" onclick="setLayer('itp')">🔵 ITP</button>
-      <button class="layer-btn defect" id="lyrDef" onclick="setLayer('defect')">🔴 Defects</button>
-      <button class="layer-btn fire" id="lyrFire" onclick="setLayer('fire')">🟡 Fire</button>
-      <div class="vdiv"></div>
-
-      <button class="zoom-btn" onclick="togglePinsPanel()" id="pinsToggleBtn" title="Toggle pins panel"><span class="ztip">Toggle pins</span>📍<span id="pinCount" style="display:none"></span></button>
-    </div>
-  </div>
-
-  <!-- Pin toolbar as its own bar -->
-  <div style="display:flex;align-items:center;gap:6px;padding:7px 16px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0">
-    <span style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-right:4px">Add Pin:</span>
-    <button class="pmode-btn off on" id="pmOff" onclick="setPinMode('')">✕ None</button>
-    <div style="width:1px;height:18px;background:var(--border)"></div>
-    <button class="pmode-btn itp" id="pmItp" onclick="setPinMode('itp')">🔵 ITP</button>
-    <button class="pmode-btn defect" id="pmDef" onclick="setPinMode('defect')">🔴 Defect</button>
-    <button class="pmode-btn fire" id="pmFire" onclick="setPinMode('fire')">🟡 Fire</button>
-    <span id="pinModeHint" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-left:8px"></span>
-    <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-left:auto">Alt + drag pin to move it</span>
-  </div>
-
-  <div class="drawing-area">
-    <!-- PDF area -->
-    <div class="pdf-wrap" id="pdfWrap">
-      <!-- pdfStage: canvas + pins move together, scaled for zoom -->
-      <div class="pdf-loading" id="pdfLoading" style="display:none">
-        <div class="pdf-loading-spinner"></div>
-        <div class="pdf-loading-text">Loading drawing…</div>
-      </div>
-      <div id="pdfStage">
-        <canvas id="pdfCanvas" style="display:none"></canvas>
-        <div class="pin-overlay" id="pinOverlay"></div>
-      </div>
-      <div class="no-pdf" id="noPdfMsg" style="position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px">
-        <div class="no-pdf-icon">📐</div>
-        <div>No PDF uploaded for this drawing</div>
-        <button class="bg bsm btn" onclick="triggerUpload()">⬆ Upload PDF</button>
-        <input type="file" id="pdfFileInput" accept=".pdf" style="display:none" onchange="loadPdfFile(event)">
-      </div>
-    </div>
-
-    <!-- Zoom controls — fixed to bottom-left of the drawing viewport -->
-    <div id="zoomControls" style="display:none;position:absolute;bottom:20px;left:20px;z-index:50;flex-direction:column;gap:6px;pointer-events:all">
-      <button class="zoom-btn" onclick="zoomIn()" style="width:36px;height:36px;font-size:18px;box-shadow:0 4px 16px rgba(0,0,0,.6)"><span class="ztip">Zoom in</span>＋</button>
-      <button class="zoom-btn" onclick="zoomOut()" style="width:36px;height:36px;font-size:18px;box-shadow:0 4px 16px rgba(0,0,0,.6)"><span class="ztip">Zoom out</span>－</button>
-      <button class="zoom-btn" onclick="fitPage()" style="width:36px;height:36px;font-size:16px;box-shadow:0 4px 16px rgba(0,0,0,.6)"><span class="ztip">Fit to page</span>⊡</button>
-    </div>
-    <!-- Pins panel -->
-    <div class="pins-panel" id="pinsPanel">
-      <div class="pp-collapse-tab" onclick="togglePinsPanel()" id="ppCollapseTab" title="Collapse panel">◀</div>
-      <div class="pp-hdr pp-hide">
-        <span class="pp-title">Pins</span>
-        <select class="fsel" id="pinTypeFilter" onchange="renderPins()" style="font-size:11px;padding:3px 8px">
-          <option value="">All</option><option value="itp">ITP</option><option value="defect">Defect</option><option value="fire">Fire</option>
-        </select>
-      </div>
-      <div class="pp-list pp-hide" id="ppList"></div>
-    </div>
-  </div>
+<!-- FILTER BAR -->
+<div class="filter-bar" id="filterBar">
+  <span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0">Status</span>
+  <div class="chip chip-all on" id="chip-all" onclick="toggleStatusChip('all')">All</div>
+  <div class="chip chip-ns" id="chip-ns" onclick="toggleStatusChip('not-started')">● Not Started</div>
+  <div class="chip chip-ip" id="chip-ip" onclick="toggleStatusChip('in-progress')">● In Progress</div>
+  <div class="chip chip-act" id="chip-act" onclick="toggleStatusChip('action')">● Action Req.</div>
+  <div class="chip chip-cl" id="chip-cl" onclick="toggleStatusChip('closed')">● Closed</div>
+  <div class="chip" id="chip-del" onclick="toggleShowDeleted()" style="color:var(--muted);border-color:var(--border)">🗑 Deleted</div>
+  <div class="filter-sep"></div>
+  <span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0">Layers</span>
+  <div id="layerChips" style="display:flex;gap:6px"></div>
 </div>
 
-
+<!-- VIEWER -->
+<div class="viewer grab" id="viewer">
+  <div id="pdfStage"><canvas id="pdfCanvas"></canvas></div>
+  <div id="pinLayer" style="position:absolute;inset:0;pointer-events:none;z-index:30"></div>
+  <div class="loading" id="loading"><div class="spin"></div><span>Loading drawing…</span></div>
+  <div class="error-state" id="errorState"><div style="font-size:36px">⚠️</div><div id="errorMsg">Could not load PDF</div></div>
+  <div class="no-pdf" id="noPdf"><div style="font-size:48px">📄</div><div>No PDF attached to this drawing</div><div style="font-size:11px">Upload a PDF in the Drawings module first</div></div>
 </div>
 
-<!-- ITP PIN MODAL -->
-<div class="mo" id="itpModal" onclick="if(event.target===this)cancelPin()">
+<!-- PLACE HINT -->
+<div id="pinCtxMenu" class="ctx-menu">
+  <div class="ctx-item" onclick="ctxMovePin()">📍 Move Pin</div>
+</div>
+
+<div class="place-hint" id="placeHint">📍 Click on drawing to place ITP pin — Esc to cancel</div>
+
+</div><!-- /mainWrap -->
+
+<!-- PIN MODAL -->
+<div class="mo" id="pinMo">
   <div class="modal">
-    <h3>New ITP Pin</h3>
-    <p class="msub" id="itpSub"></p>
-    <label class="ml">Reference</label>
-    <input class="mi" id="itp-ref" readonly style="color:var(--purple);font-family:'DM Mono',monospace;font-size:13px"/>
-    <label class="ml">Equipment ID</label>
-    <input class="mi" id="itp-equip" placeholder="e.g. TB1-FCU-02-01"/>
-    <label class="ml">Description *</label>
-    <input class="mi" id="itp-desc" placeholder="Describe the inspection point…"/>
-    <label class="ml">Status</label>
-    <select class="ms" id="itp-status">
-      <option value="open">Open</option><option value="inprogress">In Progress</option><option value="closed">Closed</option>
-    </select>
-    <div class="mac">
-      <button class="bg bsm btn" onclick="cancelPin()">Cancel</button>
-      <button class="bg bsm btn" style="border-color:var(--purple);color:var(--purple)" onclick="confirmPin('itp',true)">Save &amp; Add Another</button>
-      <button class="bp bsm btn" onclick="confirmPin('itp')">Save ITP Pin</button>
+    <div class="modal-hdr"><h3 id="pinMoTitle">New ITP Pin</h3></div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">ITP TYPE *</label>
+        <select class="mi" id="pinItpType" onchange="onPinTypeInput()" style="cursor:pointer;height:38px;appearance:auto"></select>
+      </div>
+      <div id="pinEquipField">
+        <label class="ml" id="pinEquipLabel">Equipment ID</label>
+        <div class="sugg-wrap">
+          <input class="mi" id="pinEquipTag" placeholder="e.g. FCU-L02-001" oninput="showEquipSugg()" autocomplete="off">
+          <div class="sugg-list" id="equipSugg"></div>
+        </div>
+      </div>
+      <div>
+        <label class="ml">Status</label>
+        <div class="st-row">
+          <div class="st-opt sel-ns" id="st-not-started" onclick="setStatus('not-started')">Not Started</div>
+          <div class="st-opt" id="st-in-progress" onclick="setStatus('in-progress')">In Progress</div>
+          <div class="st-opt" id="st-action" onclick="setStatus('action')">Action Req.</div>
+          <div class="st-opt" id="st-closed" onclick="setStatus('closed')">Closed</div>
+        </div>
+      </div>
+      <textarea id="pinNotes" style="display:none"></textarea>
+      <input type="hidden" id="pinRef">
+    </div>
+    <div class="modal-footer">
+      <button class="mbg mbtn" onclick="closePinMo()">Cancel</button>
+      <button class="mbg mbtn" id="deletePinBtn" onclick="deletePin()" style="color:var(--danger);border-color:rgba(255,77,109,.3);display:none">Delete Pin</button>
+      <button class="mbp mbtn" onclick="savePin()">Save Pin</button>
     </div>
   </div>
 </div>
 
-<!-- DEFECT PIN MODAL -->
-<div class="mo" id="defectModal" onclick="if(event.target===this)cancelPin()">
-  <div class="modal">
-    <h3>New Defect Pin</h3>
-    <label class="ml">Reference</label>
-    <input class="mi" id="def-ref" readonly style="color:var(--danger);font-family:'DM Mono',monospace;font-size:13px"/>
-    <label class="ml">Description *</label>
-    <input class="mi" id="def-desc" placeholder="Describe the defect…"/>
-    <label class="ml">Status</label>
-    <select class="ms" id="def-status">
-      <option value="open">Open</option><option value="inprogress">In Progress</option><option value="closed">Closed</option>
-    </select>
-    <div class="mac">
-      <button class="bg bsm btn" onclick="cancelPin()">Cancel</button>
-      <button class="bg bsm btn" style="border-color:var(--danger);color:var(--danger)" onclick="confirmPin('defect',true)">Save &amp; Add Another</button>
-      <button class="bp bsm btn" onclick="confirmPin('defect')">Save Defect Pin</button>
-    </div>
-  </div>
-</div>
-
-<!-- FIRE PIN MODAL -->
-<div class="mo" id="fireModal" onclick="if(event.target===this)cancelPin()">
-  <div class="modal">
-    <h3>New Fire Rating Pin</h3>
-    <label class="ml">Reference</label>
-    <input class="mi" id="fire-ref" readonly style="color:var(--warn);font-family:'DM Mono',monospace;font-size:13px"/>
-    <label class="ml">Description *</label>
-    <input class="mi" id="fire-desc" placeholder="e.g. Fire damper FD-01 penetration…"/>
-    <label class="ml">Status</label>
-    <select class="ms" id="fire-status">
-      <option value="open">Open</option><option value="inprogress">In Progress</option><option value="closed">Closed</option>
-    </select>
-    <div class="mac">
-      <button class="bg bsm btn" onclick="cancelPin()">Cancel</button>
-      <button class="bg bsm btn" style="border-color:var(--warn);color:var(--warn)" onclick="confirmPin('fire',true)">Save &amp; Add Another</button>
-      <button class="bp bsm btn" onclick="confirmPin('fire')">Save Fire Rating Pin</button>
-    </div>
-  </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-var SBK='hvacnexus_sb_collapsed';
-var SUPA_URL='https://qbsjrccrgkbevncvxbio.supabase.co';
-var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
-var SUPA_BUCKET='drawings';
-var pdfDoc=null,pdfScale=1.5,pdfBaseScale=1.5,pinMode='',activeLayer='all';
-var _renderTask=null,_prevScale=1.5,_panX=0,_panY=0;
-var PDF_BASE_RES=2.0,PDF_FAST_RES=1.0,_pdfCache={};
-var drawings=[],curId='',templates=[];
-var _uid=0;function nid(){return ++_uid;}
+// ── DATA KEYS ──
+var params=new URLSearchParams(window.location.search);
+var drawingId=params.get('id')||params.get('drawingId')||'';
+var itpTypeFilter=params.get('itpType')||''; // optional pre-filter
+var proj=dbGetCurrentProject();
+var pKey=proj.num||proj.number||'GCT001';
 
-function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
-function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
-function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main){main.style.marginLeft=c?'52px':'';main.style.left=c?'52px':'230px';}if(btn)btn.textContent=c?'>>':'<<';}
-function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'>':'v';}
-function showView(){}
-function goList(){navTo('hvac-drawings.html');}
-function showToast(msg){var t=document.createElement('div');t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;white-space:nowrap;pointer-events:none';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .5s';setTimeout(function(){t.remove();},500);},2500);}
+// ITP MASTER LIST (same as itp register)
+var ITP_MASTER=['AC Single Head - Split','AC Multi Head - Split','AC Multi Head CU - Split','AHU CHW and HHW','Attenuator','Boiler','CRAC Unit','Chiller - Water Cooled','Chiller - Air Cooled','Electric Duct Heater','Expansion Tank','FCU - Water Cooled','Fans','Humidifier','Hot Water Heater','MSSB/DCP','BMS Panel','Plate Heat Exchanger','Pump','VAV','VRF - BP Box','VRF - Indoor Unit','VRF - Outdoor Unit','Auto Refill Unit','Chemical Dosing Pot - Cooling Tower','Side Stream Filtration - Cooling Tower','PAC Unit - Air Cooled','PAC Unit - Water Cooled','Chilled Beams','Energy Recovery Ventilator','Security Grilles','DAHU','Pressure Relief Damper','VSD','Duct Installation Riser','Pipework Pressure Test','Refrigeration Pressure Test & Vacuum','Seismic Install','Flushing','Duct Installation','Duct Pressure Testing','Refrigeration Pipework Install','Mechanical Services Seals','Water Pipework Installation','Fire Seals','Fire Dampers','Penetration ITP'];
+var EQUIP_TYPES=['AC Single Head - Split','AC Multi Head - Split','AC Multi Head CU - Split','AHU CHW and HHW','Attenuator','Boiler','CRAC Unit','Chiller - Water Cooled','Chiller - Air Cooled','Electric Duct Heater','Expansion Tank','FCU - Water Cooled','Fans','Humidifier','Hot Water Heater','MSSB/DCP','BMS Panel','Plate Heat Exchanger','Pump','VAV','VRF - BP Box','VRF - Indoor Unit','VRF - Outdoor Unit','Auto Refill Unit','Chemical Dosing Pot - Cooling Tower','Side Stream Filtration - Cooling Tower','PAC Unit - Air Cooled','PAC Unit - Water Cooled','Chilled Beams','Energy Recovery Ventilator','Security Grilles','DAHU','Pressure Relief Damper','VSD'];
+
+// STATE
+var PDF_BASE_RES=3.0,PDF_FAST_RES=1.5;
+var _scale=1,_offsetX=0,_offsetY=0;
+var _dragging=false,_lastX=0,_lastY=0;
+var _canvasW=0,_canvasH=0;
+var _renderTask=null;
+var _placing=false;
+var _showDeleted=false;
+var _pendingX=0,_pendingY=0; // canvas % position for new pin
+var _editPinId=null;
+var _pinStatus='not-started';
+
+// FILTERS
+var _activeStatuses=new Set(); // empty = all
+var _activeLayers=new Set();   // empty = all
+
+// DATA
+var drawings=[];
+var structure={buildings:[]};
+var responses={};
+var equipData=null;
+var templates=[];
+var curDrawing=null;
+
+async function loadData(){
+  try{var d=await dbGetDrawings(pKey);drawings=Array.isArray(d)?d:[];}catch(e){}
+  try{var s=await dbGetItpStructure(pKey);structure=(s&&s.buildings)?s:{buildings:[]};}catch(e){}
+  try{var r=await dbGetItpResponses(pKey);responses=r||{};}catch(e){}
+  try{var eq=await dbGetEquipment(pKey);equipData=eq||null;}catch(e){}
+  try{var pt=await dbGetItpProjectTemplates(pKey);templates=Array.isArray(pt)?pt:[];}catch(e){}
+
+  curDrawing=drawings.find(function(d){return d.id===drawingId;})||null;
+}
+function saveDrawings(){
+  dbSetDrawings(pKey,drawings).catch(function(e){console.error('saveDrawings error:',e);});
+}
+function saveResponses(){
+  dbSetItpResponses(pKey,responses).catch(function(e){console.error('saveResponses error:',e);});
+}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function nid(){return'pin_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);}
 
 // ── INIT ──
-var params = new URLSearchParams(window.location.search);
-var _drawingId = params.get('id') || '';
-var _pNum = (dbGetCurrentProject() || {}).num || 'GCT001';
+(async function(){
+  await loadData();
+  if(!drawingId){showError('No drawing ID provided');return;}
+  if(!curDrawing){showError('Drawing not found');return;}
+  document.title=(curDrawing.num||'Drawing')+' — HVAC NEXUS';
+  document.getElementById('topNum').textContent=curDrawing.num||'—';
+  document.getElementById('topName').textContent=curDrawing.name||'Untitled Drawing';
+  buildLayerChips();
+  if(curDrawing.pdfUrl&&!curDrawing.pdfData){loadFromUrl(curDrawing.pdfUrl);}
+  else if(curDrawing.pdfData){loadFromData(curDrawing.pdfData);}
+  else{showNoPdf();}
+  // Auto-start move pin mode if URL param present
+  var movePinId=params.get('movePin')||'';
+  if(movePinId){
+    setTimeout(function(){startMovePin(movePinId);},800);
+  }
 
-async function uploadPdfToSupabase(file, drawingId){
-  var ext='pdf';
-  var path='drawings/'+drawingId+'-'+Date.now()+'.'+ext;
-  var res=await fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET+'/'+path,{
-    method:'POST',
-    headers:{'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/pdf','x-upsert':'true'},
-    body:file
+})();
+
+// ── LAYER CHIPS ──
+function getLinkedItpTypes(){
+  // Get all ITP types linked to this drawing from structure
+  var types=new Set();
+  (structure.buildings||[]).forEach(function(b){
+    (b.locations||[]).forEach(function(l){
+      (l.itpTypes||[]).forEach(function(t){
+        var linked=(t.drawings||[]).find(function(d){return d.id===drawingId;});
+        if(linked)types.add(t.name);
+      });
+    });
   });
-  if(!res.ok){var e=await res.text();throw new Error('Upload failed: '+e);}
-  return SUPA_URL+'/storage/v1/object/public/'+SUPA_BUCKET+'/'+path;
+  // Also add any types already pinned on this drawing
+  (curDrawing&&curDrawing.pins||[]).forEach(function(p){if(p.itpTypeLabel)types.add(p.itpTypeLabel);});
+  return[...types].sort();
+}
+function buildLayerChips(){
+  var types=getLinkedItpTypes();
+  var container=document.getElementById('layerChips');
+  if(!types.length){container.innerHTML='<span style="font-size:11px;color:var(--muted)">No ITP types linked</span>';return;}
+  container.innerHTML=types.map(function(t){
+    return'<div class="chip layer-chip on" id="layer-'+escH(t.replace(/[^a-zA-Z0-9]/g,'_'))+'" onclick="toggleLayer(\''+escH(t)+'\')" data-type="'+escH(t)+'">'+escH(t)+'</div>';
+  }).join('');
+}
+function toggleLayer(type){
+  if(_activeLayers.has(type)){_activeLayers.delete(type);}else{_activeLayers.add(type);}
+  // Update chip UI
+  var id='layer-'+type.replace(/[^a-zA-Z0-9]/g,'_');
+  var el=document.getElementById(id);
+  if(el)el.classList.toggle('on',!_activeLayers.has(type));
+  // If nothing deselected, show all
+  renderPins();
+}
+function toggleStatusChip(status){
+  if(status==='all'){
+    _activeStatuses.clear();
+    ['all','ns','ip','act','cl'].forEach(function(s){document.getElementById('chip-'+s).classList.remove('on');});
+    document.getElementById('chip-all').classList.add('on');
+  } else {
+    document.getElementById('chip-all').classList.remove('on');
+    var map={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
+    var chipId='chip-'+map[status];
+    if(_activeStatuses.has(status)){_activeStatuses.delete(status);document.getElementById(chipId).classList.remove('on');}
+    else{_activeStatuses.add(status);document.getElementById(chipId).classList.add('on');}
+    if(!_activeStatuses.size)document.getElementById('chip-all').classList.add('on');
+  }
+  renderPins();
 }
 
-async function deletePdfFromSupabase(url){
-  if(!url||!url.includes(SUPA_URL))return;
-  var path=url.split('/object/public/'+SUPA_BUCKET+'/')[1];
-  if(!path)return;
-  await fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET+'/'+path,{
-    method:'DELETE',
-    headers:{'Authorization':'Bearer '+SUPA_KEY}
+// ── PIN STATUS ──
+function getPinStatus(pin){
+  var r=responses[pin.id];
+  return(r&&r.status)||pin.itpStatus||'not-started';
+}
+function pinVisible(pin){
+  var st=getPinStatus(pin);
+  var type=pin.itpTypeLabel||'';
+  if(_activeStatuses.size&&!_activeStatuses.has(st))return false;
+  if(_activeLayers.size&&!_activeLayers.has(type))return false; // hidden = deselected
+  return pin.type==='itp';
+}
+
+// ── RENDER PINS ──
+var ST_COLOR={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
+function renderPins(){
+  if(!curDrawing||!_canvasW)return;
+  var layer=document.getElementById('pinLayer');
+  layer.innerHTML='';
+  layer.style.pointerEvents='none';
+  var stage=document.getElementById('pdfStage');
+  var sr=stage.getBoundingClientRect();
+  var vr=document.getElementById('viewer').getBoundingClientRect();
+  (curDrawing.pins||[]).filter(function(p){return p.type==='itp';}).forEach(function(pin){
+    if(!pinVisible(pin))return;
+    var st=getPinStatus(pin);
+    var el=document.createElement('div');
+    el.className='itp-pin';
+    el.style.left=(sr.left-vr.left+pin.x/100*sr.width)+'px';
+    el.style.top=(sr.top-vr.top+pin.y/100*sr.height)+'px';
+    el.style.pointerEvents='all';
+    var label=pin.equip||pin.ref||pin.itpTypeLabel||'ITP';
+    var resp=responses[pin.id]||{};
+    var isDeleted=resp.deleted||false;
+    if(isDeleted&&!_showDeleted)return;
+    var dotCls=isDeleted?'':ST_COLOR[st]||'ns';
+    var dotStyle=isDeleted?' style="background:#1a1a1a;border-color:#666;color:#fff;opacity:0.9"':'';
+    // Show ITP ref number (last 4 digits) or equip initials as fallback
+    var refNum=pin.ref?(pin.ref.replace(/^ITP-/,'')||pin.ref):'';
+    var pinText=refNum||(pin.equip?(pin.equip.slice(0,4)):'ITP');
+    el.innerHTML='<div class="pin-dot '+dotCls+'"'+dotStyle+'>'+escH(pinText)+'</div>'
+      +'<div class="pin-label">'+(pin.equip?escH(pin.equip):'—')+(pin.itpTypeLabel?' · '+escH(pin.itpTypeLabel):'')+'</div>';
+    el.addEventListener('click',function(e){e.stopPropagation();openItpDetail(pin);});
+    (function(pid){el.addEventListener('contextmenu',function(e){
+      e.preventDefault();e.stopPropagation();
+      var menu=document.getElementById('pinCtxMenu');
+      menu._pinId=pid;
+      menu.style.left=e.clientX+'px';menu.style.top=e.clientY+'px';menu.style.display='block';
+    });})(pin.id);
+    layer.appendChild(el);
   });
+
+}
+
+// ── PLACE MODE ──
+function togglePlaceMode(){
+  _placing=!_placing;
+  var btn=document.getElementById('addItpBtn');
+  var hint=document.getElementById('placeHint');
+  var viewer=document.getElementById('viewer');
+  btn.classList.toggle('placing',_placing);
+  btn.textContent=_placing?'✕ Cancel':'📍 Add ITP';
+  hint.style.display=_placing?'block':'none';
+  viewer.classList.toggle('grabbing',_placing);
+  viewer.style.cursor=_placing?'crosshair':'grab';
+}
+// ── MOVE PIN MODE ──
+var _movingPinId = null;
+function startMovePin(pinId){
+  _movingPinId=pinId;
+  _placing=false; // cancel any add mode
+  var btn=document.getElementById('addItpBtn');
+  btn.classList.remove('placing');
+  btn.textContent='📍 Add ITP';
+  var hint=document.getElementById('placeHint');
+  hint.textContent='📍 Click new position for pin — Esc to cancel';
+  hint.style.display='block';
+  var viewer=document.getElementById('viewer');
+  viewer.style.cursor='crosshair';
+  viewer.classList.add('grabbing');
+}
+function ctxMovePin(){
+  var menu=document.getElementById('pinCtxMenu');
+  var pinId=menu._pinId;
+  menu.style.display='none';
+  startMovePin(pinId);
+}
+document.addEventListener('click',function(){document.getElementById('pinCtxMenu').style.display='none';});
+function cancelMoveMode(){
+  if(!_movingPinId)return;
+  _movingPinId=null;
+  document.getElementById('placeHint').style.display='none';
+  var viewer=document.getElementById('viewer');
+  viewer.style.cursor='grab';
+  viewer.classList.remove('grabbing');
+}
+function commitMovePin(xPct,yPct){
+  var pin=(curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===_movingPinId;});
+  if(pin){pin.x=xPct;pin.y=yPct;saveDrawings();renderPins();}
+  cancelMoveMode();
+  toast('Pin moved ✓');
+}
+function cancelPlaceMode(){
+  if(!_placing)return;
+  _placing=false;
+  var btn=document.getElementById('addItpBtn');
+  btn.classList.remove('placing');
+  btn.textContent='📍 Add ITP';
+  document.getElementById('placeHint').style.display='none';
+  document.getElementById('viewer').style.cursor='grab';
+}
+
+// ── PIN MODAL ──
+function openNewPin(xPct,yPct){
+  _editPinId=null;_pendingX=xPct;_pendingY=yPct;_pinStatus='not-started';
+  document.getElementById('pinMoTitle').textContent='New ITP Pin';
+  document.getElementById('pinItpType').value='';
+  document.getElementById('pinItpType').removeAttribute('readonly');
+  document.getElementById('pinEquipTag').value='';
+  document.getElementById('pinRef').value='';
+  document.getElementById('pinNotes').value='';
+  document.getElementById('deletePinBtn').style.display='none';
+  document.getElementById('pinEquipField').style.display='';
+  setStatus('not-started');
+  populateTypeSelect('');
+  document.getElementById('pinMo').classList.add('open');
+  setTimeout(function(){document.getElementById('pinItpType').focus();},80);
+}
+function openEditPin(pinId){
+  var pin=(curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===pinId;});if(!pin)return;
+  _editPinId=pinId;_pinStatus=getPinStatus(pin);
+  document.getElementById('pinMoTitle').textContent='Edit ITP Pin';
+  document.getElementById('pinItpType').value=pin.itpTypeLabel||'';
+  document.getElementById('pinEquipTag').value=pin.equip||'';
+  document.getElementById('pinRef').value=pin.ref||'';
+  document.getElementById('pinNotes').value=pin.notes||'';
+  document.getElementById('deletePinBtn').style.display='';
+  onPinTypeInput();
+  setStatus(_pinStatus);
+  populateTypeSelect(pin.itpTypeLabel||'');
+  document.getElementById('pinMo').classList.add('open');
+}
+function closePinMo(){document.getElementById('pinMo').classList.remove('open');_editPinId=null;}
+
+function setStatus(st){
+  _pinStatus=st;
+  ['not-started','in-progress','action','closed'].forEach(function(s){
+    var el=document.getElementById('st-'+s);
+    var map={'not-started':'sel-ns','in-progress':'sel-ip','action':'sel-act','closed':'sel-cl'};
+    el.className='st-opt'+(s===st?' '+map[s]:'');
+  });
+}
+
+function savePin(){
+  var type=document.getElementById('pinItpType').value.trim();
+  if(!type){alert('Please enter an ITP type');return;}
+  var equip=document.getElementById('pinEquipTag').value.trim();
+  var ref=document.getElementById('pinRef').value.trim();
+  var notes=document.getElementById('pinNotes').value.trim();
+  if(!ref){
+    // Auto-generate ITP-XXXX ref — find highest across ALL drawings in project
+    var maxSeq=0;
+    drawings.forEach(function(d){
+      (d.pins||[]).forEach(function(p){
+        var m=(p.ref||'').match(/^ITP-(\d+)$/);
+        if(m){var n=parseInt(m[1]);if(n>maxSeq)maxSeq=n;}
+      });
+    });
+    ref='ITP-'+String(maxSeq+1).padStart(4,'0');
+  }
+  if(_editPinId){
+    var pin=(curDrawing.pins||[]).find(function(p){return p.id===_editPinId;});
+    if(pin){pin.itpTypeLabel=type;pin.equip=equip;pin.ref=ref;pin.notes=notes;pin.itpStatus=_pinStatus;}
+    // Update response status
+    if(!responses[_editPinId])responses[_editPinId]={rows:{},signoffs:{}};
+    responses[_editPinId].status=_pinStatus;
+    saveResponses();
+  } else {
+    var pinId=nid();
+    if(!curDrawing.pins)curDrawing.pins=[];
+    var u=dbGetCurrentUser();
+    curDrawing.pins.push({id:pinId,type:'itp',itpTypeLabel:type,equip:equip,ref:ref,notes:'',itpStatus:_pinStatus,x:_pendingX,y:_pendingY});
+    responses[pinId]={status:_pinStatus,rows:{},signoffs:{},equipId:equip,raisedBy:u?(u.name||u.username||'Unknown'):'Unknown',raisedDate:new Date().toISOString().split('T')[0]};
+    saveResponses();
+    // Update layer chips
+    buildLayerChips();
+  }
+  saveDrawings();
+  closePinMo();
+  renderPins();
+  toast('Pin saved ✓');
+}
+
+function deletePin(){
+  if(!_editPinId)return;
+  if(!confirm('Delete this ITP pin? It will be hidden but recoverable from the ITP Register.'))return;
+  // Soft delete - mark in responses, keep pin data
+  if(!responses[_editPinId])responses[_editPinId]={rows:{},signoffs:{}};
+  responses[_editPinId].deleted=true;
+  responses[_editPinId].deletedDate=new Date().toISOString().split('T')[0];
+  var u=dbGetCurrentUser();
+  responses[_editPinId].deletedBy=u?(u.name||u.username||'Unknown'):'Unknown';
+  saveResponses();
+  closePinMo();renderPins();buildLayerChips();
+  toast('ITP hidden — recoverable from ITP Register');
+}
+
+// ── TYPE SUGGESTIONS ──
+var _flashTimer=null;
+function flashPins(){
+  var btn=document.getElementById('flashPinsBtn');
+  if(_flashTimer){clearTimeout(_flashTimer);document.querySelectorAll('.itp-pin').forEach(function(el){el.classList.remove('flashing');});_flashTimer=null;btn.style.color='';return;}
+  document.querySelectorAll('.itp-pin').forEach(function(el){el.classList.add('flashing');});
+  btn.style.color='var(--accent)';
+  _flashTimer=setTimeout(function(){
+    document.querySelectorAll('.itp-pin').forEach(function(el){el.classList.remove('flashing');});
+    _flashTimer=null;btn.style.color='';
+  },10000);
+}
+function toggleShowDeleted(){
+  _showDeleted=!_showDeleted;
+  var btn=document.getElementById('showDeletedBtn');
+  if(btn){btn.style.color=_showDeleted?'var(--danger)':'';btn.style.borderColor=_showDeleted?'var(--danger)':'';}
+  var chip=document.getElementById('chip-del');
+  if(chip){chip.style.color=_showDeleted?'var(--danger)':'var(--muted)';chip.style.borderColor=_showDeleted?'var(--danger)':'var(--border)';}
+  renderPins();
+}
+function populateTypeSelect(selectedVal){
+  var sel=document.getElementById('pinItpType');
+  var types=getTemplateTypes();
+  sel.innerHTML='<option value="">— Select ITP Type —</option>'
+    +types.map(function(t){
+      return '<option value="'+escH(t.name)+'"'+(t.name===selectedVal?' selected':'')+'>'+escH(t.name)+(t.itpNo?' ('+escH(t.itpNo)+')':'')+'</option>';
+    }).join('');
+}
+function showTypeSugg(){}
+function getTemplateTypes(){
+  // Use templates loaded from Supabase at init (project level)
+  var result=[];
+  templates.forEach(function(t){if(t.itpType)result.push({itpNo:t.itpNo||'',name:t.itpType});});
+  if(!result.length)result=ITP_MASTER.map(function(n){return{itpNo:'',name:n};});
+  return result;
+}
+function renderTypeSugg(v){
+  var linked=getLinkedItpTypes();
+  var all=getTemplateTypes();
+  var list=document.getElementById('typeSugg');
+  var inp=document.getElementById('pinItpType');
+  // Position fixed dropdown below the input
+  if(inp){
+    var r=inp.getBoundingClientRect();
+    list.style.top=(r.bottom+3)+'px';
+    list.style.left=r.left+'px';
+    list.style.width=r.width+'px';
+  }
+  // No project templates set up yet
+  if(!all.length){
+    list.innerHTML='<div class="sugg-item" style="color:var(--muted);pointer-events:none;font-size:11px">No project templates — import from ITP Templates first</div>';
+    list.style.display='';
+    return;
+  }
+  var filtered=v
+    ?all.filter(function(t){return t.name.toLowerCase().includes(v.toLowerCase())||(t.itpNo||'').toLowerCase().includes(v.toLowerCase());})
+    :all;
+  var linkedItems=filtered.filter(function(t){return linked.includes(t.name);});
+  var otherItems=filtered.filter(function(t){return !linked.includes(t.name);});
+  var items=[...linkedItems,...otherItems].slice(0,12);
+  if(!items.length){list.style.display='none';return;}
+  list.innerHTML=items.map(function(t){
+    var isLinked=linked.includes(t.name);
+    return'<div class="sugg-item" onmousedown="pickType(\''+escH(t.name)+'\')" style="display:flex;align-items:center;justify-content:space-between">'
+      +'<span>'+escH(t.name)+'</span>'
+      +'<span style="font-family:DM Mono,monospace;font-size:9px;color:'+(isLinked?'var(--accent)':'var(--muted)')+';">'
+        +(isLinked?'linked ':'')+escH(t.itpNo||'')
+      +'</span>'
+      +'</div>';
+  }).join('');
+  list.style.display='';
+}
+function pickType(t){
+  var inp=document.getElementById('pinItpType');
+  inp.value=t;
+  inp.setAttribute('readonly','');
+  document.getElementById('typeSugg').style.display='none';
+  onPinTypeInput();
+}
+function onPinTypeInput(){
+  var t=document.getElementById('pinItpType').value;
+  var isEquip=EQUIP_TYPES.includes(t);
+  document.getElementById('pinEquipField').style.display='';
+  if(t==='Penetration ITP'){document.getElementById('pinEquipLabel').textContent='Penetration ID *';document.getElementById('pinEquipField').style.display='';}
+  else{document.getElementById('pinEquipLabel').textContent='Equipment ID';}
+}
+
+// ── EQUIP SUGGESTIONS ──
+function showEquipSugg(){
+  var v=document.getElementById('pinEquipTag').value.trim().toLowerCase();
+  var list=document.getElementById('equipSugg');
+  if(!v||!equipData||!equipData.tabs){list.style.display='none';return;}
+  var matches=[];
+  equipData.tabs.forEach(function(tab){(tab.rows||[]).forEach(function(r){var tag=(r.tag||r.equipId||'');if(tag.toLowerCase().includes(v))matches.push(r);});});
+  if(!matches.length){list.style.display='none';return;}
+  list.innerHTML=matches.slice(0,8).map(function(r){var t=escH(r.tag||r.equipId||''),n=escH(r.description||r.name||'');return'<div class="sugg-item" onmousedown="document.getElementById(\'pinEquipTag\').value=\''+t+'\';document.getElementById(\'equipSugg\').style.display=\'none\'"><span style="font-family:DM Mono,monospace;color:var(--accent)">'+t+'</span>'+(n?'<span style="color:var(--muted);margin-left:8px;font-size:11px">'+n+'</span>':'')+'</div>';}).join('');
+  list.style.display='';
+}
+
+// ── PDF LOAD ──
+function loadFromUrl(url){pdfjsLib.getDocument(url).promise.then(renderPdf).catch(function(e){showError('Could not load PDF: '+e.message);});}
+function loadFromData(dataUrl){
+  try{
+    var b64=dataUrl.split(',')[1];var bin=atob(b64);var arr=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+    pdfjsLib.getDocument({data:arr}).promise.then(renderPdf).catch(function(e){showError('PDF render error: '+e.message);});
+  }catch(e){showError('Invalid PDF data');}
+}
+function renderPdf(pdf){
+  pdf.getPage(1).then(function(page){
+    var vpFast=page.getViewport({scale:PDF_FAST_RES});
+    var fast=document.createElement('canvas');fast.width=vpFast.width;fast.height=vpFast.height;
+    page.render({canvasContext:fast.getContext('2d'),viewport:vpFast}).promise.then(function(){
+      var canvas=document.getElementById('pdfCanvas');
+      canvas.width=fast.width;canvas.height=fast.height;
+      canvas.getContext('2d').drawImage(fast,0,0);
+      _canvasW=fast.width;_canvasH=fast.height;
+      document.getElementById('loading').style.display='none';
+      fitToScreen();
+      renderPins();
+      var vpHi=page.getViewport({scale:PDF_BASE_RES});
+      var hi=document.createElement('canvas');hi.width=vpHi.width;hi.height=vpHi.height;
+      if(_renderTask){try{_renderTask.cancel();}catch(e){}}
+      _renderTask=page.render({canvasContext:hi.getContext('2d'),viewport:vpHi});
+      _renderTask.promise.then(function(){
+        canvas.width=vpHi.width;canvas.height=vpHi.height;
+        canvas.getContext('2d').drawImage(hi,0,0);
+        _canvasW=vpHi.width;_canvasH=vpHi.height;
+        fitToScreen();renderPins();
+      }).catch(function(){});
+    });
+  });
+}
+
+// ── TRANSFORM ──
+function applyTransform(){
+  document.getElementById('pdfStage').style.transform='translate('+_offsetX+'px,'+_offsetY+'px) scale('+_scale+')';
+  renderPins();
+}
+function fitToScreen(){
+  var v=document.getElementById('viewer');
+  if(!_canvasW||!_canvasH)return;
+  var sx=v.clientWidth/_canvasW,sy=v.clientHeight/_canvasH;
+  _scale=Math.min(sx,sy)*0.96;
+  _offsetX=(v.clientWidth-_canvasW*_scale)/2;
+  _offsetY=(v.clientHeight-_canvasH*_scale)/2;
+  applyTransform();
+}
+function zoom(f){
+  var v=document.getElementById('viewer');
+  var cx=v.clientWidth/2,cy=v.clientHeight/2;
+  _offsetX=cx-(cx-_offsetX)*f;_offsetY=cy-(cy-_offsetY)*f;_scale*=f;
+  applyTransform();
+}
+
+// ── VIEWER INTERACTIONS ──
+var viewer=document.getElementById('viewer');
+viewer.addEventListener('mousedown',function(e){
+  if(_placing)return;
+  _dragging=true;_lastX=e.clientX;_lastY=e.clientY;viewer.classList.add('grabbing');viewer.style.cursor='grabbing';
+});
+viewer.addEventListener('mousemove',function(e){
+  if(!_dragging)return;
+  _offsetX+=e.clientX-_lastX;_offsetY+=e.clientY-_lastY;_lastX=e.clientX;_lastY=e.clientY;applyTransform();
+});
+viewer.addEventListener('mouseup',function(){if(_dragging){_dragging=false;viewer.classList.remove('grabbing');viewer.style.cursor=_placing?'crosshair':'grab';}});
+viewer.addEventListener('mouseleave',function(){if(_dragging){_dragging=false;viewer.classList.remove('grabbing');}});
+viewer.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var f=e.deltaY<0?1.1:0.9;
+  var r=viewer.getBoundingClientRect();
+  var cx=e.clientX-r.left,cy=e.clientY-r.top;
+  _offsetX=cx-(cx-_offsetX)*f;_offsetY=cy-(cy-_offsetY)*f;_scale*=f;
+  applyTransform();
+},{passive:false});
+
+viewer.addEventListener('click',function(e){
+  var stage=document.getElementById('pdfStage');
+  var sr=stage.getBoundingClientRect();
+  var xPct=((e.clientX-sr.left)/sr.width)*100;
+  var yPct=((e.clientY-sr.top)/sr.height)*100;
+  xPct=Math.max(0,Math.min(100,xPct));
+  yPct=Math.max(0,Math.min(100,yPct));
+  if(_movingPinId){commitMovePin(xPct,yPct);return;}
+  if(!_placing)return;
+  cancelPlaceMode();
+  openNewPin(xPct,yPct);
+});
+
+// Touch
+var _touches={};
+viewer.addEventListener('touchstart',function(e){e.preventDefault();Array.from(e.changedTouches).forEach(function(t){_touches[t.identifier]={x:t.clientX,y:t.clientY};});},{passive:false});
+viewer.addEventListener('touchmove',function(e){e.preventDefault();
+  var tArr=Array.from(e.touches);
+  if(tArr.length===1&&!_placing){
+    var t=tArr[0],prev=_touches[t.identifier];
+    if(prev){_offsetX+=t.clientX-prev.x;_offsetY+=t.clientY-prev.y;applyTransform();}
+    _touches[t.identifier]={x:t.clientX,y:t.clientY};
+  } else if(tArr.length===2){
+    var t1=tArr[0],t2=tArr[1],p1=_touches[t1.identifier],p2=_touches[t2.identifier];
+    if(p1&&p2){
+      var od=Math.hypot(p1.x-p2.x,p1.y-p2.y),nd=Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
+      var f=nd/od;var cx=(t1.clientX+t2.clientX)/2,cy=(t1.clientY+t2.clientY)/2;
+      var r=viewer.getBoundingClientRect();cx-=r.left;cy-=r.top;
+      _offsetX=cx-(cx-_offsetX)*f;_offsetY=cy-(cy-_offsetY)*f;_scale*=f;applyTransform();
+    }
+    _touches[t1.identifier]={x:t1.clientX,y:t1.clientY};
+    _touches[t2.identifier]={x:t2.clientX,y:t2.clientY};
+  }
+},{passive:false});
+viewer.addEventListener('touchend',function(e){
+  if(_placing&&e.changedTouches.length===1){
+    var t=e.changedTouches[0];
+    var stage=document.getElementById('pdfStage');var sr=stage.getBoundingClientRect();
+    var xPct=((t.clientX-sr.left)/sr.width)*100,yPct=((t.clientY-sr.top)/sr.height)*100;
+    cancelPlaceMode();openNewPin(Math.max(0,Math.min(100,xPct)),Math.max(0,Math.min(100,yPct)));
+  }
+  Array.from(e.changedTouches).forEach(function(t){delete _touches[t.identifier];});
+});
+
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){cancelMoveMode();cancelPlaceMode();closePinMo();}});
+
+document.addEventListener('click',function(e){
+  ['typeSugg','equipSugg'].forEach(function(id){var el=document.getElementById(id);if(el&&!e.target.closest('#'+id))el.style.display='none';});
+});
+
+window.addEventListener('resize',function(){fitToScreen();});
+
+function showError(msg){document.getElementById('loading').style.display='none';var el=document.getElementById('errorState');el.style.display='flex';el.querySelector('#errorMsg').textContent=msg;}
+function showNoPdf(){document.getElementById('loading').style.display='none';document.getElementById('noPdf').style.display='flex';}
+
+function toast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:9px 18px;border-radius:8px;z-index:9999;white-space:nowrap;pointer-events:none';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .4s';setTimeout(function(){t.remove();},400);},2200);
 }
 
 // ── SIDEBAR ──
-
-
-
-
-(function(){try{var s=JSON.parse(localStorage.getItem('hvacnexus_company_settings')||'{}');if(s.coName)document.getElementById('sb-proj-name').textContent=s.coName;if(s.userName)document.getElementById('sb-user').textContent=s.userName;}catch(e){}})();
-
-// ── DATA ──
-var _proj=dbGetCurrentProject();
-var _pNum=_proj.num||_proj.number||'GCT001';
-var drawings=[];
-var _uid=100;
-function nid(){return ++_uid;}
-
-function save(){
-  var toStore=drawings.map(function(d){var c=Object.assign({},d);delete c.pdfData;return c;});
-  dbSetDrawings(_pNum,toStore).catch(function(e){console.error('Save error:',e);});
-}
-
-async function load(){
-  try{var data=await dbGetDrawings(_pNum);drawings=Array.isArray(data)?data:[];}
-  catch(e){drawings=[];}
-}
-
-var CATS=['Mechanical','Electrical','Architectural','Hydraulic','Base Build Mechanical','MSSB','DCP','RCP'];
-var CAT_ICONS={Mechanical:'💨',Electrical:'⚡',Architectural:'🏗️',Hydraulic:'💧','Base Build Mechanical':'🏢',MSSB:'⚡',DCP:'🔌',RCP:'🏛️'};
-var STATUS_LIST=['IFR','IFA','IFC','AB','Obsolete'];
-var ST_CLS={IFR:'st-p',IFA:'st-ifa',IFC:'st-ifc',AB:'st-ab',Preliminary:'st-p',Obsolete:'st-obs'};
-var APPR_CLS={Approved:'st-ab','Approved with Comments':'st-ifa',Pending:'st-p',Rejected:'st-rej',Obsolete:'st-obs'};
-var SUBCATS={Mechanical:['General','Schematics','Schedules','Mechanical Services Layout','Piping Layout','Sections','Builders Works','Board Drawings','Seismics'],Architectural:['Partitions','Reflected Ceiling Plan','Fire Compartment Plan','General Arrangement','Doors','Wall Finishes','Ceiling Finishes','Room Layout'],Electrical:['General'],Hydraulic:['General'],'Base Build Mechanical':['General'],MSSB:['General'],DCP:['General'],RCP:['General']};
-
-// Areas — UI preference, stays in localStorage
-var AREAS_KEY='hvacnexus_areas_'+_pNum;
-var DEFAULT_AREAS=['General','Basement','Ground Floor','Level 1','Level 2','Level 3','Level 4','Level 5','Roof','Plant Room','External'];
-function loadAreas(){try{var s=localStorage.getItem(AREAS_KEY);return s?JSON.parse(s):DEFAULT_AREAS.slice();}catch(e){return DEFAULT_AREAS.slice();}}
-function saveAreas(a){try{localStorage.setItem(AREAS_KEY,JSON.stringify(a));}catch(e){}}
-var AREAS=loadAreas();
-
-function nextRef(type){
-  var pfx={itp:'ITP',defect:'DEF',fire:'FIR'}[type];
-  var max=0;
-  drawings.forEach(function(d){(d.pins||[]).forEach(function(p){if(p.type===type){var n=parseInt((p.ref||'').split('-')[1])||0;if(n>max)max=n;}});});
-  return pfx+'-'+String(max+1).padStart(3,'0');
-}
-
-// ── ADD DRAWING MODAL ──
-var _pendingPdfData=null;
-var _pendingPdfFile=null;
-function openAddModal(){
-  _pendingPdfData=null;_pendingPdfFile=null;_bulkFiles=[];
-  ['f-num','f-name','f-rev'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-  var fl=document.getElementById('fileLabel');if(fl)fl.textContent='Click or drag & drop PDF here';
-  var dz=document.getElementById('addDropZone');if(dz)dz.classList.remove('has-file');
-  var fs=document.getElementById('f-status');if(fs)fs.value='IFR';
-  var fa=document.getElementById('f-approval');if(fa)fa.value='Pending';
-  var fsd=document.getElementById('f-subdate');if(fsd)fsd.value='';
-  var bl=document.getElementById('bulkList');if(bl)bl.innerHTML='';
-  setAddTab('single');
-  if(typeof populateSubcat==='function')populateSubcat('f-cat','f-subcat');
-  if(typeof toggleApprovalField==='function')toggleApprovalField('f-approval-wrap');
-  // Populate area dropdown
-  var fa=document.getElementById('f-area');
-  if(fa){fa.innerHTML=AREAS.map(function(a){return'<option>'+escH(a)+'</option>';}).join('');}
-  document.getElementById('addModal').classList.add('open');
-  setTimeout(function(){var el=document.getElementById('f-num');if(el)el.focus();},80);
-}
-function closeAddModal(){document.getElementById('addModal').classList.remove('open');}
-function handleModalPdf(inp){
-  var files=inp.files||inp.target&&inp.target.files;
-  if(!files||!files[0]) return;
-  var file=files[0];
-  var lbl=document.getElementById('fileLabel');if(lbl)lbl.textContent=file.name+' (uploading...)';
-  var dz=document.getElementById('addDropZone');if(dz)dz.classList.add('has-file');
-  _pendingPdfData=null;_pendingPdfFile=file;
-  if(lbl)lbl.textContent=file.name+' ✓ ready';
-}
-function saveDrawing(){
-  var num=document.getElementById('f-num').value.trim();
-  var name=document.getElementById('f-name').value.trim();
-  if(!num||!name){alert('Drawing Number and Name are required.');return;}
-  var today=new Date().toISOString().split('T')[0];
-  var rev=document.getElementById('f-rev').value.trim()||'A';
-  var status=(document.getElementById('f-status')||{value:'IFR'}).value;
-  var approval=(document.getElementById('f-approval')||{value:'Pending'}).value;
-  var subDate=(document.getElementById('f-subdate')||{value:''}).value;
-  var apprDate=(document.getElementById('f-apprdate')||{value:''}).value;
-  var newId='d'+nid();
-  var drwObj={id:newId,num:num,name:name,rev:rev,
-    cat:document.getElementById('f-cat').value,
-    subcat:(document.getElementById('f-subcat')||{value:'General'}).value,
-    area:(document.getElementById('f-area')||{value:'General'}).value||'General',
-    status:status,approval:approval,subDate:subDate,apprDate:'',superseded:false,
-    history:[{rev:rev,status:status,approval:approval,subDate:subDate,apprDate:'',recorded:today}],
-    pins:[],pdfData:null,pdfUrl:null};
-  drawings.push(drwObj);
-  save();closeAddModal();renderList();
-  if(_pendingPdfFile){
-    var btn=document.getElementById('addModalSaveBtn');
-    uploadPdfToSupabase(_pendingPdfFile,newId).then(function(url){
-      drwObj.pdfUrl=url;drwObj.pdfData=null;save();renderList();
-      showToast('✓ PDF uploaded successfully');
-    }).catch(function(err){
-      showToast('PDF upload failed — '+err.message);
-    });
-    _pendingPdfFile=null;
-  }
-}
-
-var _showObsolete=false;
-function markDrawingObsolete(){
-  // Find by _editingId first, fallback to any non-superseded with same num
-  var d=drawings.find(function(x){return x.id===_editingId;});
-  if(!d){showToast('Error: drawing not found');return;}
-  // If this specific one is superseded, find the active one with same num
-  if(d.superseded){
-    var active=drawings.find(function(x){return x.num===d.num&&!x.superseded;});
-    if(active)d=active;
-  }
-  if(!confirm('Mark "'+d.num+'" as Obsolete?\nIt will be hidden from the drawing list.'))return;
-  d.status='Obsolete';
-  var today=new Date().toISOString().split('T')[0];
-  if(!d.history)d.history=[];
-  d.history.push({rev:d.rev,status:'Obsolete',approval:d.approval||'',subDate:d.subDate||'',apprDate:d.apprDate||'',recorded:today,note:'Marked obsolete'});
-  save();
-  closeEditModal();
-  renderList();
-  showToast('✓ '+d.num+' marked Obsolete');
-}
-function toggleShowObsolete(){
-  _showObsolete=!_showObsolete;
-  var btn=document.getElementById('obsToggleBtn');
-  if(btn){btn.style.color=_showObsolete?'var(--warn)':'var(--muted)';btn.style.borderColor=_showObsolete?'var(--warn)':'var(--border)';}
-  renderList();
-}
-
-// ── BUILD DRAWING ROW HELPER ──
-function buildDrawingRow(d){
-  var tr=document.createElement('tr');
-  var pc=(d.pins||[]).length;
-  var apprCls=(APPR_CLS||{})[d.approval]||'st-p';
-  if(d.status==='Obsolete')tr.style.opacity='0.5';
-  tr.innerHTML=
-    '<td class="drw-num" style="cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(d.num||'')+'</td>'
-    +'<td style="color:var(--text);font-weight:500;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(d.name||'')+'</td>'
-    +'<td style="white-space:nowrap"><span class="drw-rev">'+escH(d.rev||'-')+'</span></td>'
-    +'<td style="white-space:nowrap"><span class="drw-status '+(ST_CLS[d.status]||'st-p')+'">'+escH(d.status||'-')+'</span></td>'
-    +'<td style="white-space:nowrap"><span class="drw-status '+apprCls+'" style="font-size:9.5px">'+escH(d.approval||'Pending')+'</span></td>'
-    +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);white-space:nowrap">'+escH(d.subDate||'-')+'</td>'
-    +'<td>'+(pc?'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">&#128205;'+pc+'</span>':'')+'</td>'
-    +'<td onclick="event.stopPropagation()">'
-      +'<div class="drw-actions">'
-        +'<button class="drw-act-btn" onclick="openEditModal(\''+d.id+'\')"><span class="tip">Edit</span>&#9998;</button>'
-        +'<button class="drw-act-btn warn" onclick="openSupersedeConfirm(\''+d.id+'\')"><span class="tip">Supersede</span>&#8856;</button>'
-        +'<button class="drw-act-btn" onclick="openRevHistory(\''+d.id+'\')"><span class="tip">Revision history</span>&#128336;</button>'
-      +'</div>'
-    +'</td>';
-  (function(id){tr.cells[0].onclick=function(){openDrawing(id);};tr.cells[1].onclick=function(){openDrawing(id);};})(d.id);
-  return tr;
-}
-
-// ── LIST VIEW ──
-
-
-var drawings = [];
-var curId = _drawingId;
-
-(async function(){
-  applySB(localStorage.getItem(SBK) === '1');
-  var p = dbGetCurrentProject();
-  if(p.name){ var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name; var bc=document.getElementById('bc-proj');if(bc)bc.textContent=p.name; }
-  if(p.num){ var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num; }
-  var cu = dbGetCurrentUser();
-  if(cu){ var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||''; }
-
-  drawings = await dbGetDrawings(_pNum) || [];
-  var d = drawings.find(function(x){ return x.id === _drawingId; });
-  if(!d){ document.getElementById('bcDrawingNum').textContent = 'Not found'; return; }
-  document.getElementById('bcDrawingNum').textContent = d.num || d.name || 'Drawing';
-  document.title = (d.num || 'Drawing') + ' — HVAC NEXUS';
-
-  // Show detail topbar info
-  var dt = document.getElementById('detailTitle');
-  var dm = document.getElementById('detailMeta');
-  if(dt) dt.textContent = d.num || '';
-  if(dm) dm.textContent = (d.name || '') + (d.rev ? '  Rev ' + d.rev : '');
-
-  // Load PDF
-  if(d.pdfUrl) { renderPdfFromUrl(d.pdfUrl, _drawingId); }
-  else if(d.pdfData) { renderPdfData(d.pdfData, _drawingId); }
-  else { document.getElementById('noPdfMsg').style.display='flex'; }
-
-  document.getElementById('zoomControls').style.display = 'flex';
-
-  // Handle highlightDefect param
-  var highlightDef = params.get('highlightDefect');
-  if(highlightDef){
-    setTimeout(function(){
-      expandPin(highlightDef);
-      document.getElementById('pinsPanel').classList.remove('collapsed');
-    }, 800);
-  }
-
-  // Handle pinDefect param
-  var pinDefectId = params.get('pinDefect');
-  if(pinDefectId){
-    setTimeout(function(){
-      setPinMode('defect');
-      window._pendingDefectPin = pinDefectId;
-      var hint = document.createElement('div');
-      hint.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--danger);color:#fff;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999';
-      hint.textContent = '🔴 Click on drawing to place defect pin';
-      document.body.appendChild(hint);
-      setTimeout(function(){if(hint.parentNode)hint.parentNode.removeChild(hint);}, 5000);
-    }, 600);
-  }
-})();
-
-function loadPdfFile(e){
-  var file=e.target.files[0];if(!file)return;
-  var d=drawings.find(function(x){return x.id===curId;});if(!d)return;
-  document.getElementById('pdfCanvas').style.display='block';
-  document.getElementById('noPdfMsg').style.display='none';
-  showToast('Uploading PDF...');
-  uploadPdfToSupabase(file,curId).then(function(url){
-    d.pdfUrl=url;d.pdfData=null;save();
-    renderPdfFromUrl(url,curId);showToast('✓ PDF uploaded');
-  }).catch(function(err){showToast('Upload failed: '+err.message);});
-}
-
-function _doFitAndShow(canvas,vpW,vpH){
-  var wrap=document.getElementById('pdfWrap');
-  var ww=wrap.offsetWidth||800,wh=wrap.offsetHeight||600;
-  var fitScale=Math.min(ww/vpW,wh/vpH)*0.92;
-  pdfScale=Math.max(0.05,fitScale);pdfBaseScale=pdfScale;_prevScale=pdfScale;
-  _panX=(ww-vpW*pdfScale)/2;_panY=(wh-vpH*pdfScale)/2;
-  applyZoom();
-  setTimeout(function(){document.getElementById('pdfStage').style.opacity='1';},30);
-  renderPinOverlay();
-}
-
-function renderPdfData(dataUrl,drawingId){
-  if(_renderTask){try{_renderTask.cancel();}catch(e){}_renderTask=null;}
-  function doRender(pdf){
-    pdfDoc=pdf;
-    pdf.getPage(1).then(function(page){
-      var vpFast=page.getViewport({scale:PDF_FAST_RES});
-      var fast=document.createElement('canvas');
-      fast.width=vpFast.width;fast.height=vpFast.height;
-      page.render({canvasContext:fast.getContext('2d'),viewport:vpFast}).promise.then(function(){
-        var canvas=document.getElementById('pdfCanvas');
-        canvas.width=fast.width;canvas.height=fast.height;
-        canvas.getContext('2d').drawImage(fast,0,0);
-        canvas.style.display='block';canvas.onclick=onCanvasClick;
-        var loader=document.getElementById('pdfLoading');if(loader)loader.style.display='none';
-        requestAnimationFrame(function(){_doFitAndShow(canvas,vpFast.width,vpFast.height);});
-        var vpHi=page.getViewport({scale:PDF_BASE_RES});
-        var hi=document.createElement('canvas');hi.width=vpHi.width;hi.height=vpHi.height;
-        _renderTask=page.render({canvasContext:hi.getContext('2d'),viewport:vpHi});
-        _renderTask.promise.then(function(){
-          _renderTask=null;if(drawingId&&curId!==drawingId)return;
-          canvas.width=vpHi.width;canvas.height=vpHi.height;
-          canvas.getContext('2d').drawImage(hi,0,0);
-          requestAnimationFrame(function(){_doFitAndShow(canvas,vpHi.width,vpHi.height);});
-        }).catch(function(){});
-      });
-    });
-  }
-  if(drawingId&&_pdfCache[drawingId]){doRender(_pdfCache[drawingId]);return;}
-  try{
-    var blob=new Blob([Uint8Array.from(atob(dataUrl.split(',')[1]),function(c){return c.charCodeAt(0);})],{type:'application/pdf'});
-    blob.arrayBuffer().then(function(buf){
-      pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise.then(function(pdf){
-        if(drawingId)_pdfCache[drawingId]=pdf;doRender(pdf);
-      });
-    });
-  }catch(e){
-    var b64=dataUrl.split(',')[1];var bin=atob(b64);var arr=new Uint8Array(bin.length);
-    for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
-    pdfjsLib.getDocument({data:arr}).promise.then(function(pdf){
-      if(drawingId)_pdfCache[drawingId]=pdf;doRender(pdf);
-    }).catch(function(err){console.error('PDF error:',err);});
-  }
-}
-
-function renderPdfFromUrl(url,drawingId){
-  if(_renderTask){try{_renderTask.cancel();}catch(e){}_renderTask=null;}
-  var loader=document.getElementById('pdfLoading');if(loader)loader.style.display='flex';
-  pdfjsLib.getDocument(url).promise.then(function(pdf){
-    pdfDoc=pdf;if(_pdfCache)_pdfCache[drawingId]=pdf;
-    pdf.getPage(1).then(function(page){
-      var vpFast=page.getViewport({scale:PDF_FAST_RES});
-      var fast=document.createElement('canvas');fast.width=vpFast.width;fast.height=vpFast.height;
-      page.render({canvasContext:fast.getContext('2d'),viewport:vpFast}).promise.then(function(){
-        var canvas=document.getElementById('pdfCanvas');
-        canvas.width=fast.width;canvas.height=fast.height;
-        canvas.getContext('2d').drawImage(fast,0,0);
-        canvas.style.display='block';canvas.onclick=onCanvasClick;
-        if(loader)loader.style.display='none';
-        requestAnimationFrame(function(){_doFitAndShow(canvas,vpFast.width,vpFast.height);});
-        var vpHi=page.getViewport({scale:PDF_BASE_RES});
-        var hi=document.createElement('canvas');hi.width=vpHi.width;hi.height=vpHi.height;
-        _renderTask=page.render({canvasContext:hi.getContext('2d'),viewport:vpHi});
-        _renderTask.promise.then(function(){
-          _renderTask=null;if(drawingId&&curId!==drawingId)return;
-          canvas.width=vpHi.width;canvas.height=vpHi.height;
-          canvas.getContext('2d').drawImage(hi,0,0);
-          requestAnimationFrame(function(){_doFitAndShow(canvas,vpHi.width,vpHi.height);});
-        }).catch(function(){});
-      });
-    });
-  }).catch(function(err){
-    if(loader)loader.style.display='none';
-    showToast('Could not load PDF from storage');
-  });
-}
-
-function applyZoom(){
-  var stage=document.getElementById('pdfStage');
-  stage.style.transform='translate('+_panX+'px,'+_panY+'px) scale('+pdfScale+')';
-  renderPinOverlay();
-}
-function _centreStage(){
-  var wrap=document.getElementById('pdfWrap');
-  var canvas=document.getElementById('pdfCanvas');if(!canvas||!canvas.width)return;
-  var ww=wrap.offsetWidth||800,wh=wrap.offsetHeight||600;
-  _panX=(ww-canvas.width*pdfScale)/2;_panY=(wh-canvas.height*pdfScale)/2;
-}
-function _zoomAt(mx,my,newScale){
-  newScale=Math.max(0.1,Math.min(6,parseFloat(newScale.toFixed(2))));
-  var ratio=newScale/pdfScale;
-  _panX=mx-(mx-_panX)*ratio;_panY=my-(my-_panY)*ratio;
-  pdfScale=newScale;applyZoom();
-}
-function zoomIn(){var wrap=document.getElementById('pdfWrap');_zoomAt(wrap.clientWidth/2,wrap.clientHeight/2,pdfScale+0.15);}
-function zoomOut(){var wrap=document.getElementById('pdfWrap');_zoomAt(wrap.clientWidth/2,wrap.clientHeight/2,pdfScale-0.15);}
-
-function fitPage(){
-  var wrap=document.getElementById('pdfWrap');
-  var canvas=document.getElementById('pdfCanvas');
-  if(!canvas||!canvas.width)return;
-  var fitScale=Math.min(wrap.clientWidth/canvas.width,wrap.clientHeight/canvas.height)*0.95;
-  pdfScale=parseFloat(fitScale.toFixed(3));
-  _centreStage();applyZoom();
-}
-function reRenderPdf(){applyZoom();}
-
-// Wheel zoom toward cursor
-document.getElementById('pdfWrap').addEventListener('wheel',function(e){
-  e.preventDefault();
-  var wrap=document.getElementById('pdfWrap');
-  var rect=wrap.getBoundingClientRect();
-  var mx=e.clientX-rect.left;
-  var my=e.clientY-rect.top;
-  var delta=e.deltaY>0?-0.12:0.12;
-  _zoomAt(mx,my,pdfScale+delta);
-},{passive:false});
-
-// Click-and-drag pan — works in all 4 directions with no boundary
+var SBK='hvacnexus_sb_collapsed';
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.left=c?'52px':'230px';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
 (function(){
-  var wrap=document.getElementById('pdfWrap');
-  var _dragging=false,_startX=0,_startY=0,_startPanX=0,_startPanY=0,_moved=false;
-  wrap.addEventListener('mousedown',function(e){
-    if(e.button!==0)return;
-    if(pinMode)return; // pin mode: let canvas click handler deal with it
-    _dragging=true;_moved=false;
-    _startX=e.clientX;_startY=e.clientY;
-    _startPanX=_panX;_startPanY=_panY;
-    wrap.classList.add('panning');
-  });
-  window.addEventListener('mousemove',function(e){
-    if(!_dragging)return;
-    var dx=e.clientX-_startX;
-    var dy=e.clientY-_startY;
-    if(Math.abs(dx)>3||Math.abs(dy)>3)_moved=true;
-    _panX=_startPanX+dx;
-    _panY=_startPanY+dy;
-    var stage=document.getElementById('pdfStage');
-    stage.style.transform='translate('+_panX+'px,'+_panY+'px) scale('+pdfScale+')';
-  });
-  window.addEventListener('mouseup',function(e){
-    if(!_dragging)return;
-    _dragging=false;
-    wrap.classList.remove('panning');
-    if(!_moved&&e.target===document.getElementById('pdfCanvas')&&pinMode){
-      onCanvasClick(e);
-    }
-    if(_moved) renderPinOverlay();
-  });
-
-  // Touch pan & pinch zoom
-  var _t1=null,_t2=null,_tPanX=0,_tPanY=0,_tScale=1,_tDist=0;
-  wrap.addEventListener('touchstart',function(e){
-    if(e.touches.length===1){
-      _t1=e.touches[0];_t2=null;
-      _tPanX=_panX;_tPanY=_panY;
-    } else if(e.touches.length===2){
-      _t1=e.touches[0];_t2=e.touches[1];
-      _tScale=pdfScale;_tPanX=_panX;_tPanY=_panY;
-      _tDist=Math.hypot(_t2.clientX-_t1.clientX,_t2.clientY-_t1.clientY);
-      e.preventDefault();
-    }
-  },{passive:false});
-  wrap.addEventListener('touchmove',function(e){
-    if(e.touches.length===1&&_t1&&!_t2){
-      var dx=e.touches[0].clientX-_t1.clientX;
-      var dy=e.touches[0].clientY-_t1.clientY;
-      _panX=_tPanX+dx;_panY=_tPanY+dy;
-      var stage=document.getElementById('pdfStage');
-      stage.style.transform='translate('+_panX+'px,'+_panY+'px) scale('+pdfScale+')';
-    } else if(e.touches.length===2&&_t1&&_t2){
-      var d=Math.hypot(e.touches[1].clientX-e.touches[0].clientX,e.touches[1].clientY-e.touches[0].clientY);
-      var newScale=Math.max(0.1,Math.min(6,_tScale*(d/_tDist)));
-      var midX=(e.touches[0].clientX+e.touches[1].clientX)/2-wrap.getBoundingClientRect().left;
-      var midY=(e.touches[0].clientY+e.touches[1].clientY)/2-wrap.getBoundingClientRect().top;
-      var ratio=newScale/_tScale;
-      _panX=midX-(_tPanX===0?midX:(midX-_tPanX))*ratio;
-      _panY=midY-(_tPanY===0?midY:(midY-_tPanY))*ratio;
-      pdfScale=newScale;
-      var stage=document.getElementById('pdfStage');
-      stage.style.transform='translate('+_panX+'px,'+_panY+'px) scale('+pdfScale+')';
-      e.preventDefault();
-    }
-  },{passive:false});
-  wrap.addEventListener('touchend',function(){renderPinOverlay();});
-})();
-
-// ── PIN DRAG TO REPOSITION ──
-(function(){
-  var _dragPin=null,_dragPinEl=null,_dragStartX=0,_dragStartY=0,_dragOrigX=0,_dragOrigY=0;
-  document.addEventListener('mousedown',function(e){
-    if(!e.altKey)return; // hold Alt to drag a pin
-    var el=e.target.closest('.drw-pin');
-    if(!el)return;
-    var d=drawings.find(function(x){return x.id===curId;});if(!d)return;
-    var ref=el.querySelector('.pin-lbl');if(!ref)return;
-    var pinRef=ref.textContent;
-    _dragPin=d.pins.find(function(p){return p.ref===pinRef;});
-    if(!_dragPin)return;
-    _dragPinEl=el;
-    _dragStartX=e.clientX;_dragStartY=e.clientY;
-    _dragOrigX=_dragPin.x;_dragOrigY=_dragPin.y;
-    el.classList.add('dragging');
-    e.stopPropagation();e.preventDefault();
-  });
-  document.addEventListener('mousemove',function(e){
-    if(!_dragPin||!_dragPinEl)return;
-    var canvas=document.getElementById('pdfCanvas');
-    if(!canvas)return;
-    var rect=canvas.getBoundingClientRect();
-    var nx=((e.clientX-rect.left)/rect.width)*100;
-    var ny=((e.clientY-rect.top)/rect.height)*100;
-    nx=Math.max(0,Math.min(100,nx));
-    ny=Math.max(0,Math.min(100,ny));
-    var cw=canvas.offsetWidth,ch=canvas.offsetHeight;
-    _dragPinEl.style.left=(nx/100*cw)+'px';
-    _dragPinEl.style.top=(ny/100*ch)+'px';
-    _dragPin.x=Math.round(nx*10)/10;
-    _dragPin.y=Math.round(ny*10)/10;
-    e.preventDefault();
-  });
-  document.addEventListener('mouseup',function(e){
-    if(!_dragPin)return;
-    _dragPinEl.classList.remove('dragging');
-    save();
-    _dragPin=null;_dragPinEl=null;
-    renderPinOverlay();
-  });
-})();
-
-// ── PIN CONTEXT MENU ──
-var _ctxPin=null;
-function showPinContextMenu(e,pin){
-  e.preventDefault();e.stopPropagation();
-  var existing=document.getElementById('pinCtxMenu');
-  if(existing)existing.remove();
-  _ctxPin=pin;
-  var menu=document.createElement('div');
-  menu.id='pinCtxMenu';
-  menu.style.cssText='position:fixed;z-index:9999;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,.5);font-family:DM Sans,sans-serif;font-size:13px';
-  menu.style.left=Math.min(e.clientX, window.innerWidth-180)+'px';
-  menu.style.top=Math.min(e.clientY, window.innerHeight-120)+'px';
-  var items=[
-    {icon:'✥',label:'Move Pin',action:function(){startMovePin(pin);}},
-    {icon:'✕',label:'Delete Pin',action:function(){deletePinById(pin.id);},danger:true}
-  ];
-  items.forEach(function(item){
-    var row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;cursor:pointer;color:'+(item.danger?'var(--danger)':'var(--text)');
-    row.innerHTML='<span style="font-size:14px;width:16px;text-align:center">'+item.icon+'</span><span>'+item.label+'</span>';
-    row.addEventListener('mouseenter',function(){row.style.background='var(--surface3)';});
-    row.addEventListener('mouseleave',function(){row.style.background='';});
-    row.addEventListener('click',function(){closePinContextMenu();item.action();});
-    menu.appendChild(row);
-  });
-  document.body.appendChild(menu);
-  setTimeout(function(){document.addEventListener('click',closePinContextMenu,{once:true});},0);
-}
-function closePinContextMenu(){
-  var m=document.getElementById('pinCtxMenu');if(m)m.remove();
-}
-
-// ── MOVE PIN MODE ──
-var _movingPin=null;
-function startMovePin(pin){
-  _movingPin=pin;
-  var hint=document.getElementById('pinModeHint');
-  if(hint)hint.textContent='Click new location to move pin — press Escape to cancel';
-  var wrap=document.getElementById('pdfWrap');
-  wrap.style.cursor='crosshair';
-  document.addEventListener('keydown',cancelMovePin);
-}
-function cancelMovePin(e){
-  if(e&&e.key!=='Escape')return;
-  _movingPin=null;
-  var wrap=document.getElementById('pdfWrap');
-  wrap.style.cursor='';
-  var hint=document.getElementById('pinModeHint');if(hint)hint.textContent='';
-  document.removeEventListener('keydown',cancelMovePin);
-}
-function deletePinById(pinId){
-  var d=drawings.find(function(x){return x.id===curId;});if(!d||!d.pins)return;
-  if(!confirm('Delete this pin?'))return;
-  d.pins=d.pins.filter(function(p){return p.id!==pinId;});
-  save();renderPins();renderPinOverlay();
-  document.getElementById('pinCount').textContent=d.pins.length;
-  showToast('Pin deleted');
-}
-
-// ── PIN OVERLAY ──
-// Pins are placed at % of the CANVAS (unscaled) — CSS scale handles visual position
-function renderPinOverlay(){
-  var overlay=document.getElementById('pinOverlay');overlay.innerHTML='';
-  var d=drawings.find(function(x){return x.id===curId;});if(!d||!d.pins) return;
-  var canvas=document.getElementById('pdfCanvas');
-  if(!canvas||canvas.style.display==='none') return;
-  var cw=canvas.width,ch=canvas.height; // use intrinsic pixel size, not CSS size
-  // Calculate offsets for overlapping pins
-  var visiblePins=d.pins.filter(function(p){return activeLayer==='all'||p.type===activeLayer;});
-  var THRESH=32; // pixels — pins within this distance get offset
-  var offsets={}; // pinId -> {dx, dy}
-  // First pass: find all overlap groups
-  var processed={};
-  visiblePins.forEach(function(pin,i){
-    if(processed[pin.id])return;
-    var px=pin.x/100*cw, py=pin.y/100*ch;
-    // Find all pins (including self) within threshold
-    var group=visiblePins.filter(function(p2){
-      var dx=p2.x/100*cw-px, dy=p2.y/100*ch-py;
-      return Math.sqrt(dx*dx+dy*dy)<THRESH;
+  applySB(localStorage.getItem(SBK)==='1');
+  localStorage.removeItem('hvacnexus_sb_groups');
+  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
+  if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
+    handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});
+    document.addEventListener('mousemove',function(e){if(!dragging)return;var w=Math.min(MAX_W,Math.max(MIN_W,startW+(e.clientX-startX)));sb.style.width=w+'px';});
+    document.addEventListener('mouseup',function(){if(!dragging)return;dragging=false;document.body.style.userSelect='';document.body.style.cursor='';});
+  }
+  var tip=document.createElement('div');tip.className='sb-tooltip';document.body.appendChild(tip);
+  document.querySelectorAll('.sb-item').forEach(function(item){
+    var lbl=item.querySelector('.sb-item-label');
+    var label=lbl?lbl.textContent:'';
+    item.addEventListener('mouseenter',function(){
+      if(!label)return;
+      var r=item.getBoundingClientRect();var sbEl=document.getElementById('sidebar');var sbW=sbEl?sbEl.offsetWidth:230;
+      tip.textContent=label;tip.style.left=(sbW+8)+'px';tip.style.top=(r.top+r.height/2)+'px';tip.style.transform='translateY(-50%)';tip.style.opacity='1';
     });
-    if(group.length===1){
-      // No overlap — no offset
-      offsets[pin.id]={dx:0,dy:0};
-    } else {
-      // Spread all pins in group evenly around a circle
-      var radius=group.length===2?16:22;
-      group.forEach(function(p2,idx){
-        var angle=(idx/group.length)*2*Math.PI - Math.PI/2;
-        offsets[p2.id]={dx:Math.cos(angle)*radius, dy:Math.sin(angle)*radius};
-        processed[p2.id]=true;
-      });
-    }
-    processed[pin.id]=true;
+    item.addEventListener('mouseleave',function(){tip.style.opacity='0';});
   });
+})();
 
-  visiblePins.forEach(function(pin){
-    var off=offsets[pin.id]||{dx:0,dy:0};
-    var el=document.createElement('div');el.className='drw-pin '+pin.type;
-    el.style.left=((pin.x/100*cw)+off.dx)+'px';
-    el.style.top=((pin.y/100*ch)+off.dy)+'px';
-    var m=document.createElement('div');m.className='pin-marker';
-    var inner=document.createElement('div');inner.className='pin-marker-inner';
-    inner.textContent=(pin.ref||'').replace(/[A-Z]+-/,'');
-    m.appendChild(inner);
-    var lbl=document.createElement('div');lbl.className='pin-lbl';lbl.textContent=pin.ref||'';
-    el.appendChild(m);el.appendChild(lbl);
-    (function(p){
-      el.addEventListener('click',function(e){
-        e.stopPropagation();
-        if(p.type==='itp'){
-          var base=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
-          window.open(base+'hvac-itp-form.html?drawingId='+curId+'&pinId='+p.id,'_blank');
-        } else {
-          document.getElementById('pinsPanel').classList.remove('collapsed');expandPin(p.id);
+</script>
+<!-- ITP DETAIL MODAL -->
+<div id="itpDetailMo" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(4,8,16,.88);align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="width:92vw;height:92vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.7)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800" id="itpDetailTitle">ITP Form</div>
+        <div style="font-size:11px;color:var(--muted)" id="itpDetailSub"></div>
+      </div>
+      <button onclick="closeItpDetail()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 14px;cursor:pointer;font-size:13px">✕ Close</button>
+    </div>
+    <iframe id="itpDetailFrame" src="" style="flex:1;border:none;width:100%"></iframe>
+  </div>
+</div>
+
+<script>
+function openItpDetail(pin){
+  document.getElementById('itpDetailTitle').textContent=(pin.itpTypeLabel||'ITP Form');
+  document.getElementById('itpDetailSub').textContent=(pin.ref?'Ref: '+pin.ref:'')+(pin.equip?' · '+pin.equip:'');
+  var base=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  document.getElementById('itpDetailFrame').src=base+'hvac-itp-form.html?drawingId='+encodeURIComponent(drawingId)+'&pinId='+encodeURIComponent(pin.id);
+  var mo=document.getElementById('itpDetailMo');
+  mo.style.display='flex';
+}
+function updatePinEquip(pinId, newEquip){
+  // Called from itp-form iframe when equipment ID changes
+  if(curDrawing&&curDrawing.pins){
+    var pin=curDrawing.pins.find(function(p){return p.id===pinId;});
+    if(pin){pin.equip=newEquip;renderPins();}
+  }
+}
+function closeItpDetail(){
+  document.getElementById('itpDetailMo').style.display='none';
+  document.getElementById('itpDetailFrame').src='';
+  // Reload data and sync equipId from responses back to pin
+  loadData().then(function(){
+    // Sync equipId from responses into pin.equip for label display
+    if(curDrawing&&curDrawing.pins){
+      curDrawing.pins.forEach(function(pin){
+        var resp=responses[pin.id];
+        if(resp&&resp.equipId&&resp.equipId!==pin.equip){
+          pin.equip=resp.equipId;
         }
       });
-    })(pin);
-    overlay.appendChild(el);
-  });
-}
-
-// ── CANVAS CLICK — account for CSS scale ──
-
-
-function setPinMode(mode){
-  pinMode=mode;
-  var wrap=document.getElementById('pdfWrap');
-  wrap.className='pdf-wrap'+(mode?' pin-mode':'');
-  ['pmOff','pmItp','pmDef','pmFire'].forEach(function(id){document.getElementById(id).classList.remove('on');});
-  if(mode==='itp'){document.getElementById('pmItp').classList.add('on');}
-  else if(mode==='defect'){document.getElementById('pmDef').classList.add('on');}
-  else if(mode==='fire'){document.getElementById('pmFire').classList.add('on');}
-  else{document.getElementById('pmOff').classList.add('on');}
-  var hint=document.getElementById('pinModeHint');
-  if(hint) hint.textContent=mode?'Click anywhere on the drawing to place pin':'';
-}
-
-var _pendingPos=null,_pendingClItems=[];
-
-function onCanvasClick(e){
-  if(!curId)return;
-  var canvas=document.getElementById('pdfCanvas');
-  if(!canvas)return;
-  var rect=canvas.getBoundingClientRect();
-  var px=((e.clientX-rect.left)/rect.width)*100;
-  var py=((e.clientY-rect.top)/rect.height)*100;
-  if(px<0||px>100||py<0||py>100)return;
-
-  // Move pin mode takes priority
-  if(_movingPin){
-    var d=drawings.find(function(x){return x.id===curId;});if(!d)return;
-    var pin=d.pins&&d.pins.find(function(p){return p.id===_movingPin.id;});
-    if(pin){
-      pin.x=Math.round(px*10)/10;
-      pin.y=Math.round(py*10)/10;
-      save();renderPins();renderPinOverlay();
-      showToast('✓ Pin moved');
     }
-    cancelMovePin();
-    return;
-  }
-
-  if(!pinMode)return;
-  _pendingPos={x:Math.round(px*10)/10,y:Math.round(py*10)/10};
-  openPinModal(pinMode);
-}
-
-// Attach click to wrap so it fires regardless of what child is clicked
-document.getElementById('pdfWrap').addEventListener('click',function(e){
-  if(!pinMode)return;
-  onCanvasClick(e);
-});
-
-document.getElementById('pdfWrap').addEventListener('contextmenu',function(e){
-  var pinEl=e.target.closest('.drw-pin');
-  if(!pinEl)return; // let browser handle right-click on non-pin areas
-  e.preventDefault();
-  e.stopPropagation();
-  var d=drawings.find(function(x){return x.id===curId;});if(!d||!d.pins)return;
-  var lbl=pinEl.querySelector('.pin-lbl');if(!lbl)return;
-  var ref=lbl.textContent;
-  var pin=d.pins.find(function(p){return p.ref===ref;});
-  if(pin)showPinContextMenu(e,pin);
-});
-
-function openPinModal(type){
-  if(type==='itp'){
-    document.getElementById('itp-ref').value=nextRef('itp');
-    document.getElementById('itp-desc').value='';
-    document.getElementById('itp-equip').value='';
-    document.getElementById('itp-status').value='open';
-    var itpSub=document.getElementById('itpSub');
-    if(itpSub)itpSub.textContent='Position: '+_pendingPos.x+'%, '+_pendingPos.y+'%';
-    document.getElementById('itpModal').classList.add('open');
-    setTimeout(function(){document.getElementById('itp-desc').focus();},80);
-  } else if(type==='defect'){
-    document.getElementById('def-ref').value=nextRef('defect');
-    document.getElementById('def-desc').value='';
-    document.getElementById('def-status').value='open';
-    var defSub=document.getElementById('defSub');
-    if(defSub)defSub.textContent='Position: '+_pendingPos.x+'%, '+_pendingPos.y+'%';
-    document.getElementById('defectModal').classList.add('open');
-    setTimeout(function(){document.getElementById('def-desc').focus();},80);
-  } else if(type==='fire'){
-    document.getElementById('fire-ref').value=nextRef('fire');
-    document.getElementById('fire-desc').value='';
-    document.getElementById('fire-status').value='open';
-    var fireSub=document.getElementById('fireSub');
-    if(fireSub)fireSub.textContent='Position: '+_pendingPos.x+'%, '+_pendingPos.y+'%';
-    document.getElementById('fireModal').classList.add('open');
-    setTimeout(function(){document.getElementById('fire-desc').focus();},80);
-  }
-}
-
-function renderClEditor(){
-  var ed=document.getElementById('itpClEditor');ed.innerHTML='';
-  if(!_pendingClItems.length){ed.innerHTML='<div style="color:var(--muted);font-size:12px;padding:2px">No items — click ＋ Add checklist item below</div>';return;}
-  _pendingClItems.forEach(function(item,i){
-    var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border)';
-    var inp=document.createElement('input');inp.type='text';inp.value=item.text;inp.placeholder='Checklist item…';
-    inp.style.cssText='flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:DM Sans,sans-serif;font-size:12px';
-    (function(idx){inp.addEventListener('input',function(){_pendingClItems[idx].text=this.value;});})(i);
-    var del=document.createElement('button');del.textContent='✕';del.style.cssText='background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px';
-    (function(idx){del.addEventListener('click',function(){_pendingClItems.splice(idx,1);renderClEditor();});})(i);
-    row.appendChild(inp);row.appendChild(del);ed.appendChild(row);
-  });
-  var inps=ed.querySelectorAll('input');if(inps.length)inps[inps.length-1].focus();
-}
-function addClItem(){_pendingClItems.push({text:'',checked:false});renderClEditor();}
-
-function cancelPin(){
-  ['itpModal','defectModal','fireModal'].forEach(function(id){document.getElementById(id).classList.remove('open');});
-  _pendingPos=null;
-}
-
-function confirmPin(type, addAnother){
-  if(!_pendingPos||!curId) return;
-  var d=drawings.find(function(x){return x.id===curId;});if(!d)return;
-  if(!d.pins) d.pins=[];
-  var pin={id:'pin'+nid(),type:type,x:_pendingPos.x,y:_pendingPos.y};
-  if(type==='itp'){
-    var desc=document.getElementById('itp-desc').value.trim();
-    if(!desc){alert('Description required.');return;}
-    pin.ref=document.getElementById('itp-ref').value;
-    pin.desc=desc;
-    pin.equip=document.getElementById('itp-equip').value.trim();
-    pin.status=document.getElementById('itp-status').value;
-    pin.checklist=_pendingClItems.filter(function(i){return i.text.trim();}).map(function(i){return{text:i.text.trim(),checked:false};});
-    document.getElementById('itpModal').classList.remove('open');
-  } else if(type==='defect'){
-    var desc=document.getElementById('def-desc').value.trim();
-    if(!desc){alert('Description required.');return;}
-    pin.ref=document.getElementById('def-ref').value;pin.desc=desc;pin.status=document.getElementById('def-status').value;
-    document.getElementById('defectModal').classList.remove('open');
-    // Also create defect record in defects table and open form
-    (async function(defRef, defDesc, pinId, drawingId, px, py){
-      var pNum=(dbGetCurrentProject()||{}).num||'GCT001';
-      var u=dbGetCurrentUser();
-      var existing=await dbGetProject('defects',pNum)||[];
-      if(!Array.isArray(existing))existing=[];
-      var defObj={
-        id:'def_'+Date.now(),
-        ref:defRef,
-        status:'open',
-        desc:defDesc,
-        priority:'medium',
-        drawingId:drawingId,
-        pinX:px,
-        pinY:py,
-        raisedBy:u?(u.name||u.username||''):'',
-        issueDate:new Date().toISOString().split('T')[0],
-        photos:[],closePhotos:[],
-        createdAt:new Date().toISOString()
-      };
-      existing.push(defObj);
-      await dbSetProject('defects',pNum,existing);
-      // Open defect form to fill in full details
-      var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
-      window.open(b+'hvac-defect-form.html?id='+encodeURIComponent(defObj.id),'_blank');
-    })(pin.ref, pin.desc, pin.id, curId, _pendingPos.x, _pendingPos.y);
-  } else if(type==='fire'){
-    var desc=document.getElementById('fire-desc').value.trim();
-    if(!desc){alert('Description required.');return;}
-    pin.ref=document.getElementById('fire-ref').value;pin.desc=desc;pin.status=document.getElementById('fire-status').value;
-    document.getElementById('fireModal').classList.remove('open');
-  }
-  d.pins.push(pin);
-  _pendingPos=null;
-  save();renderPins();renderPinOverlay();
-  document.getElementById('pinCount').textContent=d.pins.length;
-  document.getElementById('pinsPanel').classList.remove('collapsed');
-  if(addAnother){
-    // Re-activate pin mode so user can immediately place next pin
-    showToast('Pin saved — click on drawing to place next pin');
-    setPinMode(type);
-  }
-}
-
-// ── LAYER FILTER ──
-function setLayer(layer){
-  activeLayer=layer;
-  ['lyrAll','lyrItp','lyrDef','lyrFire'].forEach(function(id){document.getElementById(id).classList.remove('on');});
-  var m={all:'lyrAll',itp:'lyrItp',defect:'lyrDef',fire:'lyrFire'};
-  if(m[layer])document.getElementById(m[layer]).classList.add('on');
-  renderPinOverlay();renderPins();
-}
-
-// ── PIN OVERLAY ──
-function renderPins(){
-  var d=drawings.find(function(x){return x.id===curId;});
-  var list=document.getElementById('ppList');
-  var tf=(document.getElementById('pinTypeFilter').value||'');
-  list.innerHTML='';
-  var pins=(d&&d.pins)||[];
-  var filtered=pins.filter(function(p){return!tf||p.type===tf;});
-  document.getElementById('pinCount').textContent=pins.length;
-  if(!filtered.length){
-    list.innerHTML='<div style="text-align:center;padding:28px;color:var(--muted);font-size:12px">'+(pins.length?'No pins match filter':'Select pin type then click on drawing')+'</div>';
-    return;
-  }
-  filtered.forEach(function(pin){
-    var item=document.createElement('div');item.className='pin-item '+pin.type;item.id='pi-'+pin.id;
-    var stcls={open:'st-open',inprogress:'st-inprogress',closed:'st-closed'}[pin.status]||'st-open';
-    var stlbl={open:'Open',inprogress:'In Progress',closed:'Closed'}[pin.status]||'Open';
-    var hdr=document.createElement('div');hdr.className='pi-hdr';
-    hdr.innerHTML='<div class="pi-dot"></div><span class="pi-ref">'+escH(pin.ref||'')+'</span><span class="pi-desc" title="'+escH(pin.desc||'')+'">'+escH(pin.desc||'')+'</span><span class="pi-st '+stcls+'">'+stlbl+'</span>';
-    (function(p){hdr.addEventListener('click',function(){expandPin(p.id);});})(pin);
-    var body=document.createElement('div');body.className='pi-body';
-    if(pin.equip){var eq=document.createElement('div');eq.style.cssText='font-family:DM Mono,monospace;font-size:10px;color:var(--accent);margin-top:8px';eq.textContent='Equipment: '+pin.equip;body.appendChild(eq);}
-    // ITP Checklist
-    if(pin.type==='itp'&&pin.checklist&&pin.checklist.length){
-      var cl=document.createElement('div');cl.className='itp-cl';
-      pin.checklist.forEach(function(ci,ci_i){
-        var row=document.createElement('div');row.className='itp-ci';
-        var chk=document.createElement('div');chk.className='ci-chk'+(ci.checked?' on':'');if(ci.checked)chk.textContent='✓';
-        (function(p2,idx,c2){chk.addEventListener('click',function(e){e.stopPropagation();p2.checklist[idx].checked=!p2.checklist[idx].checked;c2.className='ci-chk'+(p2.checklist[idx].checked?' on':'');c2.textContent=p2.checklist[idx].checked?'✓':'';save();});})(pin,ci_i,chk);
-        var txt=document.createElement('span');txt.className='ci-txt'+(ci.checked?' done':'');txt.textContent=ci.text;
-        row.appendChild(chk);row.appendChild(txt);cl.appendChild(row);
-      });
-      body.appendChild(cl);
-    }
-    // Status select
-    var ss=document.createElement('select');ss.className='pi-sel';
-    [{v:'open',l:'Open'},{v:'inprogress',l:'In Progress'},{v:'closed',l:'Closed'}].forEach(function(opt){var o=document.createElement('option');o.value=opt.v;o.textContent=opt.l;if(opt.v===pin.status)o.selected=true;ss.appendChild(o);});
-    (function(p){ss.addEventListener('change',function(){p.status=this.value;save();renderPins();renderPinOverlay();});})(pin);
-    body.appendChild(ss);
-    // Delete
-    var del=document.createElement('button');del.className='pi-del';del.textContent='🗑 Delete pin';
-    (function(p){del.addEventListener('click',function(e){e.stopPropagation();if(!confirm('Delete this pin?'))return;var d=drawings.find(function(x){return x.id===curId;});if(d){d.pins=d.pins.filter(function(x){return x.id!==p.id;});save();renderPins();renderPinOverlay();}});})(pin);
-    body.appendChild(del);
-    item.appendChild(hdr);item.appendChild(body);list.appendChild(item);
+    renderPins();
   });
 }
-
-function expandPin(pinId){
-  document.querySelectorAll('.pin-item').forEach(function(el){el.classList.toggle('exp',el.id==='pi-'+pinId&&!el.classList.contains('exp'));});
-  var el=document.getElementById('pi-'+pinId);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-
-var ITP_TYPES={
-  'fcu-water-cooled':{label:'FCU — Water Cooled',itpNum:'ITP-001',requiresEquip:true}
-};>l
+// Close on backdrop click
+document.getElementById('itpDetailMo').addEventListener('click',function(e){
+  if(e.target===this)closeItpDetail();
+});
 </script>
 </body>
 </html>
