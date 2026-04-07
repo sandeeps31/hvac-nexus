@@ -334,8 +334,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div class="itp-hdr-block">
       <div class="itp-hdr-row">
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Client Doc No.</div><div class="itp-hdr-val" id="ed-clientdoc2" style="color:var(--muted);font-style:italic;font-size:11px">—</div></div>
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Ref No.</div><div class="itp-hdr-val mono" id="ed-itpno" style="color:var(--muted);font-style:italic;font-size:11px">Auto generated</div></div>
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Form No.</div><div class="itp-hdr-val mono" id="ed-formno2" style="color:var(--muted);font-style:italic;font-size:11px">Auto generated</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Ref No.</div><div class="itp-hdr-val mono" id="ed-itpno" style="color:var(--muted);font-style:italic;font-size:11px">Auto generated on creation</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Form No.</div><div class="itp-hdr-val mono" id="ed-formno">—</div></div>
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">ITP Type</div><div class="itp-hdr-val" id="ed-itptype">—</div></div>
       </div>
       <div class="itp-hdr-row cols3">
@@ -480,73 +480,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
 <script src="db.js"></script>
 <script>
-// ═══════════════════════════════════════════════════
-// ITP TEMPLATES — HVAC NEXUS
-// Company level: hvacnexus_itp_templates
-// Project level: hvacnexus_itp_templates_<projectNum>
-// ═══════════════════════════════════════════════════
-var _proj = dbGetCurrentProject();
-var _pNum = _proj.num||_proj.number||'GCT001';
-
-var currentLevel = 'company'; // fixed — this is the company library
-
-var templates = [];
-var companyTemplates = []; // always the company library
-var activeItpId = null;
-var _inEditor = false;
-var _isDirty = false;
-var _draftEditMode = false;
-var _uid = 0;
-function nid(){return 'itp'+(++_uid)+Date.now();}
-
-function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function todayStr(){return new Date().toISOString().split('T')[0];}
-function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
-
-
-
-// User name
-(function(){try{var cs=_cachedCS||{};var n=cs.userName||cs.contactName||'';if(n)document.getElementById('sbUserName').textContent=n.split(' ')[0];}catch(e){}})();
-
-// Storage
-function save(){
-  dbSetItpTemplates(templates).catch(function(e){console.error('Save company templates error:',e);});
-}
-async function load(){
-  try{var s=await dbGetItpTemplates();companyTemplates=Array.isArray(s)?s:[];templates=companyTemplates;}catch(e){companyTemplates=[];templates=[];}
-}
-
-// Auto-generate ITP number (uses active templates list)
-function genItpNum(){
-  var max=0;
-  templates.forEach(function(t){var m=(t.itpNo||'').match(/ITP-(\d+)/);if(m){var n=parseInt(m[1]);if(n>max)max=n;}});
-  // Also scan company templates to avoid clashes when on project level
-  if(currentLevel==='project'){
-    companyTemplates.forEach(function(t){var m=(t.itpNo||'').match(/ITP-(\d+)/);if(m){var n=parseInt(m[1]);if(n>max)max=n;}});
-  }
-  return 'ITP-'+String(max+1).padStart(3,'0');
-}
-
-// Status helpers
-function currentRev(itp){
-  // For editor: return draft if exists (so editing works), else latest current
-  var revs=itp.revisions;
-  for(var i=revs.length-1;i>=0;i--){if(revs[i].status==='draft')return revs[i];}
-  for(var i=revs.length-1;i>=0;i--){if(revs[i].status==='current')return revs[i];}
-  return revs[revs.length-1];
-}
-function publishedRev(itp){
-  // Always return the latest published (current) revision — ignores drafts
-  var revs=itp.revisions;
-  for(var i=revs.length-1;i>=0;i--){if(revs[i].status==='current')return revs[i];}
-  return revs[revs.length-1];
-}
-function isDraft(itp){
-  // A template is in draft state if its latest revision is a draft
-  var last=itp.revisions[itp.revisions.length-1];
-  return last.status==='draft';
-}
-
+<script>
 // ── DEFAULT FCU WATER COOLED TEMPLATE ──
 var FCU_WC_TEMPLATE = {
   sections:[
@@ -664,62 +598,111 @@ var FD_TEMPLATE = {
   ]
 };
 
-async function initTemplates(){
-  // Role gate — Director and CM only
-  try{
-    var cu=dbGetCurrentUser();
-    var role=cu&&cu.role?cu.role.toLowerCase():'';
-    var allowed=['director','construction manager','cm','admin'];
-    var isAllowed=allowed.some(function(r){return role.includes(r);});
-    if(!isAllowed&&role!==''){
-      document.getElementById('accessDenied').style.display='flex';
-      document.getElementById('mainWrap').style.display='none';
-      return;
-    }
-  }catch(e){}
-  await load();
-  // Seed default FCU template into company library if empty
-  if(!companyTemplates.length){
-    var cs=await dbGetCompanySettings();
-    var me=(cs&&(cs.userName||cs.contactName)||'Sandeep').split(' ')[0];
-    var tmpl={
-      id:nid(),itpNo:'ITP-001',itpType:'FCU — Water Cooled',
-      createdBy:me,createdDate:todayStr(),
-      revisions:[{version:1,status:'current',sections:JSON.parse(JSON.stringify(FCU_WC_TEMPLATE.sections)),modifiedDate:todayStr(),modifiedBy:me,note:'Initial revision',lastUsed:''}]
-    };
-    companyTemplates.push(tmpl);
-  }
-  // Seed Fire Damper template if not present
-  if(!companyTemplates.find(function(t){return (t.itpType||'').includes('Fire Damper');})){
-    var me2=(cs&&(cs.userName||cs.contactName)||'Admin').split(' ')[0];
-    var fdNum='ITP-00'+(companyTemplates.length+1);
-    var fdTmpl={
-      id:nid(),itpNo:fdNum,itpType:'Fire Damper',
-      createdBy:me2,createdDate:todayStr(),
-      revisions:[{version:1,status:'current',sections:JSON.parse(JSON.stringify(FD_TEMPLATE.sections)),modifiedDate:todayStr(),modifiedBy:me2,note:'Initial revision',lastUsed:''}]
-    };
-    companyTemplates.push(fdTmpl);
-  }
-  // Clean up: remove orphaned drafts on old templates that were never published
-  // (left over from earlier buggy sessions — if a draft's baseRev is also current, clean it)
-  var cleaned=false;
-  companyTemplates.forEach(function(t){
-    var hasCurrent=t.revisions.some(function(r){return r.status==='current';});
-    var draftIdx=t.revisions.findIndex(function(r){return r.status==='draft';});
-    // If we have a current AND a draft but the draft version equals the current version, it's a stale duplicate
-    if(hasCurrent&&draftIdx!==-1){
-      var draft=t.revisions[draftIdx];
-      var curr=t.revisions.find(function(r){return r.status==='current';});
-      if(curr&&draft.version===curr.version){t.revisions.splice(draftIdx,1);cleaned=true;}
-    }
-  });
-  if(companyTemplates.length){await dbSetItpTemplates(companyTemplates);}
-  if(cleaned)console.log('Cleaned up stale draft revisions');
+'use strict';
+
+// ── GLOBALS ──
+var _proj=dbGetCurrentProject();
+var _pNum=_proj?(_proj.num||_proj.number||''):'';
+var currentLevel='company';
+var templates=[];
+var companyTemplates=[];
+var activeItpId=null;
+var _inEditor=false;
+var _isDirty=false;
+var _draftEditMode=false;
+var _uid=0;
+var _cachedCS={};
+
+function nid(){return 'itp'+(++_uid)+Date.now();}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+
+// ── STORAGE ──
+function save(){
+  dbSetItpTemplates(companyTemplates).catch(function(e){console.error('Save error:',e);});
+}
+async function load(){
+  try{var s=await dbGetItpTemplates();companyTemplates=Array.isArray(s)?s:[];}catch(e){companyTemplates=[];}
+  templates=companyTemplates;
 }
 
-// Level switching not needed — company level only
-function updateTabCounts(){
-  // Single level — no tab counts needed
+function genItpNum(){
+  var max=0;
+  companyTemplates.forEach(function(t){
+    var m=(t.itpNo||'').match(/ITP-(\d+)/);
+    if(m){var n=parseInt(m[1]);if(n>max)max=n;}
+  });
+  return 'ITP-'+String(max+1).padStart(3,'0');
+}
+
+// ── REVISION HELPERS ──
+function currentRev(itp){
+  // Returns draft if one exists (for editing), else latest current
+  var revs=itp.revisions||[];
+  for(var i=revs.length-1;i>=0;i--){if(revs[i].status==='draft')return revs[i];}
+  for(var i=revs.length-1;i>=0;i--){if(revs[i].status==='current')return revs[i];}
+  return revs[revs.length-1];
+}
+function publishedRev(itp){
+  // Always returns latest published (ignores draft)
+  var revs=itp.revisions||[];
+  for(var i=revs.length-1;i>=0;i--){if(revs[i].status==='current')return revs[i];}
+  return revs[revs.length-1];
+}
+function hasDraftRev(itp){
+  return (itp.revisions||[]).some(function(r){return r.status==='draft';});
+}
+function nextVersion(itp){
+  // Next version = highest version number in revisions + 1
+  var max=0;
+  (itp.revisions||[]).forEach(function(r){if(r.version>max)max=r.version;});
+  return max+1;
+}
+
+// ── NAV ──
+function navTo(url){
+  if(_isDirty&&_inEditor){
+    if(!confirm('You have unsaved changes to this draft. Leave without saving?'))return;
+    _isDirty=false;
+  }
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  window.location.href=b+url;
+}
+
+// ── SIDEBAR ──
+var SBK='hvacnexus_sb_collapsed';
+function toggleSB(){
+  var c=!document.getElementById('sidebar').classList.contains('sm');
+  localStorage.setItem(SBK,c?'1':'0');applySB(c);
+}
+function applySB(c){
+  var sb=document.getElementById('sidebar');
+  var main=document.getElementById('mainWrap');
+  var btn=document.getElementById('sbToggleBtn');
+  if(sb)sb.classList.toggle('sm',c);
+  if(main)main.style.marginLeft=c?'var(--sb-sm)':'230px';
+  if(btn)btn.textContent=c?'\u00BB':'\u00AB';
+}
+function toggleGroup(g){
+  var el=document.getElementById('gitems-'+g);
+  var ch=document.getElementById('gchev-'+g);
+  if(!el)return;
+  var open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  if(ch)ch.style.transform=open?'rotate(-90deg)':'';
+}
+function bcParentClick(){
+  if(_inEditor){showRegister();return;}
+  navTo('hvac-settings.html');
+}
+
+// ── TOAST ──
+function showToast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+  t.innerHTML=msg;document.body.appendChild(t);
+  setTimeout(function(){t.remove();},2800);
 }
 
 // ── VIEW MANAGEMENT ──
@@ -728,182 +711,170 @@ function showView(id){
   document.getElementById('view-'+id).classList.add('active');
 }
 function showRegister(){
-  showView('register');
-  if(_isDirty){
+  if(_isDirty&&_inEditor){
     if(!confirm('You have unsaved changes to this draft. Leave without saving?'))return;
   }
-  _isDirty=false;
-  _draftEditMode=false;
-  _inEditor=false;
-  document.getElementById('backToRegBtn').style.display='none';
-  document.getElementById('publishBtn').style.display='none';
-  document.getElementById('newItpBtn').style.display='';
-  document.getElementById('bcCurr').textContent='Company ITP Templates';
+  _isDirty=false;_draftEditMode=false;_inEditor=false;
+  var el;
+  el=document.getElementById('backToRegBtn');if(el)el.style.display='none';
+  el=document.getElementById('publishBtn');if(el)el.style.display='none';
+  el=document.getElementById('newItpBtn');if(el)el.style.display='';
+  el=document.getElementById('bcCurr');if(el)el.textContent='Company ITP Templates';
   activeItpId=null;
   renderRegister();
+  showView('register');
 }
+
 function viewItp(itpId){
-  _isDirty=false; // entering view mode — no edits pending
+  _isDirty=false;_draftEditMode=false;
   openEditor(itpId);
 }
 function editItp(itpId){
   var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
-  var rev=currentRev(itp);
-  if(rev.status!=='draft') startDraft(itp);
+  if(!hasDraftRev(itp))startDraft(itp,false); // create draft without re-rendering yet
   _draftEditMode=true;
   openEditor(itpId);
 }
-
 function openEditor(itpId){
   _inEditor=true;
   activeItpId=itpId;
+  var el;
+  el=document.getElementById('backToRegBtn');if(el)el.style.display='';
+  el=document.getElementById('newItpBtn');if(el)el.style.display='none';
+  var lt=document.getElementById('levelTabs');if(lt)lt.style.display='none';
+  var ib=document.getElementById('importBtn');if(ib)ib.style.display='none';
   showView('editor');
-  var _lt=document.getElementById('levelTabs');if(_lt)_lt.style.display='none';
-  document.getElementById('backToRegBtn').style.display='';
-  document.getElementById('newItpBtn').style.display='none';
-  var _ib=document.getElementById('importBtn');if(_ib)_ib.style.display='none';
   renderEditor();
 }
 
 // ── REGISTER ──
 function renderRegister(){
-  updateTabCounts();
-  var q=(document.getElementById('srch').value||'').toLowerCase();
-  var list=templates.filter(function(t){
+  var q=(document.getElementById('srch')||{}).value||'';
+  q=q.toLowerCase();
+  var list=companyTemplates.filter(function(t){
     return !q||(t.itpNo||'').toLowerCase().includes(q)||(t.itpType||'').toLowerCase().includes(q);
   });
-  var levelLabel=currentLevel==='company'?'company library':'project';
-  document.getElementById('itpCount').textContent=list.length+' template'+(list.length!==1?'s':'');
-  if(!list.length){
-    var emptyMsg=currentLevel==='project'
-      ?'No project templates yet. Use <strong>Import from Company</strong> to add templates, or create a new one.'
-      :'No company templates yet. Create your first company-level ITP template.';
-    document.getElementById('regBody').innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No ITP templates yet</div><div class="empty-sub">'+emptyMsg+'</div></div></td></tr>';
-    return;
-  }
+  var cnt=document.getElementById('itpCount');
+  if(cnt)cnt.textContent=list.length+' template'+(list.length!==1?'s':'');
+
   var rows='';
   list.forEach(function(itp){
     var pubRev=publishedRev(itp);
-    var hasDraft=itp.revisions.some(function(r){return r.status==='draft';});
-    var stBadge='<span class="status-badge sb-current">Current</span>'
-
-    var rev=pubRev;
-
-
+    var hasDraft=hasDraftRev(itp);
     var importedBadge=itp.importedFrom?'<span class="imported-badge">imported</span>':'';
     rows+='<tr style="cursor:pointer" onclick="viewItp(\''+itp.id+'\')">'
       +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
       +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+importedBadge+'</td>'
       +'<td><span class="itp-ver current">v'+pubRev.version+'</span></td>'
-      +'<td>'+stBadge+'</td>'
+      +'<td><span class="status-badge sb-current">Current</span></td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(itp.createdDate)+'</td>'
-      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.modifiedDate)+'</td>'
+      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(pubRev.modifiedDate)+'</td>'
       +'<td>'+(hasDraft?'<span class="status-badge sb-draft" style="font-size:10px">Draft in progress</span>':'<span style="color:var(--muted);font-size:12px">—</span>')+'</td>'
       +'<td onclick="event.stopPropagation()">'
         +'<div class="act-btns-grid">'
-          +'<button class="act-btn" onclick="editItp(\''+itp.id+'\')" title="Edit"><span class="tip">Edit</span>✏️</button>'
-          +'<button class="act-btn" onclick="exportItpPDF(\''+itp.id+'\')" title="Export PDF"><span class="tip">Export PDF</span>📄</button>'
-          +'<button class="act-btn warn" onclick="duplicateItp(\''+itp.id+'\')" title="Duplicate"><span class="tip">Duplicate</span>⧉</button>'
-          +'<button class="act-btn" onclick="openRevHist(\''+itp.id+'\')" title="Revision history"><span class="tip">Revision history</span>🕐</button>'
-          +'<button class="act-btn danger" onclick="deleteItp(\''+itp.id+'\')" title="Delete"><span class="tip">Delete</span>🗑</button>'
+          +'<button class="act-btn" onclick="editItp(\''+itp.id+'\')" title="Edit"><span class="tip">Edit</span>&#9999;&#65039;</button>'
+          +'<button class="act-btn" onclick="exportItpPDF(\''+itp.id+'\')" title="Export PDF"><span class="tip">Export PDF</span>&#128196;</button>'
+          +'<button class="act-btn warn" onclick="duplicateItp(\''+itp.id+'\')" title="Duplicate"><span class="tip">Duplicate</span>&#10697;</button>'
+          +'<button class="act-btn" onclick="openRevHist(\''+itp.id+'\')" title="Revision history"><span class="tip">Revision history</span>&#128336;</button>'
+          +'<button class="act-btn danger" onclick="deleteItp(\''+itp.id+'\')" title="Delete"><span class="tip">Delete</span>&#128465;</button>'
         +'</div>'
       +'</td>'
       +'</tr>';
   });
-  document.getElementById('regBody').innerHTML=rows;
+  document.getElementById('regBody').innerHTML=rows||'<tr><td colspan="8" class="empty"><div class="empty-icon">&#128196;</div><div>No templates yet</div></td></tr>';
 }
 
 // ── EDITOR ──
 function renderEditor(){
   var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
   var rev=currentRev(itp);
-  var isDraftRev=rev.status==='draft';
-  document.getElementById('editorTitle').textContent=itp.itpType;
-  document.getElementById('bcCurr').textContent=itp.itpNo+' — '+itp.itpType;
-  // Populate ITP-form-style header
-  document.getElementById('ed-itpno').textContent=itp.itpNo||'—';
-  document.getElementById('ed-formno').textContent=itp.itpNo||'—';
-  document.getElementById('ed-itptype').textContent=itp.itpType||'—';
-  document.getElementById('ed-equipid').textContent='(set on ITP instance)';
-  document.getElementById('ed-mfr').textContent='(from equipment schedule)';
-  document.getElementById('ed-model').textContent='(from equipment schedule)';
-  document.getElementById('ed-building').textContent='(set on ITP instance)';
-  document.getElementById('ed-location').textContent='(set on ITP instance)';
-  document.getElementById('ed-subloc').textContent='(set on ITP instance)';
-  // version field removed from header display
-  document.getElementById('ed-creator').textContent=itp.createdBy||'—';
-  document.getElementById('ed-created').textContent=fmtDate(itp.createdDate);
-  document.getElementById('ed-modified').textContent=fmtDate(rev.modifiedDate)||'—';
-  // Draft edit bar
-  var draftBar2=document.getElementById('draftEditBar');
-  var draftVer=document.getElementById('draftVerNum');
-  if(draftBar2){draftBar2.classList.toggle('visible',isDraftRev);}
-  var draftActionBtn=document.getElementById('draftActionBtn');
-  if(draftActionBtn){
-    if(_draftEditMode){
-      draftActionBtn.innerHTML='&#128190; Save Draft';
-      draftActionBtn.style.background='var(--accent)';draftActionBtn.style.color='#000';
+  var isDraftR=rev.status==='draft';
+  var canEdit=isDraftR&&_draftEditMode;
+
+  // Breadcrumb
+  var bc=document.getElementById('bcCurr');if(bc)bc.textContent=itp.itpNo+' — '+itp.itpType;
+
+  // ITP form header
+  var setEl=function(id,v){var el=document.getElementById(id);if(el)el.textContent=v;};
+  setEl('ed-formno',itp.itpNo||'—');
+  setEl('ed-itptype',itp.itpType||'—');
+  setEl('ed-creator',itp.createdBy||'—');
+  setEl('ed-created',fmtDate(itp.createdDate));
+  setEl('ed-modified',fmtDate(rev.modifiedDate));
+
+  // Editor topbar badge
+  var badge=document.getElementById('editorStatusBadge');
+  if(badge){
+    badge.innerHTML=isDraftR
+      ?'<span class="status-badge sb-draft">Draft v'+rev.version+'</span>'
+      :'<span class="status-badge sb-current">v'+pubVer(itp)+' Current</span>';
+  }
+
+  // Start New Draft bar — only when current rev (no draft exists)
+  var startBar=document.getElementById('startDraftBar');
+  if(startBar)startBar.style.display=(!isDraftR&&!hasDraftRev(itp))?'flex':'none';
+
+  // Draft edit bar — only when a draft exists
+  var draftBar=document.getElementById('draftEditBar');
+  if(draftBar){
+    draftBar.classList.toggle('visible',isDraftR||hasDraftRev(itp));
+    var verSpan=document.getElementById('draftVerNum');
+    if(verSpan)verSpan.textContent=isDraftR?rev.version:nextVersion(itp)-1;
+  }
+
+  // Draft action button label
+  var dab=document.getElementById('draftActionBtn');
+  if(dab){
+    if(canEdit){
+      dab.innerHTML='&#128190; Save Draft';
+      dab.style.background='var(--accent)';dab.style.color='#000';dab.style.borderColor='var(--accent)';
     } else {
-      draftActionBtn.innerHTML='&#9999; Edit Draft';
-      draftActionBtn.style.background='';draftActionBtn.style.color='';
+      dab.innerHTML='&#9999; Edit Draft';
+      dab.style.background='';dab.style.color='';dab.style.borderColor='';
     }
   }
-  if(draftVer&&isDraftRev)draftVer.textContent=rev.version;
 
-  var stBadge=rev.status==='current'?'<span class="status-badge sb-current">Current</span>':rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>':'<span class="status-badge sb-superseded">Superseded</span>';
-  document.getElementById('editorStatusBadge').innerHTML=stBadge;
+  // Publish button
+  var pubBtn=document.getElementById('publishBtn');if(pubBtn)pubBtn.style.display='none';
 
-  var canEdit=rev.status==='draft'&&_draftEditMode;
-  document.getElementById('publishBtn').style.display='none'; // now in draftEditBar
-
-  // Start New Draft bar — shows when viewing a current/superseded revision
-  var draftBar=document.getElementById('startDraftBar');
-  var hasDraftRev=itp.revisions.some(function(r){return r.status==='draft';});
-  if(draftBar)draftBar.style.display=(rev.status==='current'&&!hasDraftRev)?'flex':'none';
-
-  renderEditorBody(itp, rev, canEdit);
+  renderEditorBody(itp,rev,canEdit);
 }
 
-function renderEditorBody(itp, rev, canEdit){
+function pubVer(itp){
+  var max=0;
+  (itp.revisions||[]).forEach(function(r){if(r.status==='current'&&r.version>max)max=r.version;});
+  return max||1;
+}
+
+function renderEditorBody(itp,rev,canEdit){
   var body=document.getElementById('editorBody');
   body.innerHTML='';
-
   var sections=rev.sections||[];
-  sections.forEach(function(sec,si){
-    var wrap=document.createElement('div');wrap.className='tset';wrap.id='sec-'+sec.id;
-    // Header
-    var hdr=document.createElement('div');hdr.className='tset-hdr';
-    var numSpan=document.createElement('span');numSpan.className='tset-num';
-    // Always display-only — auto-numbered from position
-    numSpan.textContent=String(si+1).padStart(2,'0');
-    var nameSpan=document.createElement('span');nameSpan.className='tset-name';
-    if(canEdit){
-      var nameInp=document.createElement('input');nameInp.className='step-input';nameInp.value=sec.name;nameInp.style.cssText='width:100%;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);outline:none;transition:border-color .15s';nameSpan.style.cssText='flex:1;display:flex;align-items:center;min-width:0';
-nameInp.onfocus=function(){this.style.borderColor='var(--accent)';};
-nameInp.onblur=function(){this.style.borderColor='var(--border)';};
-      nameInp.onchange=(function(s){return function(){s.name=this.value;autosave(itp);};})(sec);
-      nameSpan.appendChild(nameInp);
-    } else {
-      nameSpan.textContent=sec.name;
-    }
-    if(sec.cx_link){
-      var cxTag=document.createElement('span');cxTag.style.cssText='font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:4px;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.2);margin-left:8px';
-      cxTag.textContent=sec.cx_link==='precx'?'→ Pre-Cx Tracker':'→ Commissioning Tracker';
-      nameSpan.appendChild(cxTag);
-    }
-    var colBtn=document.createElement('button');colBtn.className='tset-collapse';colBtn.textContent='▾';colBtn.title='Collapse/Expand';
-    colBtn.onclick=(function(s,w){return function(){w.querySelector('.tset-body').classList.toggle('collapsed');this.textContent=w.querySelector('.tset-body').classList.contains('collapsed')?'▸':'▾';};})(sec,wrap);
 
-    // Section drag handle (for reordering sections)  
+  sections.forEach(function(sec,si){
+    // Auto-number section ref from position
+    sec.ref=String(si+1).padStart(2,'0');
+
+    var wrap=document.createElement('div');wrap.className='tset';wrap.id='sec-'+sec.id;
+
+    // Section header
+    var hdr=document.createElement('div');hdr.className='tset-hdr';
+
+    // Section drag handle
     if(canEdit){
-      var secHandle=document.createElement('span');secHandle.className='drag-handle';secHandle.textContent='⠿';secHandle.title='Drag to reorder section';
-      secHandle.style.cssText='font-size:16px;margin-right:6px;cursor:grab;flex-shrink:0';
+      var secHandle=document.createElement('span');
+      secHandle.className='drag-handle';secHandle.innerHTML='&#10;&#8285;';
+      secHandle.style.cssText='font-size:16px;margin-right:6px;cursor:grab;flex-shrink:0;color:var(--muted)';
       secHandle.draggable=true;
-      (function(si2,wrapEl){
-        secHandle.addEventListener('dragstart',function(e){e.dataTransfer.setData('secId',sec.id);wrapEl.classList.add('dragging');e.stopPropagation();});
-        secHandle.addEventListener('dragend',function(){wrapEl.classList.remove('dragging');document.querySelectorAll('.tset').forEach(function(t){t.classList.remove('drag-over');});});
+      (function(secId,wrapEl){
+        secHandle.addEventListener('dragstart',function(e){
+          e.dataTransfer.setData('secId',secId);wrapEl.classList.add('dragging');e.stopPropagation();
+        });
+        secHandle.addEventListener('dragend',function(){
+          wrapEl.classList.remove('dragging');
+          document.querySelectorAll('.tset').forEach(function(t){t.classList.remove('sec-drag-over');});
+        });
         wrapEl.addEventListener('dragover',function(e){
-          if(!e.dataTransfer.types.includes('secid')&&!e.dataTransfer.getData('secId')&&e.dataTransfer.types.indexOf('secid')===-1){};
           e.preventDefault();e.stopPropagation();
           document.querySelectorAll('.tset').forEach(function(t){t.classList.remove('sec-drag-over');});
           wrapEl.classList.add('sec-drag-over');
@@ -913,24 +884,66 @@ nameInp.onblur=function(){this.style.borderColor='var(--border)';};
           e.preventDefault();e.stopPropagation();
           wrapEl.classList.remove('sec-drag-over');
           var fromId=e.dataTransfer.getData('secId');
-          if(!fromId||fromId===sec.id)return;
-          var fromIdx=rev.sections.findIndex(function(s){return s.id===fromId;});
-          var toIdx=rev.sections.findIndex(function(s){return s.id===sec.id;});
-          if(fromIdx===-1||toIdx===-1)return;
-          var moved=rev.sections.splice(fromIdx,1)[0];
-          rev.sections.splice(toIdx,0,moved);
-          autosave(itp);renderEditor();
+          if(!fromId||fromId===secId)return;
+          var fi=rev.sections.findIndex(function(s){return s.id===fromId;});
+          var ti=rev.sections.findIndex(function(s){return s.id===secId;});
+          if(fi===-1||ti===-1)return;
+          var moved=rev.sections.splice(fi,1)[0];
+          rev.sections.splice(ti,0,moved);
+          markDirty(itp);renderEditorBody(itp,rev,canEdit);
         });
-      })(si,wrap);
+      })(sec.id,wrap);
       hdr.appendChild(secHandle);
     }
-    hdr.appendChild(numSpan);hdr.appendChild(nameSpan);
+
+    // Section number (display only — auto numbered)
+    var numSpan=document.createElement('span');numSpan.className='tset-num';
+    numSpan.textContent=sec.ref;
+    hdr.appendChild(numSpan);
+
+    // Section name
+    var nameSpan=document.createElement('span');nameSpan.className='tset-name';
+    nameSpan.style.cssText='flex:1;display:flex;align-items:center;min-width:0';
     if(canEdit){
-      var delSecBtn=document.createElement('button');delSecBtn.className='tset-del';delSecBtn.textContent='✕';delSecBtn.title='Delete section';
-      delSecBtn.onclick=(function(s){return function(){if(!confirm('Delete section "'+s.name+'"?'))return;rev.sections=rev.sections.filter(function(x){return x.id!==s.id;});autosave(itp);renderEditor();};})(sec);
+      var nameInp=document.createElement('input');
+      nameInp.className='step-input';
+      nameInp.value=sec.name;
+      nameInp.style.cssText='width:100%;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);outline:none;transition:border-color .15s';
+      nameInp.onfocus=function(){this.style.borderColor='var(--accent)';};
+      nameInp.onblur=function(){this.style.borderColor='var(--border)';};
+      nameInp.onchange=(function(s){return function(){s.name=this.value;markDirty(itp);};})(sec);
+      nameSpan.appendChild(nameInp);
+    } else {
+      nameSpan.textContent=sec.name;
+    }
+    hdr.appendChild(nameSpan);
+
+    if(sec.cx_link){
+      var cxTag=document.createElement('span');
+      cxTag.style.cssText='font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:4px;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.2);margin-left:8px';
+      cxTag.textContent=sec.cx_link==='precx'?'Pre-Cx Tracker':'Commissioning Tracker';
+      hdr.appendChild(cxTag);
+    }
+
+    // Collapse button
+    var colBtn=document.createElement('button');colBtn.className='tset-collapse';colBtn.textContent='&#9662;';
+    colBtn.onclick=(function(w){return function(){
+      w.querySelector('.tset-body').classList.toggle('collapsed');
+      this.textContent=w.querySelector('.tset-body').classList.contains('collapsed')?'&#9656;':'&#9662;';
+    };})(wrap);
+    hdr.appendChild(colBtn);
+
+    // Delete section button
+    if(canEdit){
+      var delSecBtn=document.createElement('button');delSecBtn.className='tset-del';delSecBtn.textContent='\u2715';
+      delSecBtn.onclick=(function(s){return function(){
+        if(!confirm('Delete section "'+s.name+'"?'))return;
+        rev.sections=rev.sections.filter(function(x){return x.id!==s.id;});
+        markDirty(itp);renderEditorBody(itp,rev,canEdit);
+      };})(sec);
       hdr.appendChild(delSecBtn);
     }
-    hdr.appendChild(colBtn);
+
     wrap.appendChild(hdr);
 
     // Body
@@ -940,84 +953,99 @@ nameInp.onblur=function(){this.style.borderColor='var(--border)';};
     // Thead
     var thead=document.createElement('thead');
     var headRow=document.createElement('tr');
-    if(canEdit){
-      var thDrag=document.createElement('th');thDrag.style.width='28px';headRow.appendChild(thDrag);
-    }
+    if(canEdit){var thDrag=document.createElement('th');thDrag.style.width='28px';headRow.appendChild(thDrag);}
     var thCols=canEdit?['Step','Description','Check Type','Flags','']:['Step','Description','Check Type','Flags'];
     var thWidths=canEdit?['40px','','160px','110px','30px']:['50px','','150px','120px'];
-    thCols.forEach(function(h,hi){var th=document.createElement('th');th.textContent=h;if(thWidths[hi])th.style.width=thWidths[hi];headRow.appendChild(th);});
+    thCols.forEach(function(h,hi){
+      var th=document.createElement('th');th.textContent=h;
+      if(thWidths[hi])th.style.width=thWidths[hi];
+      headRow.appendChild(th);
+    });
     thead.appendChild(headRow);tbl.appendChild(thead);
 
     var tbody=document.createElement('tbody');
-    // Auto-number steps based on order
     var stepCounter=0;
     sec.rows.forEach(function(row){
       if(row.checkType!=='signoff'&&row.step!==''){stepCounter++;row.step=String(stepCounter);}
     });
+
     sec.rows.forEach(function(row,ri){
       var tr=document.createElement('tr');
       tr.dataset.secId=sec.id;tr.dataset.rowId=row.id;
-      // Drag handle
+
+      // Row drag handle
       if(canEdit){
         var tdDrag=document.createElement('td');
-        var handle=document.createElement('span');handle.className='drag-handle';handle.textContent='⠿';handle.title='Drag to reorder';
+        var handle=document.createElement('span');handle.className='drag-handle';handle.innerHTML='&#10;&#8285;';handle.title='Drag to reorder';
         handle.draggable=true;
         (function(s,r,tbdy){
           handle.addEventListener('dragstart',function(e){
-            e.dataTransfer.effectAllowed='move';
-            e.dataTransfer.setData('text/plain',r.id);
-            tr.classList.add('dragging');
+            e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('rowId',r.id);tr.classList.add('dragging');
           });
-          handle.addEventListener('dragend',function(){tr.classList.remove('dragging');tbdy.querySelectorAll('tr').forEach(function(t){t.classList.remove('drag-over');});});
-          tr.addEventListener('dragover',function(e){e.preventDefault();e.dataTransfer.dropEffect='move';tbdy.querySelectorAll('tr').forEach(function(t){t.classList.remove('drag-over');});tr.classList.add('drag-over');});
+          handle.addEventListener('dragend',function(){
+            tr.classList.remove('dragging');
+            tbdy.querySelectorAll('tr').forEach(function(t){t.classList.remove('drag-over');});
+          });
+          tr.addEventListener('dragover',function(e){
+            e.preventDefault();e.dataTransfer.dropEffect='move';
+            tbdy.querySelectorAll('tr').forEach(function(t){t.classList.remove('drag-over');});
+            tr.classList.add('drag-over');
+          });
           tr.addEventListener('drop',function(e){
             e.preventDefault();tr.classList.remove('drag-over');
-            var fromId=e.dataTransfer.getData('text/plain');
-            var fromIdx=s.rows.findIndex(function(x){return x.id===fromId;});
-            var toIdx=s.rows.findIndex(function(x){return x.id===r.id;});
-            if(fromIdx<0||toIdx<0||fromIdx===toIdx)return;
-            var moved=s.rows.splice(fromIdx,1)[0];
-            s.rows.splice(toIdx,0,moved);
-            autosave(itp);renderEditor();
+            var fromId=e.dataTransfer.getData('rowId');if(!fromId||fromId===r.id)return;
+            var fi=s.rows.findIndex(function(x){return x.id===fromId;});
+            var ti=s.rows.findIndex(function(x){return x.id===r.id;});
+            if(fi===-1||ti===-1)return;
+            var moved=s.rows.splice(fi,1)[0];s.rows.splice(ti,0,moved);
+            markDirty(itp);renderEditorBody(itp,rev,canEdit);
           });
         })(sec,row,tbody);
         tdDrag.appendChild(handle);tr.appendChild(tdDrag);
       }
-      // Step (auto-numbered, read-only display)
-      var tdStep=document.createElement('td');tdStep.className='step-num';
-      tdStep.textContent=row.step||'';
+
+      // Step
+      if(canEdit){
+        var tdStep2=document.createElement('td');
+        var stepInp=document.createElement('input');stepInp.className='step-input';stepInp.value=row.step||'';stepInp.placeholder='—';
+        stepInp.onchange=(function(r){return function(){r.step=this.value;markDirty(itp);};})(row);
+        tdStep2.appendChild(stepInp);tr.appendChild(tdStep2);
+      } else {
+        var tdStep=document.createElement('td');tdStep.textContent=row.step||'';
+        tdStep.style.cssText='text-align:center;color:var(--muted);font-family:DM Mono,monospace;font-size:11px';
+        tr.appendChild(tdStep);
+      }
+
       // Description
       var tdDesc=document.createElement('td');
       if(canEdit){
-        var descInp=document.createElement('input');descInp.className='step-input';descInp.value=row.desc||'';descInp.placeholder='Step description…';
-        descInp.onchange=(function(r){return function(){r.desc=this.value;autosave(itp);};})(row);
+        var descInp=document.createElement('input');descInp.className='step-input';descInp.value=row.desc||'';
+        descInp.onchange=(function(r){return function(){r.desc=this.value;markDirty(itp);};})(row);
         tdDesc.appendChild(descInp);
       } else {
-        tdDesc.textContent=row.desc||'';tdDesc.style.color='var(--text2)';
+        tdDesc.textContent=row.desc||'';tdDesc.style.fontSize='13px';
       }
-      // Check Type
+      tr.appendChild(tdDesc);
+
+      // Check type
       var tdType=document.createElement('td');
       if(canEdit){
         var typeSelect=document.createElement('select');typeSelect.className='type-sel';
-        [
-          {v:'',l:'— Select type —'},
-          {v:'yesno',l:'YES / NO / N.A.'},
-          {v:'passfail',l:'PASS / FAIL'},
-          {v:'input',l:'Input Value'},
-          {v:'photo',l:'Photo / Attachment'},
-          {v:'signoff',l:'Sign-off'}
-        ].forEach(function(opt){
-          var o=document.createElement('option');o.value=opt.v;o.textContent=opt.l;if(row.checkType===opt.v)o.selected=true;
+        ['input','yesno','passfail','photo','document','signoff','dropdown'].forEach(function(opt){
+          var o=document.createElement('option');o.value=opt;
+          o.textContent={'input':'Input Value','yesno':'Yes / No','passfail':'Pass / Fail','photo':'Photo / Attachment','document':'Document','signoff':'Sign-off','dropdown':'Dropdown'}[opt]||opt;
+          if(row.checkType===opt)o.selected=true;
           typeSelect.appendChild(o);
         });
-        typeSelect.onchange=(function(r){return function(){r.checkType=this.value;autosave(itp);};})(row);
+        typeSelect.onchange=(function(r){return function(){r.checkType=this.value;markDirty(itp);};})(row);
         tdType.appendChild(typeSelect);
       } else {
-        var typeLabels={yesno:'YES / NO / N.A.',passfail:'PASS / FAIL',input:'Input Value',photo:'Photo / Attachment',signoff:'Sign-off'};
-        var chip=document.createElement('span');chip.style.cssText='font-family:DM Mono,monospace;font-size:10px;padding:2px 8px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text2)';
-        chip.textContent=typeLabels[row.checkType]||row.checkType;
-        tdType.appendChild(chip);
+        var typeLabel={'input':'Input Value','yesno':'Yes / No','passfail':'Pass / Fail','photo':'Photo / Attachment','document':'Document','signoff':'Sign-off','dropdown':'Dropdown'}[row.checkType]||row.checkType||'—';
+        var typePill=document.createElement('span');typePill.className='type-pill';typePill.textContent=typeLabel;
+        tdType.appendChild(typePill);
       }
+      tr.appendChild(tdType);
+
       // Flags
       var tdFlags=document.createElement('td');
       var flagsWrap=document.createElement('div');flagsWrap.className='flags';
@@ -1025,80 +1053,117 @@ nameInp.onblur=function(){this.style.borderColor='var(--border)';};
         {key:'mandatory',cls:'fb-red',tip:'Mandatory'},
         {key:'photoMandatory',cls:'fb-photo-mand',tip:'Photo — Mandatory',icon:'&#128247;'},
         {key:'photoOptional',cls:'fb-photo-opt',tip:'Photo — Optional',icon:'&#128247;'},
-        {key:'login',cls:'fb-lock',tip:'Login Check',icon:'🔒'},
+        {key:'login',cls:'fb-lock',tip:'Login Check',icon:'&#128274;'},
         {key:'timestamp',cls:'fb-blue',tip:'Export Timestamp'},
         {key:'username',cls:'fb-yellow',tip:'Export Username'}
       ];
+      if(!row.flags)row.flags={};
       flagDefs.forEach(function(fd){
-        var fb=document.createElement('div');fb.className='flag-box '+fd.cls+(row.flags[fd.key]?' active':'');
+        var fb=document.createElement('div');
+        fb.className='flag-box '+fd.cls+(row.flags[fd.key]?' active':'');
         if(fd.icon)fb.innerHTML=fd.icon;
         var tip=document.createElement('span');tip.className='ftip';tip.textContent=fd.tip;
         fb.appendChild(tip);
         if(canEdit){
-          fb.onclick=(function(r,k,el){return function(){r.flags[k]=!r.flags[k];el.classList.toggle('active',r.flags[k]);autosave(itp);};})(row,fd.key,fb);
+          fb.onclick=(function(r,k,el){return function(){
+            r.flags[k]=!r.flags[k];el.classList.toggle('active',r.flags[k]);markDirty(itp);
+          };})(row,fd.key,fb);
           fb.style.cursor='pointer';
         } else {
           fb.style.cursor='default';fb.style.opacity=row.flags[fd.key]?'1':'0.3';
         }
         flagsWrap.appendChild(fb);
       });
-      tdFlags.appendChild(flagsWrap);
-      // Delete
-      var tdDel=document.createElement('td');
+      tdFlags.appendChild(flagsWrap);tr.appendChild(tdFlags);
+
+      // Delete row
       if(canEdit){
-        var delBtn=document.createElement('button');delBtn.className='step-del';delBtn.textContent='✕';delBtn.title='Delete row';
-        delBtn.onclick=(function(s,r){return function(){s.rows=s.rows.filter(function(x){return x.id!==r.id;});autosave(itp);renderEditor();};})(sec,row);
-        tdDel.appendChild(delBtn);
+        var tdDel=document.createElement('td');
+        var delBtn=document.createElement('button');delBtn.className='row-del';delBtn.textContent='\u2715';
+        delBtn.onclick=(function(s,r){return function(){
+          s.rows=s.rows.filter(function(x){return x.id!==r.id;});
+          markDirty(itp);renderEditorBody(itp,rev,canEdit);
+        };})(sec,row);
+        tdDel.appendChild(delBtn);tr.appendChild(tdDel);
       }
-      tr.appendChild(tdStep);tr.appendChild(tdDesc);tr.appendChild(tdType);tr.appendChild(tdFlags);tr.appendChild(tdDel);
+
       tbody.appendChild(tr);
     });
-    tbl.appendChild(tbody);
-    secBody.appendChild(tbl);
 
-    // Add step button
+    // Add row button
     if(canEdit){
-      var addBtn=document.createElement('button');addBtn.className='add-step-btn';
-      addBtn.innerHTML='<span style="font-size:16px;font-weight:300">＋</span> Add Step';
-      addBtn.onclick=(function(s){return function(){
-        var nextStep=s.rows.filter(function(r){return r.step;}).length+1;
-        s.rows.push({id:nid(),step:String(nextStep),desc:'',checkType:'yesno',flags:{mandatory:false,login:false,timestamp:false,username:false}});
-        autosave(itp);renderEditor();
+      var addRowTr=document.createElement('tr');
+      var addRowTd=document.createElement('td');
+      addRowTd.colSpan=6;addRowTd.style.padding='8px';
+      var addRowBtn=document.createElement('button');addRowBtn.className='btn bg bsm';addRowBtn.innerHTML='+ Add Row';
+      addRowBtn.onclick=(function(s){return function(){
+        s.rows.push({id:nid(),step:'',desc:'',checkType:'input',flags:{mandatory:false,login:false,timestamp:false,username:false,photoMandatory:false,photoOptional:false}});
+        markDirty(itp);renderEditorBody(itp,rev,canEdit);
       };})(sec);
-      secBody.appendChild(addBtn);
+      addRowTd.appendChild(addRowBtn);addRowTr.appendChild(addRowTd);tbody.appendChild(addRowTr);
     }
-    wrap.appendChild(secBody);
+
+    tbl.appendChild(tbody);secBody.appendChild(tbl);wrap.appendChild(secBody);
     body.appendChild(wrap);
   });
 
   // Add section button
   if(canEdit){
-    var addSecBtn=document.createElement('button');addSecBtn.className='add-tset-btn';
-    addSecBtn.innerHTML='＋ Add Table Set / Section';
+    var addSecBtn=document.createElement('button');addSecBtn.className='btn bg';addSecBtn.style.margin='12px 24px';addSecBtn.innerHTML='+ Add Section';
     addSecBtn.onclick=function(){
-      var nextNum=sections.length+1;
-      rev.sections.push({id:nid(),ref:String(nextNum).padStart(2,'0'),name:'New Section',type:'checklist',rows:[]});
-      autosave(itp);renderEditor();
+      rev.sections.push({id:nid(),ref:String(rev.sections.length+1).padStart(2,'0'),name:'New Section',type:'checklist',rows:[]});
+      markDirty(itp);renderEditorBody(itp,rev,canEdit);
     };
     body.appendChild(addSecBtn);
-  } else if(rev.status==='current'||rev.status==='superseded'){
-    // Show "Start Draft" if current
-    if(rev.status==='current'){
-      var draftBtn=document.createElement('button');draftBtn.className='btn bp';draftBtn.style.marginTop='16px';
-      draftBtn.innerHTML='✏ Start New Draft';
-      draftBtn.onclick=function(){startDraft(itp);renderEditor();};
-      body.appendChild(draftBtn);
-    }
   }
 }
 
-// ── DRAFT / PUBLISH ──
+// ── DIRTY STATE ──
+function markDirty(itp){
+  _isDirty=true;
+  var ind=document.getElementById('draftSaveIndicator');
+  if(ind){ind.style.color='var(--warn)';ind.textContent='&#9679; Unsaved changes';}
+  var el=document.getElementById('ed-modified');
+  if(el&&itp)el.textContent=fmtDate(todayStr());
+}
+
+// ── DRAFT WORKFLOW ──
+function doStartDraft(){
+  var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
+  _draftEditMode=true;
+  startDraft(itp,true);
+}
+
+function startDraft(itp,rerender){
+  // Never accumulate multiple drafts
+  if(hasDraftRev(itp)){
+    if(rerender)renderEditor();
+    return;
+  }
+  var me='Sandeep';
+  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  var baseRev=null;
+  for(var i=itp.revisions.length-1;i>=0;i--){
+    if(itp.revisions[i].status==='current'){baseRev=itp.revisions[i];break;}
+  }
+  if(!baseRev)baseRev=itp.revisions[itp.revisions.length-1];
+  itp.revisions.push({
+    version:baseRev.version+1,
+    status:'draft',
+    sections:JSON.parse(JSON.stringify(baseRev.sections)),
+    modifiedDate:todayStr(),
+    modifiedBy:me,
+    note:'',
+    lastUsed:''
+  });
+  save();
+  if(rerender)renderEditor();
+}
+
 function toggleDraftEdit(){
   if(_draftEditMode){
-    // Currently editing — save
     saveDraft();
   } else {
-    // Currently viewing — enter edit mode
     _draftEditMode=true;
     renderEditor();
   }
@@ -1112,64 +1177,18 @@ function saveDraft(){
   try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
   rev.modifiedDate=todayStr();rev.modifiedBy=me;
   save();
-  _isDirty=false;
-  _draftEditMode=false;
-  renderEditor(); // re-render in view mode — Save Draft btn becomes Edit Draft
+  _isDirty=false;_draftEditMode=false;
+  renderEditor();
   var ind=document.getElementById('draftSaveIndicator');
-  if(ind){ind.style.color='var(--green)';ind.textContent='&#10003; Saved';setTimeout(function(){if(ind&&ind.textContent.includes('Saved'))ind.textContent='';},2500);}
+  if(ind){ind.style.color='var(--green)';ind.textContent='&#10003; Saved';setTimeout(function(){if(ind)ind.textContent='';},2500);}
 }
 
-function doStartDraft(){
-  var itp=templates.find(function(t){return t.id===activeItpId;});
-  if(!itp)return;
-  _draftEditMode=true;
-  startDraft(itp);
-}
-
-function startDraft(itp){
-  // If a draft already exists, just open it — never accumulate multiple drafts
-  var existing=itp.revisions.find(function(r){return r.status==='draft';});
-  if(existing){save();renderEditor();return;}
-  var me='Sandeep';
-  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
-  // Find the latest current/superseded rev to copy from
-  var baseRev=null;
-  for(var i=itp.revisions.length-1;i>=0;i--){if(itp.revisions[i].status==='current'){baseRev=itp.revisions[i];break;}}
-  if(!baseRev)baseRev=itp.revisions[itp.revisions.length-1];
-  var newRev={
-    version:baseRev.version+1,
-    status:'draft',
-    sections:JSON.parse(JSON.stringify(baseRev.sections)),
-    modifiedDate:todayStr(),
-    modifiedBy:me,
-    note:'',
-    lastUsed:''
-  };
-  itp.revisions.push(newRev);
-  save();renderEditor();
-}
-
-function autosave(itp){
-  // Mark dirty in memory — do NOT save to Supabase yet
-  var me='Sandeep';
-  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
-  var rev=currentRev(itp);
-  rev.modifiedDate=todayStr();
-  rev.modifiedBy=me;
-  _isDirty=true;
-  // Show unsaved indicator
-  var ind=document.getElementById('draftSaveIndicator');
-  if(ind){ind.style.color='var(--warn)';ind.textContent='&#9679; Unsaved changes';}
-  // Update last modified in header
-  var el=document.getElementById('ed-modified');
-  if(el)el.textContent=fmtDate(todayStr());
-}
-
+// ── PUBLISH ──
 function publishTemplate(){
   var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
-  var rev=currentRev(itp);
-  if(rev.status!=='draft'){alert('No draft to publish.');return;}
-  document.getElementById('pub-note').value=rev.note||'';
+  var draftRev=itp.revisions.find(function(r){return r.status==='draft';});
+  if(!draftRev){alert('No draft to publish. Start a draft first.');return;}
+  document.getElementById('pub-note').value=draftRev.note||'';
   document.getElementById('publishModal').classList.add('open');
 }
 function closePublishModal(){document.getElementById('publishModal').classList.remove('open');}
@@ -1177,15 +1196,18 @@ function confirmPublish(){
   var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
   var draftRev=itp.revisions.find(function(r){return r.status==='draft';});
   if(!draftRev){alert('No draft to publish.');closePublishModal();return;}
-  // Mark all current as superseded
+  // Mark all existing current as superseded
   itp.revisions.forEach(function(r){if(r.status==='current')r.status='superseded';});
   // Promote draft to current
   draftRev.status='current';
   draftRev.note=document.getElementById('pub-note').value.trim();
   draftRev.modifiedDate=todayStr();
   _isDirty=false;_draftEditMode=false;
-  save();closePublishModal();renderEditor();renderRegister();
-  showToast('✓ v'+rev.version+' published');
+  save();
+  closePublishModal();
+  renderEditor();
+  renderRegister();
+  showToast('&#10003; v'+draftRev.version+' published');
 }
 
 // ── REVISION HISTORY ──
@@ -1194,21 +1216,22 @@ function openRevHist(itpId){
   document.getElementById('revHistSub').textContent=itp.itpNo+' — '+itp.itpType;
   var body=document.getElementById('revHistBody');
   var html='';
+  // Show published revisions only, newest first
   itp.revisions.filter(function(r){return r.status!=='draft';}).slice().reverse().forEach(function(rev){
     var stCls=rev.status==='current'?'rev-status-curr':'rev-status-sup';
     var stLbl=rev.status==='current'?'Current':'Superseded';
+    var verCls=rev.status==='current'?'current':'';
     html+='<tr>'
-      +'<td><button class="rev-dl-btn" onclick="exportRevAtVer(\''+itpId+'\','+rev.version+')" title="Download">⬇</button></td>'
-      +'<td style="font-weight:500;color:var(--text)">'+escH(itp.itpType)+'</td>'
-      +'<td><span class="itp-ver '+(rev.status==='current'?'current':rev.status==='draft'?'draft':'')+'">v'+rev.version+'</span></td>'
-      +'<td style="color:var(--text2)">'+escH(rev.modifiedBy||itp.createdBy||'—')+'</td>'
-      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.version===1?itp.createdDate:rev.modifiedDate)+'</td>'
+      +'<td><button class="act-btn" onclick="exportRevAtVer(\''+itpId+'\','+rev.version+')" title="Export this revision">&#8595;</button></td>'
+      +'<td style="font-weight:600">'+escH(itp.itpType)+'</td>'
+      +'<td><span class="itp-ver '+verCls+'">v'+rev.version+'</span></td>'
+      +'<td>'+escH(rev.modifiedBy||itp.createdBy||'—')+'</td>'
+      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(itp.createdDate)+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.modifiedDate)+'</td>'
       +'<td><span class="'+stCls+'">'+stLbl+'</span></td>'
-      
       +'</tr>';
   });
-  body.innerHTML=html;
+  body.innerHTML=html||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">No published revisions</td></tr>';
   document.getElementById('revHistModal').classList.add('open');
 }
 function closeRevHist(){document.getElementById('revHistModal').classList.remove('open');}
@@ -1216,304 +1239,187 @@ function exportRevAtVer(itpId,ver){
   var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
   var rev=itp.revisions.find(function(r){return r.version===ver;});if(!rev)return;
   exportRevData(itp,rev);
-  closeRevHist();
 }
 
 // ── EXPORT PDF ──
 function exportItpPDF(itpId){
   var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
-  exportRevData(itp,currentRev(itp));
+  exportRevData(itp,publishedRev(itp));
 }
 function exportRevData(itp,rev){
-  var co={};try{co=_cachedCS||{};}catch(e){}
-  var typeLabels={yesno:'YES / NO / N.A.',passfail:'PASS / FAIL',input:'Input Value',photo:'Photo / Attachment',signoff:'Sign-off'};
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+itp.itpNo+' v'+rev.version+'</title>'
-    +'<style>body{font-family:Arial,sans-serif;font-size:10px;color:#111;padding:20px}'
-    +'h1{font-size:15px;margin:0 0 2px}h2{font-size:11px;font-weight:normal;color:#555;margin:0 0 12px}'
-    +'.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #ddd}'
-    +'.mf{display:flex;flex-direction:column;gap:2px}.ml{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:bold}.mv{font-size:11px;font-weight:600}'
-    +'.sec{margin-bottom:16px;break-inside:avoid}'
-    +'.sec-hdr{background:#0e1520;color:#fff;padding:7px 10px;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;display:flex;justify-content:space-between}'
-    +'table{width:100%;border-collapse:collapse;font-size:9.5px}'
-    +'th{background:#e8ecf0;padding:5px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #ccc}'
-    +'td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:middle}'
-    +'.flag-r{display:inline-block;width:10px;height:10px;border-radius:2px;background:#ff4d6d;margin:0 1px}'
-    +'.flag-b{display:inline-block;width:10px;height:10px;border-radius:2px;background:#3b82f6;margin:0 1px}'
-    +'.flag-y{display:inline-block;width:10px;height:10px;border-radius:2px;background:#eab308;margin:0 1px}'
-    +'.flag-k{display:inline-block;width:10px;height:10px;border-radius:2px;border:1.5px solid #0ea5e9;margin:0 1px;font-size:7px;text-align:center;line-height:10px}'
-    +'.legend{display:flex;gap:16px;margin-bottom:12px;font-size:9px;align-items:center}'
-    +'.ls{display:flex;align-items:center;gap:4px}'
-    +'</style></head><body>';
-  if(co.companyName)html+='<div style="font-weight:bold;font-size:13px;margin-bottom:4px">'+co.companyName+'</div>';
-  html+='<h1>'+itp.itpType+' — Quality Assurance ITP</h1>';
-  html+='<div class="meta">'
-    +'<div class="mf"><div class="ml">ITP No.</div><div class="mv">'+itp.itpNo+'</div></div>'
-    +'<div class="mf"><div class="ml">Version</div><div class="mv">v'+rev.version+'</div></div>'
-    +'<div class="mf"><div class="ml">Creator</div><div class="mv">'+escH(itp.createdBy||'—')+'</div></div>'
-    +'<div class="mf"><div class="ml">Date</div><div class="mv">'+fmtDate(itp.createdDate)+'</div></div>'
-    +'</div>';
-  html+='<div class="legend">'
-    +'<strong>Key:</strong>'
-    +'<div class="ls"><div class="flag-r"></div>Mandatory</div>'
-    +'<div class="ls"><div class="flag-k">🔒</div>Login Check</div>'
-    +'<div class="ls"><div class="flag-b"></div>Export Timestamp</div>'
-    +'<div class="ls"><div class="flag-y"></div>Export Username</div>'
-    +'</div>';
-  (rev.sections||[]).forEach(function(sec){
-    html+='<div class="sec"><div class="sec-hdr"><span>'+escH(sec.ref)+' '+escH(sec.name)+'</span>';
-    if(sec.cx_link)html+='<span style="font-size:8px;opacity:.7">'+(sec.cx_link==='precx'?'→ Pre-Cx Tracker':'→ Commissioning Tracker')+'</span>';
-    html+='</div>';
-    html+='<table><thead><tr><th style="width:50px">Step</th><th>Description</th><th style="width:130px">Check Type</th><th style="width:70px">Flags</th></tr></thead><tbody>';
+  var w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+itp.itpNo+' v'+rev.version+'</title>'
+    +'<style>body{font-family:Arial,sans-serif;font-size:11px;color:#000;margin:16px}'
+    +'.hdr{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #ccc;margin-bottom:12px}'
+    +'.hf{padding:6px 10px;border-right:1px solid #ccc}.hf:last-child{border-right:none}'
+    +'.hl{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#666;margin-bottom:3px}'
+    +'.hv{font-weight:600} table{width:100%;border-collapse:collapse;margin-bottom:16px}'
+    +'th{background:#f0f0f0;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #ccc}'
+    +'td{padding:7px 8px;border:1px solid #ccc;font-size:11px}'
+    +'.sec-hdr{background:#e8e8e8;font-weight:700;padding:7px 10px;margin:12px 0 0;font-size:11px}'
+    +'</style></head><body>');
+  w.document.write('<div class="hdr">'
+    +'<div class="hf"><div class="hl">Form No.</div><div class="hv">'+itp.itpNo+'</div></div>'
+    +'<div class="hf"><div class="hl">ITP Type</div><div class="hv">'+itp.itpType+'</div></div>'
+    +'<div class="hf"><div class="hl">Version</div><div class="hv">v'+rev.version+'</div></div>'
+    +'<div class="hf"><div class="hl">Status</div><div class="hv">'+rev.status+'</div></div>'
+    +'</div>');
+  rev.sections.forEach(function(sec){
+    w.document.write('<div class="sec-hdr">'+sec.ref+' — '+sec.name+'</div>');
+    w.document.write('<table><thead><tr><th style="width:40px">Step</th><th>Description</th><th style="width:120px">Check Type</th></tr></thead><tbody>');
     sec.rows.forEach(function(row){
-      var flags='';
-      if(row.flags.mandatory)flags+='<div class="flag-r"></div>';
-      if(row.flags.login)flags+='<div class="flag-k">🔒</div>';
-      if(row.flags.timestamp)flags+='<div class="flag-b"></div>';
-      if(row.flags.username)flags+='<div class="flag-y"></div>';
-      html+='<tr><td style="color:#888">'+escH(row.step||'')+'</td><td>'+escH(row.desc||'')+'</td><td style="font-size:8.5px;color:#555">'+escH(typeLabels[row.checkType]||row.checkType)+'</td><td>'+flags+'</td></tr>';
+      w.document.write('<tr><td>'+escH(row.step||'')+'</td><td>'+escH(row.desc||'')+'</td><td>'+escH(row.checkType||'')+'</td></tr>');
     });
-    html+='</tbody></table></div>';
+    w.document.write('</tbody></table>');
   });
-  html+='</body></html>';
-  var w=window.open('','_blank','width=900,height:700');w.document.write(html);w.document.close();w.focus();setTimeout(function(){w.print();},600);
+  w.document.write('</body></html>');
+  w.document.close();setTimeout(function(){w.print();},300);
 }
 
-// ── DUPLICATE / COPY ──
+// ── DUPLICATE / DELETE ──
 function duplicateItp(itpId){
   var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
   var me='Sandeep';
   try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
   var clone=JSON.parse(JSON.stringify(itp));
-  clone.id=nid();
-  clone.itpNo=genItpNum();
-  clone.itpType=itp.itpType+' (Copy)';
-  clone.createdBy=me;
-  clone.createdDate=todayStr();
-  clone.revisions=[{version:1,status:'draft',sections:JSON.parse(JSON.stringify(currentRev(itp).sections)),modifiedDate:todayStr(),modifiedBy:me,note:'Duplicated from '+itp.itpNo,lastUsed:''}];
-  templates.push(clone);
+  clone.id=nid();clone.itpNo=genItpNum();clone.createdDate=todayStr();clone.createdBy=me;
+  clone.revisions=[{version:1,status:'current',sections:JSON.parse(JSON.stringify(publishedRev(itp).sections)),modifiedDate:todayStr(),modifiedBy:me,note:'Duplicated from '+itp.itpNo,lastUsed:''}];
+  companyTemplates.push(clone);templates=companyTemplates;
   save();renderRegister();
   showToast('Duplicated as '+clone.itpNo);
 }
-function copyItp(itpId){duplicateItp(itpId);}
-
-// ── DELETE ──
 function deleteItp(itpId){
   var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
-  if(!confirm('Delete ITP template "'+itp.itpType+'" and all its revisions?\n\nThis cannot be undone.'))return;
-  templates=templates.filter(function(t){return t.id!==itpId;});
+  if(!confirm('Delete "'+itp.itpType+'"? This cannot be undone.'))return;
+  companyTemplates=companyTemplates.filter(function(t){return t.id!==itpId;});
+  templates=companyTemplates;
   save();renderRegister();
 }
 
-// ── IMPORT FROM COMPANY ──
-var _importSelected = [];
-async function openImportModal(){
-  _importSelected=[];
-  document.getElementById('importSrch').value='';
-  // Reload company templates fresh from Supabase
-  try{var s=await dbGetItpTemplates();companyTemplates=Array.isArray(s)?s:[];}catch(e){}
-  renderImportList();
-  document.getElementById('importModal').classList.add('open');
+// ── NEW ITP MODAL ──
+function openNewItpModal(){document.getElementById('newItpModal').classList.add('open');}
+function closeNewItpModal(){document.getElementById('newItpModal').classList.remove('open');}
+function confirmNewItp(){
+  var type=(document.getElementById('new-itptype').value||'').trim();
+  if(!type){alert('ITP Type name is required.');return;}
+  var num=(document.getElementById('new-itpno').value||'').trim()||genItpNum();
+  var me='Sandeep';
+  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  var tmpl={
+    id:nid(),itpNo:num,itpType:type,
+    createdBy:me,createdDate:todayStr(),
+    revisions:[{version:1,status:'current',sections:[],modifiedDate:todayStr(),modifiedBy:me,note:'Initial',lastUsed:''}]
+  };
+  companyTemplates.push(tmpl);templates=companyTemplates;
+  save();closeNewItpModal();renderRegister();
 }
-function closeImportModal(){document.getElementById('importModal').classList.remove('open');_importSelected=[];}
-function renderImportList(){
-  var q=(document.getElementById('importSrch').value||'').toLowerCase();
-  // Get IDs already imported into project
-  var alreadyImported={};
-  templates.forEach(function(t){if(t.importedFrom)alreadyImported[t.importedFrom]=true;});
-  // Only show company templates that have a current revision
-  var list=companyTemplates.filter(function(t){
-    var currentRev=t.revisions&&t.revisions.find(function(r){return r.status==='current';});
-    if(!currentRev)return false;
-    return !q||(t.itpNo||'').toLowerCase().includes(q)||(t.itpType||'').toLowerCase().includes(q);
-  });
-  var selCount=_importSelected.length;
-  document.getElementById('importSelCount').textContent=selCount+' selected';
-  if(!list.length){
-    document.getElementById('importBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">No published company templates available.<br><span style="font-size:11px">Only templates with a Current revision can be imported. Publish a draft in the Company Library first.</span></td></tr>';
-    return;
-  }
+
+// ── IMPORT MODAL (project level) ──
+var _importSelected=[];
+function openImportModal(){
+  _importSelected=[];
   var rows='';
-  list.forEach(function(itp){
-    var rev=itp.revisions.find(function(r){return r.status==='current';});
-    var alreadyDone=alreadyImported[itp.id];
-    var sel=_importSelected.indexOf(itp.id)!==-1;
-    rows+='<tr style="'+(alreadyDone?'opacity:.5;':'cursor:pointer;')+'" '+(alreadyDone?'title="Already imported"':'onclick="toggleImportSel(\''+itp.id+'\')"')+'>'
-      +'<td style="text-align:center;width:36px">'
-        +(alreadyDone
-          ?'<span style="color:var(--green);font-size:13px">✓</span>'
-          :'<div style="width:18px;height:18px;border-radius:4px;border:1.5px solid '+(sel?'var(--accent)':'var(--border)')+';background:'+(sel?'var(--accent-dim)':'transparent')+';display:flex;align-items:center;justify-content:center;margin:auto;transition:all .13s">'
-            +(sel?'<span style="color:var(--accent);font-size:11px">✓</span>':'')
-          +'</div>')
-      +'</td>'
-      +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
-      +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+(alreadyDone?'<span class="imported-badge">in project</span>':'')+'</td>'
+  companyTemplates.forEach(function(t){
+    var rev=publishedRev(t);
+    rows+='<tr onclick="toggleImportSel(\''+t.id+'\')" style="cursor:pointer" id="imp-'+t.id+'">'
+      +'<td><input type="checkbox" id="impchk-'+t.id+'" onclick="toggleImportSel(\''+t.id+'\');event.stopPropagation()"></td>'
+      +'<td><span class="itp-num">'+escH(t.itpNo)+'</span></td>'
+      +'<td>'+escH(t.itpType)+'</td>'
       +'<td><span class="itp-ver current">v'+rev.version+'</span></td>'
       +'<td><span class="status-badge sb-current">Current</span></td>'
       +'</tr>';
   });
   document.getElementById('importBody').innerHTML=rows;
+  document.getElementById('importSelCount').textContent='0 selected';
+  document.getElementById('importModal').classList.add('open');
 }
+function closeImportModal(){document.getElementById('importModal').classList.remove('open');}
 function toggleImportSel(id){
-  var i=_importSelected.indexOf(id);
-  if(i===-1)_importSelected.push(id);else _importSelected.splice(i,1);
-  renderImportList();
+  var idx=_importSelected.indexOf(id);
+  if(idx===-1)_importSelected.push(id);else _importSelected.splice(idx,1);
+  var chk=document.getElementById('impchk-'+id);if(chk)chk.checked=idx===-1;
+  var row=document.getElementById('imp-'+id);if(row)row.style.background=idx===-1?'var(--accent-dim)':'';
+  document.getElementById('importSelCount').textContent=_importSelected.length+' selected';
 }
 function confirmImport(){
-  if(!_importSelected.length){closeImportModal();return;}
-  var me='';
-  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'').split(' ')[0];}catch(e){}
-  var imported=0;
-  _importSelected.forEach(function(cId){
-    var src=companyTemplates.find(function(t){return t.id===cId;});
-    if(!src)return;
-    // Find the current revision to import
-    var currentRev=src.revisions.find(function(r){return r.status==='current';});
-    if(!currentRev)return;
-    // Deep copy with new ID, import the current revision as a fresh draft
-    var revCopy=JSON.parse(JSON.stringify(currentRev));
-    revCopy.status='draft';
-    revCopy.version=1;
-    revCopy.modifiedDate=todayStr();
-    revCopy.modifiedBy=me;
-    revCopy.note='Imported from company library ('+src.itpNo+' v'+currentRev.version+')';
-    revCopy.lastUsed='';
-    var clone={
-      id:nid(),
-      itpNo:src.itpNo,
-      itpType:src.itpType,
-      createdBy:me,
-      createdDate:todayStr(),
-      importedFrom:cId,
-      importedDate:todayStr(),
-      importedBy:me,
-      revisions:[revCopy]
-    };
-    templates.push(clone);
-    imported++;
-  });
-  save();
+  // Handled by parent page (project templates level)
   closeImportModal();
-  renderRegister();
-  showToast(imported+' template'+(imported!==1?'s':'')+' imported into project');
 }
 
-// ── NEW ITP MODAL ──
-function openNewItpModal(){
-  document.getElementById('new-itptype').value='';
-  document.getElementById('new-itpno').value='';
-  document.getElementById('newItpModal').classList.add('open');
-  setTimeout(function(){document.getElementById('new-itptype').focus();},80);
-}
-function closeNewItpModal(){document.getElementById('newItpModal').classList.remove('open');}
-function confirmNewItp(){
-  var typeName=document.getElementById('new-itptype').value.trim();
-  if(!typeName){document.getElementById('new-itptype').focus();return;}
-  var itpNo=document.getElementById('new-itpno').value.trim()||genItpNum();
-  var me='Sandeep';
-  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
-  var newItp={
-    id:nid(),itpNo:itpNo,itpType:typeName,
-    createdBy:me,createdDate:todayStr(),
-    revisions:[{version:1,status:'draft',sections:[
-      {id:nid(),ref:'01',name:'PLANT',type:'details',rows:[]},
-      {id:nid(),ref:'02',name:'DELIVERY',type:'checklist',rows:[]},
-      {id:nid(),ref:'03',name:'INSTALLATION',type:'checklist',rows:[]},
-      {id:nid(),ref:'04 PRE-CX',name:'PRE COMMISSIONING',type:'checklist',cx_link:'precx',rows:[]},
-      {id:nid(),ref:'04',name:'COMMISSIONING',type:'checklist',cx_link:'commissioning',rows:[]},
-      {id:nid(),ref:'05',name:'QA SIGN-OFF',type:'signoff',rows:[]}
-    ],modifiedDate:todayStr(),modifiedBy:me,note:'New template',lastUsed:''}]
-  };
-  templates.push(newItp);
-  save();closeNewItpModal();openEditor(newItp.id);
-}
-
-// ── TOAST ──
-function showToast(msg){
-  var t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none';
-  t.textContent=msg;document.body.appendChild(t);
-  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .5s';setTimeout(function(){t.remove();},500);},2500);
-}
-
-// ── MODAL CLOSE HANDLERS ──
-['newItpModal','revHistModal','publishModal'].forEach(function(id){
-  var el=document.getElementById(id);
-  if(el)el.addEventListener('click',function(e){if(e.target===this){if(id==='newItpModal')closeNewItpModal();else if(id==='revHistModal')closeRevHist();else if(id==='publishModal')closePublishModal();}});
-});
-
-function bcParentClick(){
-  if(_inEditor){showRegister();return;}
-  navTo('hvac-settings.html');
+// ── TAB COUNTS ──
+function updateTabCounts(){
+  var el=document.getElementById('itpCount');
+  if(el)el.textContent=companyTemplates.length+' template'+(companyTemplates.length!==1?'s':'');
 }
 
 // ── INIT ──
-var _cachedCS = {};
-(async function(){
-  var params=new URLSearchParams(window.location.search);
-  var mode=params.get('mode')||'project';
+async function initTemplates(){
+  try{_cachedCS=await dbGetCompanySettings()||{};}catch(e){_cachedCS={};}
+  var me=(_cachedCS.userName||_cachedCS.contactName||'Admin').split(' ')[0];
 
-  // Load company settings for 'me' lookups throughout the page
-  try{_cachedCS=await dbGetCompanySettings()||{};}catch(e){}
+  await load();
 
-  // Load all templates
-  await initTemplates();
-
-  // Hide tab switcher — mode determines level
-  var _lt=document.getElementById('levelTabs');if(_lt)_lt.style.display='none';
-
-  if(mode==='company'){
-    currentLevel='company';
-    templates=companyTemplates;
-    var _ib=document.getElementById('importBtn');if(_ib)_ib.style.display='none';
-    document.getElementById('newItpBtn').textContent='＋ New Company Template';
-    var _bp=document.getElementById('bcParent');if(_bp)_bp.textContent='Company Settings';
-    document.getElementById('bcCurr').textContent='ITP Templates';
-  } else {
-    currentLevel='project';
-    var _ib2=document.getElementById('importBtn');if(_ib2)_ib2.style.display='';
-    var _bp2=document.getElementById('bcParent');if(_bp2)_bp2.textContent='ITP Register';
-    document.getElementById('bcCurr').textContent='Project Templates';
-  }
-  renderRegister();
-})();
-
-// ── SIDEBAR ──
-var SBK='hvacnexus_sb_collapsed';
-function navTo(url){
-  if(_isDirty&&_inEditor){
-    if(!confirm('You have unsaved changes to this draft. Leave without saving?'))return;
-    _isDirty=false;
-  }
-  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
-  window.location.href=b+url;
-}
-function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
-function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'230px';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
-function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
-(function(){
-  applySB(localStorage.getItem(SBK)==='1');
-  localStorage.removeItem('hvacnexus_sb_groups');
-  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
-  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
-  var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
-  if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
-    handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});
-    document.addEventListener('mousemove',function(e){if(!dragging)return;var w=Math.min(MAX_W,Math.max(MIN_W,startW+(e.clientX-startX)));sb.style.width=w+'px';});
-    document.addEventListener('mouseup',function(){if(!dragging)return;dragging=false;document.body.style.userSelect='';document.body.style.cursor='';});
-  }
-  var tip=document.createElement('div');tip.className='sb-tooltip';document.body.appendChild(tip);
-  document.querySelectorAll('.sb-item').forEach(function(item){
-    var lbl=item.querySelector('.sb-item-label');
-    var label=lbl?lbl.textContent:'';
-    item.addEventListener('mouseenter',function(){
-      if(!label)return;
-      var r=item.getBoundingClientRect();var sbEl=document.getElementById('sidebar');var sbW=sbEl?sbEl.offsetWidth:230;
-      tip.textContent=label;tip.style.left=(sbW+8)+'px';tip.style.top=(r.top+r.height/2)+'px';tip.style.transform='translateY(-50%)';tip.style.opacity='1';
+  // Seed FCU Water Cooled if missing
+  if(!companyTemplates.find(function(t){return (t.itpType||'').includes('Water Cooled');})){
+    companyTemplates.push({
+      id:nid(),itpNo:'ITP-001',itpType:'FCU \u2014 Water Cooled',
+      createdBy:me,createdDate:todayStr(),
+      revisions:[{version:1,status:'current',sections:JSON.parse(JSON.stringify(FCU_WC_TEMPLATE.sections)),modifiedDate:todayStr(),modifiedBy:me,note:'Initial revision',lastUsed:''}]
     });
-    item.addEventListener('mouseleave',function(){tip.style.opacity='0';});
-  });
-})();
+  }
+  // Seed Fire Damper if missing
+  if(!companyTemplates.find(function(t){return (t.itpType||'').includes('Fire Damper');})){
+    var fdNum='ITP-'+String(companyTemplates.length+1).padStart(3,'0');
+    companyTemplates.push({
+      id:nid(),itpNo:fdNum,itpType:'Fire Damper',
+      createdBy:me,createdDate:todayStr(),
+      revisions:[{version:1,status:'current',sections:JSON.parse(JSON.stringify(FD_TEMPLATE.sections)),modifiedDate:todayStr(),modifiedBy:me,note:'Initial revision',lastUsed:''}]
+    });
+  }
 
+  // Clean up stale orphaned drafts from buggy earlier sessions
+  // A draft is stale if a 'current' revision already exists alongside it
+  var cleaned=false;
+  companyTemplates.forEach(function(t){
+    var hasCurrent=t.revisions.some(function(r){return r.status==='current';});
+    if(hasCurrent){
+      var before=t.revisions.length;
+      t.revisions=t.revisions.filter(function(r){return r.status!=='draft';});
+      if(t.revisions.length<before)cleaned=true;
+    }
+  });
+
+  templates=companyTemplates;
+  await dbSetItpTemplates(companyTemplates);
+  if(cleaned)console.log('Cleaned stale drafts');
+
+  // Sidebar
+  applySB(localStorage.getItem(SBK)==='1');
+  var proj=dbGetCurrentProject()||{};
+  var sb_name=document.getElementById('sb-proj-name');if(sb_name)sb_name.textContent=proj.name||'\u2014';
+  var sb_num=document.getElementById('sb-proj-num');if(sb_num)sb_num.textContent=proj.num||proj.number||'\u2014';
+  var u=dbGetCurrentUser();
+  if(u){
+    var av=document.getElementById('sb-av');if(av)av.textContent=(u.name||u.username||'?')[0].toUpperCase();
+    var sun=document.getElementById('sb-user');if(sun)sun.textContent=u.name||u.username||'\u2014';
+  }
+
+  // Role check
+  var role=(u&&u.role)||'';
+  var allowed=['Director','Construction Manager','Admin','CM'];
+  if(u&&!allowed.some(function(r){return role.toLowerCase().includes(r.toLowerCase());})){
+    var ad=document.getElementById('accessDenied');if(ad)ad.style.display='flex';
+    return;
+  }
+
+  renderRegister();
+}
+
+window.addEventListener('beforeunload',function(e){
+  if(_isDirty&&_inEditor){e.preventDefault();e.returnValue='You have unsaved draft changes.';}
+});
+
+window.addEventListener('DOMContentLoaded',initTemplates);
 </script>
 <!-- ACCESS DENIED OVERLAY -->
 <div id="accessDenied" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:16px">
