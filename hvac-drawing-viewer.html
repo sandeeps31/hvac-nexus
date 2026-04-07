@@ -761,8 +761,9 @@ function saveFdPin(action){
   } else if(action==='open'){
     // Save and navigate to ITP form for this pin
     closeFdMo();
-    var pNum=_proj?(_proj.num||_proj.number||''):'';
-    window.location.href='hvac-itp-form.html?pin='+encodeURIComponent(savedPin.id)+(pNum?'&p='+encodeURIComponent(pNum):'');
+    var pNum=pKey||'';
+    var dwgId3=(curDrawing&&curDrawing.id)||'';
+    window.location.href='hvac-itp-form.html?pinId='+encodeURIComponent(savedPin.id)+'&drawingId='+encodeURIComponent(dwgId3)+(pNum?'&p='+encodeURIComponent(pNum):'');
   } else {
     closeFdMo();
     toast('Fire damper pin saved');
@@ -810,11 +811,15 @@ function saveDefPin(){
 function openPinModal(pin){
   var pNum=(dbGetCurrentProject()||{}).num||pKey||'';
   if(pin.type==='itp'){
-    // Open ITP form in new tab
-    window.open('hvac-itp-form.html?pin='+encodeURIComponent(pin.id)+(pNum?'&p='+encodeURIComponent(pNum):''),'_blank');
+    // Open ITP form in new tab — pass both drawingId and pinId
+    var dwgId=(curDrawing&&curDrawing.id)||'';
+    var url='hvac-itp-form.html?pinId='+encodeURIComponent(pin.id)+'&drawingId='+encodeURIComponent(dwgId)+(pNum?'&p='+encodeURIComponent(pNum):'');
+    window.open(url,'_blank');
   } else if(pin.type==='defect'){
     // Open defect form in new tab
-    window.open('hvac-defect-form.html?pin='+encodeURIComponent(pin.id)+(pNum?'&p='+encodeURIComponent(pNum):''),'_blank');
+    var dwgId2=(curDrawing&&curDrawing.id)||'';
+    var defUrl='hvac-defect-form.html?pinId='+encodeURIComponent(pin.id)+'&drawingId='+encodeURIComponent(dwgId2)+(pNum?'&p='+encodeURIComponent(pNum):'');
+    window.open(defUrl,'_blank');
   } else if(pin.type==='fireseal'){
     openFsMo(pin);
   } else if(pin.type==='firedamper'){
