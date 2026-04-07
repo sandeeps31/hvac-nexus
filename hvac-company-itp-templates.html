@@ -127,6 +127,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .flag-box .ftip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface2);color:var(--text);font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:600}
 .flag-box:hover .ftip{opacity:1}
 .fb-red{background:#ff4d6d;opacity:.7}.fb-red.active{opacity:1}
+.fb-photo-mand{background:#ff9500;opacity:.7;font-size:10px;color:#000}.fb-photo-mand.active{opacity:1}
+.fb-photo-opt{background:#3b82f6;opacity:.45;font-size:10px;color:#fff}.fb-photo-opt.active{opacity:1}
 .fb-lock{background:var(--surface3);border:2px solid var(--muted) !important;color:var(--muted);font-size:10px}.fb-lock.active{border-color:var(--accent) !important;color:var(--accent)}
 .fb-blue{background:#3b82f6;opacity:.7}.fb-blue.active{opacity:1}
 .fb-yellow{background:#eab308;opacity:.7}.fb-yellow.active{opacity:1}
@@ -318,9 +320,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div style="padding:8px 24px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
       <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Flag Legend:</span>
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:#ff4d6d"></div>Mandatory</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:#ff9500;display:flex;align-items:center;justify-content:center;font-size:9px">&#128247;</div>Photo — Mandatory</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:9px">&#128247;</div>Photo — Optional</div>
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:var(--surface3);border:1.5px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--accent)">🔒</div>Login Check</div>
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:#3b82f6"></div>Export Timestamp</div>
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:#eab308"></div>Export Username</div>
+    </div>
+    <!-- Start New Draft bar -->
+    <div id="startDraftBar" style="display:none;padding:10px 24px;background:var(--accent-dim);border-bottom:1px solid rgba(0,200,255,.2);display:none;align-items:center;justify-content:space-between">
+      <span style="font-size:12px;color:var(--text2)">This template is published. Start a new draft to make changes.</span>
+      <button class="btn bp bsm" id="startDraftBtn">&#9999; Start New Draft</button>
     </div>
     <!-- Editor body -->
     <div class="editor-body" id="editorBody"></div>
@@ -668,6 +677,10 @@ function showRegister(){
   activeItpId=null;
   renderRegister();
 }
+function viewItp(itpId){
+  // Open in view-only mode — no draft started
+  openEditor(itpId);
+}
 function editItp(itpId){
   var itp=templates.find(function(t){return t.id===itpId;});if(!itp)return;
   var rev=currentRev(itp);
@@ -712,7 +725,7 @@ function renderRegister(){
       :rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>'
       :'<span class="status-badge sb-superseded">Superseded</span>';
     var importedBadge=itp.importedFrom?'<span class="imported-badge">imported</span>':'';
-    rows+='<tr style="cursor:pointer" onclick="editItp(\''+itp.id+'\')">'
+    rows+='<tr style="cursor:pointer" onclick="viewItp(\''+itp.id+'\')">'
       +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
       +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+importedBadge+'</td>'
       +'<td><span class="itp-ver '+verClass+'">v'+rev.version+'</span></td>'
@@ -726,7 +739,6 @@ function renderRegister(){
           +'<button class="act-btn" onclick="exportItpPDF(\''+itp.id+'\')" title="Export PDF"><span class="tip">Export PDF</span>📄</button>'
           +'<button class="act-btn warn" onclick="duplicateItp(\''+itp.id+'\')" title="Duplicate"><span class="tip">Duplicate</span>⧉</button>'
           +'<button class="act-btn" onclick="openRevHist(\''+itp.id+'\')" title="Revision history"><span class="tip">Revision history</span>🕐</button>'
-          +'<button class="act-btn" onclick="copyItp(\''+itp.id+'\')" title="Copy"><span class="tip">Copy</span>📋</button>'
           +'<button class="act-btn danger" onclick="deleteItp(\''+itp.id+'\')" title="Delete"><span class="tip">Delete</span>🗑</button>'
         +'</div>'
       +'</td>'
@@ -753,6 +765,20 @@ function renderEditor(){
 
   var canEdit=rev.status==='draft';
   document.getElementById('publishBtn').style.display=canEdit?'':'none';
+
+  // Start New Draft bar — shows when viewing a current/superseded revision
+  var draftBar=document.getElementById('startDraftBar');
+  if(draftBar){
+    if(rev.status==='current'){
+      draftBar.style.display='';
+      var draftBarBtn=document.getElementById('startDraftBtn');
+      if(draftBarBtn){
+        draftBarBtn.onclick=function(){startDraft(itp);renderEditor();};
+      }
+    } else {
+      draftBar.style.display='none';
+    }
+  }
 
   renderEditorBody(itp, rev, canEdit);
 }
@@ -891,6 +917,8 @@ function renderEditorBody(itp, rev, canEdit){
       var flagsWrap=document.createElement('div');flagsWrap.className='flags';
       var flagDefs=[
         {key:'mandatory',cls:'fb-red',tip:'Mandatory'},
+        {key:'photoMandatory',cls:'fb-photo-mand',tip:'Photo — Mandatory',icon:'&#128247;'},
+        {key:'photoOptional',cls:'fb-photo-opt',tip:'Photo — Optional',icon:'&#128247;'},
         {key:'login',cls:'fb-lock',tip:'Login Check',icon:'🔒'},
         {key:'timestamp',cls:'fb-blue',tip:'Export Timestamp'},
         {key:'username',cls:'fb-yellow',tip:'Export Username'}
@@ -1258,9 +1286,14 @@ function showToast(msg){
 });
 
 function bcParentClick(){
-  var params=new URLSearchParams(window.location.search);
-  if(params.get('mode')==='company')navTo('hvac-settings.html');
-  else navTo('hvac-itp.html');
+  // If in editor view, go back to template list
+  var regView=document.getElementById('view-register');
+  if(regView&&!regView.classList.contains('active')){
+    showRegister();
+    return;
+  }
+  // Otherwise go to company settings
+  navTo('hvac-settings.html');
 }
 
 // ── INIT ──
