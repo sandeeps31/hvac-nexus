@@ -110,6 +110,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .mod-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:8px}
 .mod-card-hdr{display:flex;align-items:center;gap:10px}
 .mod-card-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);flex:1}
+.mod-edit-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;cursor:pointer;padding:3px 8px;font-family:'DM Sans',sans-serif;transition:all .13s}
+.mod-edit-btn:hover{border-color:var(--accent);color:var(--accent)}
+.mod-group-hdr{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:8px 0 10px;border-bottom:1px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .mod-status-built{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2);font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px}
 .mod-status-wip{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2);font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px}
 .mod-status-todo{background:var(--surface3);color:var(--muted);border:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px}
@@ -386,6 +389,7 @@ var SK='hvacnexus_tracker_v1';
 var activeTab='bugs';
 var editingId=null;
 var _hideCompleted=false;
+var _editModIdx=-1;
 var items=[];
 var _uid=0;function nid(){return 'i'+(++_uid)+Date.now();}
 
@@ -452,35 +456,63 @@ var SEED=[
   {id:'b009',type:'bug',title:'Sidebar horizontal scrollbar — remove, drag resize, fixed tooltips',module:'General / Cross-module',priority:'medium',status:'backlog',desc:'Sidebar shows horizontal scrollbar when item labels are long. Standard fix for all modules: (1) overflow-x:hidden on .sb and .sb-nav, (2) text-overflow:ellipsis on .sb-item-label, (3) drag-to-resize handle on right edge capped at 276px (230+20%), (4) tooltips use position:fixed + JS mouseenter to escape overflow:hidden — CSS hover tooltips do not work inside overflow:hidden containers.',notes:'Fixed in hvac-variations.html. Needs rolling out to all other modules. Tooltip JS pattern: getBoundingClientRect on mouseenter, set fixed left=(sbWidth+8)px, top=midpoint of item.',created:'2026-04-03'},
 ];
 
+// Module group definitions — used in renderModules and modal
+var MODULE_GROUPS=[
+  {key:'financials',  label:'Financials',   icon:'💰'},
+  {key:'procurement', label:'Procurement',  icon:'📦'},
+  {key:'technical',   label:'Technical',    icon:'📐'},
+  {key:'commissioning',label:'Commissioning',icon:'⚙️'},
+  {key:'quality',     label:'Quality',      icon:'📋'},
+  {key:'settings',    label:'Settings & Platform', icon:'🔧'},
+  {key:'other',       label:'Other',        icon:'📁'}
+];
+
 var MODULES=[
-  {name:'Budget',status:'built',desc:'Cost tracking, budget vs actual, variations sync.'},
-  {name:'Variations',status:'built',desc:'Client-facing variations with vendor cost line items and subcontractor sync.'},
-  {name:'Subcontractor Variations',status:'built',desc:'Auto-syncs value to parent variation vendor line item.'},
-  {name:'Vendor Invoices',status:'built',desc:'Invoice register against budget lines.'},
-  {name:'Progress Claims',status:'built',desc:'Custom selling price, retention, claim history.'},
-  {name:'Procurement Schedule',status:'built',desc:'Inline editing, status tracking.'},
-  {name:'Purchase Orders',status:'built',desc:'PO register linked to procurement schedule.'},
-  {name:'Equipment Schedule',status:'built',desc:'Revision system, change tracking, draft/publish, PDF/Excel export.'},
-  {name:'Drawings',status:'wip',desc:'PDF upload, ITP/Defect/Fire pins, CSS-transform zoom/pan. Navigation still being refined.'},
-  {name:'Tech Submissions',status:'built',desc:'Register with data sheets, spec sign-off, MSDS, photos, PDF bundle.'},
-  {name:'ITP Templates',status:'built',desc:'Company-level templates, drag-to-reorder, auto-numbering, revision system.'},
-  {name:'ITP Form',status:'wip',desc:'On-site fillable form, signature capture, Pre-Cx/Cx tracking. Pre-Cx anchor scroll needs verification.'},
-  {name:'Commissioning Tracker',status:'wip',desc:'MSSB auto-lookup, auto-status formula, column settings, dep badges. MSSB lookup needs real-data testing.'},
-  {name:'Pre-Commissioning Checklist',status:'built',desc:'Area-based checklist.'},
-  {name:'Company Settings',status:'built',desc:'Logo, user profile, ITP templates link.'},
-  {name:'RFI',status:'todo',priority:'high',desc:'Not built. Drawing pin integration + variation linkage are the core value adds.'},
-  {name:'Installation Defects',status:'todo',priority:'high',desc:'Not built. Separate from Cx defects, linked to drawings/equipment.'},
-  {name:'NCR',status:'todo',priority:'high',desc:'Not built. Non-Conformance Report with corrective action workflow.'},
-  {name:'Subcontractor ITPs',status:'todo',priority:'medium',desc:'Not built. Same templates, tracked per subcontractor.'},
-  {name:'Subcontractor Agreements',status:'todo',priority:'medium',desc:'Not built. Sidebar link exists.'},
-  {name:'Pressure Test Register',status:'todo',priority:'medium',desc:'Not built. Hydronic system specific.'},
-  {name:'Lookahead / 3-Week View',status:'todo',priority:'medium',desc:'Not built. Auto-pulls from commissioning tracker dates.'},
-  {name:'Handover Package Builder',status:'todo',priority:'medium',desc:'Not built. Ties all modules together at end of job.'},
-  {name:'O&M Document Register',status:'todo',priority:'low',desc:'Not built.'},
-  {name:'Specifications',status:'todo',priority:'low',desc:'Not built. Sidebar link exists.'},
-  {name:'Safety',status:'todo',priority:'low',desc:'Not built. May duplicate existing system.'},
-  {name:'Documents',status:'todo',priority:'low',desc:'Not built.'},
-  {name:'Photos',status:'todo',priority:'low',desc:'Not built. Currently photos only inside ITP forms.'},
+  // Financials
+  {name:'Budget',group:'financials',status:'built',desc:'Cost tracking, budget vs actual, variations sync.'},
+  {name:'Progress Claims',group:'financials',status:'built',desc:'Custom selling price, retention, claim history.'},
+  {name:'Vendor Invoices',group:'financials',status:'built',desc:'Draft + final invoice tracking, AI extraction, match check, monthly grouping.'},
+  {name:'Variations',group:'financials',status:'built',desc:'Client-facing variations with vendor cost line items and subcontractor sync.'},
+  {name:'Subcontractor Variations',group:'financials',status:'built',desc:'Auto-syncs value to parent variation vendor line item.'},
+  // Procurement
+  {name:'Procurement Schedule',group:'procurement',status:'built',desc:'Inline editing, status tracking.'},
+  {name:'Purchase Orders',group:'procurement',status:'built',desc:'PO register linked to procurement schedule, vendor email/contact fields.'},
+  {name:'Subcontractor Agreements',group:'procurement',status:'todo',priority:'medium',desc:'Not built. Contract register, scope, value, insurance expiry, key dates.'},
+  // Technical
+  {name:'Drawings',group:'technical',status:'wip',desc:'PDF upload, ITP/Defect/Fire pins, CSS-transform zoom/pan, revision history.'},
+  {name:'Drawing Viewer',group:'technical',status:'wip',desc:'Clean rewrite. 2-pass hi-res render, 96px pins, layer toggles, pins panel, fire/ITP/defect pins.'},
+  {name:'Tech Submissions',group:'technical',status:'built',desc:'Register with data sheets, spec sign-off, MSDS, photos, PDF bundle.'},
+  {name:'Equipment Schedule',group:'technical',status:'built',desc:'Revision system, change tracking, draft/publish, PDF/Excel export.'},
+  {name:'RFI',group:'technical',status:'todo',priority:'high',desc:'Not built. Drawing pin integration + variation linkage are the core value adds.'},
+  {name:'Specifications',group:'technical',status:'todo',priority:'low',desc:'Not built. Sidebar link exists.'},
+  {name:'Transmittals',group:'technical',status:'todo',priority:'medium',desc:'Not built. Auto-generate on drawing upload, email to subbies, maintain register.'},
+  // Commissioning
+  {name:'Pre-Commissioning Checklist',group:'commissioning',status:'built',desc:'Area-based checklist.'},
+  {name:'Commissioning Tracker',group:'commissioning',status:'wip',desc:'MSSB auto-lookup, auto-status formula, column settings, dep badges.'},
+  {name:'Commissioning Plan',group:'commissioning',status:'wip',desc:'Commissioning plan module.'},
+  {name:'Lookahead / 3-Week View',group:'commissioning',status:'todo',priority:'medium',desc:'Not built. Auto-pulls from commissioning tracker dates.'},
+  // Quality
+  {name:'ITP',group:'quality',status:'built',desc:'ITP instances per building/area, linked to templates and drawing pins.'},
+  {name:'ITP Register',group:'quality',status:'built',desc:'Cross-project ITP register view with status tracking.'},
+  {name:'ITP Templates',group:'quality',status:'built',desc:'Company-level templates, drag-to-reorder, auto-numbering, revision system.'},
+  {name:'ITP Form',group:'quality',status:'wip',desc:'On-site fillable form, signature capture, Pre-Cx/Cx tracking.'},
+  {name:'Passive Fire Register',group:'quality',status:'built',desc:'Fire seal and fire damper register across all drawings, syncs with drawing pins.'},
+  {name:'Defects',group:'quality',status:'built',desc:'Installation defects snag list, linked to drawings, photo evidence, close-out.'},
+  {name:'NCR',group:'quality',status:'todo',priority:'high',desc:'Not built. Non-Conformance Report with corrective action workflow.'},
+  {name:'Installation Defects',group:'quality',status:'todo',priority:'high',desc:'Not built. Separate from Cx defects, linked to drawings/equipment.'},
+  // Settings & Platform
+  {name:'Company Settings',group:'settings',status:'built',desc:'Logo, users, PIN management, ITP templates link.'},
+  {name:'Project Settings',group:'settings',status:'built',desc:'Project details, team, subbies, areas, claims settings, email template.'},
+  {name:'User Management',group:'settings',status:'wip',desc:'PIN-based users, Switch User flow. Session persistence and role enforcement in progress.'},
+  {name:'Auth',group:'settings',status:'todo',priority:'high',desc:'Not built. Biggest pre-launch blocker. Supabase auth, multi-tenant OAuth.'},
+  // Other
+  {name:'Dashboard',group:'other',status:'built',desc:'Project overview, summary cards, invoice deadline banner.'},
+  {name:'Handover Package Builder',group:'other',status:'todo',priority:'medium',desc:'Not built. Ties all modules together at end of job.'},
+  {name:'O&M Document Register',group:'other',status:'todo',priority:'low',desc:'Not built.'},
+  {name:'Safety',group:'other',status:'todo',priority:'low',desc:'Not built. May duplicate existing system.'},
+  {name:'Documents',group:'other',status:'todo',priority:'low',desc:'Not built.'},
+  {name:'Photos',group:'other',status:'todo',priority:'low',desc:'Not built. Currently photos only inside ITP forms.'},
+  {name:'Pressure Test Register',group:'other',status:'todo',priority:'medium',desc:'Not built. Hydronic system specific.'},
 ];
 
 // ── STORAGE ──
@@ -776,9 +808,20 @@ function saveItem(){
       it.notes=document.getElementById('m-notes').value.trim();
     }
   } else {
+    var itype=document.getElementById('m-type').value;
+    if(itype==='module'){
+      // Add to MODULES array
+      MODULES.push({
+        name:title,
+        group:document.getElementById('m-module').value||'other',
+        status:'todo',
+        desc:document.getElementById('m-desc').value.trim()
+      });
+      save();closeModal();renderModules();return;
+    }
     items.push({
       id:nid(),
-      type:document.getElementById('m-type').value,
+      type:itype,
       title:title,
       module:document.getElementById('m-module').value,
       priority:document.getElementById('m-priority').value,
@@ -861,5 +904,45 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 
 </script>
 </div>
+<!-- MODULE EDIT MODAL -->
+<div class="mo" id="modEditModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <h3 id="me-name">Module</h3>
+      <p style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:3px">Edit module status and group</p>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;padding:18px 20px">
+      <div>
+        <label class="ml">Status</label>
+        <select class="ms" id="me-status">
+          <option value="built">&#10003; Built</option>
+          <option value="wip">&#9888; In Progress</option>
+          <option value="todo">&#9675; Not Built</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Group</label>
+        <select class="ms" id="me-group">
+          <option value="financials">&#128176; Financials</option>
+          <option value="procurement">&#128230; Procurement</option>
+          <option value="technical">&#128207; Technical</option>
+          <option value="commissioning">&#9881;&#65039; Commissioning</option>
+          <option value="quality">&#128203; Quality</option>
+          <option value="settings">&#128295; Settings &amp; Platform</option>
+          <option value="other">&#128193; Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Description</label>
+        <textarea class="ms" id="me-desc" rows="3" style="resize:vertical;font-family:'DM Sans',sans-serif;font-size:13px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModuleEdit()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveModuleEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
