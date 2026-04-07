@@ -125,8 +125,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
 /* ROWS table */
 .rows-tbl{width:100%;border-collapse:collapse}
-.rows-tbl th{padding:7px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)}
-.rows-tbl td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+.rows-tbl th{padding:8px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)}
+.rows-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;font-size:13px}
 .rows-tbl tr:last-child td{border-bottom:none}
 .step-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-align:center}
 .step-input{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:5px 8px;outline:none;width:100%;transition:border-color .2s}
@@ -863,7 +863,7 @@ function renderEditorBody(itp, rev, canEdit){
     numSpan.textContent=String(si+1).padStart(2,'0');
     var nameSpan=document.createElement('span');nameSpan.className='tset-name';
     if(canEdit){
-      var nameInp=document.createElement('input');nameInp.className='step-input';nameInp.value=sec.name;nameInp.style.cssText='width:auto;min-width:160px;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);outline:none;transition:border-color .15s';
+      var nameInp=document.createElement('input');nameInp.className='step-input';nameInp.value=sec.name;nameInp.style.cssText='width:100%;max-width:600px;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);outline:none;transition:border-color .15s';
 nameInp.onfocus=function(){this.style.borderColor='var(--accent)';};
 nameInp.onblur=function(){this.style.borderColor='var(--border)';};
       nameInp.onchange=(function(s){return function(){s.name=this.value;autosave(itp);};})(sec);
@@ -929,7 +929,7 @@ nameInp.onblur=function(){this.style.borderColor='var(--border)';};
       var thDrag=document.createElement('th');thDrag.style.width='28px';headRow.appendChild(thDrag);
     }
     var thCols=canEdit?['Step','Description','Check Type','Flags','']:['Step','Description','Check Type','Flags'];
-    var thWidths=canEdit?['40px','','160px','100px','30px']:['55px','','160px','100px'];
+    var thWidths=canEdit?['40px','','160px','110px','30px']:['50px','','150px','120px'];
     thCols.forEach(function(h,hi){var th=document.createElement('th');th.textContent=h;if(thWidths[hi])th.style.width=thWidths[hi];headRow.appendChild(th);});
     thead.appendChild(headRow);tbl.appendChild(thead);
 
@@ -1160,12 +1160,16 @@ function publishTemplate(){
 function closePublishModal(){document.getElementById('publishModal').classList.remove('open');}
 function confirmPublish(){
   var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
-  var rev=currentRev(itp);
-  // Mark previous current as superseded
-  itp.revisions.forEach(function(r,i){if(i<itp.revisions.length-1&&r.status==='current')r.status='superseded';});
-  rev.status='current';
-  rev.note=document.getElementById('pub-note').value.trim();
-  save();closePublishModal();renderEditor();
+  var draftRev=itp.revisions.find(function(r){return r.status==='draft';});
+  if(!draftRev){alert('No draft to publish.');closePublishModal();return;}
+  // Mark all current as superseded
+  itp.revisions.forEach(function(r){if(r.status==='current')r.status='superseded';});
+  // Promote draft to current
+  draftRev.status='current';
+  draftRev.note=document.getElementById('pub-note').value.trim();
+  draftRev.modifiedDate=todayStr();
+  _isDirty=false;_draftEditMode=false;
+  save();closePublishModal();renderEditor();renderRegister();
   showToast('✓ v'+rev.version+' published');
 }
 
