@@ -88,6 +88,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .editor-topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .editor-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text);flex:1}
 .editor-meta-bar{padding:14px 24px;background:var(--surface2);border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.itp-hdr-row{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)}
+.itp-hdr-row.cols3{grid-template-columns:repeat(3,1fr)}
+.itp-hdr-cell{padding:10px 16px;border-right:1px solid var(--border)}
+.itp-hdr-cell:last-child{border-right:none}
+.itp-hdr-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.itp-hdr-val{font-size:13px;color:var(--text);font-weight:500}
+.itp-hdr-val.mono{font-family:'DM Mono',monospace;color:var(--accent)}
+.itp-hdr-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:14px 24px 0}
+.draft-edit-bar{display:none;padding:8px 24px;background:var(--surface2);border-bottom:1px solid var(--border);align-items:center;gap:10px}
+.draft-edit-bar.visible{display:flex}
+.draft-save-indicator{font-family:'DM Mono',monospace;font-size:11px;color:var(--green);opacity:0;transition:opacity .5s}
+.draft-save-indicator.show{opacity:1}
 .emf{display:flex;flex-direction:column;gap:4px}
 .emf-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
 .emf-val{font-size:13px;color:var(--text)}
@@ -97,7 +109,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .editor-body{padding:20px 24px 80px}
 
 /* TABLE SET (section) */
-.tset{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px}
+.tset{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px;transition:box-shadow .15s}
+.tset.dragging{opacity:0.4}
+.tset.sec-drag-over{box-shadow:0 -3px 0 var(--accent),0 0 0 1px var(--accent);border-color:var(--accent)}
 .tset-hdr{padding:11px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .tset-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;flex-shrink:0;min-width:60px}
 .tset-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1}
@@ -307,14 +321,38 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <div class="editor-title" id="editorTitle">ITP Template</div>
       <div id="editorStatusBadge"></div>
     </div>
-    <!-- Meta bar -->
-    <div class="editor-meta-bar">
-      <div class="emf"><span class="emf-lbl">ITP No.</span><div class="emf-val mono" id="ed-itpno"></div></div>
-      <div class="emf"><span class="emf-lbl">ITP Type</span><div class="emf-val" id="ed-itptype"></div></div>
-      <div class="emf"><span class="emf-lbl">Version</span><div class="emf-val mono" id="ed-version"></div></div>
-      <div class="emf"><span class="emf-lbl">Creator</span><div class="emf-val" id="ed-creator"></div></div>
-      <div class="emf"><span class="emf-lbl">Date Created</span><div class="emf-val" id="ed-created"></div></div>
-      <div class="emf"><span class="emf-lbl">Last Modified</span><div class="emf-val" id="ed-modified"></div></div>
+    <!-- Draft Edit Bar -->
+    <div class="draft-edit-bar" id="draftEditBar">
+      <span style="font-size:12px;color:var(--warn);font-family:'DM Mono',monospace;">&#9888; DRAFT v<span id="draftVerNum">—</span></span>
+      <span style="flex:1"></span>
+      <span class="draft-save-indicator" id="draftSaveIndicator">&#10003; Saved</span>
+      <button class="btn bg bsm" onclick="saveDraft()">&#128190; Save Draft</button>
+      <button class="btn bp bsm" onclick="publishTemplate()">&#8593; Publish Revision</button>
+    </div>
+    <!-- ITP Header Block (matches ITP form style) -->
+    <div class="itp-hdr-block">
+      <div class="itp-hdr-row">
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Client Doc No.</div><div class="itp-hdr-val" id="ed-clientdoc">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Ref No.</div><div class="itp-hdr-val mono" id="ed-itpno">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Form No.</div><div class="itp-hdr-val mono" id="ed-formno">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">ITP Type</div><div class="itp-hdr-val" id="ed-itptype">—</div></div>
+      </div>
+      <div class="itp-hdr-row cols3">
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Equipment ID</div><div class="itp-hdr-val mono" id="ed-equipid">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Manufacturer</div><div class="itp-hdr-val mono" id="ed-mfr">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Model</div><div class="itp-hdr-val mono" id="ed-model">—</div></div>
+      </div>
+      <div class="itp-hdr-row cols3">
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Building</div><div class="itp-hdr-val" id="ed-building">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Location</div><div class="itp-hdr-val" id="ed-location">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Sub Location</div><div class="itp-hdr-val" id="ed-subloc">—</div></div>
+      </div>
+      <div class="itp-hdr-row" style="grid-template-columns:repeat(3,1fr) 1fr">
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Version</div><div class="itp-hdr-val mono" id="ed-version">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Creator</div><div class="itp-hdr-val" id="ed-creator">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Date Created</div><div class="itp-hdr-val" id="ed-created">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Last Modified</div><div class="itp-hdr-val" id="ed-modified">—</div></div>
+      </div>
     </div>
     <!-- Flag legend -->
     <div style="padding:8px 24px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -459,6 +497,7 @@ var templates = [];
 var companyTemplates = []; // always the company library
 var activeItpId = null;
 var _inEditor = false;
+var _isDirty = false;
 var _uid = 0;
 function nid(){return 'itp'+(++_uid)+Date.now();}
 
@@ -492,9 +531,15 @@ function genItpNum(){
 
 // Status helpers
 function currentRev(itp){
-  // Return the draft if one exists, otherwise the latest published revision
+  // For editor: return draft if exists (so editing works), else latest current
   var revs=itp.revisions;
   for(var i=revs.length-1;i>=0;i--){if(revs[i].status==='draft')return revs[i];}
+  for(var i=revs.length-1;i>=0;i--){if(revs[i].status==='current')return revs[i];}
+  return revs[revs.length-1];
+}
+function publishedRev(itp){
+  // Always return the latest published (current) revision — ignores drafts
+  var revs=itp.revisions;
   for(var i=revs.length-1;i>=0;i--){if(revs[i].status==='current')return revs[i];}
   return revs[revs.length-1];
 }
@@ -672,6 +717,10 @@ function showView(id){
 }
 function showRegister(){
   showView('register');
+  if(_isDirty){
+    if(!confirm('You have unsaved changes to this draft. Leave without saving?'))return;
+  }
+  _isDirty=false;
   _inEditor=false;
   document.getElementById('backToRegBtn').style.display='none';
   document.getElementById('publishBtn').style.display='none';
@@ -681,7 +730,7 @@ function showRegister(){
   renderRegister();
 }
 function viewItp(itpId){
-  // Open in view-only mode — no draft started
+  _isDirty=false; // entering view mode — no edits pending
   openEditor(itpId);
 }
 function editItp(itpId){
@@ -732,7 +781,7 @@ function renderRegister(){
     rows+='<tr style="cursor:pointer" onclick="viewItp(\''+itp.id+'\')">'
       +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
       +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+importedBadge+'</td>'
-      +'<td><span class="itp-ver '+verClass+'">v'+rev.version+'</span></td>'
+      +'<td><span class="itp-ver current">v'+pubRev.version+'</span></td>'
       +'<td>'+stBadge+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(itp.createdDate)+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.modifiedDate)+'</td>'
@@ -755,20 +804,34 @@ function renderRegister(){
 function renderEditor(){
   var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
   var rev=currentRev(itp);
+  var isDraftRev=rev.status==='draft';
   document.getElementById('editorTitle').textContent=itp.itpType;
   document.getElementById('bcCurr').textContent=itp.itpNo+' — '+itp.itpType;
-  document.getElementById('ed-itpno').textContent=itp.itpNo;
-  document.getElementById('ed-itptype').textContent=itp.itpType;
-  document.getElementById('ed-version').textContent='v'+rev.version+(rev.status==='draft'?' (Draft)':rev.status==='current'?' (Current)':'');
+  // Populate ITP-form-style header
+  document.getElementById('ed-itpno').textContent=itp.itpNo||'—';
+  document.getElementById('ed-formno').textContent=itp.itpNo||'—';
+  document.getElementById('ed-itptype').textContent=itp.itpType||'—';
+  document.getElementById('ed-equipid').textContent='(set on ITP instance)';
+  document.getElementById('ed-mfr').textContent='(from equipment schedule)';
+  document.getElementById('ed-model').textContent='(from equipment schedule)';
+  document.getElementById('ed-building').textContent='(set on ITP instance)';
+  document.getElementById('ed-location').textContent='(set on ITP instance)';
+  document.getElementById('ed-subloc').textContent='(set on ITP instance)';
+  document.getElementById('ed-version').textContent='v'+rev.version+(isDraftRev?' (Draft)':rev.status==='current'?' (Current)':'');
   document.getElementById('ed-creator').textContent=itp.createdBy||'—';
   document.getElementById('ed-created').textContent=fmtDate(itp.createdDate);
   document.getElementById('ed-modified').textContent=fmtDate(rev.modifiedDate)||'—';
+  // Draft edit bar
+  var draftBar2=document.getElementById('draftEditBar');
+  var draftVer=document.getElementById('draftVerNum');
+  if(draftBar2){draftBar2.classList.toggle('visible',isDraftRev);}
+  if(draftVer&&isDraftRev)draftVer.textContent=rev.version;
 
   var stBadge=rev.status==='current'?'<span class="status-badge sb-current">Current</span>':rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>':'<span class="status-badge sb-superseded">Superseded</span>';
   document.getElementById('editorStatusBadge').innerHTML=stBadge;
 
   var canEdit=rev.status==='draft';
-  document.getElementById('publishBtn').style.display=canEdit?'':'none';
+  document.getElementById('publishBtn').style.display='none'; // now in draftEditBar
 
   // Start New Draft bar — shows when viewing a current/superseded revision
   var draftBar=document.getElementById('startDraftBar');
@@ -789,7 +852,7 @@ function renderEditorBody(itp, rev, canEdit){
     var numSpan=document.createElement('span');numSpan.className='tset-num';
     if(canEdit){
       var refInp=document.createElement('input');refInp.className='step-input';refInp.value=sec.ref;
-      refInp.style.cssText='width:60px;font-family:DM Mono,monospace;font-size:11px;color:var(--accent);font-weight:700;background:transparent;border-color:transparent;text-align:center';
+      refInp.style.cssText='width:50px;font-family:DM Mono,monospace;font-size:11px;color:var(--accent);font-weight:700;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 6px;text-align:center;outline:none';
       refInp.title='Section number';
       refInp.onchange=(function(s){return function(){s.ref=this.value;autosave(itp);};})(sec);
       numSpan.appendChild(refInp);
@@ -798,7 +861,9 @@ function renderEditorBody(itp, rev, canEdit){
     }
     var nameSpan=document.createElement('span');nameSpan.className='tset-name';
     if(canEdit){
-      var nameInp=document.createElement('input');nameInp.className='step-input';nameInp.value=sec.name;nameInp.style.cssText='width:auto;min-width:160px;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:transparent;border-color:transparent';
+      var nameInp=document.createElement('input');nameInp.className='step-input';nameInp.value=sec.name;nameInp.style.cssText='width:auto;min-width:160px;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);outline:none;transition:border-color .15s';
+nameInp.onfocus=function(){this.style.borderColor='var(--accent)';};
+nameInp.onblur=function(){this.style.borderColor='var(--border)';};
       nameInp.onchange=(function(s){return function(){s.name=this.value;autosave(itp);};})(sec);
       nameSpan.appendChild(nameInp);
     } else {
@@ -812,6 +877,36 @@ function renderEditorBody(itp, rev, canEdit){
     var colBtn=document.createElement('button');colBtn.className='tset-collapse';colBtn.textContent='▾';colBtn.title='Collapse/Expand';
     colBtn.onclick=(function(s,w){return function(){w.querySelector('.tset-body').classList.toggle('collapsed');this.textContent=w.querySelector('.tset-body').classList.contains('collapsed')?'▸':'▾';};})(sec,wrap);
 
+    // Section drag handle (for reordering sections)  
+    if(canEdit){
+      var secHandle=document.createElement('span');secHandle.className='drag-handle';secHandle.textContent='⠿';secHandle.title='Drag to reorder section';
+      secHandle.style.cssText='font-size:16px;margin-right:6px;cursor:grab;flex-shrink:0';
+      secHandle.draggable=true;
+      (function(si2,wrapEl){
+        secHandle.addEventListener('dragstart',function(e){e.dataTransfer.setData('secId',sec.id);wrapEl.classList.add('dragging');e.stopPropagation();});
+        secHandle.addEventListener('dragend',function(){wrapEl.classList.remove('dragging');document.querySelectorAll('.tset').forEach(function(t){t.classList.remove('drag-over');});});
+        wrapEl.addEventListener('dragover',function(e){
+          if(!e.dataTransfer.types.includes('secid')&&!e.dataTransfer.getData('secId')&&e.dataTransfer.types.indexOf('secid')===-1){};
+          e.preventDefault();e.stopPropagation();
+          document.querySelectorAll('.tset').forEach(function(t){t.classList.remove('sec-drag-over');});
+          wrapEl.classList.add('sec-drag-over');
+        });
+        wrapEl.addEventListener('dragleave',function(){wrapEl.classList.remove('sec-drag-over');});
+        wrapEl.addEventListener('drop',function(e){
+          e.preventDefault();e.stopPropagation();
+          wrapEl.classList.remove('sec-drag-over');
+          var fromId=e.dataTransfer.getData('secId');
+          if(!fromId||fromId===sec.id)return;
+          var fromIdx=rev.sections.findIndex(function(s){return s.id===fromId;});
+          var toIdx=rev.sections.findIndex(function(s){return s.id===sec.id;});
+          if(fromIdx===-1||toIdx===-1)return;
+          var moved=rev.sections.splice(fromIdx,1)[0];
+          rev.sections.splice(toIdx,0,moved);
+          autosave(itp);renderEditor();
+        });
+      })(si,wrap);
+      hdr.appendChild(secHandle);
+    }
     hdr.appendChild(numSpan);hdr.appendChild(nameSpan);
     if(canEdit){
       var delSecBtn=document.createElement('button');delSecBtn.className='tset-del';delSecBtn.textContent='✕';delSecBtn.title='Delete section';
@@ -981,6 +1076,19 @@ function renderEditorBody(itp, rev, canEdit){
 }
 
 // ── DRAFT / PUBLISH ──
+function saveDraft(){
+  if(!_inEditor)return;
+  var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
+  var rev=currentRev(itp);if(rev.status!=='draft')return;
+  var me='Sandeep';
+  try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  rev.modifiedDate=todayStr();rev.modifiedBy=me;
+  save();
+  _isDirty=false;
+  var ind=document.getElementById('draftSaveIndicator');
+  if(ind){ind.style.color='var(--green)';ind.textContent='&#10003; Saved';setTimeout(function(){if(ind)ind.textContent='';},2500);}
+}
+
 function doStartDraft(){
   var itp=templates.find(function(t){return t.id===activeItpId;});
   if(!itp)return;
@@ -988,13 +1096,19 @@ function doStartDraft(){
 }
 
 function startDraft(itp){
+  // If a draft already exists, just open it — never accumulate multiple drafts
+  var existing=itp.revisions.find(function(r){return r.status==='draft';});
+  if(existing){save();renderEditor();return;}
   var me='Sandeep';
   try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
-  var latestRev=currentRev(itp);
+  // Find the latest current/superseded rev to copy from
+  var baseRev=null;
+  for(var i=itp.revisions.length-1;i>=0;i--){if(itp.revisions[i].status==='current'){baseRev=itp.revisions[i];break;}}
+  if(!baseRev)baseRev=itp.revisions[itp.revisions.length-1];
   var newRev={
-    version:latestRev.version+1,
+    version:baseRev.version+1,
     status:'draft',
-    sections:JSON.parse(JSON.stringify(latestRev.sections)),
+    sections:JSON.parse(JSON.stringify(baseRev.sections)),
     modifiedDate:todayStr(),
     modifiedBy:me,
     note:'',
@@ -1005,12 +1119,19 @@ function startDraft(itp){
 }
 
 function autosave(itp){
+  // Mark dirty in memory — do NOT save to Supabase yet
   var me='Sandeep';
   try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
   var rev=currentRev(itp);
   rev.modifiedDate=todayStr();
   rev.modifiedBy=me;
-  save();
+  _isDirty=true;
+  // Show unsaved indicator
+  var ind=document.getElementById('draftSaveIndicator');
+  if(ind){ind.style.color='var(--warn)';ind.textContent='&#9679; Unsaved changes';}
+  // Update last modified in header
+  var el=document.getElementById('ed-modified');
+  if(el)el.textContent=fmtDate(todayStr());
 }
 
 function publishTemplate(){
@@ -1038,9 +1159,9 @@ function openRevHist(itpId){
   document.getElementById('revHistSub').textContent=itp.itpNo+' — '+itp.itpType;
   var body=document.getElementById('revHistBody');
   var html='';
-  itp.revisions.slice().reverse().forEach(function(rev){
-    var stCls=rev.status==='current'?'rev-status-curr':rev.status==='draft'?'rev-status-draft':'rev-status-sup';
-    var stLbl=rev.status==='current'?'Current':rev.status==='draft'?'Draft':'Superseded';
+  itp.revisions.filter(function(r){return r.status!=='draft';}).slice().reverse().forEach(function(rev){
+    var stCls=rev.status==='current'?'rev-status-curr':'rev-status-sup';
+    var stLbl=rev.status==='current'?'Current':'Superseded';
     html+='<tr>'
       +'<td><button class="rev-dl-btn" onclick="exportRevAtVer(\''+itpId+'\','+rev.version+')" title="Download">⬇</button></td>'
       +'<td style="font-weight:500;color:var(--text)">'+escH(itp.itpType)+'</td>'
@@ -1323,7 +1444,14 @@ var _cachedCS = {};
 
 // ── SIDEBAR ──
 var SBK='hvacnexus_sb_collapsed';
-function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function navTo(url){
+  if(_isDirty&&_inEditor){
+    if(!confirm('You have unsaved changes to this draft. Leave without saving?'))return;
+    _isDirty=false;
+  }
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  window.location.href=b+url;
+}
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
 function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'230px';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
 function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
