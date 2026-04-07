@@ -112,6 +112,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .mod-card-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);flex:1}
 .mod-edit-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;cursor:pointer;padding:3px 8px;font-family:'DM Sans',sans-serif;transition:all .13s}
 .mod-edit-btn:hover{border-color:var(--accent);color:var(--accent)}
+.mod-sub-toggle{background:none;border:none;cursor:pointer;font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;padding:4px 0;display:flex;align-items:center;gap:5px;transition:color .13s}
+.mod-sub-toggle:hover{color:var(--accent)}
+.mod-sub-list{border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:none;flex-direction:column;gap:6px}
+.mod-sub-list.open{display:flex}
+.mod-sub-item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--surface2);border-radius:6px;border-left:3px solid var(--border)}
+.mod-sub-item.built{border-left-color:var(--green)}
+.mod-sub-item.wip{border-left-color:var(--warn)}
+.mod-sub-item.todo{border-left-color:var(--muted)}
+.mod-sub-name{font-size:12px;font-weight:600;color:var(--text);flex:1}
+.mod-sub-status{font-size:10px;font-family:'DM Mono',monospace;padding:2px 7px;border-radius:4px}
 .mod-group-hdr{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:8px 0 10px;border-bottom:1px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .mod-status-built{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2);font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px}
 .mod-status-wip{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2);font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px}
@@ -426,7 +436,7 @@ var MODULES=[
   {name:'Subcontractor Agreements',group:'procurement',status:'todo',priority:'medium',desc:'Not built. Contract register, scope, value, insurance expiry, key dates.'},
   // Technical
   {name:'Drawings',group:'technical',status:'wip',desc:'PDF upload, ITP/Defect/Fire pins, CSS-transform zoom/pan, revision history.'},
-  {name:'Drawing Viewer',group:'technical',status:'wip',desc:'Clean rewrite. 2-pass hi-res render, 96px pins, layer toggles, pins panel, fire/ITP/defect pins.'},
+  {name:'Drawing Viewer',group:'technical',status:'wip',parent:'Drawings',desc:'Clean rewrite. 2-pass hi-res render, 96px pins, layer toggles, pins panel, fire/ITP/defect pins.'},
   {name:'Tech Submissions',group:'technical',status:'built',desc:'Register with data sheets, spec sign-off, MSDS, photos, PDF bundle.'},
   {name:'Equipment Schedule',group:'technical',status:'built',desc:'Revision system, change tracking, draft/publish, PDF/Excel export.'},
   {name:'RFI',group:'technical',status:'todo',priority:'high',desc:'Not built. Drawing pin integration + variation linkage are the core value adds.'},
@@ -439,9 +449,9 @@ var MODULES=[
   {name:'Lookahead / 3-Week View',group:'commissioning',status:'todo',priority:'medium',desc:'Not built. Auto-pulls from commissioning tracker dates.'},
   // Quality
   {name:'ITP',group:'quality',status:'built',desc:'ITP instances per building/area, linked to templates and drawing pins.'},
-  {name:'ITP Register',group:'quality',status:'built',desc:'Cross-project ITP register view with status tracking.'},
+  {name:'ITP Register',group:'quality',status:'built',parent:'ITP',desc:'Cross-project ITP register view with status tracking.'},
   {name:'ITP Templates',group:'quality',status:'built',desc:'Company-level templates, drag-to-reorder, auto-numbering, revision system.'},
-  {name:'ITP Form',group:'quality',status:'wip',desc:'On-site fillable form, signature capture, Pre-Cx/Cx tracking.'},
+  {name:'ITP Form',group:'quality',status:'wip',parent:'ITP',desc:'On-site fillable form, signature capture, Pre-Cx/Cx tracking.'},
   {name:'Passive Fire Register',group:'quality',status:'built',desc:'Fire seal and fire damper register across all drawings, syncs with drawing pins.'},
   {name:'Defects',group:'quality',status:'built',desc:'Installation defects snag list, linked to drawings, photo evidence, close-out.'},
   {name:'NCR',group:'quality',status:'todo',priority:'high',desc:'Not built. Non-Conformance Report with corrective action workflow.'},
@@ -643,6 +653,14 @@ function toggleCard(id){
   if(body)body.classList.toggle('open');
 }
 
+function toggleSubList(sid){
+  var el=document.getElementById(sid);
+  var chev=document.getElementById('chev-'+sid);
+  if(!el)return;
+  var open=el.classList.toggle('open');
+  if(chev)chev.style.transform=open?'rotate(-90deg)':'';
+}
+
 function quickUpdate(id,field,val){
   var it=items.find(function(x){return x.id===id;});
   if(it){it[field]=val;save();updateBadges();updateStats();}
@@ -709,6 +727,8 @@ function openModuleEdit(idx){
   document.getElementById('me-desc').value=m.desc||'';
   refreshGroupDropdowns();
   document.getElementById('me-group').value=m.group||'other';
+  populateParentDropdown('me-parent',m.name);
+  document.getElementById('me-parent').value=m.parent||'';
   document.getElementById('modEditModal').classList.add('open');
 }
 function saveModuleEdit(){
@@ -716,6 +736,8 @@ function saveModuleEdit(){
   m.status=document.getElementById('me-status').value;
   m.group=document.getElementById('me-group').value;
   m.desc=document.getElementById('me-desc').value.trim();
+  var newParent=document.getElementById('me-parent').value;
+  m.parent=newParent||undefined;
   document.getElementById('modEditModal').classList.remove('open');
   saveModules();
   renderModules();
@@ -737,18 +759,22 @@ function openAddModuleModal(){
   document.getElementById('am-desc').value='';
   refreshGroupDropdowns();
   document.getElementById('am-group').value='other';
+  populateParentDropdown('am-parent','');
   document.getElementById('addModuleModal').classList.add('open');
   setTimeout(function(){document.getElementById('am-title').focus();},80);
 }
 function saveAddModule(){
   var title=document.getElementById('am-title').value.trim();
   if(!title){document.getElementById('am-title').focus();return;}
-  MODULES.push({
+  var amParent=document.getElementById('am-parent').value;
+  var newMod={
     name:title,
     group:document.getElementById('am-group').value||'other',
     status:document.getElementById('am-status').value||'todo',
     desc:document.getElementById('am-desc').value.trim()
-  });
+  };
+  if(amParent)newMod.parent=amParent;
+  MODULES.push(newMod);
   document.getElementById('addModuleModal').classList.remove('open');
   saveModules();
   renderModules();
@@ -781,6 +807,19 @@ function refreshGroupDropdowns(){
     var cur=sel.value;
     sel.innerHTML=grpOpts;
     if(cur)sel.value=cur;
+  });
+}
+
+function populateParentDropdown(selId, excludeName){
+  var sel=document.getElementById(selId);if(!sel)return;
+  var cur=sel.value;
+  sel.innerHTML='<option value="">— None (top-level) —</option>';
+  // Only top-level modules can be parents (no parent themselves)
+  MODULES.filter(function(m){return !m.parent&&m.name!==excludeName;}).forEach(function(m){
+    var o=document.createElement('option');
+    o.value=m.name;o.textContent=m.name;
+    if(m.name===cur)o.selected=true;
+    sel.appendChild(o);
   });
 }
 
@@ -1008,6 +1047,12 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
         <select class="ms" id="me-group"></select>
       </div>
       <div>
+        <label class="ml">Parent Module <span style="color:var(--muted);font-size:10px">(optional)</span></label>
+        <select class="ms" id="me-parent">
+          <option value="">— None (top-level) —</option>
+        </select>
+      </div>
+      <div>
         <label class="ml">Description</label>
         <textarea class="ms" id="me-desc" rows="3" style="resize:vertical;font-family:'DM Sans',sans-serif;font-size:13px"></textarea>
       </div>
@@ -1045,6 +1090,12 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
       <div>
         <label class="ml">Group</label>
         <select class="ms" id="am-group"></select>
+      </div>
+      <div>
+        <label class="ml">Parent Module <span style="color:var(--muted);font-size:10px">(optional — makes this a sub-module)</span></label>
+        <select class="ms" id="am-parent">
+          <option value="">— None (top-level module) —</option>
+        </select>
       </div>
       <div>
         <label class="ml">Description</label>
