@@ -219,8 +219,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     </div>
   </div>
   <div class="header-actions">
-    <button class="btn btn-ghost" onclick="exportData()">⬇ Export</button>
-    <button class="btn btn-primary" onclick="openAddModal()">＋ Add Item</button>
+    <button class="btn btn-ghost" onclick="exportData()">&#8595; Export</button>
+    <button class="btn btn-primary" id="addModuleBtn" style="display:none" onclick="openAddModuleModal()">&#65291; Add Module</button>
+    <button class="btn btn-primary" id="addItemBtn" onclick="openAddModal()">&#65291; Add Item</button>
   </div>
 </div>
 
@@ -280,7 +281,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
         <select class="ms" id="m-type" onchange="updateModalType()">
           <option value="bug">&#128027; Bug</option>
           <option value="feature">&#10024; Feature Request</option>
-          <option value="module">&#128230; New Module</option>
         </select>
       </div>
       <div>
@@ -289,62 +289,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       </div>
       <div>
         <label class="ml">Module</label>
-        <select class="ms" id="m-module">
-          <option value="">— Select Module —</option>
-          <optgroup label="💰 Financials">
-            <option>Budget</option>
-            <option>Progress Claims</option>
-            <option>Vendor Invoices</option>
-            <option>Variations</option>
-            <option>Subcontractor Variations</option>
-          </optgroup>
-          <optgroup label="📦 Procurement">
-            <option>Procurement Schedule</option>
-            <option>Purchase Orders</option>
-          </optgroup>
-          <optgroup label="📐 Technical">
-            <option>Drawings</option>
-            <option>Drawing Viewer</option>
-            <option>Tech Submissions</option>
-            <option>Equipment Schedule</option>
-            <option>RFI</option>
-            <option>Specifications</option>
-          </optgroup>
-          <optgroup label="⚙️ Commissioning">
-            <option>Pre-Commissioning</option>
-            <option>Commissioning Tracker</option>
-          </optgroup>
-          <optgroup label="📋 Quality">
-            <option>ITP</option>
-            <option>ITP Register</option>
-            <option>ITP Templates</option>
-            <option>ITP Form</option>
-            <option>Passive Fire Register</option>
-            <option>Defects</option>
-            <option>NCR</option>
-            <option>Installation Defects</option>
-          </optgroup>
-          <optgroup label="⚙️ Settings &amp; Platform">
-            <option>Company Settings</option>
-            <option>Project Settings</option>
-            <option>User Management</option>
-            <option>Auth</option>
-          </optgroup>
-          <optgroup label="🔮 Future Modules">
-            <option>Subcontractor ITPs</option>
-            <option>Subcontractor Agreements</option>
-            <option>Pressure Test Register</option>
-            <option>Lookahead</option>
-            <option>Handover Package</option>
-            <option>O&amp;M Document Register</option>
-            <option>Safety</option>
-            <option>Documents</option>
-            <option>Photos</option>
-          </optgroup>
-          <optgroup label="🔧 General">
-            <option>General / Cross-module</option>
-          </optgroup>
-        </select>
+        <select class="ms" id="m-module"><option value="">— Select Module —</option></select>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
@@ -520,6 +465,13 @@ var MODULES=[
 function save(){
   dbSetCommissioning(_trkPNum+'_tracker',items).catch(e=>console.error(e));
 }
+function saveModules(){
+  var data={modules:MODULES,moduleGroups:MODULE_GROUPS};
+  dbSetCommissioning(_trkPNum+'_tracker_modules',data).catch(e=>console.error(e));
+}
+function saveAll(){
+  save();saveModules();
+}
 async function load(){
   try{
     var s=await dbGetCommissioning(_trkPNum+'_tracker');
@@ -534,6 +486,18 @@ async function load(){
     console.warn('Tracker load failed:',e);
     items=JSON.parse(JSON.stringify(SEED));save();
   }
+  // Load saved modules and groups
+  try{
+    var md=await dbGetCommissioning(_trkPNum+'_tracker_modules');
+    if(md&&md.modules&&Array.isArray(md.modules)&&md.modules.length){
+      MODULES.length=0;
+      md.modules.forEach(function(m){MODULES.push(m);});
+    }
+    if(md&&md.moduleGroups&&Array.isArray(md.moduleGroups)&&md.moduleGroups.length){
+      MODULE_GROUPS.length=0;
+      md.moduleGroups.forEach(function(g){MODULE_GROUPS.push(g);});
+    }
+  }catch(e){console.warn('Module load failed:',e);}
   render();updateBadges();updateStats();
   document.getElementById('badge-modules').textContent=MODULES.length;
 }
@@ -549,6 +513,9 @@ function switchTab(tab){
   document.getElementById('filterStatus').style.display=tab==='modules'?'none':'';
   document.getElementById('filterPriority').style.display=tab==='modules'?'none':'';
   document.getElementById('filterModule').style.display=tab==='modules'?'none':'';
+  document.getElementById('addModuleBtn').style.display=tab==='modules'?'':'none';
+  document.getElementById('addItemBtn').style.display=tab==='modules'?'none':'';
+  document.getElementById('hideCompBtn').style.display=tab==='modules'?'none':'';
   if(tab==='modules')renderModules();else render();
 }
 
@@ -737,10 +704,11 @@ function renderModules(){
 function openModuleEdit(idx){
   var m=MODULES[idx];if(!m)return;
   _editModIdx=idx;
-  document.getElementById('me-name').textContent=escH(m.name);
+  document.getElementById('me-name').textContent=m.name;
   document.getElementById('me-status').value=m.status||'todo';
-  document.getElementById('me-group').value=m.group||'other';
   document.getElementById('me-desc').value=m.desc||'';
+  refreshGroupDropdowns();
+  document.getElementById('me-group').value=m.group||'other';
   document.getElementById('modEditModal').classList.add('open');
 }
 function saveModuleEdit(){
@@ -749,9 +717,99 @@ function saveModuleEdit(){
   m.group=document.getElementById('me-group').value;
   m.desc=document.getElementById('me-desc').value.trim();
   document.getElementById('modEditModal').classList.remove('open');
+  saveModules();
   renderModules();
 }
 function closeModuleEdit(){document.getElementById('modEditModal').classList.remove('open');}
+
+function deleteModule(){
+  var m=MODULES[_editModIdx];if(!m)return;
+  if(!confirm('Delete module "'+m.name+'"? This cannot be undone.'))return;
+  MODULES.splice(_editModIdx,1);
+  document.getElementById('modEditModal').classList.remove('open');
+  saveModules();
+  renderModules();
+}
+
+function openAddModuleModal(){
+  document.getElementById('am-title').value='';
+  document.getElementById('am-status').value='todo';
+  document.getElementById('am-desc').value='';
+  refreshGroupDropdowns();
+  document.getElementById('am-group').value='other';
+  document.getElementById('addModuleModal').classList.add('open');
+  setTimeout(function(){document.getElementById('am-title').focus();},80);
+}
+function saveAddModule(){
+  var title=document.getElementById('am-title').value.trim();
+  if(!title){document.getElementById('am-title').focus();return;}
+  MODULES.push({
+    name:title,
+    group:document.getElementById('am-group').value||'other',
+    status:document.getElementById('am-status').value||'todo',
+    desc:document.getElementById('am-desc').value.trim()
+  });
+  document.getElementById('addModuleModal').classList.remove('open');
+  saveModules();
+  renderModules();
+}
+function closeAddModuleModal(){document.getElementById('addModuleModal').classList.remove('open');}
+
+function addCustomGroup(){
+  var name=(document.getElementById('customGroupName').value||'').trim();
+  if(!name)return;
+  var key=name.toLowerCase().replace(/[^a-z0-9]/g,'_');
+  if(MODULE_GROUPS.find(function(g){return g.key===key;})){
+    alert('A group with this name already exists.');return;
+  }
+  MODULE_GROUPS.push({key:key,label:name,icon:'&#128193;'});
+  document.getElementById('customGroupName').value='';
+  saveModules();
+  // Refresh group dropdowns
+  refreshGroupDropdowns();
+  renderModules();
+}
+
+function refreshGroupDropdowns(){
+  // Rebuild group options in all group selects
+  var grpOpts=MODULE_GROUPS.map(function(g){
+    return '<option value="'+g.key+'">'+g.icon+' '+g.label+'</option>';
+  }).join('');
+  ['am-group','me-group'].forEach(function(id){
+    var sel=document.getElementById(id);
+    if(!sel)return;
+    var cur=sel.value;
+    sel.innerHTML=grpOpts;
+    if(cur)sel.value=cur;
+  });
+}
+
+function populateModuleDropdown(){
+  var sel=document.getElementById('m-module');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">— Select Module —</option>';
+  MODULE_GROUPS.forEach(function(grp){
+    var grpMods=MODULES.filter(function(m){return m.group===grp.key;});
+    if(!grpMods.length)return;
+    var og=document.createElement('optgroup');
+    og.label=grp.icon+' '+grp.label;
+    grpMods.forEach(function(m){
+      var o=document.createElement('option');
+      o.value=m.name;o.textContent=m.name;
+      if(m.name===cur)o.selected=true;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+  // Add General cross-module option
+  var og2=document.createElement('optgroup');
+  og2.label='General';
+  var o2=document.createElement('option');
+  o2.value='General / Cross-module';o2.textContent='General / Cross-module';
+  if(cur==='General / Cross-module')o2.selected=true;
+  og2.appendChild(o2);
+  sel.appendChild(og2);
+}
 
 function updateBadges(){
   var bugs=items.filter(function(it){return it.type==='bug'&&it.status!=='done'&&it.status!=='wont-fix';}).length;
@@ -805,6 +863,7 @@ function openAddModal(){
   document.getElementById('m-status').value=activeTab==='features'?'planned':'open';
   document.getElementById('m-desc').value='';
   document.getElementById('m-notes').value='';
+  populateModuleDropdown();
   document.getElementById('addModal').classList.add('open');
   setTimeout(function(){document.getElementById('m-title').focus();},80);
 }
@@ -820,6 +879,8 @@ function openEditModal(id){
   document.getElementById('m-status').value=it.status||'open';
   document.getElementById('m-desc').value=it.desc||'';
   document.getElementById('m-notes').value=it.notes||'';
+  populateModuleDropdown();
+  document.getElementById('m-module').value=it.module||'';
   document.getElementById('addModal').classList.add('open');
 }
 function closeModal(){document.getElementById('addModal').classList.remove('open');editingId=null;}
@@ -841,16 +902,6 @@ function saveItem(){
     }
   } else {
     var itype=document.getElementById('m-type').value;
-    if(itype==='module'){
-      // Add to MODULES array
-      MODULES.push({
-        name:title,
-        group:document.getElementById('m-module').value||'other',
-        status:'todo',
-        desc:document.getElementById('m-desc').value.trim()
-      });
-      save();closeModal();renderModules();return;
-    }
     items.push({
       id:nid(),
       type:itype,
@@ -954,24 +1005,63 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
       </div>
       <div>
         <label class="ml">Group</label>
-        <select class="ms" id="me-group">
-          <option value="financials">&#128176; Financials</option>
-          <option value="procurement">&#128230; Procurement</option>
-          <option value="technical">&#128207; Technical</option>
-          <option value="commissioning">&#9881;&#65039; Commissioning</option>
-          <option value="quality">&#128203; Quality</option>
-          <option value="settings">&#128295; Settings &amp; Platform</option>
-          <option value="other">&#128193; Other</option>
-        </select>
+        <select class="ms" id="me-group"></select>
       </div>
       <div>
         <label class="ml">Description</label>
         <textarea class="ms" id="me-desc" rows="3" style="resize:vertical;font-family:'DM Sans',sans-serif;font-size:13px"></textarea>
       </div>
     </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn" style="color:var(--danger);border-color:var(--danger)" onclick="deleteModule()">&#128465; Delete</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="closeModuleEdit()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveModuleEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MODULE MODAL -->
+<div class="mo" id="addModuleModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <h3>&#128230; Add Module</h3>
+      <p style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:3px">Add a new module to the tracker</p>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;padding:18px 20px">
+      <div>
+        <label class="ml">Module Name *</label>
+        <input class="mi" id="am-title" placeholder="e.g. Transmittals" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%;box-sizing:border-box"/>
+      </div>
+      <div>
+        <label class="ml">Status</label>
+        <select class="ms" id="am-status">
+          <option value="todo">&#9675; Not Built</option>
+          <option value="wip">&#9888; In Progress</option>
+          <option value="built">&#10003; Built</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Group</label>
+        <select class="ms" id="am-group"></select>
+      </div>
+      <div>
+        <label class="ml">Description</label>
+        <textarea class="ms" id="am-desc" rows="3" style="resize:vertical;font-family:'DM Sans',sans-serif;font-size:13px" placeholder="Brief description of what this module does…"></textarea>
+      </div>
+    </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+        <label class="ml" style="margin-bottom:8px">&#10133; Add Custom Group</label>
+        <div style="display:flex;gap:8px">
+          <input id="customGroupName" class="mi" placeholder="e.g. Reporting" style="background:var(--surface);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;flex:1;box-sizing:border-box">
+          <button class="btn" style="height:36px;padding:0 12px;white-space:nowrap" onclick="addCustomGroup()">Add Group</button>
+        </div>
+      </div>
+    </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModuleEdit()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveModuleEdit()">Save</button>
+      <button class="btn btn-ghost" onclick="closeAddModuleModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAddModule()">Add Module</button>
     </div>
   </div>
 </div>
