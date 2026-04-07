@@ -333,9 +333,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <!-- ITP Header Block (matches ITP form style) -->
     <div class="itp-hdr-block">
       <div class="itp-hdr-row">
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Ref No.</div><div class="itp-hdr-val mono" style="color:var(--muted);font-style:italic;font-size:11px" id="ed-itpno">Auto-generated on ITP creation</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Client Doc No.</div><div class="itp-hdr-val" id="ed-clientdoc2" style="color:var(--muted);font-style:italic;font-size:11px">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Ref No.</div><div class="itp-hdr-val mono" id="ed-itpno" style="color:var(--muted);font-style:italic;font-size:11px">Auto generated</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Form No.</div><div class="itp-hdr-val mono" id="ed-formno2" style="color:var(--muted);font-style:italic;font-size:11px">Auto generated</div></div>
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">ITP Type</div><div class="itp-hdr-val" id="ed-itptype">—</div></div>
-        <div class="itp-hdr-cell" style="grid-column:span 2"><div class="itp-hdr-lbl">Version</div><div class="itp-hdr-val mono" id="ed-version">—</div></div>
       </div>
       <div class="itp-hdr-row cols3">
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Equipment ID</div><div class="itp-hdr-val mono" id="ed-equipid">—</div></div>
@@ -699,7 +700,21 @@ async function initTemplates(){
     };
     companyTemplates.push(fdTmpl);
   }
+  // Clean up: remove orphaned drafts on old templates that were never published
+  // (left over from earlier buggy sessions — if a draft's baseRev is also current, clean it)
+  var cleaned=false;
+  companyTemplates.forEach(function(t){
+    var hasCurrent=t.revisions.some(function(r){return r.status==='current';});
+    var draftIdx=t.revisions.findIndex(function(r){return r.status==='draft';});
+    // If we have a current AND a draft but the draft version equals the current version, it's a stale duplicate
+    if(hasCurrent&&draftIdx!==-1){
+      var draft=t.revisions[draftIdx];
+      var curr=t.revisions.find(function(r){return r.status==='current';});
+      if(curr&&draft.version===curr.version){t.revisions.splice(draftIdx,1);cleaned=true;}
+    }
+  });
   if(companyTemplates.length){await dbSetItpTemplates(companyTemplates);}
+  if(cleaned)console.log('Cleaned up stale draft revisions');
 }
 
 // Level switching not needed — company level only
@@ -815,7 +830,7 @@ function renderEditor(){
   document.getElementById('ed-building').textContent='(set on ITP instance)';
   document.getElementById('ed-location').textContent='(set on ITP instance)';
   document.getElementById('ed-subloc').textContent='(set on ITP instance)';
-  document.getElementById('ed-version').textContent='v'+rev.version+(isDraftRev?' (Draft)':rev.status==='current'?' (Current)':'');
+  // version field removed from header display
   document.getElementById('ed-creator').textContent=itp.createdBy||'—';
   document.getElementById('ed-created').textContent=fmtDate(itp.createdDate);
   document.getElementById('ed-modified').textContent=fmtDate(rev.modifiedDate)||'—';
@@ -863,7 +878,7 @@ function renderEditorBody(itp, rev, canEdit){
     numSpan.textContent=String(si+1).padStart(2,'0');
     var nameSpan=document.createElement('span');nameSpan.className='tset-name';
     if(canEdit){
-      var nameInp=document.createElement('input');nameInp.className='step-input';nameInp.value=sec.name;nameInp.style.cssText='width:100%;max-width:600px;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);outline:none;transition:border-color .15s';
+      var nameInp=document.createElement('input');nameInp.className='step-input';nameInp.value=sec.name;nameInp.style.cssText='width:100%;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);outline:none;transition:border-color .15s';nameSpan.style.cssText='flex:1;display:flex;align-items:center;min-width:0';
 nameInp.onfocus=function(){this.style.borderColor='var(--accent)';};
 nameInp.onblur=function(){this.style.borderColor='var(--border)';};
       nameInp.onchange=(function(s){return function(){s.name=this.value;autosave(itp);};})(sec);
