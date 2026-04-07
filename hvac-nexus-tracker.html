@@ -722,7 +722,7 @@ function renderModules(){
 function openModuleEdit(idx){
   var m=MODULES[idx];if(!m)return;
   _editModIdx=idx;
-  document.getElementById('me-name').textContent=m.name;
+  document.getElementById('me-name').value=m.name;
   document.getElementById('me-status').value=m.status||'todo';
   document.getElementById('me-desc').value=m.desc||'';
   refreshGroupDropdowns();
@@ -733,11 +733,19 @@ function openModuleEdit(idx){
 }
 function saveModuleEdit(){
   var m=MODULES[_editModIdx];if(!m)return;
+  var oldName=m.name;
+  var newName=document.getElementById('me-name').value.trim();
+  if(!newName){document.getElementById('me-name').focus();return;}
+  m.name=newName;
   m.status=document.getElementById('me-status').value;
   m.group=document.getElementById('me-group').value;
   m.desc=document.getElementById('me-desc').value.trim();
   var newParent=document.getElementById('me-parent').value;
   m.parent=newParent||undefined;
+  // Update any sub-modules that referenced the old name
+  if(oldName!==newName){
+    MODULES.forEach(function(s){if(s.parent===oldName)s.parent=newName;});
+  }
   document.getElementById('modEditModal').classList.remove('open');
   saveModules();
   renderModules();
@@ -1030,8 +1038,8 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 <div class="mo" id="modEditModal">
   <div class="modal" style="max-width:440px">
     <div class="modal-hdr">
-      <h3 id="me-name">Module</h3>
-      <p style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:3px">Edit module status and group</p>
+      <input id="me-name" class="mi" style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;background:transparent;border:none;border-bottom:1.5px solid var(--border);border-radius:0;padding:4px 0;color:var(--text);outline:none;width:100%;" placeholder="Module name">
+      <p style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:4px">Edit module name, status and group</p>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;padding:18px 20px">
       <div>
