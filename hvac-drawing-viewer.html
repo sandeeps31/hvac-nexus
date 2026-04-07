@@ -62,17 +62,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 .drw-pin:hover{transform:translate(-50%,-50%) scale(1.2);z-index:40}
 .drw-pin.hidden{display:none}
 /* ITP - pill */
-.pin-itp{height:96px;min-width:96px;padding:0 18px;border-radius:48px;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 10px rgba(0,0,0,.6);background:#6d4aff;color:#fff;white-space:nowrap}
+.pin-itp{height:22px;min-width:22px;padding:0 7px;border-radius:11px;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);background:#6d4aff;color:#fff;white-space:nowrap}
 .pin-itp.ns{background:#3d5a7a}.pin-itp.ip{background:#cc8800}.pin-itp.act{background:#cc2244}.pin-itp.cl{background:#00aa70}
 /* Defect - circle */
-.pin-def{width:96px;height:96px;border-radius:50%;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 10px rgba(0,0,0,.6);background:var(--danger);color:#fff}
+.pin-def{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);background:var(--danger);color:#fff}
 .pin-def.cl{background:#00aa70}
 /* Fire Seal - diamond */
-.pin-fs-wrap{width:96px;height:96px;display:flex;align-items:center;justify-content:center}
-.pin-fs{width:72px;height:72px;background:#ff4444;border:2px solid rgba(255,255,255,.7);transform:rotate(45deg);box-shadow:0 2px 10px rgba(0,0,0,.6)}
+.pin-fs-wrap{width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.pin-fs{width:18px;height:18px;background:#ff4444;border:2px solid rgba(255,255,255,.7);transform:rotate(45deg);box-shadow:0 2px 8px rgba(0,0,0,.5)}
 .pin-fs.cl{background:#00aa70}
 /* Fire Damper - pentagon via clip-path */
-.pin-fd{width:96px;height:96px;background:#ff9500;border:2px solid rgba(255,255,255,.7);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 10px rgba(0,0,0,.6);color:#fff;clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%)}
+.pin-fd{width:22px;height:22px;background:#ff9500;border:2px solid rgba(255,255,255,.7);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);color:#fff;clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%)}
 .pin-fd.cl{background:#00aa70}
 /* Pin label on hover */
 .pin-lbl{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);background:rgba(8,12,18,.92);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);white-space:nowrap;pointer-events:none;display:none;z-index:50}
@@ -283,20 +283,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 
 <!-- FIRE DAMPER MODAL -->
 <div class="mo" id="fdMo">
-  <div class="modal" style="width:420px">
+  <div class="modal" style="width:440px">
     <div class="modal-hdr"><h3>🟠 Fire Damper Pin</h3><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="fdRef"></span></div>
     <div class="modal-body">
       <div>
-        <label class="ml">Damper Tag</label>
+        <label class="ml">Equipment ID (Tag)</label>
         <input class="mi" id="fdTag" placeholder="e.g. FD-L02-001">
       </div>
       <div>
-        <label class="ml">Duct Size</label>
-        <input class="mi" id="fdSize" placeholder="e.g. 600x300">
-      </div>
-      <div>
-        <label class="ml">Assignee</label>
-        <input class="mi" id="fdAssignee" placeholder="Assigned subcontractor">
+        <label class="ml">Assignee — Duct Installer</label>
+        <select class="mi" id="fdAssignee" style="cursor:pointer">
+          <option value="">— Select installer —</option>
+        </select>
       </div>
       <div>
         <label class="ml">Status</label>
@@ -307,10 +305,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
         </div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="mbtn" onclick="closeFdMo()">Cancel</button>
+    <div class="modal-footer" style="flex-wrap:wrap;gap:6px">
       <button class="mbtn danger" id="fdDelBtn" onclick="deleteCurrentPin()" style="display:none;margin-right:auto">Delete</button>
-      <button class="mbtn primary" onclick="saveFdPin()">Save</button>
+      <button class="mbtn" onclick="closeFdMo()">Cancel</button>
+      <button class="mbtn" id="fdSaveAnotherBtn" onclick="saveFdPin('another')" style="display:none">Save &amp; Add Another</button>
+      <button class="mbtn" id="fdSaveOpenBtn" onclick="saveFdPin('open')" style="display:none">Save &amp; Open ITP</button>
+      <button class="mbtn primary" onclick="saveFdPin('close')">Save</button>
     </div>
   </div>
 </div>
@@ -353,7 +353,6 @@ var pKey=(dbGetCurrentProject()||{}).num||'GCT001';
 var _scale=1,_offsetX=0,_offsetY=0;
 var _dragging=false,_lastX=0,_lastY=0;
 var _canvasW=0,_canvasH=0;
-var PDF_FAST_RES=1.5,PDF_BASE_RES=3.0,_renderTask=null;
 var _renderTask=null;
 var _placing=false; // true = click places pin
 var _placeType=''; // 'itp','defect','fireseal','firedamper'
@@ -427,26 +426,16 @@ function loadFromData(dataUrl){
 }
 function renderPdf(pdf){
   pdf.getPage(1).then(function(page){
-    var vpFast=page.getViewport({scale:PDF_FAST_RES});
-    var fast=document.createElement('canvas');fast.width=vpFast.width;fast.height=vpFast.height;
-    page.render({canvasContext:fast.getContext('2d'),viewport:vpFast}).promise.then(function(){
-      var canvas=document.getElementById('pdfCanvas');
-      canvas.width=fast.width;canvas.height=fast.height;
-      canvas.getContext('2d').drawImage(fast,0,0);
-      _canvasW=fast.width;_canvasH=fast.height;
+    var vp=page.getViewport({scale:1});
+    _canvasW=vp.width;_canvasH=vp.height;
+    var canvas=document.getElementById('pdfCanvas');
+    canvas.width=_canvasW;canvas.height=_canvasH;
+    var ctx=canvas.getContext('2d');
+    page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
       document.getElementById('loading').style.display='none';
       fitToScreen();
-      renderPins();renderPanel();
-      var vpHi=page.getViewport({scale:PDF_BASE_RES});
-      var hi=document.createElement('canvas');hi.width=vpHi.width;hi.height=vpHi.height;
-      if(_renderTask){try{_renderTask.cancel();}catch(e){}}
-      _renderTask=page.render({canvasContext:hi.getContext('2d'),viewport:vpHi});
-      _renderTask.promise.then(function(){
-        canvas.width=vpHi.width;canvas.height=vpHi.height;
-        canvas.getContext('2d').drawImage(hi,0,0);
-        _canvasW=vpHi.width;_canvasH=vpHi.height;
-        fitToScreen();renderPins();renderPanel();
-      }).catch(function(){});
+      renderPins();
+      renderPanel();
     });
   });
 }
@@ -696,34 +685,88 @@ function selectFdStatus(st){
   var m={'not-started':'ns','in-progress':'ip','closed':'cl'};
   if(m[st])document.getElementById('fdst-'+m[st]).classList.add('primary');
 }
+async function loadFdAssignees(){
+  var sel=document.getElementById('fdAssignee');if(!sel)return;
+  var current=sel.value;
+  sel.innerHTML='<option value="">— Select installer —</option>';
+  var contacts=[];
+  try{var cs=await dbGetCompanySettings();if(cs&&cs.contacts)contacts=cs.contacts;}catch(e){}
+  var subs=contacts.filter(function(c){return c.type==='Subcontractor';});
+  var ductTrades=subs.filter(function(c){return (c.trade||'').toLowerCase().includes('duct')||(c.trade||'').toLowerCase().includes('fire')||(c.trade||'').toLowerCase().includes('mechanical');});
+  var other=subs.filter(function(c){return !ductTrades.includes(c);});
+  if(ductTrades.length){
+    var grp1=document.createElement('optgroup');grp1.label='Duct / Mechanical';
+    ductTrades.forEach(function(c){
+      var o=document.createElement('option');o.value=c.company+(c.contact?' — '+c.contact:'');
+      o.textContent=c.company+(c.contact?' ('+c.contact+')':'')+(c.trade?' · '+c.trade:'');
+      grp1.appendChild(o);
+    });
+    sel.appendChild(grp1);
+  }
+  if(other.length){
+    var grp2=document.createElement('optgroup');grp2.label='Other Subcontractors';
+    other.forEach(function(c){
+      var o=document.createElement('option');o.value=c.company+(c.contact?' — '+c.contact:'');
+      o.textContent=c.company+(c.contact?' ('+c.contact+')':'');
+      grp2.appendChild(o);
+    });
+    sel.appendChild(grp2);
+  }
+  if(!subs.length){
+    var o=document.createElement('option');o.disabled=true;o.textContent='No subcontractors in company settings';
+    sel.appendChild(o);
+  }
+  if(current)sel.value=current;
+}
 function openFdMo(pin){
   _fdPinCache=pin;
   _fdStatus=pin?(responses[pin.id]||{}).status||'not-started':'not-started';
   document.getElementById('fdTag').value=pin?(pin.tag||''):'';
-  document.getElementById('fdSize').value=pin?(pin.size||''):'';
-  document.getElementById('fdAssignee').value=pin?(pin.assignee||''):'';
   document.getElementById('fdRef').textContent=pin?pin.ref:'';
   document.getElementById('fdDelBtn').style.display=pin?'':'none';
+  // Save & Add Another / Save & Open ITP only for new pins
+  var isNew=!pin;
+  document.getElementById('fdSaveAnotherBtn').style.display=isNew?'':'none';
+  document.getElementById('fdSaveOpenBtn').style.display=isNew?'':'none';
+  loadFdAssignees();
+  document.getElementById('fdAssignee').value=pin?(pin.assignee||''):'';
   selectFdStatus(_fdStatus);
   document.getElementById('fdMo').classList.add('open');
 }
 function closeFdMo(){document.getElementById('fdMo').classList.remove('open');_fdPinCache=null;}
-function saveFdPin(){
+function saveFdPin(action){
   if(!curDrawing.pins)curDrawing.pins=[];
   var u=dbGetCurrentUser();
+  var tag=document.getElementById('fdTag').value.trim();
+  var assignee=document.getElementById('fdAssignee').value;
+  var savedPin=null;
   if(_fdPinCache){
-    _fdPinCache.tag=document.getElementById('fdTag').value.trim();
-    _fdPinCache.size=document.getElementById('fdSize').value.trim();
-    _fdPinCache.assignee=document.getElementById('fdAssignee').value.trim();
+    _fdPinCache.tag=tag;
+    _fdPinCache.assignee=assignee;
     responses[_fdPinCache.id]=responses[_fdPinCache.id]||{};
     responses[_fdPinCache.id].status=_fdStatus;
+    savedPin=_fdPinCache;
   } else {
     var ref=nextRef('FD');
-    var pin={id:nid(),type:'firedamper',ref:ref,tag:document.getElementById('fdTag').value.trim(),size:document.getElementById('fdSize').value.trim(),assignee:document.getElementById('fdAssignee').value.trim(),x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
-    curDrawing.pins.push(pin);
-    responses[pin.id]={status:_fdStatus};
+    savedPin={id:nid(),type:'firedamper',ref:ref,tag:tag,assignee:assignee,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    curDrawing.pins.push(savedPin);
+    responses[savedPin.id]={status:'not-started'};
   }
-  saveAll();renderPins();renderPanel();closeFdMo();toast('Fire damper pin saved');
+  saveAll();renderPins();renderPanel();
+  if(action==='another'){
+    // Close modal and immediately re-enter placement mode for another FD pin
+    closeFdMo();
+    toast('Fire damper saved — click to place next pin');
+    startPlace('firedamper');
+  } else if(action==='open'){
+    // Save and navigate to ITP form for this pin
+    closeFdMo();
+    var pNum=_proj?(_proj.num||_proj.number||''):'';
+    window.location.href='hvac-itp-form.html?pin='+encodeURIComponent(savedPin.id)+(pNum?'&p='+encodeURIComponent(pNum):'');
+  } else {
+    closeFdMo();
+    toast('Fire damper pin saved');
+  }
 }
 
 // ── DEFECT PIN MODAL (syncs with defects table) ──
