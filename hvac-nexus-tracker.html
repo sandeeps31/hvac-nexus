@@ -278,8 +278,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <div>
         <label class="ml">Type *</label>
         <select class="ms" id="m-type" onchange="updateModalType()">
-          <option value="bug">🐛 Bug</option>
-          <option value="feature">✨ Feature Request</option>
+          <option value="bug">&#128027; Bug</option>
+          <option value="feature">&#10024; Feature Request</option>
+          <option value="module">&#128230; New Module</option>
         </select>
       </div>
       <div>
@@ -694,32 +695,63 @@ function deleteItem(id){
 
 function renderModules(){
   var grid=document.getElementById('moduleGrid');
-  var statusOrder={built:0,wip:1,todo:2};
-  var sorted=MODULES.slice().sort(function(a,b){return (statusOrder[a.status]||0)-(statusOrder[b.status]||0);});
   var bugCount={};var featCount={};
   items.forEach(function(it){
     var m=it.module||'';
     if(it.type==='bug'&&it.status!=='done'&&it.status!=='wont-fix'){bugCount[m]=(bugCount[m]||0)+1;}
-    if(it.type==='feature'&&it.status==='planned'){featCount[m]=(featCount[m]||0)+1;}
+    if(it.type==='feature'&&it.status!=='done'){featCount[m]=(featCount[m]||0)+1;}
   });
-  grid.innerHTML='<div class="mod-grid">'+sorted.map(function(m){
-    var sCls=m.status==='built'?'mod-status-built':m.status==='wip'?'mod-status-wip':'mod-status-todo';
-    var sLbl=m.status==='built'?'✓ Built':m.status==='wip'?'⚠ In Progress':'○ Not Built';
-    var bugs=bugCount[m.name]||0;
-    var feats=featCount[m.name]||0;
-    var pLbl=m.priority?{high:'🟠 High priority',medium:'🔵 Medium priority',low:'⚪ Low priority'}[m.priority]||'':'';
-    return '<div class="mod-card">'
-      +'<div class="mod-card-hdr"><div class="mod-card-name">'+escH(m.name)+'</div><span class="'+sCls+'">'+sLbl+'</span></div>'
-      +'<div class="mod-card-desc">'+escH(m.desc)+'</div>'
-      +'<div class="mod-priority-row">'
-        +(pLbl?'<span>'+pLbl+'</span>':'')
-        +(bugs?'<span style="color:var(--danger)">🐛 '+bugs+' bug'+(bugs!==1?'s':'')+'</span>':'')
-        +(feats?'<span style="color:var(--purple)">✨ Planned</span>':'')
-      +'</div>'
-    +'</div>';
-  }).join('')+'</div>';
+  var html='';
+  MODULE_GROUPS.forEach(function(grp){
+    var grpModules=MODULES.filter(function(m){return m.group===grp.key;});
+    if(!grpModules.length)return;
+    html+='<div style="margin-bottom:28px">';
+    html+='<div class="mod-group-hdr">'+grp.icon+' '+escH(grp.label)
+      +'<span style="margin-left:6px;color:var(--muted);font-weight:400">('+grpModules.length+')</span></div>';
+    html+='<div class="mod-grid">';
+    grpModules.forEach(function(m){
+      var midx=MODULES.indexOf(m);
+      var sCls=m.status==='built'?'mod-status-built':m.status==='wip'?'mod-status-wip':'mod-status-todo';
+      var sLbl=m.status==='built'?'&#10003; Built':m.status==='wip'?'&#9888; In Progress':'&#9675; Not Built';
+      var bugs=bugCount[m.name]||0;
+      var feats=featCount[m.name]||0;
+      var pLbl=m.priority?({high:'&#128992; High',medium:'&#128309; Medium',low:'&#9898; Low'}[m.priority]||''):'';
+      html+='<div class="mod-card">'
+        +'<div class="mod-card-hdr"><div class="mod-card-name">'+escH(m.name)+'</div>'
+        +'<button class="mod-edit-btn" onclick="event.stopPropagation();openModuleEdit('+midx+')">Edit</button>'
+        +'<span class="'+sCls+'" style="margin-left:6px">'+sLbl+'</span></div>'
+        +'<div class="mod-card-desc">'+escH(m.desc)+'</div>'
+        +'<div class="mod-priority-row">'
+          +(pLbl?'<span>'+pLbl+'</span>':'')
+          +(bugs?'<span style="color:var(--danger)">&#128027; '+bugs+' bug'+(bugs!==1?'s':'')+'</span>':'')
+          +(feats?'<span style="color:var(--purple)">&#10024; '+feats+' open</span>':'')
+        +'</div>'
+      +'</div>';
+    });
+    html+='</div></div>';
+  });
+  grid.innerHTML=html;
   document.getElementById('badge-modules').textContent=MODULES.length;
 }
+
+function openModuleEdit(idx){
+  var m=MODULES[idx];if(!m)return;
+  _editModIdx=idx;
+  document.getElementById('me-name').textContent=escH(m.name);
+  document.getElementById('me-status').value=m.status||'todo';
+  document.getElementById('me-group').value=m.group||'other';
+  document.getElementById('me-desc').value=m.desc||'';
+  document.getElementById('modEditModal').classList.add('open');
+}
+function saveModuleEdit(){
+  var m=MODULES[_editModIdx];if(!m)return;
+  m.status=document.getElementById('me-status').value;
+  m.group=document.getElementById('me-group').value;
+  m.desc=document.getElementById('me-desc').value.trim();
+  document.getElementById('modEditModal').classList.remove('open');
+  renderModules();
+}
+function closeModuleEdit(){document.getElementById('modEditModal').classList.remove('open');}
 
 function updateBadges(){
   var bugs=items.filter(function(it){return it.type==='bug'&&it.status!=='done'&&it.status!=='wont-fix';}).length;
