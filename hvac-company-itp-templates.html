@@ -133,6 +133,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .step-input:focus{border-color:var(--accent);background:var(--surface2)}.step-input::placeholder{color:var(--muted)}
 .type-sel{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 8px;outline:none;cursor:pointer;width:100%;min-width:130px}
 .type-sel:focus{border-color:var(--accent)}.type-sel option{background:var(--surface2)}
+.dd-popover{position:fixed;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;padding:14px 16px;width:280px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none}
+.dd-popover.open{display:block}
+.dd-popover h4{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin:0 0 10px}
+.dd-opt-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.dd-opt-inp{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;font-family:'DM Sans',sans-serif}
+.dd-opt-inp:focus{border-color:var(--accent)}
+.dd-opt-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;line-height:1}
+.dd-opt-del:hover{color:var(--danger)}
+.dd-add-btn{font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 0;font-family:'DM Sans',sans-serif}
+.dd-add-btn:hover{text-decoration:underline}
+.type-pill.has-opts{cursor:pointer;border-bottom:1px dashed var(--accent);color:var(--accent)}
+.type-cell-wrap{display:flex;align-items:center;gap:6px}
+.opts-badge{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);background:var(--surface3);border-radius:3px;padding:1px 5px}
 
 /* Flag colour boxes */
 .flags{display:flex;gap:4px;align-items:center;flex-shrink:0}
@@ -369,6 +382,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     </div>
     <!-- Editor body -->
     <div class="editor-body" id="editorBody"></div>
+
+    <!-- Dropdown options popover -->
+    <div class="dd-popover" id="ddPopover">
+      <h4>&#9660; Dropdown Options</h4>
+      <div id="ddOptList"></div>
+      <button class="dd-add-btn" onclick="ddAddOption()">+ Add option</button>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+        <button class="btn bsm" onclick="closeDdPopover()">Done</button>
+      </div>
+    </div>
   </div>
 
 </div><!-- /main -->
@@ -1041,12 +1064,34 @@ function renderEditorBody(itp,rev,canEdit){
           if(row.checkType===opt)o.selected=true;
           typeSelect.appendChild(o);
         });
-        typeSelect.onchange=(function(r){return function(){r.checkType=this.value;markDirty(itp);};})(row);
+        typeSelect.onchange=(function(r){return function(){
+          r.checkType=this.value;
+          if(this.value==='dropdown'&&(!r.options||!r.options.length))r.options=['Option 1'];
+          markDirty(itp);
+          // Re-render to show options badge
+          renderEditorBody(itp,rev,canEdit);
+        };})(row);
         tdType.appendChild(typeSelect);
+        if(row.checkType==='dropdown'){
+          var ddWrap=document.createElement('div');ddWrap.style.cssText='display:flex;align-items:center;gap:6px;margin-top:4px';
+          var optCount=document.createElement('span');optCount.className='opts-badge';
+          optCount.textContent=((row.options||[]).length||0)+' opts';
+          var editOptsBtn=document.createElement('button');editOptsBtn.className='dd-add-btn';editOptsBtn.textContent='Edit options &#9660;';
+          editOptsBtn.onclick=(function(r,el){return function(e){e.stopPropagation();openDdPopover(r,el,itp);};})(row,editOptsBtn);
+          ddWrap.appendChild(optCount);ddWrap.appendChild(editOptsBtn);
+          tdType.appendChild(ddWrap);
+        }
       } else {
         var typeLabel={'input':'Input Value','yesno':'Yes / No','passfail':'Pass / Fail','photo':'Photo / Attachment','document':'Document','signoff':'Sign-off','dropdown':'Dropdown'}[row.checkType]||row.checkType||'—';
         var typePill=document.createElement('span');typePill.className='type-pill';typePill.textContent=typeLabel;
-        tdType.appendChild(typePill);
+        if(row.checkType==='dropdown'&&row.options&&row.options.length){
+          var optBadge=document.createElement('span');optBadge.className='opts-badge';optBadge.style.marginLeft='6px';
+          optBadge.title=(row.options||[]).join(', ');
+          optBadge.textContent=(row.options.length)+' opts';
+          tdType.appendChild(typePill);tdType.appendChild(optBadge);
+        } else {
+          tdType.appendChild(typePill);
+        }
       }
       tr.appendChild(tdType);
 
@@ -1123,6 +1168,73 @@ function renderEditorBody(itp,rev,canEdit){
 }
 
 // ── DIRTY STATE ──
+// ── DROPDOWN POPOVER ──
+var _ddRow=null;
+var _ddItp=null;
+
+function openDdPopover(row,anchorEl,itp){
+  _ddRow=row;
+  _ddItp=itp;
+  if(!row.options||!row.options.length)row.options=['Option 1'];
+  var pop=document.getElementById('ddPopover');
+  renderDdOpts();
+  pop.classList.add('open');
+  // Position near anchor
+  var rect=anchorEl.getBoundingClientRect();
+  var top=rect.bottom+6;
+  var left=rect.left;
+  if(left+290>window.innerWidth)left=window.innerWidth-295;
+  if(top+220>window.innerHeight)top=rect.top-230;
+  pop.style.top=top+'px';pop.style.left=left+'px';
+  // Close on outside click
+  setTimeout(function(){
+    document.addEventListener('click',closeDdOnOutside,{once:false});
+  },10);
+}
+
+function closeDdOnOutside(e){
+  var pop=document.getElementById('ddPopover');
+  if(pop&&!pop.contains(e.target)){
+    closeDdPopover();
+    document.removeEventListener('click',closeDdOnOutside);
+  }
+}
+
+function closeDdPopover(){
+  var pop=document.getElementById('ddPopover');
+  if(pop)pop.classList.remove('open');
+  document.removeEventListener('click',closeDdOnOutside);
+}
+
+function renderDdOpts(){
+  if(!_ddRow)return;
+  var list=document.getElementById('ddOptList');
+  if(!list)return;
+  list.innerHTML='';
+  (_ddRow.options||[]).forEach(function(opt,i){
+    var row=document.createElement('div');row.className='dd-opt-row';
+    var inp=document.createElement('input');inp.className='dd-opt-inp';inp.value=opt;inp.placeholder='Option text';
+    inp.oninput=(function(idx){return function(){_ddRow.options[idx]=this.value;if(_ddItp)markDirty(_ddItp);};})(i);
+    var del=document.createElement('button');del.className='dd-opt-del';del.innerHTML='&#10005;';
+    del.onclick=(function(idx){return function(){
+      _ddRow.options.splice(idx,1);
+      renderDdOpts();
+      if(_ddItp)markDirty(_ddItp);
+    };})(i);
+    row.appendChild(inp);row.appendChild(del);list.appendChild(row);
+  });
+}
+
+function ddAddOption(){
+  if(!_ddRow)return;
+  if(!_ddRow.options)_ddRow.options=[];
+  _ddRow.options.push('');
+  renderDdOpts();
+  // Focus last input
+  var inputs=document.getElementById('ddOptList').querySelectorAll('input');
+  if(inputs.length)inputs[inputs.length-1].focus();
+}
+
 function markDirty(itp){
   _isDirty=true;
   var ind=document.getElementById('draftSaveIndicator');
