@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="theme.css">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ITP Templates — HVAC NEXUS</title>
+<title>Company ITP Templates — HVAC NEXUS</title>
 <style>
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
 
@@ -246,12 +246,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
       <div class="sb-group-items" id="gitems-quality" style="display:block">
         <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Register</span></div>
-        <div class="sb-item active" ><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
+        <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
         <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
       <div class="sb-group-items" id="gitems-settings" style="display:block">
-        <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
+        <div class="sb-item active" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
       </div></div>
   </nav>
   <div class="sb-footer"><div class="sb-av" id="sb-av">S</div><span class="sb-user-name" id="sb-user">—</span></div>
@@ -263,14 +263,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
   <div class="topbar">
     <div class="bc">
-      <span class="bcl" onclick="navTo('hvac-itp.html')">ITP Register</span><span class="bcs">›</span>
-      <span class="bcc" id="bcCurr">Project Templates</span>
+      <span class="bcl" onclick="navTo('hvac-settings.html')">Company Settings</span><span class="bcs">›</span>
+      <span class="bcc" id="bcCurr">Company ITP Templates</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="bg bsm btn" id="backToRegBtn" style="display:none" onclick="showRegister()">← Back to Templates</button>
       <button class="bg bsm btn" id="publishBtn" style="display:none" onclick="publishTemplate()">↑ Publish Revision</button>
-      <button class="bg bsm btn" id="importBtn" onclick="openImportModal()" style="gap:6px">⬇ Import from Company</button>
       <button class="bp bsm btn" id="newItpBtn" onclick="openNewItpModal()">＋ New ITP Template</button>
+    </div>
+  </div>
+
+    <div class="level-tab active" id="tab-project" onclick="switchLevel('project')">
+      📁 <span>Project Templates</span><span class="tab-count" id="tabCountProject">0</span>
     </div>
   </div>
 
@@ -444,7 +448,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 var _proj = dbGetCurrentProject();
 var _pNum = _proj.num||_proj.number||'GCT001';
 
-var currentLevel = 'project'; // always project level
+var currentLevel = 'company'; // fixed — this is the company library
 
 var templates = [];
 var companyTemplates = []; // always the company library
@@ -463,15 +467,10 @@ function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[
 
 // Storage
 function save(){
-  if(currentLevel==='company'){
-    dbSetItpTemplates(templates).catch(function(e){console.error('Save company templates error:',e);});
-  } else {
-    dbSetItpProjectTemplates(_pNum,templates).catch(function(e){console.error('Save project templates error:',e);});
-  }
+  dbSetItpTemplates(templates).catch(function(e){console.error('Save company templates error:',e);});
 }
 async function load(){
-  try{var s=await dbGetItpProjectTemplates(_pNum);templates=Array.isArray(s)?s:[];}catch(e){templates=[];}
-  try{var s2=await dbGetItpTemplates();companyTemplates=Array.isArray(s2)?s2:[];}catch(e){companyTemplates=[];}
+  try{var s=await dbGetItpTemplates();companyTemplates=Array.isArray(s)?s:[];templates=companyTemplates;}catch(e){companyTemplates=[];templates=[];}
 }
 
 // Auto-generate ITP number (uses active templates list)
@@ -563,6 +562,18 @@ var FCU_WC_TEMPLATE = {
 
 // ── ASYNC INIT ──
 async function initTemplates(){
+  // Role gate — Director and CM only
+  try{
+    var cu=dbGetCurrentUser();
+    var role=cu&&cu.role?cu.role.toLowerCase():'';
+    var allowed=['director','construction manager','cm','admin'];
+    var isAllowed=allowed.some(function(r){return role.includes(r);});
+    if(!isAllowed&&role!==''){
+      document.getElementById('accessDenied').style.display='flex';
+      document.getElementById('mainWrap').style.display='none';
+      return;
+    }
+  }catch(e){}
   await load();
   // Seed default FCU template into company library if empty
   if(!companyTemplates.length){
@@ -578,21 +589,9 @@ async function initTemplates(){
   }
 }
 
-// ── LEVEL SWITCHING ──
-async function switchLevel(level){
-  currentLevel=level;
-  if(level==='company'){
-    templates=companyTemplates;
-  } else {
-    try{var s=await dbGetItpProjectTemplates(_pNum);templates=Array.isArray(s)?s:[];}catch(e){templates=[];}
-  }
-  document.getElementById('tab-company').classList.toggle('active',level==='company');
-  document.getElementById('tab-project').classList.toggle('active',level==='project');
-  document.getElementById('importBtn').style.display=level==='project'?'':'none';
-  renderRegister();
-}
+// Level switching not needed — company level only
 function updateTabCounts(){
-  // project level only
+  // Single level — no tab counts needed
 }
 
 // ── VIEW MANAGEMENT ──
@@ -605,8 +604,7 @@ function showRegister(){
   document.getElementById('backToRegBtn').style.display='none';
   document.getElementById('publishBtn').style.display='none';
   document.getElementById('newItpBtn').style.display='';
-  document.getElementById('importBtn').style.display=currentLevel==='project'?'':'none';
-  document.getElementById('bcCurr').textContent='Project Templates';
+  document.getElementById('bcCurr').textContent='Company ITP Templates';
   activeItpId=null;
   renderRegister();
 }
@@ -1226,7 +1224,7 @@ var _cachedCS = {};
     document.getElementById('importBtn').style.display='none';
     document.getElementById('newItpBtn').textContent='＋ New Company Template';
     document.getElementById('bcParent').textContent='Company Settings';
-    document.getElementById('bcCurr').textContent='Project Templates';
+    document.getElementById('bcCurr').textContent='ITP Templates';
   } else {
     currentLevel='project';
     document.getElementById('importBtn').style.display='';
@@ -1267,5 +1265,13 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 })();
 
 </script>
+<!-- ACCESS DENIED OVERLAY -->
+<div id="accessDenied" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <div style="font-size:48px">🔒</div>
+  <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--text)">Access Restricted</div>
+  <div style="font-size:14px;color:var(--text2);text-align:center;max-width:380px;line-height:1.6">Company ITP Templates are managed by Directors and Construction Managers only.</div>
+  <button class="btn bp" onclick="navTo('hvac-settings.html')" style="margin-top:8px">← Back to Company Settings</button>
+</div>
+
 </body>
 </html>

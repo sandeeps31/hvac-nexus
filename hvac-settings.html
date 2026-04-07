@@ -371,7 +371,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
         </div>
         <div class="card-body" style="display:flex;align-items:center;justify-content:space-between">
           <div style="font-size:13px;color:var(--text2)">Create and manage reusable ITP checklists for FCUs, AHUs, fans and other equipment types.</div>
-          <button class="btn bp bsm" onclick="navTo('hvac-itp-templates.html')" style="flex-shrink:0;margin-left:16px">Open ITP Templates</button>
+          <button class="btn bp bsm" id="openItpTemplatesBtn" onclick="navTo('hvac-company-itp-templates.html')" style="flex-shrink:0;margin-left:16px">Open ITP Templates</button>
         </div>
       </div>
 
@@ -892,6 +892,14 @@ async function clearPrecxTemplate(){
 (async function(){
   var settings=await loadSettings();
   applySettings(settings);
+  // Role gate: show Open ITP Templates only for Director/CM/Admin
+  try{
+    var cu=dbGetCurrentUser();
+    var role=(cu&&cu.role?cu.role:'').toLowerCase();
+    var canAccess=['director','construction manager','cm','admin'].some(function(r){return role.includes(r);});
+    var btn=document.getElementById('openItpTemplatesBtn');
+    if(btn)btn.style.display=canAccess?'':'none';
+  }catch(e){}
   // Load existing template if any
   try{var tmpl=await dbGetBudget('__template__');if(tmpl)renderTemplateStatus(typeof tmpl==='string'?JSON.parse(tmpl):tmpl);}catch(e){}
 })();
