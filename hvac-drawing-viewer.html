@@ -759,11 +759,26 @@ function saveFdPin(action){
     toast('Fire damper saved — click to place next pin');
     startPlace('firedamper');
   } else if(action==='open'){
-    // Save and navigate to ITP form for this pin
+    // Create a linked ITP pin at the same location, then open ITP form
     closeFdMo();
-    var pNum=pKey||'';
+    var u2=dbGetCurrentUser();
+    var itpRef=nextRef('ITP');
+    var itpPin={
+      id:nid(),type:'itp',
+      ref:itpRef,
+      itpTypeLabel:'Fire Damper',
+      equip:savedPin.tag||'',
+      x:savedPin.x,y:savedPin.y,
+      createdBy:(u2&&(u2.name||u2.username))||'',
+      createdDate:today()
+    };
+    if(!curDrawing.pins)curDrawing.pins=[];
+    curDrawing.pins.push(itpPin);
+    responses[itpPin.id]={status:'not-started'};
+    saveAll();renderPins();
+    var pNum2=pKey||'';
     var dwgId3=(curDrawing&&curDrawing.id)||'';
-    window.location.href='hvac-itp-form.html?pinId='+encodeURIComponent(savedPin.id)+'&drawingId='+encodeURIComponent(dwgId3)+(pNum?'&p='+encodeURIComponent(pNum):'');
+    window.open('hvac-itp-form.html?pinId='+encodeURIComponent(itpPin.id)+'&drawingId='+encodeURIComponent(dwgId3)+(pNum2?'&p='+encodeURIComponent(pNum2):''),'_blank');
   } else {
     closeFdMo();
     toast('Fire damper pin saved');
