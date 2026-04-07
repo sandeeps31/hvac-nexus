@@ -760,6 +760,8 @@ function renderRegister(){
   list.forEach(function(itp){
     var pubRev=publishedRev(itp);
     var hasDraft=hasDraftRev(itp);
+    var draftRevObj=itp.revisions.find(function(r){return r.status==='draft';});
+    var hasDraftSaved=hasDraft&&draftRevObj&&draftRevObj.savedOnce;
     var importedBadge=itp.importedFrom?'<span class="imported-badge">imported</span>':'';
     rows+='<tr style="cursor:pointer" onclick="viewItp(\''+itp.id+'\')">'
       +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
@@ -768,7 +770,7 @@ function renderRegister(){
       +'<td><span class="status-badge sb-current">Current</span></td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(itp.createdDate)+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(pubRev.modifiedDate)+'</td>'
-      +'<td>'+(hasDraft?'<span class="status-badge sb-draft" style="font-size:10px">Draft in progress</span>':'<span style="color:var(--muted);font-size:12px">—</span>')+'</td>'
+      +'<td>'+(hasDraftSaved?'<span class="status-badge sb-draft" style="font-size:10px">Draft in progress</span>':'<span style="color:var(--muted);font-size:12px">—</span>')+'</td>'
       +'<td onclick="event.stopPropagation()">'
         +'<div class="act-btns-grid">'
           +'<button class="act-btn" onclick="editItp(\''+itp.id+'\')" title="Edit"><span class="tip">Edit</span>&#9999;&#65039;</button>'
@@ -821,8 +823,9 @@ function renderEditor(){
     if(verSpan)verSpan.textContent=isDraftR?rev.version:nextVersion(itp)-1;
   }
 
-  // Draft action button label
+  // Draft action button label + Cancel button
   var dab=document.getElementById('draftActionBtn');
+  var cancelBtn=document.getElementById('cancelDraftBtn');
   if(dab){
     if(canEdit){
       dab.innerHTML='&#128190; Save Draft';
@@ -832,6 +835,7 @@ function renderEditor(){
       dab.style.background='';dab.style.color='';dab.style.borderColor='';
     }
   }
+  if(cancelBtn)cancelBtn.style.display=canEdit?'':'none';
 
   // Publish button
   var pubBtn=document.getElementById('publishBtn');if(pubBtn)pubBtn.style.display='none';
@@ -862,7 +866,7 @@ function renderEditorBody(itp,rev,canEdit){
     // Section drag handle
     if(canEdit){
       var secHandle=document.createElement('span');
-      secHandle.className='drag-handle';secHandle.innerHTML='&#10;&#8285;';
+      secHandle.className='drag-handle';secHandle.innerHTML='&#8285;';
       secHandle.style.cssText='font-size:16px;margin-right:6px;cursor:grab;flex-shrink:0;color:var(--muted)';
       secHandle.draggable=true;
       (function(secId,wrapEl){
@@ -907,7 +911,7 @@ function renderEditorBody(itp,rev,canEdit){
       var nameInp=document.createElement('input');
       nameInp.className='step-input';
       nameInp.value=sec.name;
-      nameInp.style.cssText='width:100%;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);outline:none;transition:border-color .15s';
+      nameInp.style.cssText='width:100%;max-width:520px;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);outline:none;transition:border-color .15s';
       nameInp.onfocus=function(){this.style.borderColor='var(--accent)';};
       nameInp.onblur=function(){this.style.borderColor='var(--border)';};
       nameInp.onchange=(function(s){return function(){s.name=this.value;markDirty(itp);};})(sec);
@@ -925,10 +929,10 @@ function renderEditorBody(itp,rev,canEdit){
     }
 
     // Collapse button
-    var colBtn=document.createElement('button');colBtn.className='tset-collapse';colBtn.textContent='&#9662;';
+    var colBtn=document.createElement('button');colBtn.className='tset-collapse';colBtn.innerHTML='&#9662;';
     colBtn.onclick=(function(w){return function(){
       w.querySelector('.tset-body').classList.toggle('collapsed');
-      this.textContent=w.querySelector('.tset-body').classList.contains('collapsed')?'&#9656;':'&#9662;';
+      this.innerHTML=w.querySelector('.tset-body').classList.contains('collapsed')?'&#9656;':'&#9662;';
     };})(wrap);
     hdr.appendChild(colBtn);
 
@@ -975,7 +979,7 @@ function renderEditorBody(itp,rev,canEdit){
       // Row drag handle
       if(canEdit){
         var tdDrag=document.createElement('td');
-        var handle=document.createElement('span');handle.className='drag-handle';handle.innerHTML='&#10;&#8285;';handle.title='Drag to reorder';
+        var handle=document.createElement('span');handle.className='drag-handle';handle.innerHTML='&#8285;';handle.title='Drag to reorder';
         handle.draggable=true;
         (function(s,r,tbdy){
           handle.addEventListener('dragstart',function(e){
@@ -1159,6 +1163,18 @@ function startDraft(itp,rerender){
   if(rerender)renderEditor();
 }
 
+function cancelDraft(){
+  var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
+  var draftRev=itp.revisions.find(function(r){return r.status==='draft';});
+  if(draftRev&&!draftRev.savedOnce){
+    // Never saved — discard draft entirely
+    itp.revisions=itp.revisions.filter(function(r){return r.status!=='draft';});
+    save();
+  }
+  _isDirty=false;_draftEditMode=false;
+  renderEditor();
+}
+
 function toggleDraftEdit(){
   if(_draftEditMode){
     saveDraft();
@@ -1175,6 +1191,7 @@ function saveDraft(){
   var me='Sandeep';
   try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
   rev.modifiedDate=todayStr();rev.modifiedBy=me;
+  rev.savedOnce=true;
   save();
   _isDirty=false;_draftEditMode=false;
   renderEditor();
@@ -1390,7 +1407,7 @@ async function initTemplates(){
 
   templates=companyTemplates;
   await dbSetItpTemplates(companyTemplates);
-  if(cleaned)console.log('Cleaned stale drafts');
+
 
   // Sidebar
   applySB(localStorage.getItem(SBK)==='1');
