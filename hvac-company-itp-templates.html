@@ -300,13 +300,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <table class="reg-tbl" id="regTbl">
         <thead>
           <tr>
-            <th style="width:100px">ITP No.</th>
+            <th style="width:100px">Form No.</th>
             <th>ITP Type / Name</th>
             <th style="width:70px">Version</th>
             <th style="width:90px">Status</th>
             <th style="width:110px">Created</th>
             <th style="width:110px">Last Modified</th>
-            <th style="width:110px">Last Used</th>
+            <th style="width:120px">Draft Status</th>
+            
             <th style="width:130px;text-align:right">Actions</th>
           </tr>
         </thead>
@@ -332,10 +333,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <!-- ITP Header Block (matches ITP form style) -->
     <div class="itp-hdr-block">
       <div class="itp-hdr-row">
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Client Doc No.</div><div class="itp-hdr-val" id="ed-clientdoc">—</div></div>
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Ref No.</div><div class="itp-hdr-val mono" id="ed-itpno">—</div></div>
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Form No.</div><div class="itp-hdr-val mono" id="ed-formno">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Ref No.</div><div class="itp-hdr-val mono" style="color:var(--muted);font-style:italic;font-size:11px" id="ed-itpno">Auto-generated on ITP creation</div></div>
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">ITP Type</div><div class="itp-hdr-val" id="ed-itptype">—</div></div>
+        <div class="itp-hdr-cell" style="grid-column:span 2"><div class="itp-hdr-lbl">Version</div><div class="itp-hdr-val mono" id="ed-version">—</div></div>
       </div>
       <div class="itp-hdr-row cols3">
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Equipment ID</div><div class="itp-hdr-val mono" id="ed-equipid">—</div></div>
@@ -347,12 +347,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Location</div><div class="itp-hdr-val" id="ed-location">—</div></div>
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Sub Location</div><div class="itp-hdr-val" id="ed-subloc">—</div></div>
       </div>
-      <div class="itp-hdr-row" style="grid-template-columns:repeat(3,1fr) 1fr">
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Version</div><div class="itp-hdr-val mono" id="ed-version">—</div></div>
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Creator</div><div class="itp-hdr-val" id="ed-creator">—</div></div>
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Date Created</div><div class="itp-hdr-val" id="ed-created">—</div></div>
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Last Modified</div><div class="itp-hdr-val" id="ed-modified">—</div></div>
-      </div>
+      <!-- hidden fields for compat -->
+      <div style="display:none"><span id="ed-creator"></span><span id="ed-created"></span><span id="ed-modified"></span><span id="ed-formno"></span><span id="ed-clientdoc"></span></div>
     </div>
     <!-- Flag legend -->
     <div style="padding:8px 24px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -394,7 +390,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
           <thead>
             <tr>
               <th style="width:36px"></th>
-              <th style="width:100px">ITP No.</th>
+              <th style="width:100px">Form No.</th>
               <th>ITP Type / Name</th>
               <th style="width:80px">Version</th>
               <th style="width:90px">Status</th>
@@ -422,7 +418,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div class="modal-body">
       <label class="ml">ITP Type Name *</label>
       <input class="mi" id="new-itptype" placeholder="e.g. FCU — Water Cooled"/>
-      <label class="ml">ITP No. (auto-generated if blank)</label>
+      <label class="ml">Form No. (auto-generated if blank)</label>
       <input class="mi mono" id="new-itpno" placeholder="e.g. ITP-001"/>
     </div>
     <div class="modal-footer">
@@ -498,6 +494,7 @@ var companyTemplates = []; // always the company library
 var activeItpId = null;
 var _inEditor = false;
 var _isDirty = false;
+var _draftEditMode = false;
 var _uid = 0;
 function nid(){return 'itp'+(++_uid)+Date.now();}
 
@@ -721,6 +718,7 @@ function showRegister(){
     if(!confirm('You have unsaved changes to this draft. Leave without saving?'))return;
   }
   _isDirty=false;
+  _draftEditMode=false;
   _inEditor=false;
   document.getElementById('backToRegBtn').style.display='none';
   document.getElementById('publishBtn').style.display='none';
@@ -785,7 +783,7 @@ function renderRegister(){
       +'<td>'+stBadge+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(itp.createdDate)+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.modifiedDate)+'</td>'
-      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.lastUsed)+'</td>'
+      +'<td>'+(hasDraft?'<span class="status-badge sb-draft" style="font-size:10px">Draft in progress</span>':'<span style="color:var(--muted);font-size:12px">—</span>')+'</td>'
       +'<td onclick="event.stopPropagation()">'
         +'<div class="act-btns-grid">'
           +'<button class="act-btn" onclick="editItp(\''+itp.id+'\')" title="Edit"><span class="tip">Edit</span>✏️</button>'
@@ -825,17 +823,28 @@ function renderEditor(){
   var draftBar2=document.getElementById('draftEditBar');
   var draftVer=document.getElementById('draftVerNum');
   if(draftBar2){draftBar2.classList.toggle('visible',isDraftRev);}
+  var draftActionBtn=document.getElementById('draftActionBtn');
+  if(draftActionBtn){
+    if(_draftEditMode){
+      draftActionBtn.innerHTML='&#128190; Save Draft';
+      draftActionBtn.style.background='var(--accent)';draftActionBtn.style.color='#000';
+    } else {
+      draftActionBtn.innerHTML='&#9999; Edit Draft';
+      draftActionBtn.style.background='';draftActionBtn.style.color='';
+    }
+  }
   if(draftVer&&isDraftRev)draftVer.textContent=rev.version;
 
   var stBadge=rev.status==='current'?'<span class="status-badge sb-current">Current</span>':rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>':'<span class="status-badge sb-superseded">Superseded</span>';
   document.getElementById('editorStatusBadge').innerHTML=stBadge;
 
-  var canEdit=rev.status==='draft';
+  var canEdit=rev.status==='draft'&&_draftEditMode;
   document.getElementById('publishBtn').style.display='none'; // now in draftEditBar
 
   // Start New Draft bar — shows when viewing a current/superseded revision
   var draftBar=document.getElementById('startDraftBar');
-  if(draftBar)draftBar.style.display=(rev.status==='current')?'flex':'none';
+  var hasDraftRev=itp.revisions.some(function(r){return r.status==='draft';});
+  if(draftBar)draftBar.style.display=(rev.status==='current'&&!hasDraftRev)?'flex':'none';
 
   renderEditorBody(itp, rev, canEdit);
 }
@@ -850,15 +859,8 @@ function renderEditorBody(itp, rev, canEdit){
     // Header
     var hdr=document.createElement('div');hdr.className='tset-hdr';
     var numSpan=document.createElement('span');numSpan.className='tset-num';
-    if(canEdit){
-      var refInp=document.createElement('input');refInp.className='step-input';refInp.value=sec.ref;
-      refInp.style.cssText='width:50px;font-family:DM Mono,monospace;font-size:11px;color:var(--accent);font-weight:700;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 6px;text-align:center;outline:none';
-      refInp.title='Section number';
-      refInp.onchange=(function(s){return function(){s.ref=this.value;autosave(itp);};})(sec);
-      numSpan.appendChild(refInp);
-    } else {
-      numSpan.textContent=sec.ref;
-    }
+    // Always display-only — auto-numbered from position
+    numSpan.textContent=String(si+1).padStart(2,'0');
     var nameSpan=document.createElement('span');nameSpan.className='tset-name';
     if(canEdit){
       var nameInp=document.createElement('input');nameInp.className='step-input';nameInp.value=sec.name;nameInp.style.cssText='width:auto;min-width:160px;font-family:Syne,sans-serif;font-weight:700;font-size:13px;background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);outline:none;transition:border-color .15s';
@@ -1076,6 +1078,17 @@ nameInp.onblur=function(){this.style.borderColor='var(--border)';};
 }
 
 // ── DRAFT / PUBLISH ──
+function toggleDraftEdit(){
+  if(_draftEditMode){
+    // Currently editing — save
+    saveDraft();
+  } else {
+    // Currently viewing — enter edit mode
+    _draftEditMode=true;
+    renderEditor();
+  }
+}
+
 function saveDraft(){
   if(!_inEditor)return;
   var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
@@ -1085,13 +1098,16 @@ function saveDraft(){
   rev.modifiedDate=todayStr();rev.modifiedBy=me;
   save();
   _isDirty=false;
+  _draftEditMode=false;
+  renderEditor(); // re-render in view mode — Save Draft btn becomes Edit Draft
   var ind=document.getElementById('draftSaveIndicator');
-  if(ind){ind.style.color='var(--green)';ind.textContent='&#10003; Saved';setTimeout(function(){if(ind)ind.textContent='';},2500);}
+  if(ind){ind.style.color='var(--green)';ind.textContent='&#10003; Saved';setTimeout(function(){if(ind&&ind.textContent.includes('Saved'))ind.textContent='';},2500);}
 }
 
 function doStartDraft(){
   var itp=templates.find(function(t){return t.id===activeItpId;});
   if(!itp)return;
+  _draftEditMode=true;
   startDraft(itp);
 }
 
@@ -1170,7 +1186,7 @@ function openRevHist(itpId){
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.version===1?itp.createdDate:rev.modifiedDate)+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.modifiedDate)+'</td>'
       +'<td><span class="'+stCls+'">'+stLbl+'</span></td>'
-      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.lastUsed)+'</td>'
+      
       +'</tr>';
   });
   body.innerHTML=html;
