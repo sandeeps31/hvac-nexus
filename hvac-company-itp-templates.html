@@ -327,7 +327,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:14px;height:14px;border-radius:2px;background:#eab308"></div>Export Username</div>
     </div>
     <!-- Start New Draft bar -->
-    <div id="startDraftBar" style="display:none;padding:10px 24px;background:var(--accent-dim);border-bottom:1px solid rgba(0,200,255,.2);display:none;align-items:center;justify-content:space-between">
+    <div id="startDraftBar" style="display:none;padding:10px 24px;background:var(--accent-dim);border-bottom:1px solid rgba(0,200,255,.2);align-items:center;justify-content:space-between">
       <span style="font-size:12px;color:var(--text2)">This template is published. Start a new draft to make changes.</span>
       <button class="btn bp bsm" id="startDraftBtn">&#9999; Start New Draft</button>
     </div>
@@ -458,6 +458,7 @@ var currentLevel = 'company'; // fixed — this is the company library
 var templates = [];
 var companyTemplates = []; // always the company library
 var activeItpId = null;
+var _inEditor = false;
 var _uid = 0;
 function nid(){return 'itp'+(++_uid)+Date.now();}
 
@@ -670,6 +671,7 @@ function showView(id){
 }
 function showRegister(){
   showView('register');
+  _inEditor=false;
   document.getElementById('backToRegBtn').style.display='none';
   document.getElementById('publishBtn').style.display='none';
   document.getElementById('newItpBtn').style.display='';
@@ -690,6 +692,7 @@ function editItp(itpId){
 }
 
 function openEditor(itpId){
+  _inEditor=true;
   activeItpId=itpId;
   showView('editor');
   var _lt=document.getElementById('levelTabs');if(_lt)_lt.style.display='none';
@@ -770,7 +773,7 @@ function renderEditor(){
   var draftBar=document.getElementById('startDraftBar');
   if(draftBar){
     if(rev.status==='current'){
-      draftBar.style.display='';
+      draftBar.style.display='flex';
       var draftBarBtn=document.getElementById('startDraftBtn');
       if(draftBarBtn){
         draftBarBtn.onclick=function(){startDraft(itp);renderEditor();};
@@ -925,7 +928,7 @@ function renderEditorBody(itp, rev, canEdit){
       ];
       flagDefs.forEach(function(fd){
         var fb=document.createElement('div');fb.className='flag-box '+fd.cls+(row.flags[fd.key]?' active':'');
-        if(fd.icon)fb.textContent=fd.icon;
+        if(fd.icon)fb.innerHTML=fd.icon;
         var tip=document.createElement('span');tip.className='ftip';tip.textContent=fd.tip;
         fb.appendChild(tip);
         if(canEdit){
@@ -1286,13 +1289,7 @@ function showToast(msg){
 });
 
 function bcParentClick(){
-  // If in editor view, go back to template list
-  var regView=document.getElementById('view-register');
-  if(regView&&!regView.classList.contains('active')){
-    showRegister();
-    return;
-  }
-  // Otherwise go to company settings
+  if(_inEditor){showRegister();return;}
   navTo('hvac-settings.html');
 }
 
