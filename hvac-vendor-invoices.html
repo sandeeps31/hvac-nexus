@@ -536,7 +536,18 @@ function saveRequest(){
   alert('Invoice request logged. 10-day deadline: '+fmtD(r.deadline));
 }
 
-// renderAll called in async init
+(async function(){
+  try{
+    _viPNum=(dbGetCurrentProject()||{}).num||'GCT001';
+    await load();
+    await loadAllPOs();
+    var poInvs=await loadPOInvoices();
+    window._poInvoicesCache=poInvs||[];
+    updateSummary();
+    renderAll();
+    renderClaimsPane();
+  }catch(e){console.error('Init error:',e);}
+})();
 </script>
 <script>
 (function(){try{var cp=localStorage.getItem('hvacnexus_current_project');if(cp){var p=JSON.parse(cp);document.querySelectorAll('.bc-proj-name').forEach(function(el){el.textContent=p.name||el.textContent;});}}catch(e){}})();
