@@ -527,25 +527,30 @@ function updateBudgetPanel(){
   var te=document.getElementById('bp-this');
   if(te)te.textContent=fmtZ(thisPO);
 
+  // Remaining always = budget - committed - thisPO (works even if budget = 0)
+  var remaining = budget - committed - thisPO;
+  var reEl = document.getElementById('bp-remaining');
+  if(reEl){
+    reEl.textContent = (committed===0 && thisPO===0 && !budget) ? '—' : fmtZ(remaining);
+    reEl.className = 'bp-val' + (remaining < 0 ? ' danger' : (budget && remaining < budget*0.1) ? ' warn' : ' green');
+  }
+
   if(!budget){
-    // No budget set for this line
     if(budgetEl){budgetEl.textContent='Not set';budgetEl.className='bp-val muted';}
-    var re=document.getElementById('bp-remaining');
-    if(re){re.textContent='—';re.className='bp-val muted';}
     if(barWrap)barWrap.style.display='none';
-    if(alert)alert.className='bp-alert visible info';
-    if(alertMsg){
-      alertMsg.innerHTML='No budget set for this line. <a href="hvac-budget.html" style="color:var(--accent);text-decoration:underline">Set budget →</a>';
+    if(committed===0 && thisPO===0){
+      if(alert)alert.className='bp-alert visible info';
+      if(alertMsg)alertMsg.innerHTML='No budget set for this line — contact your Estimator.';
+    } else {
+      if(alert)alert.className='bp-alert visible danger';
+      if(alertMsg)alertMsg.innerHTML='⚠ No budget set for this line — contact your Estimator.';
     }
     return;
   }
 
   // Budget exists
   if(budgetEl){budgetEl.textContent=fmtZ(budget);budgetEl.className='bp-val';}
-  var remaining=budget-committed-thisPO;
-  var pct=budget>0?Math.min((committed+thisPO)/budget*100,100):0;
-  var re2=document.getElementById('bp-remaining');
-  if(re2){re2.textContent=fmtZ(remaining);re2.className='bp-val'+(remaining<0?' danger':remaining<budget*0.1?' warn':' green');}
+  var pct=Math.min((committed+thisPO)/budget*100,100);
   if(barWrap)barWrap.style.display='';
   if(bar){bar.style.width=pct+'%';bar.style.background=pct>=100?'var(--danger)':pct>=80?'var(--warn)':'var(--green)';}
   if(remaining<0){
@@ -599,8 +604,8 @@ function buildDefault(){
     groups:groups.map((g,gi)=>({id:'g'+si+'_'+gi,parent:g.parent,budget:'',pos:[]}))
   }));
 }
-const saved=loadData();
-sections=saved?.sections||buildDefault();
+// sections loaded in async init below
+sections=buildDefault(); // temporary until async init runs
 
 // ── PO NUMBER ──
 function genPONum(){return PROJECT_NO+'-PO-'+String(getAllPOs().length+1).padStart(3,'0');}
@@ -979,7 +984,13 @@ function emailPO(){
 }
 
 // ── INIT ──
-(async function(){await loadBudgetData();populateFilters();renderList();})();
+(async function(){
+  const saved=await loadData();
+  if(saved?.sections){sections=saved.sections;}
+  await loadBudgetData();
+  populateFilters();
+  renderList();
+})();
 
 // Sidebar tooltip
 var sbTip=document.createElement('div');sbTip.id='sb-tip';document.body.appendChild(sbTip);
