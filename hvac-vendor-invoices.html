@@ -1,140 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Vendor Invoices — HVAC NEXUS</title>
 <link rel="stylesheet" href="theme.css">
-<script src="db.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vendor Invoices — HVAC NEXUS</title>
 <style>
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;margin:0;display:flex;min-height:100vh}
-.sb{width:var(--sb);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:width .2s}
-.sb.sm{width:var(--sb-sm)}
-.sb-resize-handle{position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:10}
-.sb-top{display:flex;align-items:center;justify-content:space-between;padding:16px 14px 12px;gap:8px;border-bottom:1px solid var(--border)}
-.sb-brand{display:flex;align-items:center;gap:8px;overflow:hidden}
-.sb-icon{font-size:20px;flex-shrink:0}
-.sb-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--accent);white-space:nowrap}
-.sb-toggle{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0}
-.sb-proj-block{padding:10px 14px 8px;border-bottom:1px solid var(--border)}
-.sb-proj-lbl{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:'DM Mono',monospace}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type=number]{-moz-appearance:textfield}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px}.sb-icon{font-size:20px}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 .sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sb-proj-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent)}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
 .sb-nav{flex:1;overflow-y:auto;padding:8px 0}
-.sb-group-hdr{display:flex;align-items:center;gap:6px;padding:7px 14px;cursor:pointer;color:var(--muted);font-size:11px;letter-spacing:1px;text-transform:uppercase;font-family:'DM Mono',monospace;user-select:none}
-.sb-group-hdr:hover{color:var(--text2)}
-.sb-group-chev{font-size:10px}
-.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent}.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
-.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;position:relative;white-space:nowrap;overflow:hidden}
+.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis}
+.sb-tooltip{position:absolute;left:100%;top:50%;transform:translateY(-50%);background:var(--surface2);color:var(--text);font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:400;margin-left:8px}
+.sb-group{}.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}
+.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}
+.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.sb-group-items .sb-item{padding-left:28px}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}
+.sb-user-name{font-size:12.5px;color:var(--text2);white-space:nowrap}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px}.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted);background:var(--surface2)}
+.bsm{padding:5px 12px;font-size:12px}
+.bdanger{background:transparent;color:var(--danger);border:1px solid rgba(255,77,109,.3)}.bdanger:hover{background:var(--danger-dim)}
+.sum-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:stretch;overflow-x:auto;flex-shrink:0}
+.sc{padding:11px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:3px;flex-shrink:0}
+.sc-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.sc-val{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;line-height:1}
+.sc-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.cb .sc-val{color:var(--accent)}.cg .sc-val{color:var(--green)}.cw .sc-val{color:var(--warn)}.cd .sc-val{color:var(--danger)}
+.toolbar{padding:10px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px;width:260px;transition:border-color .15s}
+.search-box:focus-within{border-color:var(--accent)}
+.search-box input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%}
+.search-box input::placeholder{color:var(--muted)}
+.fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;cursor:pointer}
+.fsel:focus{border-color:var(--accent);color:var(--text)}.fsel option{background:var(--surface2)}
+.page{padding:16px 24px 60px}
+.month-group{margin-bottom:14px}
+.month-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;user-select:none;transition:background .13s}
+.month-hdr:hover{background:var(--surface3)}
+.month-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1}
+.month-stats{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.month-pill{font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid var(--border);color:var(--muted)}
+.month-pill.all-good{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.month-pill.has-pending{background:var(--warn-dim);border-color:var(--warn);color:var(--warn)}
+.month-pill.has-rejected{background:var(--danger-dim);border-color:var(--danger);color:var(--danger)}
+.month-total{font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:600}
+.month-chev{font-size:11px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.month-group.collapsed .month-chev{transform:rotate(-90deg)}
+.month-group.collapsed .month-body{display:none}
+.month-group.collapsed .month-hdr{border-radius:var(--radius)}
+.inv-tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-top:none;overflow:hidden}
+.inv-tbl thead tr{background:var(--surface2)}
+.inv-tbl th{padding:8px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)}
+.inv-tbl th.r,.inv-tbl td.r{text-align:right}
+.inv-tbl td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.inv-tbl tbody tr:last-child td{border-bottom:none}
+.inv-tbl tbody tr.data-row{cursor:pointer;transition:background .13s}.inv-tbl tbody tr.data-row:hover td{background:var(--surface2)}
+.inv-num{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:600}
+.inv-po{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)}
+.sb-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.st-draft{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.st-approved{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.st-rejected{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
+.st-pending{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
+.days-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.d-ok{color:var(--green)}.d-warn{color:var(--warn)}.d-over{color:var(--danger)}
+.tot-row td{background:var(--surface2) !important;font-weight:600}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;gap:14px;color:var(--muted)}
+.empty-icon{font-size:40px;opacity:.4}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.mo.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:500px;max-width:96vw;transform:translateY(10px);transition:transform .2s;max-height:90vh;overflow-y:auto}
+.mo.open .modal{transform:translateY(0)}
+.modal h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px;color:var(--text)}
+.msub{color:var(--text2);font-size:12.5px;margin-bottom:14px}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;margin-top:12px}
+.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;transition:border-color .2s}
+.mi:focus{border-color:var(--accent);background:var(--surface2)}.mi::placeholder{color:var(--muted)}
+.ms{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;cursor:pointer}
+.ms:focus{border-color:var(--accent)}.ms option{background:var(--surface2)}
+.mta{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;resize:vertical;min-height:70px;transition:border-color .2s}
+.mta:focus{border-color:var(--accent)}.mta::placeholder{color:var(--muted)}
+.mac{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.reject-block{background:var(--danger-dim);border:1px solid rgba(255,77,109,.2);border-radius:8px;padding:12px 14px;margin-top:12px;display:none}
+.reject-block.show{display:block}
+.reject-block .ml{color:var(--danger);margin-top:0}
+
+
+/* ── SIDEBAR STANDARD ── */
+.sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden;overflow-x:hidden}
+.sb.sm{width:52px}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px;overflow:hidden}.sb-icon{font-size:20px;flex-shrink:0}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0;scrollbar-width:thin}
+.sb-nav::-webkit-scrollbar{width:4px}.sb-nav::-webkit-scrollbar-track{background:transparent}.sb-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;position:relative;overflow:hidden;text-decoration:none}.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.sb-tooltip{position:fixed;background:var(--surface2);color:var(--text);font-size:12px;font-weight:500;padding:5px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.sb-group{}.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 .sb-group-items .sb-item{padding-left:28px}
 .sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-group-hdr,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
-.sb-footer{padding:12px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
-.sb-av{width:30px;height:30px;border-radius:50%;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
-.sb-user-name{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sb-tooltip{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text);pointer-events:none;white-space:nowrap;z-index:9999;opacity:0;transition:opacity .1s}
-.main{flex:1;display:flex;flex-direction:column;margin-left:var(--sb);transition:margin-left .2s;min-height:100vh}
-/* Banner */
-.notif-banner{background:rgba(255,184,48,.08);border:1px solid var(--warn);border-radius:10px;margin:16px 28px 0;padding:12px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.notif-banner.hidden{display:none}
-/* Header */
-.hdr{padding:20px 28px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.hdr h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin:0}
-.hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-/* Buttons */
-.btn{height:34px;padding:0 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:all .13s}
-.btn:hover{border-color:var(--accent);color:var(--accent)}
-.btn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}.btn.primary:hover{opacity:.88}
-.btn.warn-btn{background:var(--warn);color:#000;border-color:var(--warn);font-weight:600}.btn.warn-btn:hover{opacity:.88}
-.btn.danger{border-color:var(--danger);color:var(--danger)}.btn.danger:hover{background:var(--danger-dim)}
-/* Stats */
-.stats-bar{display:flex;gap:12px;padding:16px 28px 0;flex-wrap:wrap}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;min-width:110px}
-.stat-val{font-family:'DM Mono',monospace;font-size:22px;font-weight:700}
-.stat-lbl{font-size:11px;color:var(--text2);margin-top:2px}
-.stat-card.s-total .stat-val{color:var(--text)}
-.stat-card.s-approved .stat-val{color:var(--green)}
-.stat-card.s-pending .stat-val{color:var(--warn)}
-.stat-card.s-var .stat-val{color:var(--danger)}
-/* Toolbar */
-.toolbar{display:flex;align-items:center;gap:8px;padding:16px 28px 0;flex-wrap:wrap}
-.search-box{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 12px;flex:1;min-width:200px;max-width:360px}
-.search-box input{background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%}
-.fsel{height:32px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text2);font-size:12px;padding:0 10px;cursor:pointer;font-family:'DM Sans',sans-serif;outline:none}
-/* Table */
-.tbl-wrap{padding:16px 28px 28px;overflow-x:auto}
-.month-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 0 6px;margin-top:8px;border-bottom:2px solid var(--border)}
-.month-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:800}
-.month-meta{font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);display:flex;gap:14px}
-.month-meta .mv{color:var(--text);font-weight:600}
-.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px}
-.tbl th{text-align:left;padding:9px 12px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;border-bottom:1px solid var(--border);white-space:nowrap}
-.tbl td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
-.tbl tr:hover td{background:var(--surface)}
-.tbl tr:last-child td{border-bottom:none}
-.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Mono',monospace;white-space:nowrap}
-.bd-draft{background:var(--surface3);color:var(--text2)}
-.bd-approved{background:var(--green-dim);color:var(--green)}
-.bd-final{background:rgba(0,200,255,.1);color:var(--accent)}
-.bd-matched{background:var(--green-dim);color:var(--green)}
-.bd-variance{background:var(--danger-dim);color:var(--danger)}
-.bd-paid{background:rgba(167,139,250,.12);color:var(--purple)}
-.bd-disputed{background:var(--warn-dim);color:var(--warn)}
-.match-ok{color:var(--green);font-weight:700;font-family:'DM Mono',monospace;font-size:12px}
-.match-var{color:var(--danger);font-weight:700;font-family:'DM Mono',monospace;font-size:12px}
-.match-none{color:var(--muted);font-size:12px}
-.pdf-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:11px;font-family:'DM Mono',monospace;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .13s;white-space:nowrap;text-decoration:none}
-.pdf-btn:hover{border-color:var(--accent);color:var(--accent)}
-.pdf-btn.has-pdf{color:var(--danger);border-color:rgba(255,77,109,.4)}
-.empty{text-align:center;padding:60px 20px;color:var(--muted)}
-.empty-icon{font-size:40px;margin-bottom:12px}
-/* Modals */
-.mo-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:none;align-items:center;justify-content:center}
-.mo-bg.open{display:flex}
-.mo{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:620px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
-.mo-hdr{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0}
-.mo-hdr h3{font-size:15px;font-weight:700;margin:0;font-family:'Syne',sans-serif}
-.mo-hdr-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:3px}
-.mo-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;padding:0 4px;flex-shrink:0}
-.mo-close:hover{color:var(--text)}
-.mo-body{padding:18px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;flex:1}
-.mo-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:space-between;align-items:center;flex-shrink:0}
-.ml{font-size:11px;color:var(--text2);margin-bottom:5px;display:block;font-weight:500}
-.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color .15s;box-sizing:border-box}
-.mi:focus{border-color:var(--accent)}
-.mi.err{border-color:var(--danger)}
-.ms{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer}
-.mi-row{display:flex;gap:10px}
-.mi-row>div{flex:1;display:flex;flex-direction:column}
-.upload-zone{border:2px dashed var(--border);border-radius:10px;padding:18px;text-align:center;cursor:pointer;transition:all .15s;position:relative}
-.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-dim)}
-.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.upload-zone-icon{font-size:22px;margin-bottom:4px}
-.upload-zone-lbl{font-size:12px;color:var(--text2)}
-.upload-zone-sub{font-size:11px;color:var(--muted);margin-top:2px}
-.upload-zone.has-file{border-color:var(--green);background:var(--green-dim)}
-.upload-zone.has-file .upload-zone-lbl{color:var(--green);font-weight:600}
-.ai-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-size:12px;margin-top:6px}
-.ai-box-hdr{display:flex;align-items:center;gap:6px;margin-bottom:7px;color:var(--accent);font-weight:600;font-size:11px;font-family:'DM Mono',monospace}
-.ai-row{display:flex;gap:8px;margin-bottom:5px;align-items:baseline}
-.ai-lbl{color:var(--muted);font-size:11px;width:100px;flex-shrink:0}
-.ai-val{color:var(--text);font-family:'DM Mono',monospace;font-size:12px}
-.ai-spin{animation:spin .8s linear infinite;display:inline-block}
-@keyframes spin{to{transform:rotate(360deg)}}
-.match-banner{border-radius:8px;padding:10px 14px;font-size:12px;display:flex;align-items:center;gap:8px}
-.match-ok-banner{background:var(--green-dim);border:1px solid var(--green);color:var(--green)}
-.match-warn-banner{background:var(--danger-dim);border:1px solid var(--danger);color:var(--danger)}
-.sec-div{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:10px;font-family:'DM Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;margin:2px 0}
-.sec-div::before,.sec-div::after{content:'';flex:1;height:1px;background:var(--border)}
-/* Vendor checklist */
-.vendor-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);transition:background .1s}
-.vendor-row:last-child{border-bottom:none}
-.vendor-row:hover{background:var(--surface2)}
-.v-check{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
-.v-name{font-size:13px;font-weight:600;color:var(--text);flex:1}
-.v-meta{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
-.v-email-miss{color:var(--danger);font-size:11px}
-.info-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-size:12px;display:flex;gap:20px;flex-wrap:wrap}
-.info-box span{color:var(--muted)}
-.info-box strong{color:var(--text);font-family:'DM Mono',monospace;font-weight:600}
+.sb.sm .sb-group-items{display:block !important}.sb.sm .sb-item{padding:9px 14px;justify-content:center;border-left:none;overflow:visible}
+.sb.sm .sb-top{padding:14px 12px 10px;justify-content:center}.sb.sm .sb-footer{justify-content:center}.sb.sm .sb-item-icon{width:auto}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
+.main{margin-left:230px;transition:margin-left .25s}
 </style>
 </head>
 <body>
@@ -149,7 +140,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;mar
       <div class="sb-group-items" id="gitems-financials" style="display:block">
         <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
         <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span></div>
-        <div class="sb-item active"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
+        <div class="sb-item active" ><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
         <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span></div>
         <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span></div>
       </div></div>
@@ -164,634 +155,412 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;mar
         <div class="sb-item" onclick="navTo('hvac-rfi.html')"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span></div>
         <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span></div>
         <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></div>
+        <div class="sb-item" onclick="navTo('hvac-specifications.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span></div>
         <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span></div>
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('commissioning')" id="ghdr-commissioning"><span class="sb-group-chev" id="gchev-commissioning">▾</span><span class="sb-group-name">Commissioning</span></div>
       <div class="sb-group-items" id="gitems-commissioning" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning plan</span></div>
         <div class="sb-item" onclick="navTo('hvac-precommissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span></div>
         <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span></div>
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
       <div class="sb-group-items" id="gitems-quality" style="display:block">
-        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
+        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITP Register</span></div>
         <div class="sb-item" onclick="navTo('hvac-itp-templates.html')"><span class="sb-item-icon">📁</span><span class="sb-item-label">ITP Templates</span></div>
         <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
-        <div class="sb-item" onclick="navTo('hvac-fire-register.html')"><span class="sb-item-icon">🔥</span><span class="sb-item-label">Passive Fire</span></div>
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
       <div class="sb-group-items" id="gitems-settings" style="display:block">
         <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
       </div></div>
   </nav>
-  <div class="sb-footer"><div class="sb-av" id="sb-av">?</div><span class="sb-user-name" id="sb-user">—</span></div>
+  <div class="sb-footer"><div class="sb-av" id="sb-av">S</div><span class="sb-user-name" id="sb-user">—</span></div>
 </div>
 
-<!-- MAIN -->
+
 <div class="main" id="mainWrap">
 
-  <!-- Notification banner -->
-  <div class="notif-banner hidden" id="notifBanner">
-    <span style="font-size:20px">📬</span>
-    <div style="flex:1;font-size:13px"><strong style="color:var(--warn)" id="notifText">Draft invoice requests due today</strong></div>
-    <button class="btn warn-btn" onclick="openSendMo()">Send Requests Now</button>
-    <button class="btn" style="padding:0 8px" onclick="dismissBanner()">&#215;</button>
+<div class="topbar">
+  <div class="bc">
+    <span class="bcl" onclick="window.location.href='index.html'">My Projects</span><span class="bcs">›</span>
+    <span class="bcl bc-proj-name" onclick="window.location.href='project.html'" onclick="navTo(\'project.html\')">Greenfield Commercial Tower</span><span class="bcs">›</span>
+    <span class="bcc">Vendor Invoices</span>
   </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="bg bsm btn" onclick="openRequestModal()">📨 Request Invoices</button>
+    <button class="bp bsm btn" onclick="openAddModal()">＋ Add Invoice</button>
+  </div>
+</div>
 
-  <!-- Header -->
-  <div class="hdr">
-    <div><h1>🧾 Vendor Invoices</h1><p style="color:var(--text2);font-size:13px;margin:4px 0 0">Grouped by claim period &mdash; draft &amp; final invoice tracking</p></div>
-    <div class="hdr-right">
-      <button class="btn" onclick="openSendMo()">📬 Send Draft Requests</button>
-      <button class="btn" onclick="exportCsv()">&#8595; Export CSV</button>
-      <button class="btn primary" onclick="openAddMo()">&#65291; Add Invoice</button>
-    </div>
-  </div>
+<div class="sum-bar">
+  <div class="sc cb"><div class="sc-lbl">This month approved</div><div class="sc-val" id="sumMonthAmt">—</div><div class="sc-sub" id="sumMonthLbl">ex GST</div></div>
+  <div class="sc cw"><div class="sc-lbl">Pending review</div><div class="sc-val" id="sumPending">0</div><div class="sc-sub">awaiting decision</div></div>
+  <div class="sc cd"><div class="sc-lbl">Rejected</div><div class="sc-val" id="sumRejected">0</div><div class="sc-sub">awaiting resubmit</div></div>
+  <div class="sc"><div class="sc-lbl">Total invoices</div><div class="sc-val" id="sumTotal">0</div><div class="sc-sub">all time</div></div>
+  <div class="sc"><div class="sc-lbl">Review deadline</div><div class="sc-val" id="sumDeadline">—</div><div class="sc-sub" id="sumDeadlineSub">10 days from request</div></div>
+</div>
 
-  <!-- Stats -->
-  <div class="stats-bar">
-    <div class="stat-card s-total"><div class="stat-val" id="stTotal">0</div><div class="stat-lbl">Total invoices</div></div>
-    <div class="stat-card s-approved"><div class="stat-val" id="stApproved">$0</div><div class="stat-lbl">Approved (ex GST)</div></div>
-    <div class="stat-card s-pending"><div class="stat-val" id="stPending">0</div><div class="stat-lbl">Awaiting approval</div></div>
-    <div class="stat-card s-var"><div class="stat-val" id="stVar">0</div><div class="stat-lbl">Variances</div></div>
-  </div>
+<div class="toolbar">
+  <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="searchInput" placeholder="Search vendor, invoice no, PO ref…" oninput="renderAll()"></div>
+  <select class="fsel" id="stFilter" onchange="renderAll()">
+    <option value="">All Statuses</option>
+    <option value="Draft">Draft</option>
+    <option value="Pending">Pending review</option>
+    <option value="Approved">Approved</option>
+    <option value="Rejected">Rejected</option>
+  </select>
+  <select class="fsel" id="monthFilter" onchange="renderAll()"><option value="">All Months</option></select>
+  <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="invCount"></span>
+</div>
 
-  <!-- Toolbar -->
-  <div class="toolbar">
-    <div class="search-box"><span style="color:var(--muted)">&#128269;</span><input type="text" id="searchInp" placeholder="Search vendor, invoice no, PO…" oninput="renderAll()"></div>
-    <select class="fsel" id="statusSel" onchange="renderAll()">
-      <option value="">All Statuses</option>
-      <option>Draft</option><option>PM Approved</option><option>Final Received</option>
-      <option>Matched</option><option>Variance</option><option>Paid</option><option>Disputed</option>
-    </select>
-    <select class="fsel" id="monthSel" onchange="renderAll()"><option value="">All Periods</option></select>
-  </div>
-
-  <!-- Table area -->
-  <div class="tbl-wrap" id="tblWrap">
-    <div class="empty" id="emptyMsg" style="display:none">
-      <div class="empty-icon">&#129534;</div>
-      <div>No invoices yet. Click <strong>+ Add Invoice</strong> to get started.</div>
-    </div>
-  </div>
+<div class="page" id="pageContent"></div>
 </div>
 
 <!-- ADD / EDIT MODAL -->
-<div class="mo-bg" id="addMoBg" onclick="if(event.target===this)closeAddMo()">
-  <div class="mo">
-    <div class="mo-hdr">
-      <div><h3 id="addMoTitle">Add Invoice</h3><div class="mo-hdr-sub">Upload PDF/Excel for AI extraction, or enter manually</div></div>
-      <button class="mo-close" onclick="closeAddMo()">&#215;</button>
+<div class="mo" id="addModal" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal">
+    <h3 id="modalTitle">Add Invoice</h3>
+    <p class="msub">Enter vendor invoice details.</p>
+    <div class="mgrid">
+      <div><label class="ml">Invoice Number <span id="invnum-req">*</span></label><input class="mi" id="f-num" placeholder="e.g. INV-2025-001"/></div>
+      <div><label class="ml">Invoice Date <span id="invdate-req">*</span></label><input class="mi" id="f-date" type="date"/></div>
     </div>
-    <div class="mo-body">
-
-      <div class="sec-div">Draft Invoice</div>
-
-      <div>
-        <label class="ml">Upload Draft (PDF or Excel) — AI extracts fields automatically</label>
-        <div class="upload-zone" id="draftZone" ondragover="onDrag(event,'draftZone')" ondragleave="offDrag('draftZone')" ondrop="onDrop(event,'draft')">
-          <input type="file" accept=".pdf,.xlsx,.xls,.csv" onchange="onFileSel(event,'draft')" id="draftInp">
-          <div class="upload-zone-icon">&#128196;</div>
-          <div class="upload-zone-lbl" id="draftZoneLbl">Click or drag draft invoice here</div>
-          <div class="upload-zone-sub">PDF or Excel</div>
-        </div>
-        <div id="draftAi" style="display:none"></div>
+    <label class="ml">Vendor Name *</label>
+    <input class="mi" id="f-vendor" placeholder="e.g. Acme HVAC Supplies"/>
+    <div class="mgrid">
+      <div><label class="ml">Assign to PO</label>
+        <select class="mi" id="f-po" style="cursor:pointer">
+          <option value="">— Select PO (optional) —</option>
+        </select>
       </div>
-
-      <div class="mi-row">
-        <div><label class="ml">Vendor / Supplier *</label><input class="mi" id="fVendor" placeholder="e.g. Austral Air"></div>
-        <div><label class="ml">PO Reference</label><input class="mi" id="fPo" placeholder="e.g. GCT001-PO-001"></div>
-      </div>
-      <div class="mi-row">
-        <div><label class="ml">Draft Invoice No.</label><input class="mi" id="fDraftNum" placeholder="e.g. DRAFT-001"></div>
-        <div><label class="ml">Draft Invoice Date</label><input class="mi" id="fDraftDate" type="date"></div>
-      </div>
-      <div class="mi-row">
-        <div><label class="ml">Draft Amount (ex GST) *</label><input class="mi" id="fDraftAmt" type="number" step="0.01" placeholder="0.00" oninput="updMatch()"></div>
-        <div><label class="ml">Claim Period *</label><input class="mi" id="fMonth" type="month"></div>
-      </div>
-      <div><label class="ml">Notes</label><textarea class="mi" id="fNotes" rows="2" style="resize:vertical" placeholder="Optional notes…"></textarea></div>
-
-      <div class="sec-div">Final Invoice</div>
-
-      <div>
-        <label class="ml">Upload Final Invoice (PDF) — AI compares against draft</label>
-        <div class="upload-zone" id="finalZone" ondragover="onDrag(event,'finalZone')" ondragleave="offDrag('finalZone')" ondrop="onDrop(event,'final')">
-          <input type="file" accept=".pdf" onchange="onFileSel(event,'final')" id="finalInp">
-          <div class="upload-zone-icon">&#128203;</div>
-          <div class="upload-zone-lbl" id="finalZoneLbl">Click or drag final invoice here</div>
-          <div class="upload-zone-sub">PDF only</div>
-        </div>
-        <div id="finalAi" style="display:none"></div>
-      </div>
-
-      <div class="mi-row">
-        <div><label class="ml">Final Invoice No.</label><input class="mi" id="fFinalNum" placeholder="e.g. INV-2025-001"></div>
-        <div><label class="ml">Final Invoice Date</label><input class="mi" id="fFinalDate" type="date"></div>
-      </div>
-      <div class="mi-row">
-        <div><label class="ml">Final Amount (ex GST)</label><input class="mi" id="fFinalAmt" type="number" step="0.01" placeholder="0.00" oninput="updMatch()"></div>
-        <div><label class="ml">Status</label>
-          <select class="ms" id="fStatus">
-            <option>Draft</option><option>PM Approved</option><option>Final Received</option>
-            <option>Matched</option><option>Variance</option><option>Paid</option><option>Disputed</option>
-          </select>
-        </div>
-      </div>
-
-      <div id="matchDiv" style="display:none"></div>
-
+      <div><label class="ml">Amount (ex GST) *</label><input class="mi" id="f-amount" type="number" placeholder="0.00"/></div>
     </div>
-    <div class="mo-footer">
-      <button class="btn danger" id="delBtn" onclick="delInv()" style="display:none">Delete</button>
-      <div style="display:flex;gap:8px">
-        <button class="btn" onclick="closeAddMo()">Cancel</button>
-        <button class="btn primary" onclick="saveInv()">Save Invoice</button>
-      </div>
+    <label class="ml">Billing Month</label>
+    <input class="mi" id="f-month" type="month"/>
+    <label class="ml">Status</label>
+    <select class="ms" id="f-status" onchange="onStatusChange()">
+      <option value="Draft">Draft</option>
+      <option value="Pending">Pending review</option>
+      <option value="Approved">Approved</option>
+      <option value="Rejected">Rejected</option>
+    </select>
+    <div class="reject-block" id="rejectBlock">
+      <label class="ml">Rejection Reason *</label>
+      <textarea class="mta" id="f-reject" placeholder="Explain why this invoice is rejected…"></textarea>
+    </div>
+    <label class="ml">Notes</label>
+    <textarea class="mta" id="f-notes" placeholder="Any additional notes…" style="min-height:56px"></textarea>
+    <div class="mac">
+      <button class="bdanger bsm btn" id="deleteBtn" style="display:none;margin-right:auto" onclick="deleteInv()">Delete</button>
+      <button class="bg bsm btn" onclick="closeAddModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="saveInv()">Save Invoice</button>
     </div>
   </div>
 </div>
 
-<!-- SEND DRAFT REQUESTS MODAL -->
-<div class="mo-bg" id="sendMoBg" onclick="if(event.target===this)closeSendMo()">
-  <div class="mo">
-    <div class="mo-hdr">
-      <div><h3>&#128236; Send Draft Invoice Requests</h3><div class="mo-hdr-sub">Select vendors to notify for this claim period</div></div>
-      <button class="mo-close" onclick="closeSendMo()">&#215;</button>
-    </div>
-    <div class="mo-body">
-      <div class="info-box">
-        <div><span>Claim date </span><strong id="sendClaimDay">—</strong></div>
-        <div><span>Invoice deadline </span><strong id="sendDeadline" style="color:var(--warn)">—</strong></div>
-        <div><span>Period </span><strong id="sendPeriod">—</strong></div>
-      </div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <label class="ml" style="margin:0">Vendors with approved POs</label>
-        <div style="display:flex;gap:6px">
-          <button class="btn" style="height:26px;font-size:11px;padding:0 10px" onclick="chkAll(true)">All</button>
-          <button class="btn" style="height:26px;font-size:11px;padding:0 10px" onclick="chkAll(false)">None</button>
-        </div>
-      </div>
-
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:260px;overflow-y:auto" id="vendorList"></div>
-
-      <div id="noEmailWarn" style="display:none;background:var(--warn-dim);border:1px solid var(--warn);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--warn)">
-        &#9888; Some vendors have no email address. <span onclick="navTo('hvac-procurement-pos.html')" style="cursor:pointer;text-decoration:underline">Add in Purchase Orders.</span>
-      </div>
-
-      <div id="sendLog" style="display:none"></div>
-    </div>
-    <div class="mo-footer">
-      <span style="font-size:11px;color:var(--muted)" id="sendCount">0 vendors selected</span>
-      <div style="display:flex;gap:8px">
-        <button class="btn" onclick="closeSendMo()">Close</button>
-        <button class="btn primary" id="sendBtn" onclick="doSend()">Send Requests</button>
-      </div>
+<!-- REQUEST MODAL -->
+<div class="mo" id="requestModal" onclick="if(event.target===this)closeRequestModal()">
+  <div class="modal">
+    <h3>Request Draft Invoices</h3>
+    <p class="msub">Log a monthly invoice request to all vendors. Sets a 10-day review deadline.</p>
+    <label class="ml">Billing Month</label>
+    <input class="mi" id="r-month" type="month"/>
+    <label class="ml">Request Date</label>
+    <input class="mi" id="r-date" type="date" onchange="updateDeadline()"/>
+    <label class="ml">10-Day Review Deadline</label>
+    <input class="mi" id="r-deadline" type="date" readonly style="color:var(--accent);font-family:'DM Mono',monospace"/>
+    <label class="ml">Notes (optional)</label>
+    <textarea class="mta" id="r-notes" placeholder="e.g. Sent to all active vendors…"></textarea>
+    <div class="mac">
+      <button class="bg bsm btn" onclick="closeRequestModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="saveRequest()">Log Request</button>
     </div>
   </div>
 </div>
 
 <script>
-'use strict';
-var SBK='hvacnexus_sb_collapsed';
-var SUPABASE_URL='https://qbsjrccrgkbevncvxbio.supabase.co';
-var SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
-var BANNER_KEY='hvacnexus_vi_banner';
+var _viProj=dbGetCurrentProject();var _viPNum=_viProj.num||_viProj.number||'GCT001';
 
-var _proj={},_pNum='',_settings={};
-var invoices=[],_pos=[];
-var _editId=null,_draftFile=null,_finalFile=null,_draftUrl='',_finalUrl='';
-var _vendors=[];
-
-// Helpers
-function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+var invoices=[],requests=[];
+var editingId=null,_uid=100;
+function nid(){return ++_uid;}
 function num(v){return parseFloat(v)||0;}
 function fmt(n){var v=num(n);return v===0?'—':'$'+Math.round(v).toLocaleString('en-AU');}
-function fmtF(n){var v=num(n);return v===0?'—':'$'+v.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtFull(n){var v=num(n);if(v===0)return '—';return '$'+v.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtD(d){if(!d)return '—';try{var dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
+function fmtM(m){if(!m)return 'No month';try{var p=m.split('-');var dt=new Date(parseInt(p[0]),parseInt(p[1])-1,1);return dt.toLocaleDateString('en-AU',{month:'long',year:'numeric'});}catch(e){return m;}}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function today(){return new Date().toISOString().split('T')[0];}
-function curMonth(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
-function fmtMonth(m){if(!m)return '—';try{var p=m.split('-');return new Date(parseInt(p[0]),parseInt(p[1])-1,1).toLocaleDateString('en-AU',{month:'long',year:'numeric'});}catch(e){return m;}}
-function fmtD(d){if(!d)return '—';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}}
-function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
-function toast(msg,bg){var t=document.createElement('div');t.textContent=msg;t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(bg||'var(--surface)')+';color:'+(bg?'#000':'var(--text)')+';border:1px solid var(--border);padding:8px 20px;border-radius:8px;font-size:12px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.4)';document.body.appendChild(t);setTimeout(function(){t.remove();},2500);}
+function currentMonth(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function addDays(ds,n){var d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
+function daysDiff(a,b){return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/(86400000));}
 
-// Sidebar
-function navTo(u){window.location.href=u;}
-function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
-function applySB(c){var sb=document.getElementById('sidebar');var m=document.getElementById('mainWrap');var b=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(m)m.style.marginLeft=c?'var(--sb-sm)':'var(--sb)';if(b)b.textContent=c?'\u00BB':'\u00AB';}
-function toggleGroup(id){var it=document.getElementById('gitems-'+id);var ch=document.getElementById('gchev-'+id);if(!it||!ch)return;var o=it.style.display!=='none';it.style.display=o?'none':'block';ch.textContent=o?'\u25B8':'\u25BE';}
 
-// Init
-async function init(){
-  applySB(localStorage.getItem(SBK)==='1');
-  _proj=dbGetCurrentProject()||{};_pNum=_proj.num||_proj.number||'';
-  document.getElementById('sb-proj-name').textContent=_proj.name||'—';
-  document.getElementById('sb-proj-num').textContent=_pNum||'—';
-  var u=dbGetCurrentUser();
-  if(u){document.getElementById('sb-av').textContent=(u.name||'?')[0].toUpperCase();document.getElementById('sb-user').textContent=u.name||'—';}
-  try{var s=await dbGetProject('proj_settings',_pNum||'GCT001');if(s)_settings=s;}catch(e){}
-  try{var vi=await dbGetVendorInvoices(_pNum);if(vi&&vi.invoices)invoices=vi.invoices;else invoices=[];}catch(e){invoices=[];}
-  try{var pd=await dbGetPurchaseOrders(_pNum);_pos=pd||[];}catch(e){_pos=[];}
-  checkBanner();populateMonthFilter();updateStats();renderAll();
-}
 
-function save(){dbSetVendorInvoices(_pNum,{invoices:invoices}).catch(function(e){console.error(e);});}
 
-// Deadline calc — 5 working days before claimDay
-function calcDeadline(claimDay){
-  var now=new Date();
-  var d=new Date(now.getFullYear(),now.getMonth(),parseInt(claimDay)||25);
-  var wd=0;
-  while(wd<5){d.setDate(d.getDate()-1);var day=d.getDay();if(day!==0&&day!==6)wd++;}
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
+(async function(){applySB(localStorage.getItem(SBK)==='1');})();
 
-// Banner
-function checkBanner(){
-  var claimDay=parseInt(_settings.claimDay)||25;
-  var deadline=calcDeadline(claimDay);
-  var todayStr=today();
-  if(deadline===todayStr&&localStorage.getItem(BANNER_KEY+'_'+todayStr)!=='1'){
-    document.getElementById('notifText').textContent='Draft invoice requests due today (COB) — '+fmtMonth(curMonth());
-    document.getElementById('notifBanner').classList.remove('hidden');
-  }
-}
-function dismissBanner(){
-  document.getElementById('notifBanner').classList.add('hidden');
-  localStorage.setItem(BANNER_KEY+'_'+today(),'1');
-}
 
-// Stats
-function updateStats(){
-  var total=invoices.length;
-  var approvedAmt=invoices.filter(function(i){return i.status==='PM Approved'||i.status==='Matched'||i.status==='Paid';}).reduce(function(a,i){return a+num(i.draftAmt);},0);
-  var pending=invoices.filter(function(i){return i.status==='Draft';}).length;
-  var variances=invoices.filter(function(i){return i.status==='Variance';}).length;
-  document.getElementById('stTotal').textContent=total;
-  document.getElementById('stApproved').textContent=fmt(approvedAmt);
-  document.getElementById('stPending').textContent=pending;
-  document.getElementById('stVar').textContent=variances;
-}
-
-// Month filter
-function populateMonthFilter(){
-  var sel=document.getElementById('monthSel');
-  var months=[...new Set(invoices.map(function(i){return i.month||'';}).filter(Boolean))].sort().reverse();
-  sel.innerHTML='<option value="">All Periods</option>'+months.map(function(m){return'<option value="'+m+'">'+fmtMonth(m)+'</option>';}).join('');
-}
-
-// Render
-function renderAll(){
-  var q=(document.getElementById('searchInp').value||'').toLowerCase();
-  var sf=document.getElementById('statusSel').value;
-  var mf=document.getElementById('monthSel').value;
-  var filtered=invoices.filter(function(i){
-    if(sf&&i.status!==sf)return false;
-    if(mf&&i.month!==mf)return false;
-    if(q){var h=[i.vendor,i.draftNum,i.finalNum,i.po,i.notes].join(' ').toLowerCase();if(!h.includes(q))return false;}
-    return true;
-  });
-  var wrap=document.getElementById('tblWrap');
-  var empty=document.getElementById('emptyMsg');
-  if(!filtered.length){wrap.innerHTML='';empty.style.display='';wrap.appendChild(empty);return;}
-  empty.style.display='none';
-  var groups={};
-  filtered.forEach(function(i){var k=i.month||'zzz';if(!groups[k])groups[k]=[];groups[k].push(i);});
-  var keys=Object.keys(groups).sort().reverse();
-  var stCls={'Draft':'bd-draft','PM Approved':'bd-approved','Final Received':'bd-final','Matched':'bd-matched','Variance':'bd-variance','Paid':'bd-paid','Disputed':'bd-disputed'};
-  var html='';
-  keys.forEach(function(k){
-    var items=groups[k];
-    var lbl=k==='zzz'?'No Period':fmtMonth(k);
-    var totDraft=items.reduce(function(a,i){return a+num(i.draftAmt);},0);
-    var totFinal=items.reduce(function(a,i){return a+num(i.finalAmt);},0);
-    var appr=items.filter(function(i){return i.status==='PM Approved'||i.status==='Matched'||i.status==='Paid';}).length;
-    html+='<div class="month-hdr"><div class="month-title">'+escH(lbl)+'</div>'
-      +'<div class="month-meta"><span>Draft <span class="mv">'+fmt(totDraft)+'</span></span>'
-      +(totFinal?'<span>Final <span class="mv">'+fmt(totFinal)+'</span></span>':'')
-      +'<span>'+appr+'/'+items.length+' approved</span></div></div>';
-    html+='<table class="tbl"><thead><tr>'
-      +'<th>Vendor</th><th>PO</th><th>Draft Invoice</th><th>Draft Amt</th>'
-      +'<th>Final Invoice</th><th>Final Amt</th><th>Match</th><th>Status</th><th></th>'
-      +'</tr></thead><tbody>';
-    items.forEach(function(inv){
-      var draftPdf=inv.draftUrl?('<a class="pdf-btn has-pdf" href="'+escH(inv.draftUrl)+'" target="_blank">&#128196; Draft</a>'):'<span class="pdf-btn">&#128196; Draft</span>';
-      var finalPdf=inv.finalUrl?('<a class="pdf-btn has-pdf" href="'+escH(inv.finalUrl)+'" target="_blank">&#128203; Final</a>'):'<span class="pdf-btn">&#128203; Final</span>';
-      var matchCell='<span class="match-none">—</span>';
-      if(inv.draftAmt&&inv.finalAmt){
-        var diff=num(inv.finalAmt)-num(inv.draftAmt);
-        matchCell=Math.abs(diff)<0.01?'<span class="match-ok">&#10003; Matched</span>':'<span class="match-var">&#9888; '+(diff>0?'+':'')+fmtF(diff)+'</span>';
-      }
-      html+='<tr>'
-        +'<td><div style="font-weight:600">'+escH(inv.vendor||'—')+'</div></td>'
-        +'<td><span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent)">'+escH(inv.po||'—')+'</span></td>'
-        +'<td><div style="font-family:\'DM Mono\',monospace;font-size:11px">'+escH(inv.draftNum||'—')+'</div>'
-          +'<div style="font-size:11px;color:var(--muted)">'+fmtD(inv.draftDate)+'</div>'
-          +'<div style="margin-top:4px">'+draftPdf+'</div></td>'
-        +'<td style="font-family:\'DM Mono\',monospace">'+fmtF(inv.draftAmt)+'</td>'
-        +'<td><div style="font-family:\'DM Mono\',monospace;font-size:11px">'+escH(inv.finalNum||'—')+'</div>'
-          +'<div style="font-size:11px;color:var(--muted)">'+fmtD(inv.finalDate)+'</div>'
-          +'<div style="margin-top:4px">'+finalPdf+'</div></td>'
-        +'<td style="font-family:\'DM Mono\',monospace">'+fmtF(inv.finalAmt)+'</td>'
-        +'<td>'+matchCell+'</td>'
-        +'<td><span class="badge '+(stCls[inv.status]||'bd-draft')+'">'+escH(inv.status)+'</span></td>'
-        +'<td><button class="btn" style="height:28px;padding:0 10px;font-size:11px" onclick="openEditMo(\''+inv.id+'\')">Edit</button></td>'
-        +'</tr>';
-    });
-    html+='</tbody></table>';
-  });
-  wrap.innerHTML=html;
-}
-
-// Add / Edit modal
-function openAddMo(){
-  _editId=null;_draftFile=null;_finalFile=null;_draftUrl='';_finalUrl='';
-  resetForm();
-  document.getElementById('addMoTitle').textContent='Add Invoice';
-  document.getElementById('delBtn').style.display='none';
-  document.getElementById('addMoBg').classList.add('open');
-}
-function openEditMo(id){
-  var inv=invoices.find(function(i){return i.id===id;});if(!inv)return;
-  _editId=id;_draftFile=null;_finalFile=null;_draftUrl=inv.draftUrl||'';_finalUrl=inv.finalUrl||'';
-  document.getElementById('addMoTitle').textContent='Edit — '+escH(inv.vendor||'Invoice');
-  document.getElementById('delBtn').style.display='';
-  document.getElementById('fVendor').value=inv.vendor||'';
-  document.getElementById('fPo').value=inv.po||'';
-  document.getElementById('fDraftNum').value=inv.draftNum||'';
-  document.getElementById('fDraftDate').value=inv.draftDate||'';
-  document.getElementById('fDraftAmt').value=inv.draftAmt||'';
-  document.getElementById('fMonth').value=inv.month||curMonth();
-  document.getElementById('fNotes').value=inv.notes||'';
-  document.getElementById('fFinalNum').value=inv.finalNum||'';
-  document.getElementById('fFinalDate').value=inv.finalDate||'';
-  document.getElementById('fFinalAmt').value=inv.finalAmt||'';
-  document.getElementById('fStatus').value=inv.status||'Draft';
-  if(inv.draftUrl)setZone('draftZone','draftZoneLbl',inv.draftNum||'Draft attached');
-  if(inv.finalUrl)setZone('finalZone','finalZoneLbl',inv.finalNum||'Final attached');
-  document.getElementById('draftAi').style.display='none';
-  document.getElementById('finalAi').style.display='none';
-  updMatch();
-  document.getElementById('addMoBg').classList.add('open');
-}
-function closeAddMo(){document.getElementById('addMoBg').classList.remove('open');}
-function resetForm(){
-  ['fVendor','fPo','fDraftNum','fDraftDate','fDraftAmt','fFinalNum','fFinalDate','fFinalAmt','fNotes'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('fMonth').value=curMonth();
-  document.getElementById('fDraftDate').value=today();
-  document.getElementById('fStatus').value='Draft';
-  resetZone('draftZone','draftZoneLbl','Click or drag draft invoice here');
-  resetZone('finalZone','finalZoneLbl','Click or drag final invoice here');
-  document.getElementById('draftAi').style.display='none';
-  document.getElementById('finalAi').style.display='none';
-  document.getElementById('matchDiv').style.display='none';
-}
-function resetZone(zId,lId,txt){var z=document.getElementById(zId);if(z)z.classList.remove('has-file');var l=document.getElementById(lId);if(l)l.textContent=txt;}
-function setZone(zId,lId,name){var z=document.getElementById(zId);if(z)z.classList.add('has-file');var l=document.getElementById(lId);if(l)l.textContent='\u2713 '+name;}
-
-// Drag & drop
-function onDrag(e,id){e.preventDefault();document.getElementById(id).classList.add('drag');}
-function offDrag(id){document.getElementById(id).classList.remove('drag');}
-function onDrop(e,type){e.preventDefault();var f=e.dataTransfer.files[0];if(f)procFile(f,type);}
-function onFileSel(e,type){var f=e.target.files[0];if(f)procFile(f,type);}
-function procFile(file,type){
-  if(type==='draft'){_draftFile=file;setZone('draftZone','draftZoneLbl',file.name);}
-  else{_finalFile=file;setZone('finalZone','finalZoneLbl',file.name);}
-  doExtract(file,type);
-}
-
-// AI extraction
-async function doExtract(file,type){
-  var box=document.getElementById(type==='draft'?'draftAi':'finalAi');
-  box.style.display='';
-  box.innerHTML='<div class="ai-box"><div class="ai-box-hdr"><span class="ai-spin">&#8635;</span> Extracting invoice details…</div></div>';
+function save(){dbSetVendorInvoices(_viPNum,{invoices:invoices,requests:requests}).catch(e=>console.error(e));}
+async function load(){
   try{
-    var b64=await toB64(file);
-    var isPdf=file.name.toLowerCase().endsWith('.pdf');
-    var prompt='Extract from this invoice. Return ONLY valid JSON with these exact keys: {"vendor":"","invoiceNumber":"","invoiceDate":"YYYY-MM-DD or empty","amountExGST":0,"poReference":""}. No markdown, no explanation.';
-    var content=isPdf
-      ?[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}]
-      :[{type:'text',text:prompt+'\n\nFile (base64 truncated):\n'+b64.slice(0,6000)}];
-    var res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,messages:[{role:'user',content:content}]})
-    });
-    var data=await res.json();
-    var txt=(data.content||[]).map(function(c){return c.text||'';}).join('').replace(/```json|```/g,'').trim();
-    var ex=JSON.parse(txt);
-    if(type==='draft'){
-      if(ex.vendor&&!document.getElementById('fVendor').value)document.getElementById('fVendor').value=ex.vendor;
-      if(ex.invoiceNumber)document.getElementById('fDraftNum').value=ex.invoiceNumber;
-      if(ex.invoiceDate)document.getElementById('fDraftDate').value=ex.invoiceDate;
-      if(ex.amountExGST)document.getElementById('fDraftAmt').value=ex.amountExGST;
-      if(ex.poReference&&!document.getElementById('fPo').value)document.getElementById('fPo').value=ex.poReference;
-    } else {
-      if(ex.invoiceNumber)document.getElementById('fFinalNum').value=ex.invoiceNumber;
-      if(ex.invoiceDate)document.getElementById('fFinalDate').value=ex.invoiceDate;
-      if(ex.amountExGST)document.getElementById('fFinalAmt').value=ex.amountExGST;
-    }
-    updMatch();
-    box.innerHTML='<div class="ai-box"><div class="ai-box-hdr">&#129302; Extracted — please verify</div>'
-      +(ex.vendor?'<div class="ai-row"><span class="ai-lbl">Vendor</span><span class="ai-val">'+escH(ex.vendor)+'</span></div>':'')
-      +(ex.invoiceNumber?'<div class="ai-row"><span class="ai-lbl">Invoice No</span><span class="ai-val">'+escH(ex.invoiceNumber)+'</span></div>':'')
-      +(ex.invoiceDate?'<div class="ai-row"><span class="ai-lbl">Date</span><span class="ai-val">'+escH(ex.invoiceDate)+'</span></div>':'')
-      +(ex.amountExGST?'<div class="ai-row"><span class="ai-lbl">Amount ex GST</span><span class="ai-val">'+fmtF(ex.amountExGST)+'</span></div>':'')
-      +(ex.poReference?'<div class="ai-row"><span class="ai-lbl">PO Ref</span><span class="ai-val">'+escH(ex.poReference)+'</span></div>':'')
-      +'</div>';
-  }catch(e){
-    box.innerHTML='<div class="ai-box" style="border-color:var(--danger)"><div class="ai-box-hdr" style="color:var(--danger)">&#9888; Extraction failed — enter manually</div></div>';
-    console.error('AI extract:',e);
-  }
+    var s=await dbGetVendorInvoices(_viPNum);
+    if(s){var p=JSON.parse(s);invoices=Array.isArray(p.invoices)?p.invoices:[];requests=Array.isArray(p.requests)?p.requests:[];}
+  }catch(e){invoices=[];requests=[];}
 }
+load();
 
-function toB64(file){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result.split(',')[1]);};r.onerror=function(){rej(new Error('read failed'));};r.readAsDataURL(file);});}
-
-// Match check
-function updMatch(){
-  var da=num(document.getElementById('fDraftAmt').value);
-  var fa=num(document.getElementById('fFinalAmt').value);
-  var el=document.getElementById('matchDiv');
-  if(!da||!fa){el.style.display='none';return;}
-  el.style.display='';
-  var diff=fa-da;
-  if(Math.abs(diff)<0.01){
-    el.innerHTML='<div class="match-banner match-ok-banner">&#10003; Final matches draft — '+fmtF(da)+'</div>';
-    document.getElementById('fStatus').value='Matched';
+function updateSummary(){
+  var cm=currentMonth();
+  var thisAmt=invoices.filter(function(i){return i.month===cm&&i.status==='Approved';}).reduce(function(a,i){return a+num(i.amount);},0);
+  var pending=invoices.filter(function(i){return i.status==='Pending';}).length;
+  var rejected=invoices.filter(function(i){return i.status==='Rejected';}).length;
+  document.getElementById('sumMonthAmt').textContent=fmt(thisAmt);
+  document.getElementById('sumMonthLbl').textContent=fmtM(cm)+' · ex GST';
+  document.getElementById('sumPending').textContent=pending;
+  document.getElementById('sumRejected').textContent=rejected;
+  document.getElementById('sumTotal').textContent=invoices.length;
+  var latestReq=requests.filter(function(r){return r.month===cm;}).sort(function(a,b){return a.date<b.date?1:-1;})[0];
+  if(latestReq&&latestReq.deadline){
+    var d=daysDiff(today(),latestReq.deadline);
+    var dEl=document.getElementById('sumDeadline');
+    var dSub=document.getElementById('sumDeadlineSub');
+    if(d<0){dEl.textContent='Overdue';dEl.style.color='var(--danger)';dSub.textContent=Math.abs(d)+' days past';}
+    else if(d===0){dEl.textContent='Today';dEl.style.color='var(--danger)';dSub.textContent='deadline is today';}
+    else{dEl.textContent=d+'d';dEl.style.color=d<=3?'var(--danger)':d<=5?'var(--warn)':'var(--green)';dSub.textContent='days remaining';}
   } else {
-    el.innerHTML='<div class="match-banner match-warn-banner">&#9888; Variance: final is '+(diff>0?'+':'')+fmtF(diff)+' vs draft ('+fmtF(da)+'). Acknowledge before saving.</div>';
-    document.getElementById('fStatus').value='Variance';
+    document.getElementById('sumDeadline').textContent='—';
+    document.getElementById('sumDeadlineSub').textContent='no request logged';
   }
 }
 
-// Upload to Supabase storage
-async function uploadFile(file,folder){
-  var ext=file.name.split('.').pop()||'pdf';
-  var path=folder+'/'+(_pNum||'proj')+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,5)+'.'+ext;
-  var res=await fetch(SUPABASE_URL+'/storage/v1/object/hvacnex-photos/'+path,{
-    method:'POST',
-    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':file.type||'application/pdf'},
-    body:file
+function renderAll(){
+  var q=(document.getElementById('searchInput').value||'').toLowerCase();
+  var sf=document.getElementById('stFilter').value;
+  var mf=document.getElementById('monthFilter').value;
+  // Rebuild month filter
+  var ms={};invoices.forEach(function(i){if(i.month)ms[i.month]=true;});
+  var mSel=document.getElementById('monthFilter'),mv=mSel.value;
+  mSel.innerHTML='<option value="">All Months</option>';
+  Object.keys(ms).sort().reverse().forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=fmtM(m);if(m===mv)o.selected=true;mSel.appendChild(o);});
+  var filtered=invoices.filter(function(i){
+    return(!q||(i.invnum||'').toLowerCase().includes(q)||(i.vendor||'').toLowerCase().includes(q)||(i.po||'').toLowerCase().includes(q))
+      &&(!sf||i.status===sf)&&(!mf||i.month===mf);
   });
-  if(!res.ok)throw new Error('Upload failed '+res.status);
-  return SUPABASE_URL+'/storage/v1/object/public/hvacnex-photos/'+path;
+  document.getElementById('invCount').textContent=filtered.length+' invoice'+(filtered.length!==1?'s':'');
+  updateSummary();
+  var page=document.getElementById('pageContent');page.innerHTML='';
+  if(!filtered.length){
+    page.innerHTML='<div class="empty-state"><div class="empty-icon">🧾</div><div>'+(invoices.length?'No invoices match filters.':'No invoices yet. Click <strong>＋ Add Invoice</strong> to get started.')+'</div></div>';
+    return;
+  }
+  var groups={};
+  filtered.forEach(function(i){var k=i.month||'zz-no-month';if(!groups[k])groups[k]=[];groups[k].push(i);});
+  Object.keys(groups).sort().reverse().forEach(function(m){
+    var items=groups[m];
+    var approvedAmt=items.filter(function(i){return i.status==='Approved';}).reduce(function(a,i){return a+num(i.amount);},0);
+    var pendingCt=items.filter(function(i){return i.status==='Pending';}).length;
+    var rejCt=items.filter(function(i){return i.status==='Rejected';}).length;
+    var allApproved=items.length>0&&items.every(function(i){return i.status==='Approved';});
+    var pillCls=allApproved?'month-pill all-good':pendingCt>0?'month-pill has-pending':rejCt>0?'month-pill has-rejected':'month-pill';
+    var pillTxt=allApproved?'All approved':pendingCt>0?pendingCt+' pending':rejCt>0?rejCt+' rejected':items.length+' invoices';
+    var grp=document.createElement('div');grp.className='month-group';
+    var hdr=document.createElement('div');hdr.className='month-hdr';
+    hdr.innerHTML='<span class="month-name">'+(m==='zz-no-month'?'No month assigned':fmtM(m))+'</span>'
+      +'<div class="month-stats">'
+      +'<span class="'+pillCls+'">'+pillTxt+'</span>'
+      +'<span style="font-size:11px;color:var(--text2)">Approved ex GST</span>'
+      +'<span class="month-total">'+fmt(approvedAmt)+'</span>'
+      +'<span class="month-chev">▾</span></div>';
+    hdr.addEventListener('click',function(){grp.classList.toggle('collapsed');});
+    var body=document.createElement('div');body.className='month-body';
+    var tbl=document.createElement('table');tbl.className='inv-tbl';
+    tbl.innerHTML='<thead><tr><th>Invoice No.</th><th>Vendor</th><th>Date</th><th>PO Ref</th><th class="r">Amount (ex GST)</th><th class="r">GST</th><th class="r">Total (incl GST)</th><th>Status</th><th>Age</th></tr></thead>';
+    var tbody=document.createElement('tbody');
+    items.sort(function(a,b){return (b.invdate||'')<(a.invdate||'')?-1:1;}).forEach(function(inv){
+      var tr=document.createElement('tr');tr.className='data-row';
+      var stMap={Draft:'st-draft',Pending:'st-pending',Approved:'st-approved',Rejected:'st-rejected'};
+      var gst=num(inv.amount)*0.1;var total=num(inv.amount)+gst;
+      var ageBadge='';
+      if((inv.status==='Pending'||inv.status==='Draft')&&inv.invdate){
+        var age=daysDiff(inv.invdate,today());
+        var acls=age<=7?'d-ok':age<=10?'d-warn':'d-over';
+        ageBadge='<span class="days-badge '+acls+'">'+age+'d</span>';
+      }
+      tr.innerHTML='<td class="inv-num">'+escH(inv.invnum||'—')+'</td>'
+        +'<td style="font-weight:500;color:var(--text)">'+escH(inv.vendor||'—')+'</td>'
+        +'<td style="color:var(--text2);font-size:12px">'+fmtD(inv.invdate)+'</td>'
+        +'<td class="inv-po">'+escH(inv.po||'—')+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmtFull(inv.amount)+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmtFull(gst)+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:600">'+fmtFull(total)+'</td>'
+        +'<td><span class="sb-badge '+(stMap[inv.status]||'st-draft')+'">'+escH(inv.status)+'</span>'
+        +(inv.rejectReason?'<div style="font-size:10px;color:var(--danger);margin-top:3px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(inv.rejectReason)+'">'+escH(inv.rejectReason)+'</div>':'')
+        +'</td>'
+        +'<td>'+ageBadge+'</td>';
+      (function(id){tr.addEventListener('click',function(){openEditModal(id);});})(inv.id);
+      tbody.appendChild(tr);
+    });
+    // Subtotal row
+    var sub=document.createElement('tr');sub.className='tot-row';
+    sub.innerHTML='<td colspan="4" style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Monthly approved total</td>'
+      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--green)">'+fmtFull(approvedAmt)+'</td>'
+      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmtFull(approvedAmt*0.1)+'</td>'
+      +'<td class="r" style="font-family:DM Mono,monospace;font-size:13px;color:var(--green)">'+fmtFull(approvedAmt*1.1)+'</td>'
+      +'<td colspan="2"></td>';
+    tbody.appendChild(sub);
+    tbl.appendChild(tbody);body.appendChild(tbl);grp.appendChild(hdr);grp.appendChild(body);page.appendChild(grp);
+  });
 }
 
-// Save invoice
-async function saveInv(){
-  var vendor=document.getElementById('fVendor').value.trim();
-  var draftAmt=document.getElementById('fDraftAmt').value;
-  var month=document.getElementById('fMonth').value;
-  if(!vendor){document.getElementById('fVendor').classList.add('err');toast('Vendor required','#ff4d6d');return;}
-  if(!draftAmt){document.getElementById('fDraftAmt').classList.add('err');toast('Draft amount required','#ff4d6d');return;}
-  if(!month){toast('Claim period required','#ff4d6d');return;}
-  if(_draftFile){try{_draftUrl=await uploadFile(_draftFile,'vi-draft');}catch(e){console.error(e);}}
-  if(_finalFile){try{_finalUrl=await uploadFile(_finalFile,'vi-final');}catch(e){console.error(e);}}
-  var inv={
-    id:_editId||nid(),vendor:vendor,po:document.getElementById('fPo').value.trim(),
-    draftNum:document.getElementById('fDraftNum').value.trim(),draftDate:document.getElementById('fDraftDate').value,
-    draftAmt:num(draftAmt),draftUrl:_draftUrl,
-    finalNum:document.getElementById('fFinalNum').value.trim(),finalDate:document.getElementById('fFinalDate').value,
-    finalAmt:num(document.getElementById('fFinalAmt').value)||0,finalUrl:_finalUrl,
-    month:month,status:document.getElementById('fStatus').value,notes:document.getElementById('fNotes').value.trim()
-  };
-  if(_editId){var idx=invoices.findIndex(function(i){return i.id===_editId;});if(idx>=0)invoices[idx]=inv;else invoices.push(inv);}
-  else invoices.push(inv);
-  save();closeAddMo();renderAll();populateMonthFilter();updateStats();
-  toast('Saved');
+// ADD MODAL
+function openAddModal(){
+  editingId=null;
+  document.getElementById('modalTitle').textContent='Add Invoice';
+  document.getElementById('f-num').value='';
+  document.getElementById('f-date').value=today();
+  document.getElementById('f-vendor').value='';
+  document.getElementById('f-po').value='';
+  document.getElementById('f-amount').value='';
+  document.getElementById('f-month').value=currentMonth();
+  document.getElementById('f-status').value='Draft';
+  onStatusChange();
+  document.getElementById('f-reject').value='';
+  document.getElementById('f-notes').value='';
+  document.getElementById('rejectBlock').classList.remove('show');
+  document.getElementById('deleteBtn').style.display='none';
+  document.getElementById('addModal').classList.add('open');
+  loadPOsForDropdown('');
+  setTimeout(function(){document.getElementById('f-num').focus();},80);
 }
-
-function delInv(){
-  if(!_editId||!confirm('Delete this invoice?'))return;
-  invoices=invoices.filter(function(i){return i.id!==_editId;});
-  save();closeAddMo();renderAll();populateMonthFilter();updateStats();
+function openEditModal(id){
+  var inv=invoices.find(function(i){return i.id===id;});if(!inv)return;
+  editingId=id;
+  document.getElementById('modalTitle').textContent='Edit Invoice';
+  document.getElementById('f-num').value=inv.invnum||'';
+  document.getElementById('f-date').value=inv.invdate||'';
+  document.getElementById('f-vendor').value=inv.vendor||'';
+  loadPOsForDropdown(inv.po||'');
+  document.getElementById('f-amount').value=inv.amount||'';
+  document.getElementById('f-month').value=inv.month||currentMonth();
+  document.getElementById('f-status').value=inv.status||'Draft';
+  onStatusChange();
+  document.getElementById('f-reject').value=inv.rejectReason||'';
+  document.getElementById('f-notes').value=inv.notes||'';
+  document.getElementById('rejectBlock').classList.toggle('show',inv.status==='Rejected');
+  document.getElementById('deleteBtn').style.display='';
+  document.getElementById('addModal').classList.add('open');
 }
-
-// Send draft requests modal
-function openSendMo(){
-  var claimDay=parseInt(_settings.claimDay)||25;
-  var deadline=calcDeadline(claimDay);
-  var now=new Date();
-  document.getElementById('sendClaimDay').textContent=claimDay+'th of each month';
-  document.getElementById('sendDeadline').textContent=fmtD(deadline)+' (COB)';
-  document.getElementById('sendPeriod').textContent=fmtMonth(curMonth());
-  document.getElementById('sendLog').style.display='none';
-  document.getElementById('sendBtn').disabled=false;
-  document.getElementById('sendBtn').textContent='Send Requests';
-  buildVendors();
-  document.getElementById('sendMoBg').classList.add('open');
+function onStatusChange(){
+  var st=document.getElementById('f-status').value;
+  var isDraft=st==='Draft';
+  document.getElementById('rejectBlock').classList.toggle('show',st==='Rejected');
+  var rn=document.getElementById('invnum-req'),rd=document.getElementById('invdate-req');
+  if(rn){rn.style.color=isDraft?'var(--muted)':'var(--danger)';}
+  if(rd){rd.style.color=isDraft?'var(--muted)':'var(--danger)';}
+  document.getElementById('f-num').style.opacity=isDraft?'0.4':'1';
+  document.getElementById('f-date').style.opacity=isDraft?'0.4':'1';
 }
-function closeSendMo(){document.getElementById('sendMoBg').classList.remove('open');}
-
-function buildVendors(){
-  var map={};
-  function walkPOs(data){
-    if(!data)return;
-    if(Array.isArray(data)){
-      data.forEach(function(s){
-        (s.groups||[]).forEach(function(g){
-          (g.pos||[]).forEach(function(p){
-            if((p.status==='Approved')&&p.supplier){
-              var k=p.supplier;
-              if(!map[k])map[k]={name:p.supplier,email:p.email||'',contact:p.contact||'',poIds:[]};
-              map[k].poIds.push(p.id||'');
-            }
+function closeAddModal(){document.getElementById('addModal').classList.remove('open');}
+async function loadPOsForDropdown(selectedVal){
+  var sel=document.getElementById('f-po');if(!sel)return;
+  var cur=selectedVal||sel.value;
+  sel.innerHTML='<option value="">— Select PO (optional) —</option>';
+  try{
+    var d=await dbGetPurchaseOrders(_viPNum);
+    if(d&&d.sections){
+      d.sections.forEach(function(sec){
+        sec.groups.forEach(function(g){
+          (g.pos||[]).forEach(function(po){
+            var opt=document.createElement('option');
+            opt.value=po.id;
+            opt.textContent=po.id+' — '+(po.supplier||'')+(g.parent?' ('+g.parent+')':'');
+            if(cur&&opt.value===cur)opt.selected=true;
+            sel.appendChild(opt);
           });
         });
       });
     }
-  }
-  walkPOs(_pos);
-  _vendors=Object.values(map);
-  var hasNoEmail=_vendors.some(function(v){return !v.email;});
-  document.getElementById('noEmailWarn').style.display=hasNoEmail?'':'none';
-  var el=document.getElementById('vendorList');
-  if(!_vendors.length){
-    el.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No vendors with approved POs.<br><span onclick="navTo(\'hvac-procurement-pos.html\')" style="color:var(--accent);cursor:pointer">Go to Purchase Orders</span></div>';
-    updSendCount();return;
-  }
-  el.innerHTML=_vendors.map(function(v,i){
-    return'<div class="vendor-row">'
-      +'<input type="checkbox" class="v-check" id="vch-'+i+'" checked onchange="updSendCount()">'
-      +'<div style="flex:1"><div class="v-name">'+escH(v.name)+'</div>'
-        +(v.contact?'<div class="v-meta">'+escH(v.contact)+'</div>':'')
-        +'<div>'+(v.email?('<span class="v-meta">'+escH(v.email)+'</span>'):('<span class="v-email-miss">No email — add in POs</span>'))+'</div>'
-      +'</div>'
-      +'<div style="font-size:11px;color:var(--muted);font-family:\'DM Mono\',monospace">'+v.poIds.length+' PO'+(v.poIds.length!==1?'s':'')+'</div>'
-      +'</div>';
-  }).join('');
-  updSendCount();
+  }catch(e){console.warn('PO load failed:',e);}
 }
 
-function chkAll(v){_vendors.forEach(function(_,i){var el=document.getElementById('vch-'+i);if(el)el.checked=v;});updSendCount();}
-function updSendCount(){
-  var n=_vendors.filter(function(_,i){var el=document.getElementById('vch-'+i);return el&&el.checked;}).length;
-  document.getElementById('sendCount').textContent=n+' vendor'+(n!==1?'s':'')+' selected';
+function saveInv(){
+  var num_val=document.getElementById('f-num').value.trim();
+  var vendor=document.getElementById('f-vendor').value.trim();
+  var amount=document.getElementById('f-amount').value;
+  var status=document.getElementById('f-status').value;
+  if(!vendor){alert('Vendor name is required.');return;}
+  if(!amount){alert('Amount is required.');return;}
+  if(!document.getElementById('f-month').value){alert('Billing month is required.');return;}
+  if(status!=='Draft'&&!num_val){alert('Invoice number is required for '+status+' status.');return;}
+  if(status==='Rejected'&&!document.getElementById('f-reject').value.trim()){alert('Please provide a rejection reason.');return;}
+  var inv={id:editingId||('inv'+nid()),invnum:num_val,invdate:document.getElementById('f-date').value,vendor:vendor,po:document.getElementById('f-po').value.trim(),amount:num(amount),month:document.getElementById('f-month').value,status:status,rejectReason:document.getElementById('f-reject').value.trim(),notes:document.getElementById('f-notes').value.trim()};
+  if(editingId){var idx=invoices.findIndex(function(i){return i.id===editingId;});if(idx>=0)invoices[idx]=inv;else invoices.push(inv);}
+  else invoices.push(inv);
+  save();closeAddModal();renderAll();
+}
+function deleteInv(){
+  if(!editingId||!confirm('Delete this invoice?'))return;
+  invoices=invoices.filter(function(i){return i.id!==editingId;});
+  save();closeAddModal();renderAll();
 }
 
-function doSend(){
-  var selected=_vendors.filter(function(v,i){var el=document.getElementById('vch-'+i);return el&&el.checked;});
-  if(!selected.length){toast('No vendors selected','#ff4d6d');return;}
-  var claimDay=parseInt(_settings.claimDay)||25;
-  var deadline=calcDeadline(claimDay);
-  var period=fmtMonth(curMonth());
-  var replyEmail=_settings.claimEmail||'';
-  var tmpl=_settings.claimTemplate||'Dear {vendor_name},\n\nPlease submit your draft invoice for {period} by COB {deadline}.\n\nKind regards';
-  var u=dbGetCurrentUser()||{};
-  var logItems=selected.map(function(v){
-    var body=tmpl.replace(/{vendor_name}/g,v.name).replace(/{po_number}/g,v.poIds.join(', ')).replace(/{po_value}/g,'').replace(/{deadline}/g,fmtD(deadline)).replace(/{period}/g,period).replace(/{reply_email}/g,replyEmail).replace(/{sender_name}/g,u.name||'PM');
-    var mailHref='mailto:'+encodeURIComponent(v.email)+'?subject='+encodeURIComponent('Draft Invoice Request — '+period)+'&body='+encodeURIComponent(body);
-    return'<div style="padding:8px 0;border-top:1px solid var(--border)">'
-      +'<div style="font-weight:600;font-size:12px">'+escH(v.name)+'</div>'
-      +(v.email?'<div style="font-size:11px;color:var(--muted)">'+escH(v.email)+'</div>':'<div class="v-email-miss">No email — skipped</div>')
-      +(v.email?'<a href="'+mailHref+'" target="_blank" class="btn" style="height:26px;font-size:11px;padding:0 10px;margin-top:5px;display:inline-flex">Open in Mail</a>':'')
-      +'</div>';
-  }).join('');
-  var logEl=document.getElementById('sendLog');
-  logEl.innerHTML='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px">'
-    +'<div style="font-weight:600;color:var(--green);margin-bottom:8px;font-size:12px">&#10003; Requests ready — '+new Date().toLocaleTimeString('en-AU')+'</div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Click each vendor to open in your email client. Resend integration coming soon.</div>'
-    +logItems+'</div>';
-  logEl.style.display='';
-  document.getElementById('sendBtn').textContent='&#10003; Done';
-  document.getElementById('sendBtn').disabled=true;
-  dismissBanner();
+// REQUEST MODAL
+function openRequestModal(){
+  var t=today();
+  document.getElementById('r-month').value=currentMonth();
+  document.getElementById('r-date').value=t;
+  document.getElementById('r-deadline').value=addDays(t,10);
+  document.getElementById('r-notes').value='';
+  document.getElementById('requestModal').classList.add('open');
+}
+function updateDeadline(){
+  var d=document.getElementById('r-date').value;
+  if(d) document.getElementById('r-deadline').value=addDays(d,10);
+}
+function closeRequestModal(){document.getElementById('requestModal').classList.remove('open');}
+function saveRequest(){
+  var r={id:'req'+nid(),month:document.getElementById('r-month').value,date:document.getElementById('r-date').value,deadline:document.getElementById('r-deadline').value,notes:document.getElementById('r-notes').value.trim()};
+  requests.push(r);save();closeRequestModal();updateSummary();
+  alert('Invoice request logged. 10-day deadline: '+fmtD(r.deadline));
 }
 
-// Export CSV
-function exportCsv(){
-  var rows=[['Vendor','PO','Draft No','Draft Date','Draft Amt','Draft PDF','Final No','Final Date','Final Amt','Final PDF','Match','Status','Period','Notes']];
-  invoices.forEach(function(i){
-    var diff=i.draftAmt&&i.finalAmt?num(i.finalAmt)-num(i.draftAmt):null;
-    var match=diff===null?'—':Math.abs(diff)<0.01?'Matched':'Variance '+(diff>0?'+':'')+fmtF(diff);
-    rows.push([i.vendor,i.po,i.draftNum,i.draftDate,i.draftAmt,i.draftUrl||'',i.finalNum,i.finalDate,i.finalAmt||'',i.finalUrl||'',match,i.status,fmtMonth(i.month),i.notes]);
-  });
-  var csv=rows.map(function(r){return r.map(function(c){return'"'+String(c||'').replace(/"/g,'""')+'"';}).join(',');}).join('\n');
-  var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='vendor-invoices.csv';a.click();
-}
-
-window.addEventListener('DOMContentLoaded',init);
+renderAll();
 </script>
-
 <script>
-// Sidebar init
+(function(){try{var cp=localStorage.getItem('hvacnexus_current_project');if(cp){var p=JSON.parse(cp);document.querySelectorAll('.bc-proj-name').forEach(function(el){el.textContent=p.name||el.textContent;});}}catch(e){}})();
+
+// ── SIDEBAR ──
+var SBK='hvacnexus_sb_collapsed';
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
 (function(){
-  var SBK='hvacnexus_sb_collapsed';
-  (function(){try{var p=dbGetCurrentProject();if(p&&p.name){var e=document.getElementById('sb-proj-name');if(e)e.textContent=p.name;}if(p&&p.num){var e2=document.getElementById('sb-proj-num');if(e2)e2.textContent=p.num;}}catch(e){}})();
-  try{if(localStorage.getItem(SBK)==='1'){var sb=document.getElementById('sidebar');if(sb){sb.classList.add('sm');var m=document.getElementById('mainWrap');if(m)m.style.marginLeft='var(--sb-sm)';var b=document.getElementById('sbToggleBtn');if(b)b.textContent='\u00BB';}}}catch(e){}
+  applySB(localStorage.getItem(SBK)==='1');
+  localStorage.removeItem('hvacnexus_sb_groups');
+  try{var p=dbGetCurrentProject();if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
   if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
     handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});
-    document.addEventListener('mousemove',function(e){if(!dragging)return;sb.style.width=Math.min(MAX_W,Math.max(MIN_W,startW+(e.clientX-startX)))+'px';});
+    document.addEventListener('mousemove',function(e){if(!dragging)return;var w=Math.min(MAX_W,Math.max(MIN_W,startW+(e.clientX-startX)));sb.style.width=w+'px';});
     document.addEventListener('mouseup',function(){if(!dragging)return;dragging=false;document.body.style.userSelect='';document.body.style.cursor='';});
   }
   var tip=document.createElement('div');tip.className='sb-tooltip';document.body.appendChild(tip);
   document.querySelectorAll('.sb-item').forEach(function(item){
-    var lbl=item.querySelector('.sb-item-label');var label=lbl?lbl.textContent:'';
-    item.addEventListener('mouseenter',function(){if(!label)return;var r=item.getBoundingClientRect();var sbEl=document.getElementById('sidebar');tip.textContent=label;tip.style.left=(sbEl?sbEl.offsetWidth:230)+8+'px';tip.style.top=(r.top+r.height/2)+'px';tip.style.transform='translateY(-50%)';tip.style.opacity='1';});
+    var lbl=item.querySelector('.sb-item-label');
+    var label=lbl?lbl.textContent:'';
+    item.addEventListener('mouseenter',function(){
+      if(!label)return;
+      var r=item.getBoundingClientRect();var sbEl=document.getElementById('sidebar');var sbW=sbEl?sbEl.offsetWidth:230;
+      tip.textContent=label;tip.style.left=(sbW+8)+'px';tip.style.top=(r.top+r.height/2)+'px';tip.style.transform='translateY(-50%)';tip.style.opacity='1';
+    });
     item.addEventListener('mouseleave',function(){tip.style.opacity='0';});
   });
 })();
+
 </script>
 </body>
 </html>
