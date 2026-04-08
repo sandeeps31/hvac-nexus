@@ -84,20 +84,10 @@ input[type=number]{-moz-appearance:textfield}
 .dt tbody tr:last-child{border-bottom:none}
 .dt tbody tr:hover{background:var(--surface2)}
 .dt td{padding:10px 13px;vertical-align:middle;font-size:13px}
-.budget-panel{margin:14px 28px 0;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none}
-.budget-panel.visible{display:block}
-.bp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px}
-.bp-cell{display:flex;flex-direction:column;gap:3px}
-.bp-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
-.bp-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--text)}
-.bp-val.green{color:var(--green)}.bp-val.warn{color:var(--warn)}.bp-val.danger{color:var(--danger)}.bp-val.muted{color:var(--muted);font-size:12px;font-style:italic}
-.bp-bar-wrap{height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:6px}
-.bp-bar{height:100%;border-radius:3px;transition:width .3s,background .3s}
-.bp-alert{display:none;padding:9px 14px;border-radius:7px;font-size:12px;font-weight:600;margin-top:10px;gap:8px;align-items:center}
-.bp-alert.visible{display:flex}
-.bp-alert.warn{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
-.bp-alert.danger{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.3)}
-.bp-alert.info{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+.src-tab{padding:7px 18px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text2);border:none;background:var(--surface2);border-bottom:2px solid transparent;transition:all .13s;font-family:'DM Sans',sans-serif}
+.src-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface)}
+.src-tab:hover:not(.active){color:var(--text)}
+.sv-badge{font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
 .po-num-c{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:600}
 .ra{display:flex;gap:5px;justify-content:flex-end;opacity:0;transition:opacity .13s}
 tr:hover .ra{opacity:1}
@@ -167,6 +157,22 @@ tr:hover .li-del{opacity:1}.li-del:hover{color:var(--danger)}
 
 input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:0.6;cursor:pointer}
 input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
+/* Budget health panel */
+.budget-panel{margin:14px 28px 0;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none}
+.budget-panel.visible{display:block}
+.bp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px}
+.bp-cell{display:flex;flex-direction:column;gap:3px}
+.bp-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.bp-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--text)}
+.bp-val.green{color:var(--green)}
+.bp-val.warn{color:var(--warn)}
+.bp-val.danger{color:var(--danger)}
+.bp-bar-wrap{height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:6px}
+.bp-bar{height:100%;border-radius:3px;transition:width .3s,background .3s}
+.bp-alert{display:none;padding:9px 14px;border-radius:7px;font-size:12px;font-weight:600;margin-top:10px;gap:8px;align-items:center}
+.bp-alert.visible{display:flex}
+.bp-alert.warn{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+.bp-alert.danger{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.3)}
 /* Associated items reminder */
 
 
@@ -273,7 +279,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
     </div>
     <div class="toolbar">
       <div style="display:flex;gap:8px">
-        <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search PO, supplier, category…" oninput="renderList()"></div>
+        <div style="display:flex;gap:0;margin-bottom:0" id="srcTabBar">
+    <button class="src-tab active" id="srcTab-all" onclick="setSrcTab('all')">All</button>
+    <button class="src-tab" id="srcTab-proc" onclick="setSrcTab('proc')">Procurement</button>
+    <button class="src-tab" id="srcTab-subvar" onclick="setSrcTab('subvar')">Subcontractor</button>
+  </div>
+  <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search PO, supplier, category…" oninput="renderList()"></div>
         <select class="fsel" id="catFil" onchange="renderList()"><option value="">All Categories</option></select>
       </div>
       <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="poCount"></div>
@@ -325,14 +336,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
       <!-- BUDGET HEALTH PANEL -->
       <div class="budget-panel" id="budgetPanel">
         <div class="bp-grid">
-          <div class="bp-cell"><span class="bp-lbl">Budget (ex GST)</span><span class="bp-val" id="bp-budget">—</span></div>
-          <div class="bp-cell"><span class="bp-lbl" id="bp-committed-lbl">Committed POs (ex GST)</span><span class="bp-val" id="bp-committed">—</span></div>
-          <div class="bp-cell"><span class="bp-lbl">This PO (ex GST)</span><span class="bp-val" id="bp-this">—</span></div>
-          <div class="bp-cell"><span class="bp-lbl">Remaining After (ex GST)</span><span class="bp-val" id="bp-remaining">—</span></div>
+          <div class="bp-cell">
+            <span class="bp-lbl">Budget</span>
+            <span class="bp-val" id="bp-budget">—</span>
+          </div>
+          <div class="bp-cell">
+            <span class="bp-lbl">Committed POs</span>
+            <span class="bp-val" id="bp-committed">—</span>
+          </div>
+          <div class="bp-cell">
+            <span class="bp-lbl">This PO</span>
+            <span class="bp-val" id="bp-this">—</span>
+          </div>
+          <div class="bp-cell">
+            <span class="bp-lbl">Remaining After</span>
+            <span class="bp-val" id="bp-remaining">—</span>
+          </div>
         </div>
-        <div class="bp-bar-wrap" id="bp-bar-wrap"><div class="bp-bar" id="bp-bar" style="width:0%"></div></div>
-        <div class="bp-alert" id="bp-alert"><span id="bp-alert-msg"></span></div>
+        <div class="bp-bar-wrap"><div class="bp-bar" id="bp-bar"></div></div>
+        <div class="bp-alert" id="bp-alert"><span id="bp-alert-icon">⚠️</span><span id="bp-alert-msg"></span></div>
       </div>
+
       <div class="li-section">
         <div class="li-hdr">
           <span class="li-hdr-title">Line Items</span>
@@ -386,13 +410,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 </div><!-- /main -->
 
 <script>
-function escH(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 const STORAGE_KEY = 'hvacnexus_budget_GCT001';
 const PROJECT_NO = 'GCT2025';
 const CATEGORIES = [{"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "Active Chilled Beam"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "Chiller"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "CRAC Unit"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "Waffle pads"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "Gas - Water - Leak detection"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "Package Unit"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "PAC Unit"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "DX Systems"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "VRF Systems"}, {"section": "02. AHU & Fan Coils", "section_short": "AHU & Fan Coils", "name": "Air Handling Unit"}, {"section": "02. AHU & Fan Coils", "section_short": "AHU & Fan Coils", "name": "Fan Coil Unit"}, {"section": "02. AHU & Fan Coils", "section_short": "AHU & Fan Coils", "name": "Air Filter"}, {"section": "02. AHU & Fan Coils", "section_short": "AHU & Fan Coils", "name": "Bygold"}, {"section": "03. Cooling Tower Equipment", "section_short": "Cooling Tower Equipment", "name": "Cooling Tower"}, {"section": "03. Cooling Tower Equipment", "section_short": "Cooling Tower Equipment", "name": "Expansion Tank"}, {"section": "03. Cooling Tower Equipment", "section_short": "Cooling Tower Equipment", "name": "Dosing Equipment"}, {"section": "03. Cooling Tower Equipment", "section_short": "Cooling Tower Equipment", "name": "Water Treatment"}, {"section": "03. Cooling Tower Equipment", "section_short": "Cooling Tower Equipment", "name": "Sidestream Filtration"}, {"section": "04. Heating Equipment", "section_short": "Heating Equipment", "name": "Boiler"}, {"section": "04. Heating Equipment", "section_short": "Heating Equipment", "name": "Heat Exchanger - Water"}, {"section": "04. Heating Equipment", "section_short": "Heating Equipment", "name": "Humidifier"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Compressed air installation"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Air Compressor"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Air receiver"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Underground pipes"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Above ground pipes"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Service pits"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Underground Tracer wire"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Sampling point control panel"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Air hose reels"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Oil water speprator"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Oil drum pump"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Oil reels"}, {"section": "06. Pumps", "section_short": "Pumps", "name": "Pumps"}, {"section": "06. Pumps", "section_short": "Pumps", "name": "Inertia bases"}, {"section": "07. Coolroom Equipment", "section_short": "Coolroom Equipment", "name": "Coolroom Panel"}, {"section": "07. Coolroom Equipment", "section_short": "Coolroom Equipment", "name": "Coolroom  Refrigeration System"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Fans"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Roof Mounted Fans"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Fan - Vibration mounts"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Fan - Speed pots"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Roof cowls"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Silencers and Attenuators"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Fume Cupboard"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Fume Cupboard - Associated Items"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Exhaust Hood"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "General Fume Exhaust Equipment"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Welding extraction system"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Dust extraction system"}, {"section": "09. Filtering equipment", "section_short": "Filtering equipment", "name": "Electrostatic precipitation filter"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "VAVs"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "VCDs"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "MVCDs"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "NRDs"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "Fire Damper"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "MFSD"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "MSD"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "Pressure relief damper"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Cushion boxes & grilles"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Flexible Duct"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Starting collars/spigots"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Flexible Duct - wall tubes/joining collars"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Reducers for felxible duct"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Thermafusers"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Grill - Relocates"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Grill - Installation"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Spiral"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Square"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Exhaust"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Fabric"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Duct Board"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Kitchen Exhaust"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Associated Item"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Installation"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Relocation"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Cleaning"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Supply & Installation"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Weathproof protective covering for piping/cabling"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Pressure relief damper install"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Security bars"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Plinths and Support Frames"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Electronic Controls"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Switchboard"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - S & I"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Installation"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Duct Heater"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Variable Speed Drive"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "MSSBs"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Equipment labels"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Smoke Detector"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Associated Item"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - Water"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - Refigeration"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - Drain"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - S&I - Water"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - S&I - Refrigeration"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - Associated Items"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipeworks and valve labels"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Flushing"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - installation"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "Air Conditioning Controls"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "BMS - Control Hardware"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "BMS - Installation"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "BMS - S & I"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "BMS - Associated Item"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "Sensor relocation"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "Refrigerant Detection System"}, {"section": "16. Fire stopping", "section_short": "Fire stopping", "name": "Pasive fire rating"}, {"section": "16. Fire stopping", "section_short": "Fire stopping", "name": "Duct Fyre wrapping"}, {"section": "16. Fire stopping", "section_short": "Fire stopping", "name": "Fire spraying"}, {"section": "16. Fire stopping", "section_short": "Fire stopping", "name": "FD install"}, {"section": "17. Insulation", "section_short": "Insulation", "name": "Pipe -  Lagging & Insulation"}, {"section": "17. Insulation", "section_short": "Insulation", "name": "Sounlag AC units"}, {"section": "17. Insulation", "section_short": "Insulation", "name": "Duct - External Insulation"}, {"section": "18. Acoustic Treatment", "section_short": "Acoustic Treatment", "name": "Acoustic Treatment"}, {"section": "19. Equipment Installation/ Rigging", "section_short": "Equipment Installation/ Rigging", "name": "Equipment installation"}, {"section": "19. Equipment Installation/ Rigging", "section_short": "Equipment Installation/ Rigging", "name": "Hoisting Cranage"}, {"section": "19. Equipment Installation/ Rigging", "section_short": "Equipment Installation/ Rigging", "name": "Hire Equipment"}, {"section": "19. Equipment Installation/ Rigging", "section_short": "Equipment Installation/ Rigging", "name": "Plinths and Support Frames"}, {"section": "19. Equipment Installation/ Rigging", "section_short": "Equipment Installation/ Rigging", "name": "Consumables - Nuts & Bolts"}, {"section": "20. Seismics", "section_short": "Seismics", "name": "Gripple wires, Fames and materials"}, {"section": "20. Seismics", "section_short": "Seismics", "name": "Design"}, {"section": "21. Building works", "section_short": "Building works", "name": "Core Holes & Penetrations"}, {"section": "21. Building works", "section_short": "Building works", "name": "Scaffolding"}, {"section": "21. Building works", "section_short": "Building works", "name": "Painting"}, {"section": "21. Building works", "section_short": "Building works", "name": "Structural"}, {"section": "21. Building works", "section_short": "Building works", "name": "Associated Item"}, {"section": "21. Building works", "section_short": "Building works", "name": "Demolition Work"}, {"section": "21. Building works", "section_short": "Building works", "name": "Asbestos removal"}, {"section": "21. Building works", "section_short": "Building works", "name": "Tipping / Recycling"}, {"section": "22. Equipment hire", "section_short": "Equipment hire", "name": "Aircon rental"}, {"section": "22. Equipment hire", "section_short": "Equipment hire", "name": "Craneage"}, {"section": "22. Equipment hire", "section_short": "Equipment hire", "name": "EWPs"}, {"section": "23. Filters", "section_short": "Filters", "name": "Panel filters"}, {"section": "23. Filters", "section_short": "Filters", "name": "Bag filters"}, {"section": "23. Filters", "section_short": "Filters", "name": "Premedia filter"}, {"section": "24. Commissioning", "section_short": "Commissioning", "name": "Pre Commissioning - Technician"}, {"section": "24. Commissioning", "section_short": "Commissioning", "name": "Commissioning - Air"}, {"section": "24. Commissioning", "section_short": "Commissioning", "name": "Commissioning - Water"}, {"section": "25. Design & Documentation", "section_short": "Design & Documentation", "name": "Drafting"}, {"section": "25. Design & Documentation", "section_short": "Design & Documentation", "name": "Design - Working Drawings"}, {"section": "25. Design & Documentation", "section_short": "Design & Documentation", "name": "Design - As Built & Manual"}, {"section": "25. Design & Documentation", "section_short": "Design & Documentation", "name": "Design - Engineering"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "After hours Work"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Insurances and Fees"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Site Costs"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "General Sundries"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Freight and Delivery"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Project Manager"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Site Manager"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Parking"}, {"section": "27. DLP & Maintenance", "section_short": "DLP & Maintenance", "name": "Maintenance - Warranty Allowance"}, {"section": "27. DLP & Maintenance", "section_short": "DLP & Maintenance", "name": "Maintenance - Preventative"}, {"section": "27. DLP & Maintenance", "section_short": "DLP & Maintenance", "name": "Maintenance - Existing equipment servicing"}, {"section": "28. Miscellaneous", "section_short": "Miscellaneous", "name": "Platform install"}, {"section": "28. Miscellaneous", "section_short": "Miscellaneous", "name": "Plant maintenance"}];
 const RAW_GROUPED = {"01. Air Conditioning Equipment": [{"parent": "Active Chilled Beam", "children": ["Active Chilled Beam", "ACB 2x flexible hoses"]}, {"parent": "Chiller", "children": ["Chiller - Air Cooled", "Chiller - Water Cooled", "Chiller - Associated Items", "Chiller - Cathodic Protection", "Chiller - Buffer Tank"]}, {"parent": "CRAC Unit", "children": ["CRAC Unit", "CRAC Unit Bases", "CRAC Unit Plenums", "CRAC Unit Control panel"]}, {"parent": "Waffle pads", "children": ["Waffle pads"]}, {"parent": "Gas - Water - Leak detection", "children": ["Gas - Water - Leak detection"]}, {"parent": "Package Unit", "children": ["Package Unit - Air Cooled", "Package Unit - Water Cooled"]}, {"parent": "PAC Unit", "children": ["PAC - Wall controllers", "PAC - Vibration  mounts"]}, {"parent": "DX Systems", "children": ["DX Wall Split System", "DX Ducted Split system", "DX Split CU", "DX system - Wall controllers", "DX system - Split System Interface card"]}, {"parent": "VRF Systems", "children": ["VRF systems", "VRF systems - Branch box", "VRF systems - Central controller", "VRF systems - Wall controller", "VRF systems - Vibration mounts"]}], "02. AHU & Fan Coils": [{"parent": "Air Handling Unit", "children": ["Air Handling Unit", "Air Handling Unit  - Associated Items"]}, {"parent": "Fan Coil Unit", "children": ["Fan Coil Unit", "Fan Coil Unit  - Associated Items"]}, {"parent": "Air Filter", "children": ["Air Filter - Standard", "Air Filter - Special", "Air Filter - Terminal Unit"]}, {"parent": "Bygold", "children": ["Bygold"]}], "03. Cooling Tower Equipment": [{"parent": "Cooling Tower", "children": ["Cooling Tower", "Cooling Tower - Associated Item"]}, {"parent": "Expansion Tank", "children": ["Expansion Tank"]}, {"parent": "Dosing Equipment", "children": ["Dosing Equipment"]}, {"parent": "Water Treatment", "children": ["Water Treatment"]}, {"parent": "Sidestream Filtration", "children": ["Sidestream Filtration"]}], "04. Heating Equipment": [{"parent": "Boiler", "children": ["Boiler", "Boiler - Associated Items", "Boiler  - flue"]}, {"parent": "Heat Exchanger - Water", "children": ["Heat Exchanger - Water"]}, {"parent": "Humidifier", "children": ["Humidifier"]}], "05. Compressed air/ POL systems": [{"parent": "Compressed air installation", "children": ["Compressed air installation"]}, {"parent": "Air Compressor", "children": ["Air Compressor"]}, {"parent": "Air receiver", "children": ["Air receiver"]}, {"parent": "Underground pipes", "children": ["Underground pipes"]}, {"parent": "Above ground pipes", "children": ["Above ground pipes"]}, {"parent": "Service pits", "children": ["Service pits"]}, {"parent": "Underground Tracer wire", "children": ["Underground Tracer wire"]}, {"parent": "Sampling point control panel", "children": ["Sampling point control panel"]}, {"parent": "Air hose reels", "children": ["Air hose reels"]}, {"parent": "Oil water speprator", "children": ["Oil water speprator"]}, {"parent": "Oil drum pump", "children": ["Oil drum pump"]}, {"parent": "Oil reels", "children": ["Oil reels"]}], "06. Pumps": [{"parent": "Pumps", "children": ["Pump - Chilled Water", "Pump - Condensor Water", "Pump - Hot Water", "Pump - Condensate", "Pump - Associated Items"]}, {"parent": "Inertia bases", "children": ["Inertia bases"]}], "07. Coolroom Equipment": [{"parent": "Coolroom Panel", "children": ["Coolroom Panel"]}, {"parent": "Coolroom  Refrigeration System", "children": ["Coolroom  Refrigeration System"]}], "08. Fans & ventilation": [{"parent": "Fans", "children": ["Fans"]}, {"parent": "Roof Mounted Fans", "children": ["Roof Mounted Fans"]}, {"parent": "Fan - Vibration mounts", "children": ["Fan - Vibration mounts"]}, {"parent": "Fan - Speed pots", "children": ["Fan - Speed pots"]}, {"parent": "Roof cowls", "children": ["Roof cowls"]}, {"parent": "Silencers and Attenuators", "children": ["Silencers and Attenuators"]}, {"parent": "Fume Cupboard", "children": ["Fume Cupboard"]}, {"parent": "Fume Cupboard - Associated Items", "children": ["Fume Cupboard - Associated Items"]}, {"parent": "Exhaust Hood", "children": ["Exhaust Hood"]}, {"parent": "General Fume Exhaust Equipment", "children": ["General Fume Exhaust Equipment"]}, {"parent": "Welding extraction system", "children": ["Welding extraction system"]}, {"parent": "Dust extraction system", "children": ["Dust extraction system"]}], "09. Filtering equipment": [{"parent": "Electrostatic precipitation filter", "children": ["Electrostatic precipitation filter"]}], "11. Air Flow Control Equipment": [{"parent": "VAVs", "children": ["VAVs"]}, {"parent": "VCDs", "children": ["VCDs"]}, {"parent": "MVCDs", "children": ["MVCDs"]}, {"parent": "NRDs", "children": ["NRDs"]}, {"parent": "Fire Damper", "children": ["Fire Damper"]}, {"parent": "MFSD", "children": ["MFSD"]}, {"parent": "MSD", "children": ["MSD"]}, {"parent": "Pressure relief damper", "children": ["Pressure relief damper"]}], "10. Air Diffusion Equipment": [{"parent": "Cushion boxes & grilles", "children": ["Cushion boxes & grilles"]}, {"parent": "Flexible Duct", "children": ["Flexible Duct"]}, {"parent": "Starting collars/spigots", "children": ["Starting collars/spigots"]}, {"parent": "Flexible Duct - wall tubes/joining collars", "children": ["Flexible Duct - wall tubes/joining collars"]}, {"parent": "Reducers for felxible duct", "children": ["Reducers for felxible duct"]}, {"parent": "Thermafusers", "children": ["Thermafusers"]}], "12. Rigid Ductwork": [{"parent": "Grill - Relocates", "children": ["Grill - Relocates"]}, {"parent": "Grill - Installation", "children": ["Grill - Installation"]}, {"parent": "Duct - Spiral", "children": ["Duct - Spiral"]}, {"parent": "Duct - Square", "children": ["Duct - Square"]}, {"parent": "Duct - Exhaust", "children": ["Duct - Exhaust"]}, {"parent": "Duct - Fabric", "children": ["Duct - Fabric"]}, {"parent": "Duct - Duct Board", "children": ["Duct - Duct Board"]}, {"parent": "Duct - Kitchen Exhaust", "children": ["Duct - Kitchen Exhaust"]}, {"parent": "Duct - Associated Item", "children": ["Duct - Associated Item"]}, {"parent": "Duct - Installation", "children": ["Duct - Installation"]}, {"parent": "Duct - Relocation", "children": ["Duct - Relocation"]}, {"parent": "Duct - Cleaning", "children": ["Duct - Cleaning"]}, {"parent": "Duct - Supply & Installation", "children": ["Duct - Supply & Installation"]}, {"parent": "Duct - Weathproof protective covering for piping/cabling", "children": ["Duct - Weathproof protective covering for piping/cabling"]}, {"parent": "Pressure relief damper install", "children": ["Pressure relief damper install"]}, {"parent": "Security bars", "children": ["Security bars"]}, {"parent": "Plinths and Support Frames", "children": ["Plinths and Support Frames"]}], "13. Mechanical Electrical Systems": [{"parent": "Electrical - Electronic Controls", "children": ["Electrical - Electronic Controls"]}, {"parent": "Electrical - Switchboard", "children": ["Electrical - Switchboard"]}, {"parent": "Electrical - S & I", "children": ["Electrical - S & I"]}, {"parent": "Electrical - Installation", "children": ["Electrical - Installation"]}, {"parent": "Electrical - Duct Heater", "children": ["Electrical - Duct Heater"]}, {"parent": "Electrical - Variable Speed Drive", "children": ["Electrical - Variable Speed Drive"]}, {"parent": "MSSBs", "children": ["MSSBs"]}, {"parent": "Equipment labels", "children": ["Equipment labels"]}, {"parent": "Electrical - Smoke Detector", "children": ["Electrical - Smoke Detector"]}, {"parent": "Electrical - Associated Item", "children": ["Electrical - Associated Item"]}], "14. Mechanical plumbing": [{"parent": "Pipe - Water", "children": ["Pipe - Water"]}, {"parent": "Pipe - Refigeration", "children": ["Pipe - Refigeration"]}, {"parent": "Pipe - Drain", "children": ["Pipe - Drain"]}, {"parent": "Pipe - S&I - Water", "children": ["Pipe - S&I - Water"]}, {"parent": "Pipe - S&I - Refrigeration", "children": ["Pipe - S&I - Refrigeration"]}, {"parent": "Pipe - Associated Items", "children": ["Pipe - Associated Items"]}, {"parent": "Pipeworks and valve labels", "children": ["Pipeworks and valve labels"]}, {"parent": "Flushing", "children": ["Flushing"]}, {"parent": "Pipe - installation", "children": ["Pipe - installation"]}], "15. Controls & BMCS": [{"parent": "Air Conditioning Controls", "children": ["Air Conditioning Controls"]}, {"parent": "BMS - Control Hardware", "children": ["BMS - Control Hardware"]}, {"parent": "BMS - Installation", "children": ["BMS - Installation"]}, {"parent": "BMS - S & I", "children": ["BMS - S & I"]}, {"parent": "BMS - Associated Item", "children": ["BMS - Associated Item"]}, {"parent": "Sensor relocation", "children": ["Sensor relocation"]}, {"parent": "Refrigerant Detection System", "children": ["Refrigerant Detection System"]}], "16. Fire stopping": [{"parent": "Pasive fire rating", "children": ["Pasive fire rating"]}, {"parent": "Duct Fyre wrapping", "children": ["Duct Fyre wrapping"]}, {"parent": "Fire spraying", "children": ["Fire spraying"]}, {"parent": "FD install", "children": ["FD install"]}], "17. Insulation": [{"parent": "Pipe -  Lagging & Insulation", "children": ["Pipe -  Lagging & Insulation"]}, {"parent": "Sounlag AC units", "children": ["Sounlag AC units"]}, {"parent": "Duct - External Insulation", "children": ["Duct - External Insulation"]}], "18. Acoustic Treatment": [{"parent": "Acoustic Treatment", "children": ["Acoustic Treatment"]}], "19. Equipment Installation/ Rigging": [{"parent": "Equipment installation", "children": ["Equipment installation"]}, {"parent": "Hoisting Cranage", "children": ["Hoisting Cranage"]}, {"parent": "Hire Equipment", "children": ["Hire Equipment"]}, {"parent": "Plinths and Support Frames", "children": ["Plinths and Support Frames"]}, {"parent": "Consumables - Nuts & Bolts", "children": ["Consumables - Nuts & Bolts"]}], "20. Seismics": [{"parent": "Gripple wires, Fames and materials", "children": ["Gripple wires, Fames and materials"]}, {"parent": "Design", "children": ["Design"]}], "21. Building works": [{"parent": "Core Holes & Penetrations", "children": ["Core Holes & Penetrations"]}, {"parent": "Scaffolding", "children": ["Scaffolding"]}, {"parent": "Painting", "children": ["Painting"]}, {"parent": "Structural", "children": ["Structural"]}, {"parent": "Associated Item", "children": ["Associated Item"]}, {"parent": "Demolition Work", "children": ["Demolition Work"]}, {"parent": "Asbestos removal", "children": ["Asbestos removal"]}, {"parent": "Tipping / Recycling", "children": ["Tipping / Recycling"]}], "22. Equipment hire": [{"parent": "Aircon rental", "children": ["Aircon rental"]}, {"parent": "Craneage", "children": ["Craneage"]}, {"parent": "EWPs", "children": ["EWPs"]}], "23. Filters": [{"parent": "Panel filters", "children": ["Panel filters"]}, {"parent": "Bag filters", "children": ["Bag filters"]}, {"parent": "Premedia filter", "children": ["Premedia filter"]}], "24. Commissioning": [{"parent": "Pre Commissioning - Technician", "children": ["Pre Commissioning - Technician"]}, {"parent": "Commissioning - Air", "children": ["Commissioning - Air"]}, {"parent": "Commissioning - Water", "children": ["Commissioning - Water"]}], "25. Design & Documentation": [{"parent": "Drafting", "children": ["Drafting"]}, {"parent": "Design - Working Drawings", "children": ["Design - Working Drawings"]}, {"parent": "Design - As Built & Manual", "children": ["Design - As Built & Manual"]}, {"parent": "Design - Engineering", "children": ["Design - Engineering"]}], "26. Supervision &  Site Costs": [{"parent": "After hours Work", "children": ["After hours Work"]}, {"parent": "Insurances and Fees", "children": ["Insurances and Fees"]}, {"parent": "Site Costs", "children": ["Site Costs"]}, {"parent": "General Sundries", "children": ["General Sundries"]}, {"parent": "Freight and Delivery", "children": ["Freight and Delivery"]}, {"parent": "Project Manager", "children": ["Project Manager"]}, {"parent": "Site Manager", "children": ["Site Manager"]}, {"parent": "Parking", "children": ["Parking"]}], "27. DLP & Maintenance": [{"parent": "Maintenance - Warranty Allowance", "children": ["Maintenance - Warranty Allowance"]}, {"parent": "Maintenance - Preventative", "children": ["Maintenance - Preventative"]}, {"parent": "Maintenance - Existing equipment servicing", "children": ["Maintenance - Existing equipment servicing"]}], "28. Miscellaneous": [{"parent": "Platform install", "children": ["Platform install"]}, {"parent": "Plant maintenance", "children": ["Plant maintenance"]}]};
 
-let sections=[], editingPO=null, lineItems=[], undoStack=[];
+let sections=[], subVarPos=[], editingPO=null, editingSVPO=null, lineItems=[], undoStack=[];
 let uidN=0;
 const nid=()=>++uidN;
 const num=v=>parseFloat(v)||0;
@@ -471,7 +494,7 @@ function toggleSuggPanel(){
       return '<button onclick="addSuggestion(this,\''+c.replace(/'/g,"\'")+'\')" style="display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:6px;font-size:12.5px;font-family:DM Sans,sans-serif;cursor:pointer;transition:all .15s;'
         +(added?'background:var(--green-dim);border:1px solid var(--green);color:var(--green)':'background:var(--surface3);border:1px solid var(--border);color:var(--text2)')
         +'">'+(added?'✓ ':'＋ ')+c+'</button>';
-    }).join('');
+    }).join('')+svHtml;
   }
 }
 
@@ -484,83 +507,67 @@ function addSuggestion(btn, desc){
   btn.textContent='✓ '+desc;
 }
 
-function getBudgetForGroup(secName,grpName){
-  if(!_budgetData||!_budgetData.sections)return null;
-  var sec=_budgetData.sections.find(function(s){return s.name===secName;});if(!sec)return null;
-  var grp=sec.groups.find(function(g){return g.parent===grpName;});if(!grp)return null;
-  var b=parseFloat(grp.budget)||0;
-  return b>0?b:0; // return 0 if not set (not null — null means group not found)
+function getBudgetForGroup(secName, grpName){
+  if(!_budgetData||!_budgetData.sections)return 0;
+  var sec=_budgetData.sections.find(function(s){return s.name===secName;});
+  if(!sec)return 0;
+  var grp=sec.groups.find(function(g){return g.parent===grpName;});
+  if(!grp)return 0;
+  return parseFloat(grp.budget)||0;
 }
-function groupExists(secName,grpName){
-  if(!_budgetData||!_budgetData.sections)return false;
-  var sec=_budgetData.sections.find(function(s){return s.name===secName;});if(!sec)return false;
-  return !!(sec.groups.find(function(g){return g.parent===grpName;}));
-}
-function getCommittedForGroup(secName,grpName){
-  var sec=sections.find(function(s){return s.name===secName;});if(!sec)return 0;
-  var grp=sec.groups.find(function(g){return g.parent===grpName;});if(!grp)return 0;
+
+function getCommittedForGroup(secName, grpName){
+  // Sum all PO totals in this group (excluding current editing PO)
+  var sec=sections.find(function(s){return s.name===secName;});
+  if(!sec)return 0;
+  var grp=sec.groups.find(function(g){return g.parent===grpName;});
+  if(!grp)return 0;
   return (grp.pos||[]).reduce(function(a,po){
+    // Exclude currently editing PO from committed
     if(editingPO&&po.id===editingPO.pid)return a;
-    return a+liSub(po.lineItems||[]);
+    return a+liTot(po.lineItems||[]);
   },0);
 }
+
 function updateBudgetPanel(){
-  var panel=document.getElementById('budgetPanel');if(!panel)return;
+  var panel=document.getElementById('budgetPanel');
+  if(!panel)return;
   var catVal=(document.getElementById('po-cat')||{}).value||'';
   if(!catVal){panel.classList.remove('visible');return;}
-  panel.classList.add('visible');
   var parts=catVal.split('||');
-  var secName=parts[0]||'',grpName=parts[1]||'';
+  var secName=parts[0]||'';
+  var grpName=parts[1]||'';
   var budget=getBudgetForGroup(secName,grpName);
+  if(!budget){panel.classList.remove('visible');return;}
+  panel.classList.add('visible');
   var committed=getCommittedForGroup(secName,grpName);
-  var thisPO=liSub(lineItems);
-  var budgetEl=document.getElementById('bp-budget');
-  var barWrap=document.getElementById('bp-bar-wrap');
+  var thisPO=liTot(lineItems);
+  var remaining=budget-committed-thisPO;
+  var pct=budget>0?Math.min((committed+thisPO)/budget*100,100):0;
+  // Update cells
+  document.getElementById('bp-budget').textContent=fmtZ(budget);
+  var commEl=document.getElementById('bp-committed');
+  commEl.textContent=fmtZ(committed);
+  commEl.className='bp-val'+(committed>budget*0.8?' warn':'');
+  document.getElementById('bp-this').textContent=fmtZ(thisPO);
+  var remEl=document.getElementById('bp-remaining');
+  remEl.textContent=fmtZ(remaining);
+  remEl.className='bp-val'+(remaining<0?' danger':remaining<budget*0.1?' warn':' green');
+  // Bar
   var bar=document.getElementById('bp-bar');
+  bar.style.width=pct+'%';
+  bar.style.background=pct>=100?'var(--danger)':pct>=80?'var(--warn)':'var(--green)';
+  // Alert
   var alert=document.getElementById('bp-alert');
   var alertMsg=document.getElementById('bp-alert-msg');
-  // Committed always shows
-  var ce=document.getElementById('bp-committed');
-  if(ce)ce.textContent=fmtZ(committed);
-  var clbl=document.getElementById('bp-committed-lbl');
-  if(clbl)clbl.textContent=editingPO?'Other POs':'Committed POs';
-  var te=document.getElementById('bp-this');
-  if(te)te.textContent=fmtZ(thisPO);
-
-  // Remaining always = budget - committed - thisPO (works even if budget = 0)
-  var remaining = budget - committed - thisPO;
-  var reEl = document.getElementById('bp-remaining');
-  if(reEl){
-    reEl.textContent = (committed===0 && thisPO===0 && !budget) ? '—' : fmtZ(remaining);
-    reEl.className = 'bp-val' + (remaining < 0 ? ' danger' : (budget && remaining < budget*0.1) ? ' warn' : ' green');
-  }
-
-  if(!budget){
-    if(budgetEl){budgetEl.textContent='Not set';budgetEl.className='bp-val muted';}
-    if(barWrap)barWrap.style.display='none';
-    if(committed===0 && thisPO===0){
-      if(alert)alert.className='bp-alert visible info';
-      if(alertMsg)alertMsg.innerHTML='No budget set for this line — contact your Estimator.';
-    } else {
-      if(alert)alert.className='bp-alert visible danger';
-      if(alertMsg)alertMsg.innerHTML='⚠ No budget set for this line — contact your Estimator.';
-    }
-    return;
-  }
-
-  // Budget exists
-  if(budgetEl){budgetEl.textContent=fmtZ(budget);budgetEl.className='bp-val';}
-  var pct=Math.min((committed+thisPO)/budget*100,100);
-  if(barWrap)barWrap.style.display='';
-  if(bar){bar.style.width=pct+'%';bar.style.background=pct>=100?'var(--danger)':pct>=80?'var(--warn)':'var(--green)';}
   if(remaining<0){
-    if(alert)alert.className='bp-alert visible danger';
-    if(alertMsg)alertMsg.innerHTML='&#9888; Exceeds budget by '+fmtZ(Math.abs(remaining))+' excl GST';
-  } else if(pct>=80){
-    if(alert)alert.className='bp-alert visible warn';
-    if(alertMsg)alertMsg.innerHTML='&#9888; Warning: '+Math.round(pct)+'% of budget consumed';
+    alert.className='bp-alert visible danger';
+    alertMsg.textContent='This PO exceeds budget by '+fmtZ(Math.abs(remaining))+' (incl GST)';
+  } else if((committed+thisPO)>budget*0.8){
+    alert.className='bp-alert visible warn';
+    alertMsg.textContent='Warning: '+Math.round(pct)+'% of budget consumed';
   } else {
-    if(alert)alert.className='bp-alert';
+    alert.className='bp-alert';
   }
 }
 
@@ -589,9 +596,20 @@ function onCatChange(catVal){
 
 
 // ── STORAGE ──
-async function loadData(){try{const s=await dbGetPurchaseOrders(_poPNum);if(s)return s;}catch(e){}return null;}
 var _budgetData=null;
-async function loadBudgetData(){try{var b=await dbGetBudget(_poPNum);_budgetData=b||null;}catch(e){_budgetData=null;}}
+async function loadData(){try{const s=await dbGetPurchaseOrders(_poPNum);if(s)return s;}catch(e){}return null;}
+async function loadBudgetData(){
+  try{var b=await dbGetBudget(_poPNum);_budgetData=b||null;}catch(e){_budgetData=null;}
+}
+async function loadSubVarPos(){
+  try{var d=await dbGetSubVariations(_poPNum);subVarPos=(d&&Array.isArray(d.subVarPos))?d.subVarPos:[];}catch(e){subVarPos=[];}
+}
+function saveSubVarPos(){
+  dbGetSubVariations(_poPNum).then(function(d){
+    var data=d||{};data.subVarPos=subVarPos;
+    dbSetSubVariations(_poPNum,data).catch(function(e){console.error(e);});
+  }).catch(function(e){console.error(e);});
+}
 function saveData(){
   try{
     dbSetPurchaseOrders(_poPNum,{sections,margin:15,ts:Date.now()}).catch(e=>console.error(e));
@@ -604,8 +622,8 @@ function buildDefault(){
     groups:groups.map((g,gi)=>({id:'g'+si+'_'+gi,parent:g.parent,budget:'',pos:[]}))
   }));
 }
-// sections loaded in async init below
-sections=buildDefault(); // temporary until async init runs
+const saved=loadData();
+sections=saved?.sections||buildDefault();
 
 // ── PO NUMBER ──
 function genPONum(){return PROJECT_NO+'-PO-'+String(getAllPOs().length+1).padStart(3,'0');}
@@ -629,14 +647,19 @@ function liTot(items){return liSub(items)+liGST(items);}
 function updateSummary(){
   const all=getAllPOs();
   document.getElementById('s-total').textContent=all.length;
-  document.getElementById('s-committed').textContent=fmtZ(all.reduce((a,p)=>a+liSub(p.lineItems||[]),0));
+  document.getElementById('s-committed').textContent=fmtZ(all.reduce((a,p)=>a+liTot(p.lineItems||[]),0));
   document.getElementById('s-actual').textContent=fmtZ(all.reduce((a,p)=>a+num(p.actual),0));
 }
 
 function populateFilters(){
-  const cats=[...new Set(CATEGORIES.map(c=>c.name))];
   const cf=document.getElementById('catFil'),cur=cf.value;
-  cf.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+  var cats;
+  if(_budgetData&&_budgetData.sections&&_budgetData.sections.length){
+    cats=[...new Set(_budgetData.sections.flatMap(function(s){return s.groups.map(function(g){return g.parent;});}))];
+  } else {
+    cats=[...new Set(CATEGORIES.map(c=>c.name))];
+  }
+  cf.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option${c===cur?' selected':''}>${escH(c)}</option>`).join('');
 }
 
 // ── VIEWS ──
@@ -653,20 +676,76 @@ function goList(){
 }
 
 // ── LIST ──
+var _srcTab='all';
+function setSrcTab(t){
+  _srcTab=t;
+  ['all','proc','subvar'].forEach(function(x){
+    var el=document.getElementById('srcTab-'+x);
+    if(el)el.classList.toggle('active',x===t);
+  });
+  renderList();
+}
+
+function renderSubVarPORow(p){
+  var sub=p.value||0,gst=sub*0.1,tot=sub+gst;
+  var id=escH(p.id);
+  var row='<tr style="cursor:pointer" data-svpo="'+id+'" onclick="openSVPO(this.dataset.svpo)">';
+  row+='<td class="po-num-c">'+escH(p.poRef||p.id)+'</td>';
+  row+='<td style="font-weight:500;color:var(--text)">'+escH(p.subbie||'--')+'</td>';
+  row+='<td><span class="sv-badge">Subcontractor Variation</span> <span style="font-size:11px;color:var(--text2)">'+escH(p.svNum||'')+'</span></td>';
+  row+='<td class="r" style="font-size:12px">'+fmtZ(sub)+'</td>';
+  row+='<td class="r" style="font-size:12px;color:var(--muted)">'+fmtZ(gst)+'</td>';
+  row+='<td class="r" style="font-size:13px;color:var(--accent);font-weight:700">'+fmtZ(tot)+'</td>';
+  row+='<td style="font-size:11px;color:var(--text2)">'+fmtD(p.delivery||'')+'</td>';
+  row+='<td><span class="po-st ps-a">● Approved</span></td>';
+  row+='<td onclick="event.stopPropagation()"><div class="ra"><button class="ia del" data-svpodel="'+id+'" onclick="delSVPO(this.dataset.svpodel)">✕</button></div></td>';
+  row+='</tr>';
+  return row;
+}
+
+function openSVPO(id){
+  var p=subVarPos.find(function(x){return x.id===id;});if(!p)return;
+  editingSVPO=p;
+  // Pre-fill PO form fields
+  document.getElementById('po-page-num').textContent=p.poRef||p.id;
+  document.getElementById('po-page-title').textContent=p.subbie||'Subcontractor PO';
+  document.getElementById('po-supplier').value=p.subbie||'';
+  document.getElementById('po-delivery').value=p.delivery||'';
+  document.getElementById('po-notes').value=p.notes||'';
+  lineItems=[{id:nid(),desc:p.desc||'',qty:'1',price:String(p.value||'')}];
+  editingPO=null;
+  document.getElementById('po-cat').style.display='none';
+  document.getElementById('po-cat-lbl').style.display='none';
+  setPOView(p.poRef||p.id,true);
+  renderLineItems();
+}
+
+function delSVPO(id){
+  if(!confirm('Delete this PO?'))return;
+  subVarPos=subVarPos.filter(function(x){return x.id!==id;});
+  saveSubVarPos();renderList();
+}
+
 function renderList(){
   const q=(document.getElementById('srch').value||'').toLowerCase();
   const sf='';
   const cat=document.getElementById('catFil').value;
-  let all=getAllPOs().filter(p=>
+  let procPOs=_srcTab!=='subvar'?getAllPOs().filter(p=>
     (!q||(p.id||'').toLowerCase().includes(q)||(p.supplier||'').toLowerCase().includes(q)||(p._grpName||'').toLowerCase().includes(q))
     &&(!cat||p._grpName===cat)
-  );
+  ):[];
+  let svPOs=_srcTab!=='proc'?subVarPos.filter(function(p){
+    return !q||(p.poRef||'').toLowerCase().includes(q)||(p.subbie||'').toLowerCase().includes(q)||(p.svNum||'').toLowerCase().includes(q);
+  }):[];
+  let all=procPOs;
   document.getElementById('poCount').textContent=all.length+' purchase orders';
   updateSummary();
   if(!all.length){
     document.getElementById('poBody').innerHTML=`<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">No purchase orders yet — <button onclick="openNewPO()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">＋ Create PO</button></td></tr>`;
     return;
   }
+  var svHtml=svPOs.map(function(p){return renderSubVarPORow(p);}).join('');
+  document.getElementById('poCount').textContent=(all.length+svPOs.length)+' purchase orders';
   document.getElementById('poBody').innerHTML=all.map(p=>{
     const items=p.lineItems||[],sub=liSub(items),gst=liGST(items),tot=liTot(items);
     return `<tr onclick="openPO('${p._secId}','${p._grpId}','${p.id}')">
@@ -721,20 +800,40 @@ function openPO(sid,gid,pid){
   populateCatDD(sec&&g?sec.name+'||'+g.parent:'');
   renderLI();
   setPOView(po.id, true);
+  setTimeout(updateBudgetPanel,50);
 }
 
 // ── CATEGORY DROPDOWN ──
 function populateCatDD(selectedVal){
   const sel=document.getElementById('po-cat');
-  sel.innerHTML='<option value="">Select category…</option>';
-  let lastSec='';
-  CATEGORIES.forEach(c=>{
-    if(c.section!==lastSec){const og=document.createElement('optgroup');og.label=c.section_short;sel.appendChild(og);lastSec=c.section;}
-    const opt=document.createElement('option');
-    opt.value=c.section+'||'+c.name;opt.textContent=c.name;
-    if(selectedVal&&opt.value===selectedVal)opt.selected=true;
-    sel.lastChild.appendChild(opt);
-  });
+  sel.innerHTML='<option value="">— Select budget line —</option>';
+  // Use live budget data if available, fall back to CATEGORIES
+  if(_budgetData&&_budgetData.sections&&_budgetData.sections.length){
+    _budgetData.sections.forEach(function(sec){
+      var hasBudget=sec.groups.some(function(g){return parseFloat(g.budget)>0;});
+      var og=document.createElement('optgroup');
+      og.label=sec.name+(hasBudget?'':' (no budget set)');
+      sec.groups.forEach(function(g){
+        var opt=document.createElement('option');
+        opt.value=sec.name+'||'+g.parent;
+        var budgetAmt=parseFloat(g.budget)||0;
+        opt.textContent=g.parent+(budgetAmt?' — $'+budgetAmt.toLocaleString('en-AU',{minimumFractionDigits:0}):'');
+        if(selectedVal&&opt.value===selectedVal)opt.selected=true;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    });
+  } else {
+    // Fallback to static CATEGORIES list
+    let lastSec='';
+    CATEGORIES.forEach(c=>{
+      if(c.section!==lastSec){const og=document.createElement('optgroup');og.label=c.section_short;sel.appendChild(og);lastSec=c.section;}
+      const opt=document.createElement('option');
+      opt.value=c.section+'||'+c.name;opt.textContent=c.name;
+      if(selectedVal&&opt.value===selectedVal)opt.selected=true;
+      sel.lastChild.appendChild(opt);
+    });
+  }
   onCatChange(selectedVal||'');
 }
 
@@ -752,8 +851,6 @@ function updateRowTotal(i){
   document.getElementById('tot-sub').textContent=fmt(sub);
   document.getElementById('tot-gst').textContent=fmt(gst);
   document.getElementById('tot-total').textContent=fmt(total);
-  // Update budget panel with current PO total
-  updateBudgetPanel();
 }
 
 function liKey(e,rowIdx,field){
@@ -835,8 +932,17 @@ function savePO(){
   if(!supplier){const el=document.getElementById('po-supplier');el.classList.add('err');el.focus();setTimeout(()=>el.classList.remove('err'),2000);return;}
   const catVal=document.getElementById('po-cat').value;
   if(!catVal){document.getElementById('po-cat').focus();return;}
-  var _bp2=catVal.split('||');var _bBudget=getBudgetForGroup(_bp2[0]||'',_bp2[1]||'');
-  if(_bBudget>0){var _bComm=getCommittedForGroup(_bp2[0]||'',_bp2[1]||'');if((_bComm+liSub(lineItems))>_bBudget){if(!confirm('\u26a0\ufe0f This PO exceeds the budget for this line by '+fmtZ(_bComm+liSub(lineItems)-_bBudget)+' excl GST.\n\nSave anyway?'))return;}}
+  // Budget over-spend check
+  var parts=catVal.split('||');
+  var _budChk_budget=getBudgetForGroup(parts[0]||'',parts[1]||'');
+  if(_budChk_budget>0){
+    var _budChk_committed=getCommittedForGroup(parts[0]||'',parts[1]||'');
+    var _budChk_this=liTot(lineItems);
+    var _budChk_remaining=_budChk_budget-_budChk_committed-_budChk_this;
+    if(_budChk_remaining<0){
+      if(!confirm('⚠️ This PO exceeds the budget for this category by '+fmtZ(Math.abs(_budChk_remaining))+' (incl GST).\n\nSave anyway?'))return;
+    }
+  }
   const [secName,grpName]=catVal.split('||');
   const sec=sections.find(s=>s.name===secName);
   const grp=sec?.groups.find(g=>g.parent===grpName);
@@ -984,12 +1090,55 @@ function emailPO(){
 }
 
 // ── INIT ──
-(async function(){
-  const saved=await loadData();
-  if(saved?.sections){sections=saved.sections;}
+(async function initSubVarPO(){
+  await loadSubVarPos();
   await loadBudgetData();
+  var params=new URLSearchParams(window.location.search);
+  var src=params.get('source')||'';
+  if(src==='subvar'){
+    // Create new subvar PO
+    var svId=params.get('svId');
+    var already=subVarPos.find(function(x){return x.svId===svId&&!x.existingPoId;});
+    if(!already){
+      var newPO={
+        id:'svpo_'+Date.now(),
+        svId:svId,
+        svNum:params.get('svNum')||'',
+        poRef:params.get('poRef')||'',
+        subbie:params.get('svSubbie')||'',
+        desc:params.get('svDesc')||'',
+        value:parseFloat(params.get('svValue')||0),
+        lineItems:[{desc:params.get('svDesc')||'',qty:'1',price:params.get('svValue')||''}],
+        delivery:'',notes:'',
+        createdDate:new Date().toISOString().split('T')[0]
+      };
+      subVarPos.push(newPO);
+      saveSubVarPos();
+    }
+    setSrcTab('subvar');
+  } else if(src==='subvar-addline'){
+    // Add as line item to existing subvar PO
+    var existingPoId=params.get('existingPoId');
+    var epo=subVarPos.find(function(x){return x.id===existingPoId;});
+    if(epo){
+      if(!epo.lineItems)epo.lineItems=[];
+      var svDesc=params.get('svDesc')||'';
+      var svVal=parseFloat(params.get('svValue')||0);
+      var svNum=params.get('svNum')||'';
+      // Only add if not already there
+      var alreadyLine=epo.lineItems.find(function(l){return l.svNum===svNum;});
+      if(!alreadyLine){
+        epo.lineItems.push({desc:svDesc,qty:'1',price:String(svVal),svNum:svNum});
+        // Update total value
+        epo.value=(epo.lineItems||[]).reduce(function(a,l){return a+parseFloat(l.price||0)*parseFloat(l.qty||1);},0);
+        saveSubVarPos();
+      }
+    }
+    setSrcTab('subvar');
+  } else {
+    renderList();
+  }
   populateFilters();
-  renderList();
 })();
 
 // Sidebar tooltip

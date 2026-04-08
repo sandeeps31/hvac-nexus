@@ -231,6 +231,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
         <label class="ml">Equipment ID</label>
         <input class="mi" id="itpEquip" placeholder="e.g. FCU-L02-001" autocomplete="off">
       </div>
+      <div id="fdItpTypeWrap">
+        <label class="ml">ITP Type</label>
+        <input class="mi" id="fdItpType" list="fdItpTypeList" placeholder="Type to search templates…" autocomplete="off">
+        <datalist id="fdItpTypeList"></datalist>
+      </div>
       <div>
         <label class="ml">Status</label>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -730,6 +735,15 @@ function openFdMo(pin){
   document.getElementById('fdSaveOpenBtn').style.display=isNew?'':'none';
   loadFdAssignees();
   document.getElementById('fdAssignee').value=pin?(pin.assignee||''):'';
+  // Populate ITP type datalist from project templates
+  var fdItpInp=document.getElementById('fdItpType');
+  var fdItpList=document.getElementById('fdItpTypeList');
+  if(fdItpInp&&fdItpList){
+    fdItpList.innerHTML=(templates||[]).map(function(t){
+      return '<option value="'+escH(t.itpType)+'">';
+    }).join('');
+    fdItpInp.value=pin?(pin.linkedItpType||''):'';
+  }
   selectFdStatus(_fdStatus);
   document.getElementById('fdMo').classList.add('open');
 }
@@ -739,16 +753,18 @@ function saveFdPin(action){
   var u=dbGetCurrentUser();
   var tag=document.getElementById('fdTag').value.trim();
   var assignee=document.getElementById('fdAssignee').value;
+  var linkedItpType=(document.getElementById('fdItpType')||{}).value||'';
   var savedPin=null;
   if(_fdPinCache){
     _fdPinCache.tag=tag;
     _fdPinCache.assignee=assignee;
+    _fdPinCache.linkedItpType=linkedItpType;
     responses[_fdPinCache.id]=responses[_fdPinCache.id]||{};
     responses[_fdPinCache.id].status=_fdStatus;
     savedPin=_fdPinCache;
   } else {
     var ref=nextRef('FD');
-    savedPin={id:nid(),type:'firedamper',ref:ref,tag:tag,assignee:assignee,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    savedPin={id:nid(),type:'firedamper',ref:ref,tag:tag,assignee:assignee,linkedItpType:linkedItpType,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
     curDrawing.pins.push(savedPin);
     responses[savedPin.id]={status:'not-started'};
   }
@@ -766,7 +782,7 @@ function saveFdPin(action){
     var itpPin={
       id:nid(),type:'itp',
       ref:itpRef,
-      itpTypeLabel:'Fire Damper',
+      itpTypeLabel:savedPin.linkedItpType||'Fire Damper',
       equip:savedPin.tag||'',
       x:savedPin.x,y:savedPin.y,
       createdBy:(u2&&(u2.name||u2.username))||'',
