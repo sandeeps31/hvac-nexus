@@ -268,7 +268,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
   <div class="view active" id="view-list">
     <div class="sum-bar">
       <div class="sc cb"><div class="sc-lbl">Total POs</div><div class="sc-val" id="s-total">0</div></div>
-      <div class="sc cw"><div class="sc-lbl">Total Committed</div><div class="sc-val" id="s-committed">—</div><div class="sc-sub">incl GST</div></div>
+      <div class="sc cw"><div class="sc-lbl">Total Committed</div><div class="sc-val" id="s-committed">—</div><div class="sc-sub">excl GST</div></div>
       <div class="sc cg"><div class="sc-lbl">Total Invoiced to Date</div><div class="sc-val" id="s-actual">—</div></div>
     </div>
     <div class="toolbar">
@@ -598,8 +598,28 @@ async function loadBudgetData(){try{var b=await dbGetBudget(_poPNum);_budgetData
 function saveData(){
   try{
     dbSetPurchaseOrders(_poPNum,{sections,margin:15,ts:Date.now()}).catch(e=>console.error(e));
+    // Also sync POs into budget record so budget module stays in sync
+    syncPosToBudget();
     const i=document.getElementById('saveInd');i.classList.add('show');setTimeout(()=>i.classList.remove('show'),2000);
   }catch(e){}
+}
+
+async function syncPosToBudget(){
+  try{
+    var budgetData=await dbGetBudget(_poPNum);
+    if(!budgetData||!budgetData.sections)return;
+    // Merge current PO sections into budget sections
+    sections.forEach(function(poSec){
+      var bSec=budgetData.sections.find(function(s){return s.name===poSec.name;});
+      if(!bSec)return;
+      poSec.groups.forEach(function(poGrp){
+        var bGrp=bSec.groups.find(function(g){return g.parent===poGrp.parent;});
+        if(!bGrp)return;
+        bGrp.pos=poGrp.pos||[];
+      });
+    });
+    dbSetBudget(_poPNum,budgetData).catch(function(e){console.warn('Budget sync failed:',e);});
+  }catch(e){console.warn('syncPosToBudget failed:',e);}
 }
 function buildDefault(){
   return Object.entries(RAW_GROUPED).map(([name,groups],si)=>({
