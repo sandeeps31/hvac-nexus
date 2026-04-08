@@ -220,7 +220,7 @@ async function loadRates(){try{var s=await dbGetVariations(_vPNum+'_rates');if(s
 function saveRatesData(){dbSetVariations(_vPNum+'_rates',labourRates).catch(e=>console.error(e));}
 function ratesAreSet(){for(var i=0;i<TRADES.length;i++){var t=TRADES[i].id;if(!labourRates[t]||!labourRates[t].normal)return false;}return true;}
 function getRate(tid,ot){var r=labourRates[tid];if(!r)return 0;return ot==='ot'?(num(r.ot)||0):(num(r.normal)||0);}
-loadRates();
+// loadRates called in async init
 function nid(){return++uidN;}function num(v){return parseFloat(v)||0;}function fmt(n){return'$'+Math.round(num(n)).toLocaleString('en-AU');}function fmtZ(n){var v=num(n);return v===0?'--':fmt(v);}function fmtD(d){return d?new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'--';}
 
 
@@ -292,7 +292,7 @@ function delVar(id){if(!confirm('Delete?'))return;var arr=[];for(var i=0;i<varia
 function handleFiles(input){if(input.files&&input.files.length){var names=[];for(var i=0;i<input.files.length;i++)names.push(input.files[i].name);document.getElementById('var-file-lbl').textContent=names.join(', ');}}
 document.getElementById('subPickModal').addEventListener('click',function(e){if(e.target===this)closeSubPicker();});
 document.getElementById('ratesModal').addEventListener('click',function(e){if(e.target===this)closeRatesModal();});
-renderList();
+loadRates().then(function(){renderList();});
 document.addEventListener('visibilitychange',function(){if(!document.hidden){var fresh=loadData();if(fresh&&fresh.variations)variations=fresh.variations;renderList();}});
 
 
