@@ -445,12 +445,7 @@ function grpActual(g){
     return i.status==='Approved'&&i.po&&poIds.some(function(id){return i.po===id||i.po.includes(id)||id.includes(i.po);});
   }).reduce(function(a,i){return a+parseFloat(i.amount||0);},0);
 }
-function grpActual(g){
-  // Sum approved vendor invoices linked to any PO in this group
-  var poIds=g.pos.map(function(p){return p.id;});
-  return _invoiceData.filter(function(i){return i.status==='Approved'&&poIds.indexOf(i.po)>=0;})
-    .reduce(function(a,i){return a+num(i.amount);},0);
-}
+
 function grpFTC(g){return g.pos.reduce((a,p)=>a+Math.max(0,liSub(p.lineItems||[])-num(p.actual)),0);}
 function grpVar(g){const b=grpBudget(g),c=grpCommitted(g);return b>0||c>0?b-c:0;}
 
@@ -458,18 +453,7 @@ function secBudget(s){return s.groups.reduce((a,g)=>a+grpBudget(g),0);}
 function secActual(s){return s.groups.reduce((a,g)=>a+grpActual(g),0);}
 function grandActual(){return sections.reduce((a,s)=>a+secActual(s),0);}
 function secCommitted(s){return s.groups.reduce((a,g)=>a+grpCommitted(g),0);}
-function secActual(s){return s.groups.reduce((a,g)=>a+grpActual(g),0);}
-function secFTC(s){return s.groups.reduce((a,g)=>a+grpFTC(g),0);}
-function secVar(s){const b=secBudget(s),c=secCommitted(s);return b>0||c>0?b-c:0;}
 
-var varRegCollapsed = false;
-var baseCollapsed = false;
-var showApprovedOnly = false;
-
-var _cachedVariations = [];
-async function loadVariations(){
-  try{var d=await dbGetVariations(_pNum);_cachedVariations=Array.isArray(d)?d:(d&&d.variations?d.variations:[]);}catch(e){_cachedVariations=[];}
-}
 function getVariations(){ return _cachedVariations; }
 
 function getVarExGst(v){
@@ -644,13 +628,11 @@ function renderAll(){
   colHdrEl.className='col-header';
   colHdrEl.style.cssText='';
   colHdrEl.innerHTML='<span style="flex:1;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Category</span>'
-    +'<span class="col-h" style="width:120px">Budget</span>'
-    +'<span class="col-h" style="width:120px">Committed</span>'
-    +'<span class="col-h" style="width:120px">Actuals</span>'
-    
-    +'<span class="col-h" style="width:130px">Forecast to Complete</span>'
+    +'<span class="col-h" style="width:110px">Budget</span>'
+    +'<span class="col-h" style="width:110px">Committed</span>'
+    +'<span class="col-h" style="width:110px">Actuals</span>'
     +'<span class="col-h" style="width:100px">Variance</span>'
-    +'<span class="col-h" style="width:70px">POs</span>'
+    +'<span class="col-h" style="width:80px;text-align:center">POs</span>'
     +'<span style="width:28px"></span>';
   baseBody.appendChild(colHdrEl);
 
@@ -690,10 +672,10 @@ function renderAll(){
             <span class="grp-name">${g.parent}</span>
             ${(_canEditBudget && _budgetEditMode)
               ? `<input class="budget-inp" type="number" value="${g.budget||''}" placeholder="0" onclick="event.stopPropagation()" onblur="saveBudgetInline('${g.id}',this.value)" />`
-              : `<span class="grp-val" style="width:120px;color:${gb>0?'var(--accent)':'var(--muted)'}">${fmt(gb)}</span>`
+              : `<span class="grp-val" style="width:110px;color:${gb>0?'var(--accent)':'var(--muted)'}">${fmt(gb)}</span>`
             }
-            <span class="grp-val" style="width:120px;color:${gc>0?'var(--warn)':'var(--muted)'}">${fmt(gc)}</span>
-            <span class="grp-val" style="width:120px;color:${ga>0?'var(--green)':'var(--muted)'}">${fmt(ga)}</span>
+            <span class="grp-val" style="width:110px;color:${gc>0?'var(--warn)':'var(--muted)'}">${fmt(gc)}</span>
+            <span class="grp-val" style="width:110px;color:${ga>0?'var(--green)':'var(--muted)'}">${fmt(ga)}</span>
             <span class="grp-val ${gvCls}" style="width:100px">${gb>0||gc>0?fmtV(gv):'--'}</span>
             <span class="grp-po-count" style="width:70px;text-align:center">${poCt} PO${poCt!==1?'s':''}</span>
             <span class="grp-arrow" style="width:28px;text-align:center">></span>
