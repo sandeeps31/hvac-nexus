@@ -84,6 +84,20 @@ input[type=number]{-moz-appearance:textfield}
 .dt tbody tr:last-child{border-bottom:none}
 .dt tbody tr:hover{background:var(--surface2)}
 .dt td{padding:10px 13px;vertical-align:middle;font-size:13px}
+.budget-panel{margin:14px 28px 0;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none}
+.budget-panel.visible{display:block}
+.bp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px}
+.bp-cell{display:flex;flex-direction:column;gap:3px}
+.bp-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.bp-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--text)}
+.bp-val.green{color:var(--green)}.bp-val.warn{color:var(--warn)}.bp-val.danger{color:var(--danger)}.bp-val.muted{color:var(--muted);font-size:12px;font-style:italic}
+.bp-bar-wrap{height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:6px}
+.bp-bar{height:100%;border-radius:3px;transition:width .3s,background .3s}
+.bp-alert{display:none;padding:9px 14px;border-radius:7px;font-size:12px;font-weight:600;margin-top:10px;gap:8px;align-items:center}
+.bp-alert.visible{display:flex}
+.bp-alert.warn{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+.bp-alert.danger{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.3)}
+.bp-alert.info{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
 .po-num-c{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:600}
 .ra{display:flex;gap:5px;justify-content:flex-end;opacity:0;transition:opacity .13s}
 tr:hover .ra{opacity:1}
@@ -308,6 +322,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
         <div id="assocItemsList" style="display:flex;flex-wrap:wrap;gap:6px;padding-left:25px"></div>
       </div>
 
+      <!-- BUDGET HEALTH PANEL -->
+      <div class="budget-panel" id="budgetPanel">
+        <div class="bp-grid">
+          <div class="bp-cell"><span class="bp-lbl">Budget</span><span class="bp-val" id="bp-budget">—</span></div>
+          <div class="bp-cell"><span class="bp-lbl">Committed POs</span><span class="bp-val" id="bp-committed">—</span></div>
+          <div class="bp-cell"><span class="bp-lbl">This PO</span><span class="bp-val" id="bp-this">—</span></div>
+          <div class="bp-cell"><span class="bp-lbl">Remaining After</span><span class="bp-val" id="bp-remaining">—</span></div>
+        </div>
+        <div class="bp-bar-wrap" id="bp-bar-wrap"><div class="bp-bar" id="bp-bar" style="width:0%"></div></div>
+        <div class="bp-alert" id="bp-alert"><span id="bp-alert-msg"></span></div>
+      </div>
       <div class="li-section">
         <div class="li-hdr">
           <span class="li-hdr-title">Line Items</span>
@@ -459,6 +484,79 @@ function addSuggestion(btn, desc){
   btn.textContent='✓ '+desc;
 }
 
+function getBudgetForGroup(secName,grpName){
+  if(!_budgetData||!_budgetData.sections)return null;
+  var sec=_budgetData.sections.find(function(s){return s.name===secName;});if(!sec)return null;
+  var grp=sec.groups.find(function(g){return g.parent===grpName;});if(!grp)return null;
+  var b=parseFloat(grp.budget)||0;
+  return b>0?b:0; // return 0 if not set (not null — null means group not found)
+}
+function groupExists(secName,grpName){
+  if(!_budgetData||!_budgetData.sections)return false;
+  var sec=_budgetData.sections.find(function(s){return s.name===secName;});if(!sec)return false;
+  return !!(sec.groups.find(function(g){return g.parent===grpName;}));
+}
+function getCommittedForGroup(secName,grpName){
+  var sec=sections.find(function(s){return s.name===secName;});if(!sec)return 0;
+  var grp=sec.groups.find(function(g){return g.parent===grpName;});if(!grp)return 0;
+  return (grp.pos||[]).reduce(function(a,po){
+    if(editingPO&&po.id===editingPO.pid)return a;
+    return a+liTot(po.lineItems||[]);
+  },0);
+}
+function updateBudgetPanel(){
+  var panel=document.getElementById('budgetPanel');if(!panel)return;
+  var catVal=(document.getElementById('po-cat')||{}).value||'';
+  if(!catVal){panel.classList.remove('visible');return;}
+  panel.classList.add('visible');
+  var parts=catVal.split('||');
+  var secName=parts[0]||'',grpName=parts[1]||'';
+  var budget=getBudgetForGroup(secName,grpName);
+  var committed=getCommittedForGroup(secName,grpName);
+  var thisPO=liTot(lineItems);
+  var budgetEl=document.getElementById('bp-budget');
+  var barWrap=document.getElementById('bp-bar-wrap');
+  var bar=document.getElementById('bp-bar');
+  var alert=document.getElementById('bp-alert');
+  var alertMsg=document.getElementById('bp-alert-msg');
+  // Committed always shows
+  var ce=document.getElementById('bp-committed');
+  if(ce)ce.textContent=fmtZ(committed);
+  var te=document.getElementById('bp-this');
+  if(te)te.textContent=fmtZ(thisPO);
+
+  if(!budget){
+    // No budget set for this line
+    if(budgetEl){budgetEl.textContent='Not set';budgetEl.className='bp-val muted';}
+    var re=document.getElementById('bp-remaining');
+    if(re){re.textContent='—';re.className='bp-val muted';}
+    if(barWrap)barWrap.style.display='none';
+    if(alert)alert.className='bp-alert visible info';
+    if(alertMsg){
+      alertMsg.innerHTML='No budget set for this line. <a href="hvac-budget.html" style="color:var(--accent);text-decoration:underline">Set budget →</a>';
+    }
+    return;
+  }
+
+  // Budget exists
+  if(budgetEl){budgetEl.textContent=fmtZ(budget);budgetEl.className='bp-val';}
+  var remaining=budget-committed-thisPO;
+  var pct=budget>0?Math.min((committed+thisPO)/budget*100,100):0;
+  var re2=document.getElementById('bp-remaining');
+  if(re2){re2.textContent=fmtZ(remaining);re2.className='bp-val'+(remaining<0?' danger':remaining<budget*0.1?' warn':' green');}
+  if(barWrap)barWrap.style.display='';
+  if(bar){bar.style.width=pct+'%';bar.style.background=pct>=100?'var(--danger)':pct>=80?'var(--warn)':'var(--green)';}
+  if(remaining<0){
+    if(alert)alert.className='bp-alert visible danger';
+    if(alertMsg)alertMsg.innerHTML='&#9888; Exceeds budget by '+fmtZ(Math.abs(remaining))+' incl GST';
+  } else if(pct>=80){
+    if(alert)alert.className='bp-alert visible warn';
+    if(alertMsg)alertMsg.innerHTML='&#9888; Warning: '+Math.round(pct)+'% of budget consumed';
+  } else {
+    if(alert)alert.className='bp-alert';
+  }
+}
+
 function onCatChange(catVal){
   var grpName=catVal.split('||')[1]||'';
   // Associated items banner
@@ -477,6 +575,7 @@ function onCatChange(catVal){
   if(panel) panel.style.display='none';
   suggPanelOpen=false;
   if(btn) btn.textContent='💡 Show Procurement Suggestions';
+  updateBudgetPanel();
 }
 
 
@@ -484,6 +583,8 @@ function onCatChange(catVal){
 
 // ── STORAGE ──
 async function loadData(){try{const s=await dbGetPurchaseOrders(_poPNum);if(s)return s;}catch(e){}return null;}
+var _budgetData=null;
+async function loadBudgetData(){try{var b=await dbGetBudget(_poPNum);_budgetData=b||null;}catch(e){_budgetData=null;}}
 function saveData(){
   try{
     dbSetPurchaseOrders(_poPNum,{sections,margin:15,ts:Date.now()}).catch(e=>console.error(e));
@@ -725,6 +826,8 @@ function savePO(){
   if(!supplier){const el=document.getElementById('po-supplier');el.classList.add('err');el.focus();setTimeout(()=>el.classList.remove('err'),2000);return;}
   const catVal=document.getElementById('po-cat').value;
   if(!catVal){document.getElementById('po-cat').focus();return;}
+  var _bp2=catVal.split('||');var _bBudget=getBudgetForGroup(_bp2[0]||'',_bp2[1]||'');
+  if(_bBudget>0){var _bComm=getCommittedForGroup(_bp2[0]||'',_bp2[1]||'');if((_bComm+liTot(lineItems))>_bBudget){if(!confirm('\u26a0\ufe0f This PO exceeds the budget for this line by '+fmtZ(_bComm+liTot(lineItems)-_bBudget)+' incl GST.\n\nSave anyway?'))return;}}
   const [secName,grpName]=catVal.split('||');
   const sec=sections.find(s=>s.name===secName);
   const grp=sec?.groups.find(g=>g.parent===grpName);
@@ -872,7 +975,7 @@ function emailPO(){
 }
 
 // ── INIT ──
-populateFilters();renderList();
+(async function(){await loadBudgetData();populateFilters();renderList();})();
 
 // Sidebar tooltip
 var sbTip=document.createElement('div');sbTip.id='sb-tip';document.body.appendChild(sbTip);
