@@ -84,6 +84,10 @@ input[type=number]{-moz-appearance:textfield}
 .dt tbody tr:last-child{border-bottom:none}
 .dt tbody tr:hover{background:var(--surface2)}
 .dt td{padding:10px 13px;vertical-align:middle;font-size:13px}
+.src-tab{padding:7px 18px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text2);border:none;background:var(--surface2);border-bottom:2px solid transparent;transition:all .13s;font-family:'DM Sans',sans-serif}
+.src-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface)}
+.src-tab:hover:not(.active){color:var(--text)}
+.sv-badge{font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
 .budget-panel{margin:14px 28px 0;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none}
 .budget-panel.visible{display:block}
 .bp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px}
@@ -98,6 +102,35 @@ input[type=number]{-moz-appearance:textfield}
 .bp-alert.warn{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
 .bp-alert.danger{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.3)}
 .bp-alert.info{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+/* PO Tabs */
+.po-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface2)}
+.po-tab{padding:11px 22px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);border:none;background:none;border-bottom:2px solid transparent;transition:all .13s;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:7px}
+.po-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface)}
+.po-tab:hover:not(.active){color:var(--text)}
+.po-tab-badge{font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:10px;background:var(--surface3);color:var(--muted)}
+.po-tab.active .po-tab-badge{background:var(--accent-dim);color:var(--accent)}
+.po-tab-pane{display:none}.po-tab-pane.active{display:block}
+/* Claims & Invoices */
+.claim-row{display:flex;align-items:center;padding:12px 20px;border-bottom:1px solid var(--border);gap:12px;background:var(--surface)}
+.claim-row:hover{background:var(--surface2)}
+.claim-status,.inv-status{font-family:'DM Mono',monospace;font-size:9px;padding:3px 9px;border-radius:20px;font-weight:600;border:1px solid;flex-shrink:0}
+.cs-pending,.is-pending{color:var(--warn);border-color:rgba(255,184,48,.3);background:var(--warn-dim)}
+.cs-approved,.is-approved{color:var(--green);border-color:rgba(0,200,100,.3);background:rgba(0,200,100,.08)}
+.cs-disputed,.is-rejected{color:var(--danger);border-color:rgba(255,77,109,.3);background:var(--danger-dim)}
+.claim-amount{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--text);flex-shrink:0;min-width:90px;text-align:right}
+.claim-desc{font-size:13px;color:var(--text);flex:1;min-width:0}
+.claim-meta{font-size:11px;color:var(--muted);white-space:nowrap;margin-top:2px}
+.claims-summary{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface2)}
+.cs-cell{flex:1;padding:12px 20px;border-right:1px solid var(--border)}
+.cs-cell:last-child{border-right:none}
+.cs-lbl{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px}
+.cs-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--text)}
+.inv-row{display:flex;align-items:center;padding:12px 20px;border-bottom:1px solid var(--border);gap:12px;background:var(--surface)}
+.inv-row:hover{background:var(--surface2)}
+.inv-variance{font-family:'DM Mono',monospace;font-size:11px;padding:2px 8px;border-radius:4px;flex-shrink:0}
+.inv-var-ok{color:var(--green);background:rgba(0,200,100,.08)}
+.inv-var-warn{color:var(--warn);background:var(--warn-dim)}
+.inv-var-danger{color:var(--danger);background:var(--danger-dim)}
 .po-num-c{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:600}
 .ra{display:flex;gap:5px;justify-content:flex-end;opacity:0;transition:opacity .13s}
 tr:hover .ra{opacity:1}
@@ -268,7 +301,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
   <div class="view active" id="view-list">
     <div class="sum-bar">
       <div class="sc cb"><div class="sc-lbl">Total POs</div><div class="sc-val" id="s-total">0</div></div>
-      <div class="sc cw"><div class="sc-lbl">Total Committed</div><div class="sc-val" id="s-committed">—</div><div class="sc-sub">excl GST</div></div>
+      <div class="sc cw"><div class="sc-lbl">Total Committed</div><div class="sc-val" id="s-committed">—</div><div class="sc-sub">incl GST</div></div>
       <div class="sc cg"><div class="sc-lbl">Total Invoiced to Date</div><div class="sc-val" id="s-actual">—</div></div>
     </div>
     <div class="toolbar">
@@ -305,9 +338,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
           <div class="mf"><span class="ml">Supplier *</span>
             <input class="mi" id="po-supplier" placeholder="Supplier name…"/>
           </div>
-          <div class="mf"><span class="ml">Order Date</span>
-            <input class="mi" id="po-order-date" type="date"/>
-          </div>
           <div class="mf"><span class="ml">Delivery Date</span>
             <input class="mi" id="po-delivery" type="date" onkeydown="if(event.key==='Tab'&&!event.shiftKey){event.preventDefault();var el=document.getElementById('liDesc_0');if(el){el.focus();}}"/>
           </div>
@@ -315,16 +345,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
         </div>
       </div>
 
-      <!-- PO TABS -->
-      <div class="po-tabs" id="poTabs">
+      <!-- PO TABS (hidden for new POs) -->
+      <div class="po-tabs" id="poTabs" style="display:none">
         <button class="po-tab active" id="poTab-lineitems" onclick="switchPOTab('lineitems')">📋 Line Items <span class="po-tab-badge" id="poTabBadge-lineitems">0</span></button>
         <button class="po-tab" id="poTab-claims" onclick="switchPOTab('claims')">📝 Claims <span class="po-tab-badge" id="poTabBadge-claims">0</span></button>
         <button class="po-tab" id="poTab-invoices" onclick="switchPOTab('invoices')">🧾 Invoices <span class="po-tab-badge" id="poTabBadge-invoices">0</span></button>
       </div>
-
       <!-- TAB: LINE ITEMS -->
       <div class="po-tab-pane active" id="poPane-lineitems">
-
       <!-- ASSOCIATED ITEMS REMINDER -->
       <div id="assocBanner" style="display:none;margin:14px 28px 0;padding:12px 16px;background:rgba(255,184,48,.07);border:1px solid rgba(255,184,48,.25);border-radius:8px;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;gap:10px">
@@ -392,11 +420,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
       <div class="save-bar">
         <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" id="deletePOBtn" onclick="deleteCurrentPO()">🗑 Delete</button>
         <span style="flex:1"></span>
-        <button class="bg bsm btn" id="editPOBtn" onclick="enablePOEdit()" style="display:none">✏️ Edit PO</button>
-        <button class="bg bsm btn" id="sendVendorBtn" onclick="sendToVendor()" style="display:none;color:var(--accent);border-color:rgba(0,200,255,.3)">📧 Send to Vendor</button>
-        <button class="bp bsm btn" id="savePOBtn" onclick="savePO()">💾 Save PO</button>
+        <button class="bp btn" id="savePOBtn" onclick="savePO()">💾 Save PO</button>
       </div>
-
       </div><!-- /poPane-lineitems -->
 
       <!-- TAB: CLAIMS -->
@@ -434,15 +459,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 
 <script src="db.js"></script>
 <script>
-function escH(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 const STORAGE_KEY = 'hvacnexus_budget_GCT001';
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 const PROJECT_NO = 'GCT2025';
-// _poPNum resolved after db.js loads
-var _poPNum = PROJECT_NO;
+var _poPNum = PROJECT_NO; // resolved in init
 const CATEGORIES = [{"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "Active Chilled Beam"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "Chiller"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "CRAC Unit"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "Waffle pads"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "Gas - Water - Leak detection"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "Package Unit"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "PAC Unit"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "DX Systems"}, {"section": "01. Air Conditioning Equipment", "section_short": "Air Conditioning Equipment", "name": "VRF Systems"}, {"section": "02. AHU & Fan Coils", "section_short": "AHU & Fan Coils", "name": "Air Handling Unit"}, {"section": "02. AHU & Fan Coils", "section_short": "AHU & Fan Coils", "name": "Fan Coil Unit"}, {"section": "02. AHU & Fan Coils", "section_short": "AHU & Fan Coils", "name": "Air Filter"}, {"section": "02. AHU & Fan Coils", "section_short": "AHU & Fan Coils", "name": "Bygold"}, {"section": "03. Cooling Tower Equipment", "section_short": "Cooling Tower Equipment", "name": "Cooling Tower"}, {"section": "03. Cooling Tower Equipment", "section_short": "Cooling Tower Equipment", "name": "Expansion Tank"}, {"section": "03. Cooling Tower Equipment", "section_short": "Cooling Tower Equipment", "name": "Dosing Equipment"}, {"section": "03. Cooling Tower Equipment", "section_short": "Cooling Tower Equipment", "name": "Water Treatment"}, {"section": "03. Cooling Tower Equipment", "section_short": "Cooling Tower Equipment", "name": "Sidestream Filtration"}, {"section": "04. Heating Equipment", "section_short": "Heating Equipment", "name": "Boiler"}, {"section": "04. Heating Equipment", "section_short": "Heating Equipment", "name": "Heat Exchanger - Water"}, {"section": "04. Heating Equipment", "section_short": "Heating Equipment", "name": "Humidifier"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Compressed air installation"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Air Compressor"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Air receiver"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Underground pipes"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Above ground pipes"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Service pits"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Underground Tracer wire"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Sampling point control panel"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Air hose reels"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Oil water speprator"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Oil drum pump"}, {"section": "05. Compressed air/ POL systems", "section_short": "Compressed air/ POL systems", "name": "Oil reels"}, {"section": "06. Pumps", "section_short": "Pumps", "name": "Pumps"}, {"section": "06. Pumps", "section_short": "Pumps", "name": "Inertia bases"}, {"section": "07. Coolroom Equipment", "section_short": "Coolroom Equipment", "name": "Coolroom Panel"}, {"section": "07. Coolroom Equipment", "section_short": "Coolroom Equipment", "name": "Coolroom  Refrigeration System"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Fans"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Roof Mounted Fans"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Fan - Vibration mounts"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Fan - Speed pots"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Roof cowls"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Silencers and Attenuators"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Fume Cupboard"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Fume Cupboard - Associated Items"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Exhaust Hood"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "General Fume Exhaust Equipment"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Welding extraction system"}, {"section": "08. Fans & ventilation", "section_short": "Fans & ventilation", "name": "Dust extraction system"}, {"section": "09. Filtering equipment", "section_short": "Filtering equipment", "name": "Electrostatic precipitation filter"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "VAVs"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "VCDs"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "MVCDs"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "NRDs"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "Fire Damper"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "MFSD"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "MSD"}, {"section": "11. Air Flow Control Equipment", "section_short": "Air Flow Control Equipment", "name": "Pressure relief damper"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Cushion boxes & grilles"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Flexible Duct"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Starting collars/spigots"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Flexible Duct - wall tubes/joining collars"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Reducers for felxible duct"}, {"section": "10. Air Diffusion Equipment", "section_short": "Air Diffusion Equipment", "name": "Thermafusers"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Grill - Relocates"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Grill - Installation"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Spiral"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Square"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Exhaust"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Fabric"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Duct Board"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Kitchen Exhaust"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Associated Item"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Installation"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Relocation"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Cleaning"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Supply & Installation"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Duct - Weathproof protective covering for piping/cabling"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Pressure relief damper install"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Security bars"}, {"section": "12. Rigid Ductwork", "section_short": "Rigid Ductwork", "name": "Plinths and Support Frames"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Electronic Controls"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Switchboard"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - S & I"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Installation"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Duct Heater"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Variable Speed Drive"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "MSSBs"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Equipment labels"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Smoke Detector"}, {"section": "13. Mechanical Electrical Systems", "section_short": "Mechanical Electrical Systems", "name": "Electrical - Associated Item"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - Water"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - Refigeration"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - Drain"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - S&I - Water"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - S&I - Refrigeration"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - Associated Items"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipeworks and valve labels"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Flushing"}, {"section": "14. Mechanical plumbing", "section_short": "Mechanical plumbing", "name": "Pipe - installation"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "Air Conditioning Controls"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "BMS - Control Hardware"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "BMS - Installation"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "BMS - S & I"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "BMS - Associated Item"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "Sensor relocation"}, {"section": "15. Controls & BMCS", "section_short": "Controls & BMCS", "name": "Refrigerant Detection System"}, {"section": "16. Fire stopping", "section_short": "Fire stopping", "name": "Pasive fire rating"}, {"section": "16. Fire stopping", "section_short": "Fire stopping", "name": "Duct Fyre wrapping"}, {"section": "16. Fire stopping", "section_short": "Fire stopping", "name": "Fire spraying"}, {"section": "16. Fire stopping", "section_short": "Fire stopping", "name": "FD install"}, {"section": "17. Insulation", "section_short": "Insulation", "name": "Pipe -  Lagging & Insulation"}, {"section": "17. Insulation", "section_short": "Insulation", "name": "Sounlag AC units"}, {"section": "17. Insulation", "section_short": "Insulation", "name": "Duct - External Insulation"}, {"section": "18. Acoustic Treatment", "section_short": "Acoustic Treatment", "name": "Acoustic Treatment"}, {"section": "19. Equipment Installation/ Rigging", "section_short": "Equipment Installation/ Rigging", "name": "Equipment installation"}, {"section": "19. Equipment Installation/ Rigging", "section_short": "Equipment Installation/ Rigging", "name": "Hoisting Cranage"}, {"section": "19. Equipment Installation/ Rigging", "section_short": "Equipment Installation/ Rigging", "name": "Hire Equipment"}, {"section": "19. Equipment Installation/ Rigging", "section_short": "Equipment Installation/ Rigging", "name": "Plinths and Support Frames"}, {"section": "19. Equipment Installation/ Rigging", "section_short": "Equipment Installation/ Rigging", "name": "Consumables - Nuts & Bolts"}, {"section": "20. Seismics", "section_short": "Seismics", "name": "Gripple wires, Fames and materials"}, {"section": "20. Seismics", "section_short": "Seismics", "name": "Design"}, {"section": "21. Building works", "section_short": "Building works", "name": "Core Holes & Penetrations"}, {"section": "21. Building works", "section_short": "Building works", "name": "Scaffolding"}, {"section": "21. Building works", "section_short": "Building works", "name": "Painting"}, {"section": "21. Building works", "section_short": "Building works", "name": "Structural"}, {"section": "21. Building works", "section_short": "Building works", "name": "Associated Item"}, {"section": "21. Building works", "section_short": "Building works", "name": "Demolition Work"}, {"section": "21. Building works", "section_short": "Building works", "name": "Asbestos removal"}, {"section": "21. Building works", "section_short": "Building works", "name": "Tipping / Recycling"}, {"section": "22. Equipment hire", "section_short": "Equipment hire", "name": "Aircon rental"}, {"section": "22. Equipment hire", "section_short": "Equipment hire", "name": "Craneage"}, {"section": "22. Equipment hire", "section_short": "Equipment hire", "name": "EWPs"}, {"section": "23. Filters", "section_short": "Filters", "name": "Panel filters"}, {"section": "23. Filters", "section_short": "Filters", "name": "Bag filters"}, {"section": "23. Filters", "section_short": "Filters", "name": "Premedia filter"}, {"section": "24. Commissioning", "section_short": "Commissioning", "name": "Pre Commissioning - Technician"}, {"section": "24. Commissioning", "section_short": "Commissioning", "name": "Commissioning - Air"}, {"section": "24. Commissioning", "section_short": "Commissioning", "name": "Commissioning - Water"}, {"section": "25. Design & Documentation", "section_short": "Design & Documentation", "name": "Drafting"}, {"section": "25. Design & Documentation", "section_short": "Design & Documentation", "name": "Design - Working Drawings"}, {"section": "25. Design & Documentation", "section_short": "Design & Documentation", "name": "Design - As Built & Manual"}, {"section": "25. Design & Documentation", "section_short": "Design & Documentation", "name": "Design - Engineering"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "After hours Work"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Insurances and Fees"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Site Costs"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "General Sundries"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Freight and Delivery"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Project Manager"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Site Manager"}, {"section": "26. Supervision &  Site Costs", "section_short": "Supervision &  Site Costs", "name": "Parking"}, {"section": "27. DLP & Maintenance", "section_short": "DLP & Maintenance", "name": "Maintenance - Warranty Allowance"}, {"section": "27. DLP & Maintenance", "section_short": "DLP & Maintenance", "name": "Maintenance - Preventative"}, {"section": "27. DLP & Maintenance", "section_short": "DLP & Maintenance", "name": "Maintenance - Existing equipment servicing"}, {"section": "28. Miscellaneous", "section_short": "Miscellaneous", "name": "Platform install"}, {"section": "28. Miscellaneous", "section_short": "Miscellaneous", "name": "Plant maintenance"}];
 const RAW_GROUPED = {"01. Air Conditioning Equipment": [{"parent": "Active Chilled Beam", "children": ["Active Chilled Beam", "ACB 2x flexible hoses"]}, {"parent": "Chiller", "children": ["Chiller - Air Cooled", "Chiller - Water Cooled", "Chiller - Associated Items", "Chiller - Cathodic Protection", "Chiller - Buffer Tank"]}, {"parent": "CRAC Unit", "children": ["CRAC Unit", "CRAC Unit Bases", "CRAC Unit Plenums", "CRAC Unit Control panel"]}, {"parent": "Waffle pads", "children": ["Waffle pads"]}, {"parent": "Gas - Water - Leak detection", "children": ["Gas - Water - Leak detection"]}, {"parent": "Package Unit", "children": ["Package Unit - Air Cooled", "Package Unit - Water Cooled"]}, {"parent": "PAC Unit", "children": ["PAC - Wall controllers", "PAC - Vibration  mounts"]}, {"parent": "DX Systems", "children": ["DX Wall Split System", "DX Ducted Split system", "DX Split CU", "DX system - Wall controllers", "DX system - Split System Interface card"]}, {"parent": "VRF Systems", "children": ["VRF systems", "VRF systems - Branch box", "VRF systems - Central controller", "VRF systems - Wall controller", "VRF systems - Vibration mounts"]}], "02. AHU & Fan Coils": [{"parent": "Air Handling Unit", "children": ["Air Handling Unit", "Air Handling Unit  - Associated Items"]}, {"parent": "Fan Coil Unit", "children": ["Fan Coil Unit", "Fan Coil Unit  - Associated Items"]}, {"parent": "Air Filter", "children": ["Air Filter - Standard", "Air Filter - Special", "Air Filter - Terminal Unit"]}, {"parent": "Bygold", "children": ["Bygold"]}], "03. Cooling Tower Equipment": [{"parent": "Cooling Tower", "children": ["Cooling Tower", "Cooling Tower - Associated Item"]}, {"parent": "Expansion Tank", "children": ["Expansion Tank"]}, {"parent": "Dosing Equipment", "children": ["Dosing Equipment"]}, {"parent": "Water Treatment", "children": ["Water Treatment"]}, {"parent": "Sidestream Filtration", "children": ["Sidestream Filtration"]}], "04. Heating Equipment": [{"parent": "Boiler", "children": ["Boiler", "Boiler - Associated Items", "Boiler  - flue"]}, {"parent": "Heat Exchanger - Water", "children": ["Heat Exchanger - Water"]}, {"parent": "Humidifier", "children": ["Humidifier"]}], "05. Compressed air/ POL systems": [{"parent": "Compressed air installation", "children": ["Compressed air installation"]}, {"parent": "Air Compressor", "children": ["Air Compressor"]}, {"parent": "Air receiver", "children": ["Air receiver"]}, {"parent": "Underground pipes", "children": ["Underground pipes"]}, {"parent": "Above ground pipes", "children": ["Above ground pipes"]}, {"parent": "Service pits", "children": ["Service pits"]}, {"parent": "Underground Tracer wire", "children": ["Underground Tracer wire"]}, {"parent": "Sampling point control panel", "children": ["Sampling point control panel"]}, {"parent": "Air hose reels", "children": ["Air hose reels"]}, {"parent": "Oil water speprator", "children": ["Oil water speprator"]}, {"parent": "Oil drum pump", "children": ["Oil drum pump"]}, {"parent": "Oil reels", "children": ["Oil reels"]}], "06. Pumps": [{"parent": "Pumps", "children": ["Pump - Chilled Water", "Pump - Condensor Water", "Pump - Hot Water", "Pump - Condensate", "Pump - Associated Items"]}, {"parent": "Inertia bases", "children": ["Inertia bases"]}], "07. Coolroom Equipment": [{"parent": "Coolroom Panel", "children": ["Coolroom Panel"]}, {"parent": "Coolroom  Refrigeration System", "children": ["Coolroom  Refrigeration System"]}], "08. Fans & ventilation": [{"parent": "Fans", "children": ["Fans"]}, {"parent": "Roof Mounted Fans", "children": ["Roof Mounted Fans"]}, {"parent": "Fan - Vibration mounts", "children": ["Fan - Vibration mounts"]}, {"parent": "Fan - Speed pots", "children": ["Fan - Speed pots"]}, {"parent": "Roof cowls", "children": ["Roof cowls"]}, {"parent": "Silencers and Attenuators", "children": ["Silencers and Attenuators"]}, {"parent": "Fume Cupboard", "children": ["Fume Cupboard"]}, {"parent": "Fume Cupboard - Associated Items", "children": ["Fume Cupboard - Associated Items"]}, {"parent": "Exhaust Hood", "children": ["Exhaust Hood"]}, {"parent": "General Fume Exhaust Equipment", "children": ["General Fume Exhaust Equipment"]}, {"parent": "Welding extraction system", "children": ["Welding extraction system"]}, {"parent": "Dust extraction system", "children": ["Dust extraction system"]}], "09. Filtering equipment": [{"parent": "Electrostatic precipitation filter", "children": ["Electrostatic precipitation filter"]}], "11. Air Flow Control Equipment": [{"parent": "VAVs", "children": ["VAVs"]}, {"parent": "VCDs", "children": ["VCDs"]}, {"parent": "MVCDs", "children": ["MVCDs"]}, {"parent": "NRDs", "children": ["NRDs"]}, {"parent": "Fire Damper", "children": ["Fire Damper"]}, {"parent": "MFSD", "children": ["MFSD"]}, {"parent": "MSD", "children": ["MSD"]}, {"parent": "Pressure relief damper", "children": ["Pressure relief damper"]}], "10. Air Diffusion Equipment": [{"parent": "Cushion boxes & grilles", "children": ["Cushion boxes & grilles"]}, {"parent": "Flexible Duct", "children": ["Flexible Duct"]}, {"parent": "Starting collars/spigots", "children": ["Starting collars/spigots"]}, {"parent": "Flexible Duct - wall tubes/joining collars", "children": ["Flexible Duct - wall tubes/joining collars"]}, {"parent": "Reducers for felxible duct", "children": ["Reducers for felxible duct"]}, {"parent": "Thermafusers", "children": ["Thermafusers"]}], "12. Rigid Ductwork": [{"parent": "Grill - Relocates", "children": ["Grill - Relocates"]}, {"parent": "Grill - Installation", "children": ["Grill - Installation"]}, {"parent": "Duct - Spiral", "children": ["Duct - Spiral"]}, {"parent": "Duct - Square", "children": ["Duct - Square"]}, {"parent": "Duct - Exhaust", "children": ["Duct - Exhaust"]}, {"parent": "Duct - Fabric", "children": ["Duct - Fabric"]}, {"parent": "Duct - Duct Board", "children": ["Duct - Duct Board"]}, {"parent": "Duct - Kitchen Exhaust", "children": ["Duct - Kitchen Exhaust"]}, {"parent": "Duct - Associated Item", "children": ["Duct - Associated Item"]}, {"parent": "Duct - Installation", "children": ["Duct - Installation"]}, {"parent": "Duct - Relocation", "children": ["Duct - Relocation"]}, {"parent": "Duct - Cleaning", "children": ["Duct - Cleaning"]}, {"parent": "Duct - Supply & Installation", "children": ["Duct - Supply & Installation"]}, {"parent": "Duct - Weathproof protective covering for piping/cabling", "children": ["Duct - Weathproof protective covering for piping/cabling"]}, {"parent": "Pressure relief damper install", "children": ["Pressure relief damper install"]}, {"parent": "Security bars", "children": ["Security bars"]}, {"parent": "Plinths and Support Frames", "children": ["Plinths and Support Frames"]}], "13. Mechanical Electrical Systems": [{"parent": "Electrical - Electronic Controls", "children": ["Electrical - Electronic Controls"]}, {"parent": "Electrical - Switchboard", "children": ["Electrical - Switchboard"]}, {"parent": "Electrical - S & I", "children": ["Electrical - S & I"]}, {"parent": "Electrical - Installation", "children": ["Electrical - Installation"]}, {"parent": "Electrical - Duct Heater", "children": ["Electrical - Duct Heater"]}, {"parent": "Electrical - Variable Speed Drive", "children": ["Electrical - Variable Speed Drive"]}, {"parent": "MSSBs", "children": ["MSSBs"]}, {"parent": "Equipment labels", "children": ["Equipment labels"]}, {"parent": "Electrical - Smoke Detector", "children": ["Electrical - Smoke Detector"]}, {"parent": "Electrical - Associated Item", "children": ["Electrical - Associated Item"]}], "14. Mechanical plumbing": [{"parent": "Pipe - Water", "children": ["Pipe - Water"]}, {"parent": "Pipe - Refigeration", "children": ["Pipe - Refigeration"]}, {"parent": "Pipe - Drain", "children": ["Pipe - Drain"]}, {"parent": "Pipe - S&I - Water", "children": ["Pipe - S&I - Water"]}, {"parent": "Pipe - S&I - Refrigeration", "children": ["Pipe - S&I - Refrigeration"]}, {"parent": "Pipe - Associated Items", "children": ["Pipe - Associated Items"]}, {"parent": "Pipeworks and valve labels", "children": ["Pipeworks and valve labels"]}, {"parent": "Flushing", "children": ["Flushing"]}, {"parent": "Pipe - installation", "children": ["Pipe - installation"]}], "15. Controls & BMCS": [{"parent": "Air Conditioning Controls", "children": ["Air Conditioning Controls"]}, {"parent": "BMS - Control Hardware", "children": ["BMS - Control Hardware"]}, {"parent": "BMS - Installation", "children": ["BMS - Installation"]}, {"parent": "BMS - S & I", "children": ["BMS - S & I"]}, {"parent": "BMS - Associated Item", "children": ["BMS - Associated Item"]}, {"parent": "Sensor relocation", "children": ["Sensor relocation"]}, {"parent": "Refrigerant Detection System", "children": ["Refrigerant Detection System"]}], "16. Fire stopping": [{"parent": "Pasive fire rating", "children": ["Pasive fire rating"]}, {"parent": "Duct Fyre wrapping", "children": ["Duct Fyre wrapping"]}, {"parent": "Fire spraying", "children": ["Fire spraying"]}, {"parent": "FD install", "children": ["FD install"]}], "17. Insulation": [{"parent": "Pipe -  Lagging & Insulation", "children": ["Pipe -  Lagging & Insulation"]}, {"parent": "Sounlag AC units", "children": ["Sounlag AC units"]}, {"parent": "Duct - External Insulation", "children": ["Duct - External Insulation"]}], "18. Acoustic Treatment": [{"parent": "Acoustic Treatment", "children": ["Acoustic Treatment"]}], "19. Equipment Installation/ Rigging": [{"parent": "Equipment installation", "children": ["Equipment installation"]}, {"parent": "Hoisting Cranage", "children": ["Hoisting Cranage"]}, {"parent": "Hire Equipment", "children": ["Hire Equipment"]}, {"parent": "Plinths and Support Frames", "children": ["Plinths and Support Frames"]}, {"parent": "Consumables - Nuts & Bolts", "children": ["Consumables - Nuts & Bolts"]}], "20. Seismics": [{"parent": "Gripple wires, Fames and materials", "children": ["Gripple wires, Fames and materials"]}, {"parent": "Design", "children": ["Design"]}], "21. Building works": [{"parent": "Core Holes & Penetrations", "children": ["Core Holes & Penetrations"]}, {"parent": "Scaffolding", "children": ["Scaffolding"]}, {"parent": "Painting", "children": ["Painting"]}, {"parent": "Structural", "children": ["Structural"]}, {"parent": "Associated Item", "children": ["Associated Item"]}, {"parent": "Demolition Work", "children": ["Demolition Work"]}, {"parent": "Asbestos removal", "children": ["Asbestos removal"]}, {"parent": "Tipping / Recycling", "children": ["Tipping / Recycling"]}], "22. Equipment hire": [{"parent": "Aircon rental", "children": ["Aircon rental"]}, {"parent": "Craneage", "children": ["Craneage"]}, {"parent": "EWPs", "children": ["EWPs"]}], "23. Filters": [{"parent": "Panel filters", "children": ["Panel filters"]}, {"parent": "Bag filters", "children": ["Bag filters"]}, {"parent": "Premedia filter", "children": ["Premedia filter"]}], "24. Commissioning": [{"parent": "Pre Commissioning - Technician", "children": ["Pre Commissioning - Technician"]}, {"parent": "Commissioning - Air", "children": ["Commissioning - Air"]}, {"parent": "Commissioning - Water", "children": ["Commissioning - Water"]}], "25. Design & Documentation": [{"parent": "Drafting", "children": ["Drafting"]}, {"parent": "Design - Working Drawings", "children": ["Design - Working Drawings"]}, {"parent": "Design - As Built & Manual", "children": ["Design - As Built & Manual"]}, {"parent": "Design - Engineering", "children": ["Design - Engineering"]}], "26. Supervision &  Site Costs": [{"parent": "After hours Work", "children": ["After hours Work"]}, {"parent": "Insurances and Fees", "children": ["Insurances and Fees"]}, {"parent": "Site Costs", "children": ["Site Costs"]}, {"parent": "General Sundries", "children": ["General Sundries"]}, {"parent": "Freight and Delivery", "children": ["Freight and Delivery"]}, {"parent": "Project Manager", "children": ["Project Manager"]}, {"parent": "Site Manager", "children": ["Site Manager"]}, {"parent": "Parking", "children": ["Parking"]}], "27. DLP & Maintenance": [{"parent": "Maintenance - Warranty Allowance", "children": ["Maintenance - Warranty Allowance"]}, {"parent": "Maintenance - Preventative", "children": ["Maintenance - Preventative"]}, {"parent": "Maintenance - Existing equipment servicing", "children": ["Maintenance - Existing equipment servicing"]}], "28. Miscellaneous": [{"parent": "Platform install", "children": ["Platform install"]}, {"parent": "Plant maintenance", "children": ["Plant maintenance"]}]};
 
-let sections=[], editingPO=null, lineItems=[], undoStack=[];
+let sections=[], subVarPos=[], editingPO=null, editingSVPO=null, lineItems=[], undoStack=[];
+var _budgetData=null;
 let uidN=0;
 const nid=()=>++uidN;
 const num=v=>parseFloat(v)||0;
@@ -534,86 +559,6 @@ function addSuggestion(btn, desc){
   btn.textContent='✓ '+desc;
 }
 
-function getBudgetForGroup(secName,grpName){
-  if(!_budgetData||!_budgetData.sections)return null;
-  var sec=_budgetData.sections.find(function(s){return s.name===secName;});if(!sec)return null;
-  var grp=sec.groups.find(function(g){return g.parent===grpName;});if(!grp)return null;
-  var b=parseFloat(grp.budget)||0;
-  return b>0?b:0; // return 0 if not set (not null — null means group not found)
-}
-function groupExists(secName,grpName){
-  if(!_budgetData||!_budgetData.sections)return false;
-  var sec=_budgetData.sections.find(function(s){return s.name===secName;});if(!sec)return false;
-  return !!(sec.groups.find(function(g){return g.parent===grpName;}));
-}
-function getCommittedForGroup(secName,grpName){
-  var sec=sections.find(function(s){return s.name===secName;});if(!sec)return 0;
-  var grp=sec.groups.find(function(g){return g.parent===grpName;});if(!grp)return 0;
-  return (grp.pos||[]).reduce(function(a,po){
-    if(editingPO&&po.id===editingPO.pid)return a;
-    return a+liSub(po.lineItems||[]);
-  },0);
-}
-function updateBudgetPanel(){
-  var panel=document.getElementById('budgetPanel');if(!panel)return;
-  var catVal=(document.getElementById('po-cat')||{}).value||'';
-  if(!catVal){panel.classList.remove('visible');return;}
-  panel.classList.add('visible');
-  var parts=catVal.split('||');
-  var secName=parts[0]||'',grpName=parts[1]||'';
-  var budget=getBudgetForGroup(secName,grpName);
-  var committed=getCommittedForGroup(secName,grpName);
-  var thisPO=liSub(lineItems);
-  var budgetEl=document.getElementById('bp-budget');
-  var barWrap=document.getElementById('bp-bar-wrap');
-  var bar=document.getElementById('bp-bar');
-  var alert=document.getElementById('bp-alert');
-  var alertMsg=document.getElementById('bp-alert-msg');
-  // Committed always shows
-  var ce=document.getElementById('bp-committed');
-  if(ce)ce.textContent=fmtZ(committed);
-  var clbl=document.getElementById('bp-committed-lbl');
-  if(clbl)clbl.textContent='Committed POs';
-  var te=document.getElementById('bp-this');
-  if(te)te.textContent=fmtZ(thisPO);
-
-  // Remaining always = budget - committed - thisPO (works even if budget = 0)
-  var remaining = budget - committed - thisPO;
-  var reEl = document.getElementById('bp-remaining');
-  if(reEl){
-    reEl.textContent = (committed===0 && thisPO===0 && !budget) ? '—' : fmtZ(remaining);
-    reEl.className = 'bp-val' + (remaining < 0 ? ' danger' : (budget && remaining < budget*0.1) ? ' warn' : ' green');
-  }
-
-  if(!budget){
-    if(budgetEl){budgetEl.textContent='Not set';budgetEl.className='bp-val muted';}
-    if(barWrap)barWrap.style.display='none';
-    if(committed===0 && thisPO===0){
-      if(alert)alert.className='bp-alert visible info';
-      if(alertMsg)alertMsg.innerHTML='No budget set for this line — contact your Estimator.';
-    } else {
-      if(alert)alert.className='bp-alert visible danger';
-      if(alertMsg)alertMsg.innerHTML='⚠ Budget exceeded — no budget set for this line.';
-    }
-    return;
-  }
-
-  // Budget exists
-  if(budgetEl){budgetEl.textContent=fmtZ(budget);budgetEl.className='bp-val';}
-  var pct=Math.min((committed+thisPO)/budget*100,100);
-  if(barWrap)barWrap.style.display='';
-  if(bar){bar.style.width=pct+'%';bar.style.background=pct>=100?'var(--danger)':pct>=80?'var(--warn)':'var(--green)';}
-  if(remaining<0){
-    if(alert)alert.className='bp-alert visible danger';
-    if(alertMsg)alertMsg.innerHTML='&#9888; Exceeds budget by '+fmtZ(Math.abs(remaining))+' excl GST';
-  } else if(pct>=80){
-    if(alert)alert.className='bp-alert visible warn';
-    if(alertMsg)alertMsg.innerHTML='&#9888; Warning: '+Math.round(pct)+'% of budget consumed';
-  } else {
-    if(alert)alert.className='bp-alert';
-  }
-}
-
 function onCatChange(catVal){
   var grpName=catVal.split('||')[1]||'';
   // Associated items banner
@@ -632,7 +577,6 @@ function onCatChange(catVal){
   if(panel) panel.style.display='none';
   suggPanelOpen=false;
   if(btn) btn.textContent='💡 Show Procurement Suggestions';
-  updateBudgetPanel();
 }
 
 
@@ -642,31 +586,13 @@ function onCatChange(catVal){
 async function loadData(){try{const s=await dbGetPurchaseOrders(_poPNum);if(s)return s;}catch(e){}return null;}
 var _budgetData=null;
 async function loadBudgetData(){try{var b=await dbGetBudget(_poPNum);_budgetData=b||null;}catch(e){_budgetData=null;}}
+async function loadSubVarPos(){try{var d=await dbGetSubVariations(_poPNum);subVarPos=(d&&Array.isArray(d.subVarPos))?d.subVarPos:[];}catch(e){subVarPos=[];}}
+function saveSubVarPos(){dbGetSubVariations(_poPNum).then(function(d){var data=d||{};data.subVarPos=subVarPos;dbSetSubVariations(_poPNum,data).catch(function(e){console.error(e);});}).catch(function(e){console.error(e);});}
 function saveData(){
   try{
     dbSetPurchaseOrders(_poPNum,{sections,margin:15,ts:Date.now()}).catch(e=>console.error(e));
-    // Also sync POs into budget record so budget module stays in sync
-    syncPosToBudget();
     const i=document.getElementById('saveInd');i.classList.add('show');setTimeout(()=>i.classList.remove('show'),2000);
   }catch(e){}
-}
-
-async function syncPosToBudget(){
-  try{
-    var budgetData=await dbGetBudget(_poPNum);
-    if(!budgetData||!budgetData.sections)return;
-    // Merge current PO sections into budget sections
-    sections.forEach(function(poSec){
-      var bSec=budgetData.sections.find(function(s){return s.name===poSec.name;});
-      if(!bSec)return;
-      poSec.groups.forEach(function(poGrp){
-        var bGrp=bSec.groups.find(function(g){return g.parent===poGrp.parent;});
-        if(!bGrp)return;
-        bGrp.pos=poGrp.pos||[];
-      });
-    });
-    dbSetBudget(_poPNum,budgetData).catch(function(e){console.warn('Budget sync failed:',e);});
-  }catch(e){console.warn('syncPosToBudget failed:',e);}
 }
 function buildDefault(){
   return Object.entries(RAW_GROUPED).map(([name,groups],si)=>({
@@ -674,8 +600,7 @@ function buildDefault(){
     groups:groups.map((g,gi)=>({id:'g'+si+'_'+gi,parent:g.parent,budget:'',pos:[]}))
   }));
 }
-// sections loaded in async init below
-sections=buildDefault(); // temporary until async init runs
+sections=buildDefault(); // populated in async init
 
 // ── PO NUMBER ──
 function genPONum(){return PROJECT_NO+'-PO-'+String(getAllPOs().length+1).padStart(3,'0');}
@@ -699,7 +624,7 @@ function liTot(items){return liSub(items)+liGST(items);}
 function updateSummary(){
   const all=getAllPOs();
   document.getElementById('s-total').textContent=all.length;
-  document.getElementById('s-committed').textContent=fmtZ(all.reduce((a,p)=>a+liSub(p.lineItems||[]),0));
+  document.getElementById('s-committed').textContent=fmtZ(all.reduce((a,p)=>a+liTot(p.lineItems||[]),0));
   document.getElementById('s-actual').textContent=fmtZ(all.reduce((a,p)=>a+num(p.actual),0));
 }
 
@@ -761,53 +686,15 @@ function setPOView(poId){
   document.getElementById('topCreateBtn').style.display='none';
 }
 
-var _poReadOnly=false;
-
-function setPOInputState(readOnly){
-  _poReadOnly=readOnly;
-  var inputs=['po-supplier','po-delivery','po-order-date','po-cat','po-notes'];
-  inputs.forEach(function(id){var el=document.getElementById(id);if(el){el.disabled=readOnly;el.style.opacity=readOnly?'0.6':'1';}});
-  // Line item inputs
-  document.querySelectorAll('.li-desc-ta,.li-ci,.add-li,.li-del').forEach(function(el){
-    el.style.pointerEvents=readOnly?'none':'';el.style.opacity=readOnly?'0.5':'1';
-  });
-  var editBtn=document.getElementById('editPOBtn');
-  var saveBtn=document.getElementById('savePOBtn');
-  var sendBtn=document.getElementById('sendVendorBtn');
-  if(editBtn)editBtn.style.display=readOnly?'':'none';
-  if(saveBtn)saveBtn.style.display=readOnly?'none':'';
-  if(sendBtn)sendBtn.style.display=readOnly?'':'none';
-}
-
-function enablePOEdit(){
-  setPOInputState(false);
-}
-
-function sendToVendor(){
-  var po=null;
-  if(editingPO){
-    var g=getGrp(editingPO.sid,editingPO.gid);
-    po=g?g.pos.find(function(p){return p.id===editingPO.pid;}):null;
-  }
-  var supplier=document.getElementById('po-supplier').value||'Supplier';
-  var poNum=document.getElementById('po-page-num').textContent||'';
-  var subject='Purchase Order '+poNum+' — '+(po?po.supplier||supplier:supplier);
-  var body='Dear '+supplier+',\n\nPlease find attached Purchase Order '+poNum+'.\n\nKind regards';
-  window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
-}
-
 function openNewPO(){
   editingPO=null; lineItems=[{id:nid(),desc:'',qty:'',price:''}];
-  var tabs=document.getElementById('poTabs');if(tabs)tabs.style.display='none';
   document.getElementById('po-page-num').textContent=genPONum();
   document.getElementById('po-page-title').textContent='New Purchase Order';
   document.getElementById('po-supplier').value='';
   document.getElementById('po-delivery').value='';
-  document.getElementById('po-order-date').value='';
   document.getElementById('po-notes').value='';
   document.getElementById('po-file-lbl').textContent='Attach PDF (optional)';
   document.getElementById('deletePOBtn').style.display='none';
-  setPOInputState(false);
   populateCatDD('');
   renderLI();
   setPOView('New PO');
@@ -826,10 +713,8 @@ function openPO(sid,gid,pid){
   document.getElementById('po-notes').value=po.notes||'';
   document.getElementById('po-file-lbl').textContent=po.fileName||'Attach PDF (optional)';
   document.getElementById('deletePOBtn').style.display='';
-  document.getElementById('po-order-date').value=po.orderDate||'';
   populateCatDD(sec&&g?sec.name+'||'+g.parent:'');
   renderLI();
-  setPOInputState(true); // open existing PO in read-only — click Edit to modify
   setPOView(po.id, true);
 }
 
@@ -862,8 +747,6 @@ function updateRowTotal(i){
   document.getElementById('tot-sub').textContent=fmt(sub);
   document.getElementById('tot-gst').textContent=fmt(gst);
   document.getElementById('tot-total').textContent=fmt(total);
-  // Update budget panel with current PO total
-  updateBudgetPanel();
 }
 
 function liKey(e,rowIdx,field){
@@ -945,8 +828,6 @@ function savePO(){
   if(!supplier){const el=document.getElementById('po-supplier');el.classList.add('err');el.focus();setTimeout(()=>el.classList.remove('err'),2000);return;}
   const catVal=document.getElementById('po-cat').value;
   if(!catVal){document.getElementById('po-cat').focus();return;}
-  var _bp2=catVal.split('||');var _bBudget=getBudgetForGroup(_bp2[0]||'',_bp2[1]||'');
-  if(_bBudget>0){var _bComm=getCommittedForGroup(_bp2[0]||'',_bp2[1]||'');if((_bComm+liSub(lineItems))>_bBudget){if(!confirm('\u26a0\ufe0f This PO exceeds the budget for this line by '+fmtZ(_bComm+liSub(lineItems)-_bBudget)+' excl GST.\n\nSave anyway?'))return;}}
   const [secName,grpName]=catVal.split('||');
   const sec=sections.find(s=>s.name===secName);
   const grp=sec?.groups.find(g=>g.parent===grpName);
@@ -957,7 +838,6 @@ function savePO(){
     supplier,
     lineItems:JSON.parse(JSON.stringify(items)),
     actual:0,
-    orderDate:document.getElementById('po-order-date').value,
     delivery:document.getElementById('po-delivery').value,
     notes:document.getElementById('po-notes').value.trim(),
     status:'Approved',
@@ -1095,300 +975,41 @@ function emailPO(){
 }
 
 // ── INIT ──
-window.addEventListener('DOMContentLoaded',async function(){
-  _poPNum=(dbGetCurrentProject()||{}).num||PROJECT_NO;
-  const saved=await loadData();
-  if(saved?.sections){sections=saved.sections;}
+window.addEventListener('DOMContentLoaded', async function(){
+  _poPNum = (dbGetCurrentProject()||{}).num || PROJECT_NO;
+  await loadSubVarPos();
   await loadBudgetData();
+  const saved = await loadData();
+  if(saved?.sections){ sections = saved.sections; }
+  var params = new URLSearchParams(window.location.search);
+  var src = params.get('source')||'';
+  if(src==='subvar'){
+    var svId=params.get('svId');
+    if(!subVarPos.find(function(x){return x.svId===svId;})){
+      subVarPos.push({id:'svpo_'+Date.now(),svId:svId,svNum:params.get('svNum')||'',poRef:params.get('poRef')||'',subbie:params.get('svSubbie')||'',desc:params.get('svDesc')||'',value:parseFloat(params.get('svValue')||0),lineItems:[{desc:params.get('svDesc')||'',qty:'1',price:params.get('svValue')||''}],delivery:'',notes:'',createdDate:new Date().toISOString().split('T')[0]});
+      saveSubVarPos();
+    }
+    setSrcTab('subvar');
+  } else if(src==='subvar-addline'){
+    var existingPoId=params.get('existingPoId');
+    var epo=subVarPos.find(function(x){return x.id===existingPoId;});
+    if(epo){
+      if(!epo.lineItems)epo.lineItems=[];
+      var svNum2=params.get('svNum')||'';
+      if(!epo.lineItems.find(function(l){return l.svNum===svNum2;})){
+        epo.lineItems.push({desc:params.get('svDesc')||'',qty:'1',price:String(parseFloat(params.get('svValue')||0)),svNum:svNum2});
+        epo.value=(epo.lineItems||[]).reduce(function(a,l){return a+parseFloat(l.price||0);},0);
+        saveSubVarPos();
+      }
+    }
+    setSrcTab('subvar');
+  } else {
+    renderList();
+  }
   populateFilters();
-  renderList();
 });
 
-
-// ── PO TABS ──
-function switchPOTab(tab){
-  document.querySelectorAll('.po-tab').forEach(function(t){t.classList.remove('active');});
-  document.querySelectorAll('.po-tab-pane').forEach(function(p){p.classList.remove('active');});
-  document.getElementById('poTab-'+tab).classList.add('active');
-  document.getElementById('poPane-'+tab).classList.add('active');
-  if(tab==='claims')renderClaimsTab();
-  if(tab==='invoices')renderInvoicesTab();
-}
-function updatePOTabBadges(po){
-  var claims=po.claims||[];
-  var invoices=po.invoices||[];
-  var li=po.lineItems||[];
-  var liEl=document.getElementById('poTabBadge-lineitems');if(liEl)liEl.textContent=li.length;
-  var clEl=document.getElementById('poTabBadge-claims');if(clEl)clEl.textContent=claims.length;
-  var inEl=document.getElementById('poTabBadge-invoices');if(inEl)inEl.textContent=invoices.length;
-}
-
-// ── CLAIMS ──
-function getCurrentPO(){
-  if(!editingPO)return null;
-  var g=getGrp(editingPO.sid,editingPO.gid);
-  return g?g.pos.find(function(p){return p.id===editingPO.pid;}):null;
-}
-function fmtMoney(v){var n=parseFloat(v)||0;return n===0?'—':'$'+n.toLocaleString('en-AU',{minimumFractionDigits:0,maximumFractionDigits:0});}
-function fmtDateShort(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
-
-function renderClaimsTab(){
-  var po=getCurrentPO();if(!po)return;
-  if(!po.claims)po.claims=[];
-  var claims=po.claims;
-  var poVal=liSub(po.lineItems||[]);
-  var totalClaimed=claims.reduce(function(a,c){return a+parseFloat(c.amount||0);},0);
-  var totalApproved=claims.filter(function(c){return c.status==='Approved';}).reduce(function(a,c){return a+parseFloat(c.amount||0);},0);
-  var remaining=poVal-totalApproved;
-  document.getElementById('cl-po-val').textContent=fmtMoney(poVal);
-  document.getElementById('cl-total').textContent=fmtMoney(totalClaimed);
-  document.getElementById('cl-approved').textContent=fmtMoney(totalApproved);
-  document.getElementById('cl-remaining').textContent=fmtMoney(remaining);
-  var html='';
-  if(!claims.length){
-    html='<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No claims logged yet — click + Log Claim to add one</div>';
-  } else {
-    claims.slice().reverse().forEach(function(c){
-      var stCls=c.status==='Approved'?'cs-approved':c.status==='Disputed'?'cs-disputed':'cs-pending';
-      html+='<div class="claim-row">'
-        +'<div style="flex:1;min-width:0">'
-          +'<div class="claim-desc">'+escH(c.desc||'')+'</div>'
-          +'<div class="claim-meta">'+escH(c.claimNo||'')+(c.period?' · '+escH(c.period):'')+(c.approvedBy?' · Approved by '+escH(c.approvedBy):'')+'</div>'
-          +(c.invoiceId?'<div class="claim-meta" style="color:var(--green)">✓ Linked to invoice '+escH(c.invoiceId)+'</div>':'')
-        +'</div>'
-        +'<span class="claim-status '+stCls+'">'+c.status+'</span>'
-        +'<span class="claim-amount">'+fmtMoney(c.amount)+'</span>'
-        +'<div style="display:flex;gap:6px;flex-shrink:0">'
-           +(c.status==='Pending'?'<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveClaim(this.dataset.cid)">✓ Approve</button> <button class="btn bsm" style="color:var(--danger)" data-cid="'+c.id+'" onclick="disputeClaim(this.dataset.cid)">✗ Dispute</button>':'')
-          +(c.status==='Approved'&&!c.invoiceId?'<span style="font-size:11px;color:var(--muted)">Awaiting invoice</span>':'')
-        +'</div>'
-        +'</div>';
-    });
-  }
-  document.getElementById('claimsList').innerHTML=html;
-}
-
-function openAddClaim(){
-  var po=getCurrentPO();
-  if(!po||!po.id){alert('Save the PO first before adding claims.');return;}
-  document.getElementById('claimModal').classList.add('open');
-  document.getElementById('cl-no').value='CLM-'+String((po.claims||[]).length+1).padStart(3,'0');
-  document.getElementById('cl-date').value=new Date().toISOString().split('T')[0];
-  document.getElementById('cl-amount').value='';
-  document.getElementById('cl-desc').value='';
-  document.getElementById('cl-period').value='';
-  setTimeout(function(){document.getElementById('cl-amount').focus();},80);
-}
-function closeClaimModal(){document.getElementById('claimModal').classList.remove('open');}
-function saveClaim(){
-  var po=getCurrentPO();if(!po)return;
-  if(!po.claims)po.claims=[];
-  var amount=parseFloat(document.getElementById('cl-amount').value)||0;
-  if(!amount){alert('Amount is required.');return;}
-  var claim={
-    id:'clm_'+Date.now(),
-    claimNo:document.getElementById('cl-no').value.trim(),
-    date:document.getElementById('cl-date').value,
-    period:document.getElementById('cl-period').value.trim(),
-    desc:document.getElementById('cl-desc').value.trim(),
-    amount:amount,
-    status:'Pending',
-    invoiceId:null
-  };
-  po.claims.push(claim);
-  saveData();closeClaimModal();renderClaimsTab();
-  updatePOTabBadges(po);
-}
-function approveClaim(claimId){
-  var po=getCurrentPO();if(!po)return;
-  var claim=(po.claims||[]).find(function(c){return c.id===claimId;});if(!claim)return;
-  var u=dbGetCurrentUser();
-  claim.status='Approved';
-  claim.approvedBy=(u&&(u.name||u.username))||'PM';
-  claim.approvedDate=new Date().toISOString().split('T')[0];
-  saveData();renderClaimsTab();
-}
-function disputeClaim(claimId){
-  var po=getCurrentPO();if(!po)return;
-  var claim=(po.claims||[]).find(function(c){return c.id===claimId;});if(!claim)return;
-  var note=prompt('Dispute reason:');if(note===null)return;
-  claim.status='Disputed';claim.disputeNote=note;
-  saveData();renderClaimsTab();
-}
-
-// ── INVOICES ──
-function renderInvoicesTab(){
-  var po=getCurrentPO();if(!po)return;
-  if(!po.invoices)po.invoices=[];
-  if(!po.claims)po.claims=[];
-  var invoices=po.invoices;
-  var approvedClaims=po.claims.filter(function(c){return c.status==='Approved';}).reduce(function(a,c){return a+parseFloat(c.amount||0);},0);
-  var totalInvoiced=invoices.reduce(function(a,i){return a+parseFloat(i.amount||0);},0);
-  var totalApprovedInv=invoices.filter(function(i){return i.status==='Approved';}).reduce(function(a,i){return a+parseFloat(i.amount||0);},0);
-  var outstanding=approvedClaims-totalApprovedInv;
-  document.getElementById('inv-claims-approved').textContent=fmtMoney(approvedClaims);
-  document.getElementById('inv-total').textContent=fmtMoney(totalInvoiced);
-  document.getElementById('inv-approved').textContent=fmtMoney(totalApprovedInv);
-  document.getElementById('inv-outstanding').textContent=fmtMoney(outstanding);
-  var html='';
-  if(!invoices.length){
-    html='<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No invoices logged yet — click + Log Invoice to add one</div>';
-  } else {
-    invoices.slice().reverse().forEach(function(inv){
-      var stCls=inv.status==='Approved'?'is-approved':inv.status==='Rejected'?'is-rejected':'is-pending';
-      // Calculate variance vs linked claims
-      var linkedClaimsTotal=0;
-      (inv.claimIds||[]).forEach(function(cid){
-        var c=(po.claims||[]).find(function(x){return x.id===cid;});
-        if(c)linkedClaimsTotal+=parseFloat(c.amount||0);
-      });
-      var variance=inv.amount-linkedClaimsTotal;
-      var varCls=variance>0?'inv-var-danger':variance<0?'inv-var-warn':'inv-var-ok';
-      var varTxt=variance===0?'Matches claim':variance>0?'Over by $'+Math.abs(variance).toLocaleString('en-AU'):'Under by $'+Math.abs(variance).toLocaleString('en-AU');
-      html+='<div class="inv-row" data-iid="'+inv.id+'" onclick="openInvoiceDetail(this.dataset.iid)">'
-        +'<div style="flex:1;min-width:0">'
-          +'<div style="font-weight:600;font-size:13px;color:var(--text)">'+escH(inv.invoiceNo||'—')+'</div>'
-          +'<div class="claim-meta">'+escH(inv.supplier||po.supplier||'')+(inv.invoiceDate?' · '+fmtDateShort(inv.invoiceDate):'')+(inv.receivedDate?' · Received '+fmtDateShort(inv.receivedDate):'')+'</div>'
-          +((inv.claimIds||[]).length?'<div class="claim-meta">Linked to '+(inv.claimIds.length)+' claim'+(inv.claimIds.length!==1?'s':'')+'</div>':'<div class="claim-meta" style="color:var(--warn)">⚠ No claims linked</div>')
-        +'</div>'
-        +'<span class="inv-variance '+varCls+'">'+varTxt+'</span>'
-        +'<span class="claim-amount">'+fmtMoney(inv.amount)+'</span>'
-        +'<span class="inv-status '+stCls+'">'+inv.status+'</span>'
-        +'<div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">'
-           +(inv.status==='Pending Review'?'<button class="btn bp bsm" data-iid="'+inv.id+'" onclick="event.stopPropagation();approveInvoice(this.dataset.iid)">✓ Approve</button> <button class="btn bsm" style="color:var(--danger)" data-iid="'+inv.id+'" onclick="event.stopPropagation();rejectInvoice(this.dataset.iid)">✗ Reject</button>':'')
-        +'</div>'
-        +'</div>';
-    });
-  }
-  document.getElementById('invoicesList').innerHTML=html;
-}
-
-function openAddInvoice(){
-  var po=getCurrentPO();
-  if(!po||!po.id){alert('Save the PO first before logging invoices.');return;}
-  if(!(po.claims||[]).some(function(c){return c.status==='Approved';})){
-    if(!confirm('No approved claims on this PO yet. Log invoice anyway?'))return;
-  }
-  // Populate claims checkboxes
-  var approvedClaims=(po.claims||[]).filter(function(c){return c.status==='Approved';});
-  var claimChecks=approvedClaims.length
-    ?approvedClaims.map(function(c){
-        return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">'
-          +'<input type="checkbox" value="'+c.id+'" class="inv-claim-chk"> '
-          +'<span style="flex:1;font-size:13px">'+escH(c.desc||c.claimNo||'Claim')+'</span>'
-          +'<span style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">'+fmtMoney(c.amount)+'</span>'
-          +'</label>';
-      }).join('')
-    :'<div style="color:var(--muted);font-size:13px;padding:8px 0">No approved claims to link</div>';
-  document.getElementById('inv-claims-list').innerHTML=claimChecks;
-  document.getElementById('inv-no').value='';
-  document.getElementById('inv-date').value='';
-  document.getElementById('inv-received').value=new Date().toISOString().split('T')[0];
-  document.getElementById('inv-amount-inp').value='';
-  document.getElementById('inv-note').value='';
-  document.getElementById('invVarianceAlert').style.display='none';
-  document.getElementById('invoiceModal').classList.add('open');
-}
-function closeInvoiceModal(){document.getElementById('invoiceModal').classList.remove('open');}
-
-function checkInvoiceVariance(){
-  var po=getCurrentPO();if(!po)return;
-  var amount=parseFloat(document.getElementById('inv-amount-inp').value)||0;
-  var checked=[].slice.call(document.querySelectorAll('.inv-claim-chk:checked')).map(function(x){return x.value;});
-  var linkedTotal=0;
-  checked.forEach(function(cid){
-    var c=(po.claims||[]).find(function(x){return x.id===cid;});
-    if(c)linkedTotal+=parseFloat(c.amount||0);
-  });
-  var alert=document.getElementById('invVarianceAlert');
-  if(amount>0&&linkedTotal>0){
-    var variance=amount-linkedTotal;
-    if(variance>0){
-      alert.style.display='flex';alert.className='bp-alert visible danger';
-      alert.innerHTML='⚠ Invoice ($'+amount.toLocaleString('en-AU')+') exceeds linked claims ($'+linkedTotal.toLocaleString('en-AU')+') by $'+Math.abs(variance).toLocaleString('en-AU')+'. Vendor must issue a credit note.';
-    } else if(variance<0){
-      alert.style.display='flex';alert.className='bp-alert visible warn';
-      alert.innerHTML='ℹ Invoice is $'+Math.abs(variance).toLocaleString('en-AU')+' less than linked claims — this is OK, will be paid as invoiced.';
-    } else {
-      alert.style.display='flex';alert.className='bp-alert visible';alert.style.background='rgba(0,200,100,.08)';alert.style.color='var(--green)';alert.style.borderColor='rgba(0,200,100,.3)';
-      alert.innerHTML='✓ Invoice matches claims exactly.';
-    }
-  } else {
-    alert.style.display='none';
-  }
-}
-
-function saveInvoice(){
-  var po=getCurrentPO();if(!po)return;
-  if(!po.invoices)po.invoices=[];
-  var amount=parseFloat(document.getElementById('inv-amount-inp').value)||0;
-  if(!amount){alert('Amount is required.');return;}
-  var invNo=document.getElementById('inv-no').value.trim();
-  if(!invNo){alert('Invoice number is required.');return;}
-  var checked=[].slice.call(document.querySelectorAll('.inv-claim-chk:checked')).map(function(x){return x.value;});
-  // Variance check
-  var linkedTotal=0;
-  checked.forEach(function(cid){
-    var c=(po.claims||[]).find(function(x){return x.id===cid;});
-    if(c)linkedTotal+=parseFloat(c.amount||0);
-  });
-  if(linkedTotal>0&&amount>linkedTotal){
-  if(linkedTotal>0&&amount>linkedTotal){
-    if(!confirm('\u26a0 Invoice exceeds linked claims by $'+Math.abs(amount-linkedTotal).toLocaleString('en-AU')+'\n\nVendor should issue a credit note. Approve anyway?'))return;
-  }
-
-  }
-  var inv={
-    id:'inv_'+Date.now(),
-    invoiceNo:invNo,
-    invoiceDate:document.getElementById('inv-date').value,
-    receivedDate:document.getElementById('inv-received').value,
-    supplier:po.supplier||'',
-    amount:amount,
-    claimIds:checked,
-    status:'Pending Review',
-    note:document.getElementById('inv-note').value.trim()
-  };
-  po.invoices.push(inv);
-  // Link claims to this invoice
-  checked.forEach(function(cid){
-    var c=(po.claims||[]).find(function(x){return x.id===cid;});
-    if(c)c.invoiceId=inv.id;
-  });
-  saveData();closeInvoiceModal();renderInvoicesTab();renderClaimsTab();
-  updatePOTabBadges(po);
-  // Sync actuals to budget
-  syncPosToBudget();
-}
-
-function approveInvoice(invId){
-  var po=getCurrentPO();if(!po)return;
-  var inv=(po.invoices||[]).find(function(i){return i.id===invId;});if(!inv)return;
-  var u=dbGetCurrentUser();
-  inv.status='Approved';
-  inv.approvedBy=(u&&(u.name||u.username))||'PM';
-  inv.approvedDate=new Date().toISOString().split('T')[0];
-  saveData();renderInvoicesTab();
-  syncPosToBudget();
-}
-function rejectInvoice(invId){
-  var po=getCurrentPO();if(!po)return;
-  var inv=(po.invoices||[]).find(function(i){return i.id===invId;});if(!inv)return;
-  var note=prompt('Rejection reason (vendor will need to issue a credit note):');if(note===null)return;
-  inv.status='Rejected';inv.rejectNote=note;
-  // Unlink claims
-  (inv.claimIds||[]).forEach(function(cid){
-    var c=(po.claims||[]).find(function(x){return x.id===cid;});
-    if(c)c.invoiceId=null;
-  });
-  saveData();renderInvoicesTab();renderClaimsTab();
-}
-function openInvoiceDetail(invId){
-  // For now just focus the row — could expand to a detail modal later
-}
-
 // Sidebar tooltip
-
 var sbTip=document.createElement('div');sbTip.id='sb-tip';document.body.appendChild(sbTip);
 document.querySelectorAll('.sb-item[data-tip]').forEach(function(el){
   el.addEventListener('mouseenter',function(){
@@ -1450,21 +1071,371 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 })();
 
 </script>
+</body>
+</html><script>
+// ── SIDEBAR FIX: ensure main content clears sidebar ──
+(function(){
+  var SBK='hvacnexus_sb_collapsed';
+  var c=localStorage.getItem(SBK)==='1';
+  var main=document.getElementById('mainWrap');
+  if(main)main.style.marginLeft=c?'52px':'230px';
+})();
+
+// ── PO TABS ──
+function switchPOTab(tab){
+  document.querySelectorAll('.po-tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.po-tab-pane').forEach(function(p){p.classList.remove('active');});
+  var tabEl=document.getElementById('poTab-'+tab);
+  var paneEl=document.getElementById('poPane-'+tab);
+  if(tabEl)tabEl.classList.add('active');
+  if(paneEl)paneEl.classList.add('active');
+  if(tab==='claims')renderClaimsTab();
+  if(tab==='invoices')renderInvoicesTab();
+}
+function updatePOTabBadges(po){
+  var liEl=document.getElementById('poTabBadge-lineitems');if(liEl)liEl.textContent=(po.lineItems||[]).length;
+  var clEl=document.getElementById('poTabBadge-claims');if(clEl)clEl.textContent=(po.claims||[]).length;
+  var inEl=document.getElementById('poTabBadge-invoices');if(inEl)inEl.textContent=(po.invoices||[]).length;
+}
+
+// ── HELPERS ──
+function getCurrentPO(){
+  if(!editingPO)return null;
+  var g=getGrp(editingPO.sid,editingPO.gid);
+  return g?g.pos.find(function(p){return p.id===editingPO.pid;}):null;
+}
+function fmtMoney(v){var n=parseFloat(v)||0;return n===0?'—':'$'+n.toLocaleString('en-AU',{minimumFractionDigits:0,maximumFractionDigits:0});}
+function fmtDateShort(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+
+// ── BUDGET HEALTH PANEL ──
+function getBudgetForGroup(secName,grpName){
+  if(!_budgetData||!_budgetData.sections)return 0;
+  var sec=_budgetData.sections.find(function(s){return s.name===secName;});if(!sec)return 0;
+  var grp=sec.groups.find(function(g){return g.parent===grpName;});if(!grp)return 0;
+  return parseFloat(grp.budget)||0;
+}
+function getCommittedForGroup(secName,grpName){
+  var sec=sections.find(function(s){return s.name===secName;});if(!sec)return 0;
+  var grp=sec.groups.find(function(g){return g.parent===grpName;});if(!grp)return 0;
+  return (grp.pos||[]).reduce(function(a,po){
+    if(editingPO&&po.id===editingPO.pid)return a;
+    return a+liSub(po.lineItems||[]);
+  },0);
+}
+function updateBudgetPanel(){
+  var panel=document.getElementById('budgetPanel');if(!panel)return;
+  var catVal=(document.getElementById('po-cat')||{}).value||'';
+  if(!catVal){panel.classList.remove('visible');return;}
+  panel.classList.add('visible');
+  var parts=catVal.split('||');
+  var secName=parts[0]||'',grpName=parts[1]||'';
+  var budget=getBudgetForGroup(secName,grpName);
+  var committed=getCommittedForGroup(secName,grpName);
+  var thisPO=liSub(lineItems);
+  var remaining=budget-committed-thisPO;
+  var reEl=document.getElementById('bp-remaining');
+  if(reEl){
+    reEl.textContent=(committed===0&&thisPO===0&&!budget)?'—':fmtZ(remaining);
+    reEl.className='bp-val'+(remaining<0?' danger':(budget&&remaining<budget*0.1)?'warn':' green');
+  }
+  var ce=document.getElementById('bp-committed');
+  if(ce){ce.textContent=fmtZ(committed);}
+  var clbl=document.getElementById('bp-committed-lbl');
+  if(clbl)clbl.textContent=editingPO?'Other POs (ex GST)':'Committed POs (ex GST)';
+  var te=document.getElementById('bp-this');if(te)te.textContent=fmtZ(thisPO);
+  var budgetEl=document.getElementById('bp-budget');
+  var barWrap=document.getElementById('bp-bar-wrap');
+  var bar=document.getElementById('bp-bar');
+  var alert=document.getElementById('bp-alert');
+  var alertMsg=document.getElementById('bp-alert-msg');
+  if(!budget){
+    if(budgetEl){budgetEl.textContent='Not set';budgetEl.className='bp-val muted';}
+    if(barWrap)barWrap.style.display='none';
+    if(committed===0&&thisPO===0){
+      if(alert)alert.className='bp-alert visible info';
+      if(alertMsg)alertMsg.innerHTML='No budget set for this line \u2014 contact your Estimator.';
+    } else {
+      if(alert)alert.className='bp-alert visible danger';
+      if(alertMsg)alertMsg.innerHTML='\u26a0 Budget exceeded \u2014 no budget set for this line.';
+    }
+    return;
+  }
+  if(budgetEl){budgetEl.textContent=fmtZ(budget);budgetEl.className='bp-val';}
+  var pct=Math.min((committed+thisPO)/budget*100,100);
+  if(barWrap)barWrap.style.display='';
+  if(bar){bar.style.width=pct+'%';bar.style.background=pct>=100?'var(--danger)':pct>=80?'var(--warn)':'var(--green)';}
+  if(remaining<0){
+    if(alert)alert.className='bp-alert visible danger';
+    if(alertMsg)alertMsg.innerHTML='\u26a0 Exceeds budget by '+fmtZ(Math.abs(remaining))+' excl GST';
+  } else if(pct>=80){
+    if(alert)alert.className='bp-alert visible warn';
+    if(alertMsg)alertMsg.innerHTML='\u26a0 Warning: '+Math.round(pct)+'% of budget consumed';
+  } else {
+    if(alert)alert.className='bp-alert';
+  }
+}
+
+// ── CLAIMS TAB ──
+function renderClaimsTab(){
+  var po=getCurrentPO();if(!po)return;
+  if(!po.claims)po.claims=[];
+  var poVal=liSub(po.lineItems||[]);
+  var totalClaimed=po.claims.reduce(function(a,c){return a+parseFloat(c.amount||0);},0);
+  var totalApproved=po.claims.filter(function(c){return c.status==='Approved';}).reduce(function(a,c){return a+parseFloat(c.amount||0);},0);
+  document.getElementById('cl-po-val').textContent=fmtMoney(poVal);
+  document.getElementById('cl-total').textContent=fmtMoney(totalClaimed);
+  document.getElementById('cl-approved').textContent=fmtMoney(totalApproved);
+  document.getElementById('cl-remaining').textContent=fmtMoney(poVal-totalApproved);
+  var html='';
+  if(!po.claims.length){
+    html='<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No claims logged yet \u2014 click \uFF0B Log Claim to add one</div>';
+  } else {
+    po.claims.slice().reverse().forEach(function(c){
+      var stCls=c.status==='Approved'?'cs-approved':c.status==='Disputed'?'cs-disputed':'cs-pending';
+      html+='<div class="claim-row">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div class="claim-desc">'+escH(c.desc||c.claimNo||'Claim')+'</div>'
+          +'<div class="claim-meta">'+escH(c.claimNo||'')+(c.period?' \u00B7 '+escH(c.period):'')+(c.date?' \u00B7 '+fmtDateShort(c.date):'')+'</div>'
+          +(c.invoiceId?'<div class="claim-meta" style="color:var(--green)">\u2713 Invoice logged</div>':'')
+          +(c.fileName?'<div class="claim-meta">\uD83D\uDCCE '+escH(c.fileName)+'</div>':'')
+        +'</div>'
+        +'<span class="claim-status '+stCls+'">'+escH(c.status)+'</span>'
+        +'<span class="claim-amount">'+fmtMoney(c.amount)+'</span>'
+        +'<div style="display:flex;gap:6px;flex-shrink:0">'
+          +(c.status==='Pending'?'<button class="btn bp bsm" data-cid="'+escH(c.id)+'" onclick="approveClaim(this.dataset.cid)">\u2713 Approve</button>'
+            +'<button class="btn bsm" style="color:var(--danger)" data-cid="'+escH(c.id)+'" onclick="disputeClaim(this.dataset.cid)">\u2717 Dispute</button>':'')
+        +'</div>'
+        +'</div>';
+    });
+  }
+  document.getElementById('claimsList').innerHTML=html;
+}
+
+function openAddClaim(){
+  var po=getCurrentPO();
+  if(!po||!po.id){alert('Save the PO first before adding claims.');return;}
+  document.getElementById('claimModal').classList.add('open');
+  document.getElementById('cl-no').value='CLM-'+String((po.claims||[]).length+1).padStart(3,'0');
+  document.getElementById('cl-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('cl-amount').value='';
+  document.getElementById('cl-desc').value='';
+  document.getElementById('cl-period').value='';
+  document.getElementById('cl-file-lbl').textContent='Attach claim document (optional)';
+  setTimeout(function(){document.getElementById('cl-amount').focus();},80);
+}
+function closeClaimModal(){
+  document.getElementById('claimModal').classList.remove('open');
+  document.getElementById('cl-file').value='';
+}
+function saveClaim(){
+  var po=getCurrentPO();if(!po)return;
+  if(!po.claims)po.claims=[];
+  var amount=parseFloat(document.getElementById('cl-amount').value)||0;
+  if(!amount){alert('Amount is required.');return;}
+  po.claims.push({
+    id:'clm_'+Date.now(),
+    claimNo:document.getElementById('cl-no').value.trim(),
+    date:document.getElementById('cl-date').value,
+    period:document.getElementById('cl-period').value.trim(),
+    desc:document.getElementById('cl-desc').value.trim(),
+    amount:amount,
+    status:'Pending',
+    invoiceId:null,
+    fileName:(document.getElementById('cl-file').files[0]||{}).name||''
+  });
+  saveData();closeClaimModal();renderClaimsTab();updatePOTabBadges(po);
+}
+function approveClaim(claimId){
+  var po=getCurrentPO();if(!po)return;
+  var claim=(po.claims||[]).find(function(c){return c.id===claimId;});if(!claim)return;
+  var u=dbGetCurrentUser();
+  claim.status='Approved';
+  claim.approvedBy=(u&&(u.name||u.username))||'PM';
+  claim.approvedDate=new Date().toISOString().split('T')[0];
+  saveData();renderClaimsTab();
+}
+function disputeClaim(claimId){
+  var po=getCurrentPO();if(!po)return;
+  var claim=(po.claims||[]).find(function(c){return c.id===claimId;});if(!claim)return;
+  var note=prompt('Dispute reason:');if(note===null)return;
+  claim.status='Disputed';claim.disputeNote=note;
+  saveData();renderClaimsTab();
+}
+
+// ── INVOICES TAB ──
+function renderInvoicesTab(){
+  var po=getCurrentPO();if(!po)return;
+  if(!po.invoices)po.invoices=[];
+  var approvedClaims=(po.claims||[]).filter(function(c){return c.status==='Approved';}).reduce(function(a,c){return a+parseFloat(c.amount||0);},0);
+  var totalInvoiced=po.invoices.reduce(function(a,i){return a+parseFloat(i.amount||0);},0);
+  var totalApprovedInv=po.invoices.filter(function(i){return i.status==='Approved';}).reduce(function(a,i){return a+parseFloat(i.amount||0);},0);
+  document.getElementById('inv-claims-approved').textContent=fmtMoney(approvedClaims);
+  document.getElementById('inv-total').textContent=fmtMoney(totalInvoiced);
+  document.getElementById('inv-approved').textContent=fmtMoney(totalApprovedInv);
+  document.getElementById('inv-outstanding').textContent=fmtMoney(approvedClaims-totalApprovedInv);
+  var html='';
+  if(!po.invoices.length){
+    html='<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No invoices logged yet \u2014 click \uFF0B Log Invoice to add one</div>';
+  } else {
+    po.invoices.slice().reverse().forEach(function(inv){
+      var stCls=inv.status==='Approved'?'is-approved':inv.status==='Rejected'?'is-rejected':'is-pending';
+      var linkedTotal=0;
+      (inv.claimIds||[]).forEach(function(cid){
+        var c=(po.claims||[]).find(function(x){return x.id===cid;});
+        if(c)linkedTotal+=parseFloat(c.amount||0);
+      });
+      var variance=inv.amount-linkedTotal;
+      var varCls=variance>0?'inv-var-danger':variance<0?'inv-var-warn':'inv-var-ok';
+      var varTxt=variance===0?'\u2713 Matches claim':variance>0?'Over $'+Math.abs(variance).toLocaleString('en-AU'):'Under $'+Math.abs(variance).toLocaleString('en-AU');
+      html+='<div class="inv-row">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-weight:600;font-size:13px">'+escH(inv.invoiceNo||'\u2014')+'</div>'
+          +'<div class="claim-meta">'+escH(inv.supplier||po.supplier||'')+(inv.invoiceDate?' \u00B7 '+fmtDateShort(inv.invoiceDate):'')+(inv.receivedDate?' \u00B7 Received '+fmtDateShort(inv.receivedDate):'')+'</div>'
+          +((inv.claimIds||[]).length?'<div class="claim-meta">Linked to '+(inv.claimIds.length)+' claim'+(inv.claimIds.length!==1?'s':'')+'</div>':'<div class="claim-meta" style="color:var(--warn)">\u26a0 No claims linked</div>')
+          +(inv.fileName?'<div class="claim-meta">📎 '+escH(inv.fileName)+'</div>':'')
+        +'</div>'
+        +'<span class="inv-variance '+varCls+'">'+varTxt+'</span>'
+        +'<span class="claim-amount">'+fmtMoney(inv.amount)+'</span>'
+        +'<span class="inv-status '+stCls+'">'+escH(inv.status)+'</span>'
+        +'<div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">'
+          +(inv.status==='Pending Review'
+            ?'<button class="btn bp bsm" data-iid="'+escH(inv.id)+'" onclick="approveInvoice(this.dataset.iid)">\u2713 Approve</button>'
+             +'<button class="btn bsm" style="color:var(--danger)" data-iid="'+escH(inv.id)+'" onclick="rejectInvoice(this.dataset.iid)">\u2717 Reject</button>'
+            :'')
+        +'</div>'
+        +'</div>';
+    });
+  }
+  document.getElementById('invoicesList').innerHTML=html;
+}
+
+function openAddInvoice(){
+  var po=getCurrentPO();
+  if(!po||!po.id){alert('Save the PO first.');return;}
+  var approvedClaims=(po.claims||[]).filter(function(c){return c.status==='Approved'&&!c.invoiceId;});
+  var claimChecks=approvedClaims.length
+    ?approvedClaims.map(function(c){
+        return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">'
+          +'<input type="checkbox" value="'+escH(c.id)+'" class="inv-claim-chk"> '
+          +'<span style="flex:1;font-size:13px">'+escH(c.desc||c.claimNo||'Claim')+(c.period?' ('+escH(c.period)+')':'')+'</span>'
+          +'<span style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">'+fmtMoney(c.amount)+'</span>'
+          +'</label>';
+      }).join('')
+    :'<div style="color:var(--muted);font-size:13px;padding:8px 0">No approved claims to link</div>';
+  document.getElementById('inv-claims-list').innerHTML=claimChecks;
+  document.getElementById('inv-no').value='';
+  document.getElementById('inv-date').value='';
+  document.getElementById('inv-received').value=new Date().toISOString().split('T')[0];
+  document.getElementById('inv-amount-inp').value='';
+  document.getElementById('inv-note').value='';
+  document.getElementById('inv-file-lbl').textContent='Attach invoice document (optional)';
+  document.getElementById('invVarianceAlert').style.display='none';
+  document.getElementById('invoiceModal').classList.add('open');
+}
+function closeInvoiceModal(){
+  document.getElementById('invoiceModal').classList.remove('open');
+  document.getElementById('inv-file').value='';
+}
+function checkInvoiceVariance(){
+  var po=getCurrentPO();if(!po)return;
+  var amount=parseFloat(document.getElementById('inv-amount-inp').value)||0;
+  var checked=[].slice.call(document.querySelectorAll('.inv-claim-chk:checked')).map(function(x){return x.value;});
+  var linkedTotal=0;
+  checked.forEach(function(cid){var c=(po.claims||[]).find(function(x){return x.id===cid;});if(c)linkedTotal+=parseFloat(c.amount||0);});
+  var alertEl=document.getElementById('invVarianceAlert');
+  if(amount>0&&linkedTotal>0){
+    var variance=amount-linkedTotal;
+    if(variance>0){
+      alertEl.style.display='flex';alertEl.className='bp-alert visible danger';
+      alertEl.innerHTML='\u26a0 Invoice exceeds claims by $'+Math.abs(variance).toLocaleString('en-AU')+'. Vendor must issue a credit note.';
+    } else if(variance<0){
+      alertEl.style.display='flex';alertEl.className='bp-alert visible warn';
+      alertEl.innerHTML='\u2139 Invoice is $'+Math.abs(variance).toLocaleString('en-AU')+' less than claims \u2014 OK, will be paid as invoiced.';
+    } else {
+      alertEl.style.display='flex';alertEl.className='bp-alert visible';alertEl.style.cssText='display:flex;background:rgba(0,200,100,.08);color:var(--green);border:1px solid rgba(0,200,100,.3);padding:9px 14px;border-radius:7px;font-size:12px;margin-top:8px';
+      alertEl.innerHTML='\u2713 Invoice matches claims exactly.';
+    }
+  } else {alertEl.style.display='none';}
+}
+function saveInvoice(){
+  var po=getCurrentPO();if(!po)return;
+  if(!po.invoices)po.invoices=[];
+  var amount=parseFloat(document.getElementById('inv-amount-inp').value)||0;
+  if(!amount){alert('Amount is required.');return;}
+  var invNo=document.getElementById('inv-no').value.trim();
+  if(!invNo){alert('Invoice number is required.');return;}
+  var checked=[].slice.call(document.querySelectorAll('.inv-claim-chk:checked')).map(function(x){return x.value;});
+  var linkedTotal=0;
+  checked.forEach(function(cid){var c=(po.claims||[]).find(function(x){return x.id===cid;});if(c)linkedTotal+=parseFloat(c.amount||0);});
+  if(linkedTotal>0&&amount>linkedTotal){
+    if(!confirm('\u26a0 Invoice exceeds claims by $'+Math.abs(amount-linkedTotal).toLocaleString('en-AU')+'.\n\nVendor should issue a credit note. Save anyway?'))return;
+  }
+  var inv={id:'inv_'+Date.now(),invoiceNo:invNo,invoiceDate:document.getElementById('inv-date').value,receivedDate:document.getElementById('inv-received').value,supplier:po.supplier||'',amount:amount,claimIds:checked,status:'Pending Review',note:document.getElementById('inv-note').value.trim(),fileName:(document.getElementById('inv-file').files[0]||{}).name||''};
+  po.invoices.push(inv);
+  checked.forEach(function(cid){var c=(po.claims||[]).find(function(x){return x.id===cid;});if(c)c.invoiceId=inv.id;});
+  saveData();closeInvoiceModal();renderInvoicesTab();renderClaimsTab();updatePOTabBadges(po);
+  syncPosToBudget();
+}
+function approveInvoice(invId){
+  var po=getCurrentPO();if(!po)return;
+  var inv=(po.invoices||[]).find(function(i){return i.id===invId;});if(!inv)return;
+  var u=dbGetCurrentUser();
+  inv.status='Approved';inv.approvedBy=(u&&(u.name||u.username))||'PM';inv.approvedDate=new Date().toISOString().split('T')[0];
+  saveData();renderInvoicesTab();syncPosToBudget();
+}
+function rejectInvoice(invId){
+  var po=getCurrentPO();if(!po)return;
+  var inv=(po.invoices||[]).find(function(i){return i.id===invId;});if(!inv)return;
+  var note=prompt('Rejection reason:');if(note===null)return;
+  inv.status='Rejected';inv.rejectNote=note;
+  (inv.claimIds||[]).forEach(function(cid){var c=(po.claims||[]).find(function(x){return x.id===cid;});if(c)c.invoiceId=null;});
+  saveData();renderInvoicesTab();renderClaimsTab();
+}
+
+// ── SYNC POs TO BUDGET ──
+async function syncPosToBudget(){
+  try{
+    var budgetData=await dbGetBudget(_poPNum);
+    if(!budgetData||!budgetData.sections)return;
+    sections.forEach(function(poSec){
+      var bSec=budgetData.sections.find(function(s){return s.name===poSec.name;});if(!bSec)return;
+      poSec.groups.forEach(function(poGrp){
+        var bGrp=bSec.groups.find(function(g){return g.parent===poGrp.parent;});if(!bGrp)return;
+        bGrp.pos=poGrp.pos||[];
+      });
+    });
+    dbSetBudget(_poPNum,budgetData).catch(function(e){console.warn('Budget sync failed:',e);});
+  }catch(e){console.warn('syncPosToBudget:',e);}
+}
+
+// ── HOOK TABS INTO setPOView ──
+var _origSetPOView=window.setPOView;
+if(typeof setPOView==='function'){
+  var _basePOView=setPOView;
+  setPOView=function(poId,readOnly){
+    _basePOView(poId,readOnly);
+    var tabs=document.getElementById('poTabs');
+    if(tabs)tabs.style.display=poId?'flex':'none';
+    switchPOTab('lineitems');
+  };
+}
+</script>
+
 <!-- ADD CLAIM MODAL -->
 <div class="mo" id="claimModal" onclick="if(event.target===this)closeClaimModal()">
   <div class="modal" style="width:460px">
-    <div class="modal-hdr">
-      <h3>📝 Log Vendor Claim</h3>
-      <p>Record a claim submitted by the vendor against this PO</p>
-    </div>
+    <div class="modal-hdr"><h3>📝 Log Vendor Claim</h3><p>Record a claim submitted by the vendor against this PO</p></div>
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label class="ml">Claim No.</label><input class="mi" id="cl-no" placeholder="e.g. CLM-001"/></div>
         <div><label class="ml">Claim Date</label><input class="mi" id="cl-date" type="date"/></div>
       </div>
-      <div><label class="ml">Claim Period (e.g. March 2026)</label><input class="mi" id="cl-period" placeholder="e.g. March 2026"/></div>
+      <div><label class="ml">Claim Period</label><input class="mi" id="cl-period" placeholder="e.g. March 2026"/></div>
       <div><label class="ml">Description *</label><input class="mi" id="cl-desc" placeholder="What is being claimed for…"/></div>
       <div><label class="ml">Amount (ex GST) *</label><input class="mi" id="cl-amount" type="number" placeholder="0.00"/></div>
+      <div><label class="ml">Attach Document</label>
+        <label class="file-pick" style="margin-top:4px"><input type="file" accept=".pdf,.jpg,.jpeg,.png" id="cl-file" onchange="document.getElementById('cl-file-lbl').textContent=this.files[0]?.name||'Attach file'"><span>📎</span><span id="cl-file-lbl">Attach claim document (optional)</span></label>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn bg bsm" onclick="closeClaimModal()">Cancel</button>
@@ -1476,10 +1447,7 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 <!-- ADD INVOICE MODAL -->
 <div class="mo" id="invoiceModal" onclick="if(event.target===this)closeInvoiceModal()">
   <div class="modal" style="width:520px">
-    <div class="modal-hdr">
-      <h3>🧾 Log Invoice</h3>
-      <p>Record an invoice received from accounts</p>
-    </div>
+    <div class="modal-hdr"><h3>🧾 Log Invoice</h3><p>Record an invoice received from accounts</p></div>
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label class="ml">Invoice No. *</label><input class="mi" id="inv-no" placeholder="e.g. INV-2025-001"/></div>
@@ -1489,12 +1457,14 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
         <div><label class="ml">Date Received</label><input class="mi" id="inv-received" type="date"/></div>
         <div><label class="ml">Amount (ex GST) *</label><input class="mi" id="inv-amount-inp" type="number" placeholder="0.00" oninput="checkInvoiceVariance()"/></div>
       </div>
-      <div>
-        <label class="ml">Link to Approved Claims</label>
+      <div><label class="ml">Link to Approved Claims</label>
         <div id="inv-claims-list" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 12px;max-height:160px;overflow-y:auto"></div>
       </div>
       <div class="bp-alert" id="invVarianceAlert" style="display:none;margin-top:8px"></div>
       <div><label class="ml">Notes</label><input class="mi" id="inv-note" placeholder="Any notes…"/></div>
+      <div><label class="ml">Attach Invoice</label>
+        <label class="file-pick" style="margin-top:4px"><input type="file" accept=".pdf,.jpg,.jpeg,.png" id="inv-file" onchange="document.getElementById('inv-file-lbl').textContent=this.files[0]?.name||'Attach file'"><span>📎</span><span id="inv-file-lbl">Attach invoice document (optional)</span></label>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn bg bsm" onclick="closeInvoiceModal()">Cancel</button>
@@ -1502,6 +1472,5 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
     </div>
   </div>
 </div>
-
 </body>
 </html>
