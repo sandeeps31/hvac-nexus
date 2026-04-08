@@ -226,6 +226,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
 <script src="db.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -376,6 +377,22 @@ function enterBudgetEdit(){
   if(b){b.style.display='flex';b.innerHTML='<span>✏️ Editing budget — make changes then click Save Budget</span>';}
   renderAll();
 }
+function makeSellPriceEditable(){
+  var td=document.getElementById('sellPriceTd');
+  if(!td)return;
+  var gb=grandBudget();
+  var curSell=gb*(1+margin/100);
+  td.innerHTML='<input class="margin-input" type="number" id="sellPriceInput" value="'+curSell.toFixed(0)+'" min="0" step="1" style="width:110px" oninput="onSellPriceInput(this.value)" onblur="onSellPriceInput(this.value);saveData();">'
+    +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);margin-left:4px">ex GST</span>';
+}
+function onSellPriceInput(val){
+  var gb=grandBudget();
+  var sp=parseFloat(val)||0;
+  if(sp>0&&gb>0)margin=(sp-gb)/sp*100;
+  else if(sp>0)margin=0;
+  var md=document.getElementById('marginDisplay');
+  if(md)md.textContent=margin.toFixed(1)+'%';
+}
 function saveBudgetEdit(){
   _budgetEditMode=false;
   saveData();
@@ -383,7 +400,9 @@ function saveBudgetEdit(){
   document.getElementById('saveBudgetBtn').style.display='none';
   document.getElementById('cancelBudgetBtn').style.display='none';
   var b=document.getElementById('budgetRoleBanner');
-  if(b){b.style.display='flex';b.innerHTML='<span>✅ Budget saved</span>';setTimeout(function(){b.style.display='none';},2500);}
+  if(b){b.style.display='flex';b.innerHTML='<span>✅ Budget saved</span>';setTimeout(function(){b.style.display='none';
+  var ub=document.getElementById('uploadBudgetBtn');if(ub)ub.style.display='none';
+},2500);}
   renderAll();
 }
 function cancelBudgetEdit(){
@@ -393,6 +412,8 @@ function cancelBudgetEdit(){
   document.getElementById('cancelBudgetBtn').style.display='none';
   var b=document.getElementById('budgetRoleBanner');if(b)b.style.display='none';
   renderAll();
+
+  var ub=document.getElementById('uploadBudgetBtn');if(ub)ub.style.display='none';
 }
 function saveBudgetInline(grpId,val){
   sections.forEach(function(sec){
@@ -585,8 +606,8 @@ function updateSummary(){
   document.getElementById('sum-var').textContent=fmtV(v);
   document.getElementById('sum-var').style.color=v>0?'var(--green)':v<0?'var(--danger)':'var(--text2)';
   document.getElementById('sum-var-sub').textContent=v>0?'under budget':v<0?'over budget':'--';
-  document.getElementById('sum-margin').textContent=margin+'%';
-  document.getElementById('sum-margin-sub').textContent=fmt(mAmt)+' margin';
+  var smEl=document.getElementById('sum-margin');if(smEl)smEl.textContent=margin.toFixed(1)+'%';
+  var smSub=document.getElementById('sum-margin-sub');if(smSub)smSub.textContent=fmt(mAmt)+' margin';
 }
 
 // -- PO PANEL --
@@ -770,6 +791,7 @@ function renderAll(){
   // Base contract
   const baseSellEx    = gb * (1 + margin/100);
   const baseProfit    = baseSellEx - gb;
+  const baseMarginPct = baseSellEx > 0 ? (baseProfit / baseSellEx * 100) : 0;
   // Variations
   const varsList      = getVariations();
   const totalVarExGst = varsList.reduce((a,v) => {
@@ -807,20 +829,27 @@ function renderAll(){
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Sell Price (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--green)">${fmt(baseSellEx)}</td>
+              <td style="padding:9px 14px;text-align:right" id="sellPriceTd">
+                <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--green)">${fmt(baseSellEx)}</span>
+              </td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Profit</td>
+              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Profit (ex GST)</td>
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${baseProfit>=0?'color:var(--green)':'color:var(--danger)'}">${fmt(baseProfit)}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Margin %</td>
-              <td style="padding:6px 14px;text-align:right">
-                <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
-                  <input class="margin-input" type="number" value="${margin}" min="0" max="100" step="0.5" onchange="margin=parseFloat(this.value)||0;saveData();renderAll();updateSummary()">
-                  <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">%</span>
-                </div>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${baseMarginPct>=0?'color:var(--green)':'color:var(--danger)'}">
+                <span id="marginDisplay">${baseMarginPct.toFixed(1)}%</span>
               </td>
+            </tr>
+            <tr style="border-top:1px solid rgba(0,200,255,.12)">
+              <td style="padding:9px 14px;font-size:13px;color:var(--muted)">GST @ 10%</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${fmt(baseSellEx*0.1)}</td>
+            </tr>
+            <tr style="border-top:1px solid rgba(0,200,255,.08);background:rgba(0,200,255,.03)">
+              <td style="padding:9px 14px;font-size:13px;font-weight:600;color:var(--text)">Sell Price (incl GST)</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${fmt(baseSellEx*1.1)}</td>
             </tr>
           </table>
         </div>
@@ -842,20 +871,20 @@ function renderAll(){
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--text)">${fmt(newContractEx)}</td>
             </tr>
             <tr style="border-top:1px solid rgba(255,184,48,.08)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--muted)">GST @ 10%</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${fmt(newContractGst)}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(255,184,48,.08)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">New Contract Value (incl GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${fmt(newContractIncl)}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(255,184,48,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Profit (ex GST)</td>
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${newProfit>=0?'color:var(--green)':'color:var(--danger)'}">${fmt(newProfit)}</td>
             </tr>
             <tr style="border-top:1px solid rgba(255,184,48,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Margin %</td>
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${newMarginPct>=0?'color:var(--green)':'color:var(--danger)'}">${newMarginPct.toFixed(1)}%</td>
+            </tr>
+            <tr style="border-top:1px solid rgba(255,184,48,.12)">
+              <td style="padding:9px 14px;font-size:13px;color:var(--muted)">GST @ 10%</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${fmt(newContractGst)}</td>
+            </tr>
+            <tr style="border-top:1px solid rgba(255,184,48,.08);background:rgba(255,184,48,.03)">
+              <td style="padding:9px 14px;font-size:13px;font-weight:600;color:var(--text)">New Contract Value (incl GST)</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${fmt(newContractIncl)}</td>
             </tr>
           </table>
         </div>
@@ -1139,6 +1168,280 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   });
 })();
 
+</script>
+
+<!-- UPLOAD BUDGET MODAL -->
+<div class="mo" id="uploadModal" onclick="if(event.target===this)closeUploadModal()">
+  <div class="modal" style="width:500px">
+    <div class="modal-hdr">
+      <h3>⬆ Upload Budget</h3>
+      <p>Upload a filled HVAC NEXUS budget template. This will replace the entire project budget.</p>
+    </div>
+    <div class="modal-body">
+      <div id="dropZone" style="border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface2)"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='var(--accent-dim)'"
+        ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--surface2)'"
+        ondrop="handleBudgetDrop(event)"
+        onclick="document.getElementById('budgetFileInput').click()">
+        <div style="font-size:32px;margin-bottom:10px">📊</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">Drop your Excel file here</div>
+        <div style="font-size:12px;color:var(--muted)">or click to browse — .xlsx files only</div>
+        <input type="file" id="budgetFileInput" accept=".xlsx" style="display:none" onchange="handleBudgetFile(this.files[0])">
+      </div>
+      <div id="uploadPreview" style="display:none">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Preview — rows to be imported</div>
+        <div id="uploadPreviewTable" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:7px"></div>
+        <div id="uploadStats" style="margin-top:8px;font-size:12px;color:var(--text2)"></div>
+      </div>
+      <div id="uploadError" style="display:none;padding:10px 14px;background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);border-radius:7px;font-size:12px;color:var(--danger)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bg bsm" onclick="closeUploadModal()">Cancel</button>
+      <button class="btn bsm" id="downloadTplBtn" onclick="downloadFromCompanyTemplate()" style="color:var(--accent);border-color:rgba(0,200,255,.3);background:var(--surface2)">⬇ Download Template</button>
+      <button class="btn bp bsm" id="confirmUploadBtn" onclick="confirmBudgetUpload()" style="display:none">Import Budget</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── UPLOAD BUDGET ──
+var _parsedBudget = null;
+
+function openUploadModal(){
+  _parsedBudget=null;
+  document.getElementById('uploadPreview').style.display='none';
+  document.getElementById('uploadError').style.display='none';
+  document.getElementById('confirmUploadBtn').style.display='none';
+  document.getElementById('dropZone').style.borderColor='var(--border)';
+  document.getElementById('dropZone').style.background='var(--surface2)';
+  document.getElementById('budgetFileInput').value='';
+  document.getElementById('uploadModal').classList.add('open');
+}
+function closeUploadModal(){document.getElementById('uploadModal').classList.remove('open');}
+
+function handleBudgetDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZone').style.borderColor='var(--border)';
+  document.getElementById('dropZone').style.background='var(--surface2)';
+  var file=e.dataTransfer.files[0];
+  if(file)handleBudgetFile(file);
+}
+
+function handleBudgetFile(file){
+  if(!file)return;
+  if(!file.name.endsWith('.xlsx')){
+    showUploadError('Please upload an .xlsx file.');return;
+  }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      if(typeof XLSX==='undefined')throw new Error('XLSX library not loaded');
+      var wb=XLSX.read(e.target.result,{type:'array'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      parseBudgetData(data);
+    }catch(err){showUploadError('Could not read file: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseBudgetData(data){
+  document.getElementById('uploadError').style.display='none';
+  if(!data||data.length<2){showUploadError('File appears empty.');return;}
+
+  // Expect columns: Level 1 | Level 2 | Line Item | Budget | Sell Price
+  var header=data[0].map(function(h){return String(h||'').toLowerCase();});
+  var l1Col=header.findIndex(function(h){return h.includes('level 1')||h.includes('level1');});
+  var l2Col=header.findIndex(function(h){return h.includes('level 2')||h.includes('level2');});
+  var liCol=header.findIndex(function(h){return h.includes('line item')||h.includes('lineitem')||h.includes('item');});
+  var budCol=header.findIndex(function(h){return h.includes('budget');});
+  var sellCol=header.findIndex(function(h){return h.includes('sell');});
+
+  if(l1Col<0||liCol<0||budCol<0){
+    showUploadError('Could not find required columns. Make sure you are using the HVAC NEXUS budget template.');return;
+  }
+
+  // Build sections structure
+  var newSections=[];
+  var curSec=null,curGrp=null;
+  var itemCount=0;
+
+  for(var i=1;i<data.length;i++){
+    var row=data[i];
+    var l1=String(row[l1Col]||'').trim();
+    var l2=l2Col>=0?String(row[l2Col]||'').trim():'';
+    var li=liCol>=0?String(row[liCol]||'').trim():'';
+    var bud=parseFloat(row[budCol])||0;
+    var sell=sellCol>=0?(parseFloat(row[sellCol])||0):0;
+
+    if(!l1&&!l2&&!li)continue;
+
+    // Level 1 header row (no L2, no line item)
+    if(l1&&!l2&&!li){
+      curSec={id:'sec_'+Date.now()+'_'+i,name:l1,groups:[],collapsed:false};
+      newSections.push(curSec);
+      curGrp=null;
+      continue;
+    }
+    // Level 2 header row
+    if(l2&&!li){
+      if(!curSec){curSec={id:'sec_'+Date.now()+'_'+i,name:l1||'General',groups:[],collapsed:false};newSections.push(curSec);}
+      curGrp={id:'grp_'+Date.now()+'_'+i,parent:l2,budget:0,pos:[]};
+      curSec.groups.push(curGrp);
+      continue;
+    }
+    // Line item
+    if(li){
+      if(!curSec){curSec={id:'sec_'+Date.now()+'_'+i,name:l1||'General',groups:[],collapsed:false};newSections.push(curSec);}
+      if(!curGrp){curGrp={id:'grp_'+Date.now()+'_'+i,parent:li,budget:bud,pos:[]};curSec.groups.push(curGrp);itemCount++;}
+      else{
+        // Line item under a group — add as a sub-group
+        var subGrp={id:'grp_'+Date.now()+'_'+i,parent:li,budget:bud,pos:[]};
+        curSec.groups.push(subGrp);
+        itemCount++;
+      }
+      // Store sell price on the group for margin calc
+      if(sell>0&&bud>0)curGrp.sellPrice=sell;
+    }
+  }
+
+  if(!newSections.length||!itemCount){
+    showUploadError('No valid line items found. Fill in the Line Item column and at least one Budget value.');return;
+  }
+
+  _parsedBudget=newSections;
+
+  // Calculate overall margin
+  var totalBud=0,totalSell=0;
+  newSections.forEach(function(s){s.groups.forEach(function(g){totalBud+=g.budget||0;totalSell+=(g.sellPrice||0);});});
+
+  // Show preview
+  var html='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html+='<thead><tr style="background:var(--surface3)">'
+    +'<th style="padding:6px 10px;text-align:left;color:var(--muted);font-family:DM Mono,monospace;font-size:9px;font-weight:500;text-transform:uppercase">Section / Item</th>'
+    +'<th style="padding:6px 10px;text-align:right;color:var(--muted);font-family:DM Mono,monospace;font-size:9px;font-weight:500;text-transform:uppercase">Budget</th>'
+    +'</tr></thead><tbody>';
+  newSections.forEach(function(s){
+    html+='<tr style="background:rgba(0,200,255,.06)"><td style="padding:6px 10px;font-weight:700;color:var(--accent);font-size:12px" colspan="2">'+escH(s.name)+'</td></tr>';
+    s.groups.forEach(function(g){
+      html+='<tr style="border-bottom:1px solid var(--border)">'
+        +'<td style="padding:5px 10px 5px 20px;color:var(--text)">'+escH(g.parent)+'</td>'
+        +'<td style="padding:5px 10px;text-align:right;font-family:DM Mono,monospace;color:var(--accent)">'+fmtU(g.budget)+'</td>'
+        +'</tr>';
+    });
+  });
+  html+='</tbody></table>';
+  document.getElementById('uploadPreviewTable').innerHTML=html;
+  document.getElementById('uploadPreview').style.display='block';
+  var marginPctCalc=totalSell>0?((totalSell-totalBud)/totalSell*100):0;
+  document.getElementById('uploadStats').innerHTML=
+    '<strong>'+itemCount+'</strong> line items &nbsp;|&nbsp; Budget: <strong>'+fmtU(totalBud)+'</strong>'
+    +(totalSell>0?' &nbsp;|&nbsp; Sell: <strong>'+fmtU(totalSell)+'</strong> &nbsp;|&nbsp; Margin: <strong>'+marginPctCalc.toFixed(1)+'%</strong>':'');
+  document.getElementById('confirmUploadBtn').style.display='';
+}
+
+function fmtU(v){var n=parseFloat(v)||0;return n===0?'—':'$'+Math.round(n).toLocaleString('en-AU');}
+
+function confirmBudgetUpload(){
+  if(!_parsedBudget){return;}
+  // Calculate overall margin from sell prices
+  var totalBud=0,totalSell=0;
+  _parsedBudget.forEach(function(s){s.groups.forEach(function(g){totalBud+=g.budget||0;totalSell+=(g.sellPrice||0);});});
+  if(totalSell>0&&totalBud>0){
+    margin=(totalSell-totalBud)/totalSell*100;
+    if(margin<0)margin=0;
+  }
+  sections=_parsedBudget;
+  saveData();
+  closeUploadModal();
+  renderAll();
+  updateSummary();
+}
+
+function showUploadError(msg){
+  var el=document.getElementById('uploadError');
+  el.textContent=msg;el.style.display='block';
+  document.getElementById('uploadPreview').style.display='none';
+  document.getElementById('confirmUploadBtn').style.display='none';
+}
+
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function downloadFromCompanyTemplate(){
+  // Load company template and build XLSX
+  var rows=[];
+  try{
+    var settings=await dbGetCompanySettings();
+    if(settings&&settings.budgetTemplate&&settings.budgetTemplate.rows&&settings.budgetTemplate.rows.length){
+      rows=settings.budgetTemplate.rows;
+    }
+  }catch(e){}
+
+  if(!rows.length){
+    alert('No budget template found. Go to Company Settings → Budget Template to build one first.');
+    return;
+  }
+
+  if(typeof XLSX==='undefined'){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=function(){buildBudgetXLSX(rows);};
+    document.head.appendChild(s);
+  }else{
+    buildBudgetXLSX(rows);
+  }
+}
+
+function buildBudgetXLSX(rows){
+  var data=[['Level 1','Level 2','Line Item','Budget (ex GST)','Sell Price (ex GST)']];
+  var l1='',l2='';
+  rows.forEach(function(r){
+    if(r.type==='level1'){l1=r.name;l2='';data.push([r.name,'','','','']);}
+    else if(r.type==='level2'){l2=r.name;data.push([l1,r.name,'','','']);}
+    else{data.push([l1,l2,r.name,'','']);}
+  });
+
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:30},{wch:30},{wch:35},{wch:20},{wch:20}];
+  ws['!rows']=[{hpt:22}];
+
+  var hdrStyle={fill:{patternType:'solid',fgColor:{rgb:'1E3A5F'}},font:{bold:true,color:{rgb:'FFFFFF'},name:'Arial',sz:10},alignment:{horizontal:'center',vertical:'center'}};
+  ['A1','B1','C1','D1','E1'].forEach(function(a){if(ws[a]){ws[a].s=hdrStyle;}});
+
+  var range=XLSX.utils.decode_range(ws['!ref']);
+  for(var r=1;r<=range.e.r;r++){
+    var rd=data[r];if(!rd)continue;
+    var isL1=rd[0]&&!rd[1]&&!rd[2];
+    var isL2=rd[1]&&!rd[2];
+    ws['!rows'].push({hpt:18});
+    for(var c=0;c<=4;c++){
+      var addr=XLSX.utils.encode_cell({r:r,c:c});
+      if(!ws[addr])ws[addr]={t:'s',v:''};
+      if(isL1){ws[addr].s={fill:{patternType:'solid',fgColor:{rgb:'D6E4F0'}},font:{bold:true,name:'Arial',sz:10}};}
+      else if(isL2){ws[addr].s={fill:{patternType:'solid',fgColor:{rgb:'EBF4FA'}},font:{bold:true,italic:true,name:'Arial',sz:10}};}
+      else{
+        if(c===3||c===4){ws[addr].s={fill:{patternType:'solid',fgColor:{rgb:'FFFDE7'}},font:{name:'Arial',sz:10,color:{rgb:'0000CC'}}};}
+        else{ws[addr].s={font:{name:'Arial',sz:10}};}
+      }
+    }
+  }
+
+  XLSX.utils.book_append_sheet(wb,ws,'Budget Template');
+
+  // Instructions sheet
+  var ws2=XLSX.utils.aoa_to_sheet([
+    ['HVAC NEXUS — Budget Template'],[''],
+    ['1. Fill in Budget (ex GST) and Sell Price (ex GST) for each line item (white rows only)'],
+    ['2. Do not edit Level 1 or Level 2 header rows'],
+    ['3. Do not add or remove columns'],
+    ['4. Save and upload via Budget module in Edit Mode'],
+    [''],['NOTE: Uploading replaces the ENTIRE project budget.']
+  ]);
+  ws2['!cols']=[{wch:70}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Instructions');
+  XLSX.writeFile(wb,'HVAC_NEXUS_Budget_Template.xlsx');
+}
 </script>
 </body>
 </html>

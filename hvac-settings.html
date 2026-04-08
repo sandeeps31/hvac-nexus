@@ -100,6 +100,34 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 input[type="file"]{display:none}
 input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.6}
 
+.tpl-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:7px;margin-bottom:3px;transition:background .13s}
+.tpl-row:hover{background:var(--surface2)}
+.tpl-row.level1{border-left:3px solid var(--accent);background:rgba(0,200,255,.04)}
+.tpl-row.level2{border-left:3px solid var(--warn);padding-left:20px;background:rgba(255,184,48,.03)}
+.tpl-row.lineitem{border-left:3px solid var(--border);padding-left:36px}
+.tpl-row-drag{cursor:grab;color:var(--muted);font-size:13px;flex-shrink:0}
+.tpl-row-drag:active{cursor:grabbing}
+.tpl-badge{font-family:'DM Mono',monospace;font-size:9px;padding:2px 6px;border-radius:10px;font-weight:600;flex-shrink:0}
+.badge-l1{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.2)}
+.badge-l2{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
+.badge-li{background:var(--surface3);color:var(--text2);border:1px solid var(--border)}
+.tpl-name-input{flex:1;background:transparent;border:none;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;min-width:0}
+.tpl-name-input::placeholder{color:var(--muted)}
+.tpl-row-actions{display:flex;gap:3px;flex-shrink:0;opacity:0;transition:opacity .13s}
+.tpl-row:hover .tpl-row-actions{opacity:1}
+.tpl-action-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 5px;border-radius:4px;transition:all .13s}
+.tpl-action-btn:hover{color:var(--text);background:var(--surface3)}
+.tpl-action-btn.del:hover{color:var(--danger)}
+.tpl-add-btns{display:flex;gap:6px;padding:8px 0;border-top:1px dashed var(--border);margin-top:6px;flex-wrap:wrap}
+.tpl-add-btn{background:none;border:1px dashed var(--border);color:var(--text2);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:4px;transition:all .13s}
+.tpl-add-btn:hover{background:var(--surface2);border-style:solid;color:var(--text)}
+.tpl-add-btn.l1{border-color:rgba(0,200,255,.3);color:var(--accent)}.tpl-add-btn.l1:hover{background:var(--accent-dim)}
+.tpl-add-btn.l2{border-color:rgba(255,184,48,.3);color:var(--warn)}.tpl-add-btn.l2:hover{background:var(--warn-dim)}
+.tpl-empty{text-align:center;padding:32px;color:var(--muted);font-size:13px}
+.stab-inner{padding:8px 16px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent;transition:all .15s;font-family:'DM Sans',sans-serif;white-space:nowrap}
+.stab-inner:hover{color:var(--text)}
+.stab-inner.active{color:var(--accent);border-bottom-color:var(--accent)}
+.stab-inner-bar{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;gap:0;background:var(--surface2);border-radius:8px 8px 0 0;overflow:hidden}
 .stab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent;transition:all .15s;font-family:'DM Sans',sans-serif}
 .stab:hover{color:var(--text)}
 .stab.active{color:var(--accent);border-bottom-color:var(--accent)}
@@ -340,87 +368,83 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
     <!-- ── TEMPLATES TAB ── -->
     <div id="tab-templates" style="display:none">
 
-      <!-- ITP TEMPLATES -->
-      <div class="settings-card">
-        <div class="card-hdr">
-          <div class="card-hdr-title">ITP Templates</div>
-          <div class="card-hdr-sub">Manage company-level ITP templates used across all projects</div>
-        </div>
-        <div class="card-body" style="display:flex;align-items:center;justify-content:space-between">
-          <div style="font-size:13px;color:var(--text2)">Create and manage reusable ITP checklists for FCUs, AHUs, fans and other equipment types.</div>
-          <button class="btn bp bsm" onclick="navTo('hvac-itp-templates.html')" style="flex-shrink:0;margin-left:16px">Open ITP Templates</button>
-        </div>
+      <!-- SUB-TAB BAR -->
+      <div class="stab-inner-bar">
+        <button class="stab-inner active" id="itab-budget" onclick="switchInnerTab('budget')">📊 Budget</button>
+        <button class="stab-inner" id="itab-itp" onclick="switchInnerTab('itp')">📋 ITP</button>
+        <button class="stab-inner" id="itab-precx" onclick="switchInnerTab('precx')">✅ Pre-Commissioning</button>
       </div>
 
-      <!-- BUDGET TEMPLATE -->
-      <div class="settings-card">
-        <div class="card-hdr">
-          <div class="card-hdr-title">Budget Template</div>
-          <div class="card-hdr-sub">Company-level category and line item structure applied to all new projects</div>
-        </div>
-        <div class="card-body">
-          <div class="upload-zone" id="uploadZone"
-            ondragover="event.preventDefault();this.classList.add('drag')"
-            ondragleave="this.classList.remove('drag')"
-            ondrop="handleDrop(event)">
-            <input type="file" id="templateFile" accept=".xlsx" onchange="handleTemplateUpload(this)">
-            <div class="upload-icon">&#128194;</div>
-            <div class="upload-title">Upload Budget Template (.xlsx)</div>
-            <div class="upload-sub">Drag and drop or click to browse - Must have a "Template" sheet with TYPE and NAME columns</div>
-          </div>
-          <div class="template-status" id="templateStatus" style="display:none">
-            <span class="ts-icon" id="tsIcon">&#128203;</span>
-            <div class="ts-info">
-              <div class="ts-name" id="tsName">-</div>
-              <div class="ts-meta" id="tsMeta">-</div>
+      <!-- INNER TAB: BUDGET -->
+      <div id="itab-content-budget">
+        <div class="settings-card">
+          <div class="card-hdr" style="display:flex;align-items:center">
+            <div style="flex:1">
+              <div class="card-hdr-title">Budget Template</div>
+              <div class="card-hdr-sub">Company-level structure used across all projects. Estimators fill in Budget and Sell Price per line item.</div>
             </div>
-            <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="clearTemplate()">Remove</button>
-          </div>
-          <div id="catPreview" style="display:none">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">
-              <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Template Preview</span>
-              <span id="previewCount" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)"></span>
+            <div style="display:flex;gap:7px">
+              <button class="bg bsm btn" onclick="downloadBudgetTemplate()">⬇ Download</button>
+              <button class="bp bsm btn" onclick="saveBudgetTemplateSettings()">💾 Save</button>
             </div>
-            <div class="cat-preview" id="catPreviewList"></div>
           </div>
-          <div class="divider"></div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <span style="font-size:12px;color:var(--muted)">Don't have a template yet?</span>
-            <button class="bg bsm btn" onclick="navTo('hvac-budget.html')">Download from Budget</button>
+          <div class="card-body" style="padding:14px 16px">
+            <div id="budgetTplList"></div>
+            <div class="tpl-add-btns">
+              <button class="tpl-add-btn l1" onclick="budgetTplAddRow('level1')">＋ Level 1 Header</button>
+              <button class="tpl-add-btn l2" onclick="budgetTplAddRow('level2')">＋ Level 2 Header</button>
+              <button class="tpl-add-btn" onclick="budgetTplAddRow('lineitem')">＋ Line Item</button>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- PRE-CX TEMPLATE -->
-      <div class="settings-card">
-        <div class="card-hdr">
-          <div class="card-hdr-title">Pre-Commissioning Checklist Template</div>
-          <div class="card-hdr-sub">Defines sections and items loaded when creating area checklists</div>
+      <!-- INNER TAB: ITP -->
+      <div id="itab-content-itp" style="display:none">
+        <div class="settings-card">
+          <div class="card-hdr">
+            <div class="card-hdr-title">ITP Templates</div>
+            <div class="card-hdr-sub">Manage company-level ITP templates used across all projects</div>
+          </div>
+          <div class="card-body" style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:13px;color:var(--text2)">Create and manage reusable ITP checklists for FCUs, AHUs, fans and other equipment types.</div>
+            <button class="btn bp bsm" onclick="navTo('hvac-company-itp-templates.html')" style="flex-shrink:0;margin-left:16px">Open ITP Template Builder →</button>
+          </div>
         </div>
-        <div class="card-body">
-          <div class="upload-zone" id="precxUploadZone"
-            ondragover="event.preventDefault();this.classList.add('drag')"
-            ondragleave="this.classList.remove('drag')"
-            ondrop="handlePrecxDrop(event)">
-            <input type="file" id="precxTemplateFile" accept=".xlsx" onchange="handlePrecxUpload(this)">
-            <div class="upload-icon">&#9989;</div>
-            <div class="upload-title">Upload Pre-Cx Checklist Template (.xlsx)</div>
-            <div class="upload-sub">Must have a "Template" sheet - Columns: TYPE (SECTION or ITEM) and NAME</div>
+      </div>
+
+      <!-- INNER TAB: PRE-CX -->
+      <div id="itab-content-precx" style="display:none">
+        <div class="settings-card">
+          <div class="card-hdr">
+            <div class="card-hdr-title">Pre-Commissioning Checklist Template</div>
+            <div class="card-hdr-sub">Defines sections and items loaded when creating area checklists</div>
           </div>
-          <div class="template-status" id="precxTemplateStatus" style="display:none">
-            <span class="ts-icon" id="precxTsIcon">&#128203;</span>
-            <div class="ts-info">
-              <div class="ts-name" id="precxTsName">-</div>
-              <div class="ts-meta" id="precxTsMeta">-</div>
+          <div class="card-body">
+            <div class="upload-zone" id="precxUploadZone"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="handlePrecxDrop(event)">
+              <input type="file" id="precxTemplateFile" accept=".xlsx" onchange="handlePrecxUpload(this)">
+              <div class="upload-icon">&#9989;</div>
+              <div class="upload-title">Upload Pre-Cx Checklist Template (.xlsx)</div>
+              <div class="upload-sub">Must have a "Template" sheet - Columns: TYPE (SECTION or ITEM) and NAME</div>
             </div>
-            <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="clearPrecxTemplate()">Remove</button>
-          </div>
-          <div id="precxCatPreview" style="display:none">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">
-              <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Template Preview</span>
-              <span id="precxPreviewCount" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)"></span>
+            <div class="template-status" id="precxTemplateStatus" style="display:none">
+              <span class="ts-icon" id="precxTsIcon">&#128203;</span>
+              <div class="ts-info">
+                <div class="ts-name" id="precxTsName">-</div>
+                <div class="ts-meta" id="precxTsMeta">-</div>
+              </div>
+              <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="clearPrecxTemplate()">Remove</button>
             </div>
-            <div class="cat-preview" id="precxPreviewList"></div>
+            <div id="precxCatPreview" style="display:none">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">
+                <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Template Preview</span>
+                <span id="precxPreviewCount" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)"></span>
+              </div>
+              <div class="cat-preview" id="precxPreviewList"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -838,9 +862,136 @@ async function clearPrecxTemplate(){
   applySettings(settings);
   // Load existing template if any
   try{var tmpl=await dbGetBudget('__template__');if(tmpl)renderTemplateStatus(typeof tmpl==='string'?JSON.parse(tmpl):tmpl);}catch(e){}
+  // Load budget template builder
+  await initBudgetTemplateBuilder();
 })();
 
+// ── BUDGET TEMPLATE BUILDER ──
+var _btRows=[];
+var _btUid=0;
+function _btNid(){return 'bt'+(++_btUid)+Date.now();}
+function _btEscH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+async function initBudgetTemplateBuilder(){
+  try{
+    var s=await dbGetCompanySettings();
+    if(s&&s.budgetTemplate&&Array.isArray(s.budgetTemplate.rows)){
+      _btRows=s.budgetTemplate.rows;
+    }
+  }catch(e){_btRows=[];}
+  renderBudgetTplList();
+}
+
+function renderBudgetTplList(){
+  var el=document.getElementById('budgetTplList');
+  if(!el)return;
+  if(!_btRows.length){
+    el.innerHTML='<div class="tpl-empty">No rows yet — add a Level 1 header to get started.</div>';
+    return;
+  }
+  el.innerHTML=_btRows.map(function(r,i){
+    var cls='tpl-row '+r.type;
+    var badge='',bc='';
+    if(r.type==='level1'){badge='L1';bc='badge-l1';}
+    else if(r.type==='level2'){badge='L2';bc='badge-l2';}
+    else{badge='Item';bc='badge-li';}
+    return '<div class="'+cls+'" draggable="true" data-id="'+r.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondrop="_btDrop(event,this.dataset.id)">'
+      +'<span class="tpl-row-drag">&#8597;</span>'
+      +'<span class="tpl-badge '+bc+'">'+badge+'</span>'
+      +'<input class="tpl-name-input" value="'+_btEscH(r.name)+'" placeholder="'+(r.type==='level1'?'Level 1 header…':r.type==='level2'?'Level 2 header…':'Line item name…')+'" oninput="_btRows['+i+'].name=this.value"/>'
+      +'<div class="tpl-row-actions">'
+        +(i>0?'<button class="tpl-action-btn" onclick="_btMove('+i+',-1)" title="Up">↑</button>':'')
+        +(i<_btRows.length-1?'<button class="tpl-action-btn" onclick="_btMove('+i+',1)" title="Down">↓</button>':'')
+        +'<button class="tpl-action-btn del" data-delid="'+r.id+'" onclick="_btDelete(this.dataset.delid)" title="Delete">×</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function budgetTplAddRow(type){
+  _btRows.push({id:_btNid(),type:type,name:''});
+  renderBudgetTplList();
+  setTimeout(function(){var inputs=document.querySelectorAll('.tpl-name-input');if(inputs.length)inputs[inputs.length-1].focus();},50);
+}
+function _btDelete(id){_btRows=_btRows.filter(function(r){return r.id!==id;});renderBudgetTplList();}
+function _btMove(idx,dir){
+  var ni=idx+dir;if(ni<0||ni>=_btRows.length)return;
+  var t=_btRows[idx];_btRows[idx]=_btRows[ni];_btRows[ni]=t;renderBudgetTplList();
+}
+var _btDragId=null;
+function _btDragStart(e,id){_btDragId=id;e.dataTransfer.effectAllowed='move';}
+function _btDrop(e,targetId){
+  e.preventDefault();if(!_btDragId||_btDragId===targetId)return;
+  var fi=_btRows.findIndex(function(r){return r.id===_btDragId;});
+  var ti=_btRows.findIndex(function(r){return r.id===targetId;});
+  if(fi<0||ti<0)return;
+  var item=_btRows.splice(fi,1)[0];_btRows.splice(ti,0,item);
+  _btDragId=null;renderBudgetTplList();
+}
+
+async function saveBudgetTemplateSettings(){
+  try{
+    var s=await dbGetCompanySettings()||{};
+    s.budgetTemplate={rows:_btRows,updatedAt:new Date().toISOString()};
+    await dbSetCompanySettings(s);
+    showToast('Budget template saved');
+  }catch(e){alert('Save failed: '+e.message);}
+}
+
+function downloadBudgetTemplate(){
+  if(!_btRows.length){alert('Add rows to the template first.');return;}
+  function buildXL(){
+    var data=[['Level 1','Level 2','Line Item','Budget (ex GST)','Sell Price (ex GST)']];
+    var l1='',l2='';
+    _btRows.forEach(function(r){
+      if(r.type==='level1'){l1=r.name;l2='';data.push([r.name,'','','','']);}
+      else if(r.type==='level2'){l2=r.name;data.push([l1,r.name,'','','']);}
+      else{data.push([l1,l2,r.name,'','']);}
+    });
+    var wb=XLSX.utils.book_new();
+    var ws=XLSX.utils.aoa_to_sheet(data);
+    ws['!cols']=[{wch:30},{wch:30},{wch:35},{wch:20},{wch:20}];
+    ws['!rows']=[{hpt:22}];
+    var hS={fill:{patternType:'solid',fgColor:{rgb:'1E3A5F'}},font:{bold:true,color:{rgb:'FFFFFF'},name:'Arial',sz:10},alignment:{horizontal:'center',vertical:'center'}};
+    ['A1','B1','C1','D1','E1'].forEach(function(a){if(ws[a])ws[a].s=hS;});
+    var range=XLSX.utils.decode_range(ws['!ref']);
+    for(var r=1;r<=range.e.r;r++){
+      var rd=data[r];if(!rd)continue;
+      var isL1=rd[0]&&!rd[1]&&!rd[2];
+      var isL2=rd[1]&&!rd[2];
+      ws['!rows'].push({hpt:18});
+      for(var c=0;c<=4;c++){
+        var addr=XLSX.utils.encode_cell({r:r,c:c});
+        if(!ws[addr])ws[addr]={t:'s',v:''};
+        if(isL1)ws[addr].s={fill:{patternType:'solid',fgColor:{rgb:'D6E4F0'}},font:{bold:true,name:'Arial',sz:10}};
+        else if(isL2)ws[addr].s={fill:{patternType:'solid',fgColor:{rgb:'EBF4FA'}},font:{bold:true,italic:true,name:'Arial',sz:10}};
+        else if(c===3||c===4)ws[addr].s={fill:{patternType:'solid',fgColor:{rgb:'FFFDE7'}},font:{name:'Arial',sz:10,color:{rgb:'0000CC'}}};
+        else ws[addr].s={font:{name:'Arial',sz:10}};
+      }
+    }
+    var ws2=XLSX.utils.aoa_to_sheet([
+      ['HVAC NEXUS — Budget Template'],[''],
+      ['Fill in Budget (ex GST) and Sell Price (ex GST) for each line item (yellow cells only).'],
+      ['Do not edit header rows or add/remove columns.'],
+      ['Upload via Budget module in Edit Mode.'],[''],
+      ['NOTE: Uploading replaces the entire project budget.']
+    ]);
+    ws2['!cols']=[{wch:70}];
+    XLSX.utils.book_append_sheet(wb,ws,'Budget Template');
+    XLSX.utils.book_append_sheet(wb,ws2,'Instructions');
+    XLSX.writeFile(wb,'HVAC_NEXUS_Budget_Template.xlsx');
+  }
+  if(typeof XLSX!=='undefined'){buildXL();}
+  else{var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=buildXL;document.head.appendChild(s);}
+}
+
 // -- TABS --
+function switchInnerTab(tab){
+  ['budget','itp','precx'].forEach(function(t){
+    document.getElementById('itab-content-'+t).style.display=t===tab?'':'none';
+    document.getElementById('itab-'+t).classList.toggle('active',t===tab);
+  });
+}
 function switchTab(tab) {
   ['info','templates','contacts','notifications','permissions'].forEach(function(t) {
     document.getElementById('tab-'+t).style.display = t===tab ? '' : 'none';
