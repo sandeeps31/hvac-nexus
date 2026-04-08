@@ -43,9 +43,6 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .sc-val{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;line-height:1}
 .sc-sub{font-size:11px;color:var(--text2);margin-top:2px}
 .cb .sc-val{color:var(--accent)}.cg .sc-val{color:var(--green)}.cw .sc-val{color:var(--warn)}.cd .sc-val{color:var(--danger)}
-.vi-tab{padding:10px 22px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);border:none;background:none;border-bottom:2px solid transparent;transition:all .13s;font-family:'DM Sans',sans-serif}
-.vi-tab:hover{color:var(--text)}
-.vi-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface)}
 .toolbar{padding:10px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .search-box{display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px;width:260px;transition:border-color .15s}
 .search-box:focus-within{border-color:var(--accent)}
@@ -186,51 +183,36 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 
 <div class="topbar">
   <div class="bc">
-    <span class="bcl" onclick="window.location.href='index.html'">My Projects</span><span class="bcs">›</span>
-    <span class="bcl bc-proj-name" onclick="window.location.href='project.html'" onclick="navTo(\'project.html\')">Greenfield Commercial Tower</span><span class="bcs">›</span>
-    <span class="bcc">Vendor Invoices</span>
+    <span class="bcl" onclick="navTo('index.html')">My Projects</span><span class="bcs">&#8250;</span>
+    <span class="bcl bc-proj-name" onclick="navTo('project.html')">Greenfield Commercial Tower</span><span class="bcs">&#8250;</span>
+    <span class="bcc">Vendor Claims</span>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
-    <button class="bg bsm btn" onclick="openRequestModal()">📨 Request Invoices</button>
-    <button class="bp bsm btn" onclick="openAddModal()">＋ Add Invoice</button>
+    <button class="bp bsm btn" onclick="openClaimModal(null)">&#65291; Log Claim</button>
   </div>
 </div>
 
 <div class="sum-bar">
-  <div class="sc cb"><div class="sc-lbl">This month approved</div><div class="sc-val" id="sumMonthAmt">—</div><div class="sc-sub" id="sumMonthLbl">ex GST</div></div>
-  <div class="sc cw"><div class="sc-lbl">Pending review</div><div class="sc-val" id="sumPending">0</div><div class="sc-sub">awaiting decision</div></div>
-  <div class="sc cd"><div class="sc-lbl">Rejected</div><div class="sc-val" id="sumRejected">0</div><div class="sc-sub">awaiting resubmit</div></div>
-  <div class="sc"><div class="sc-lbl">Total invoices</div><div class="sc-val" id="sumTotal">0</div><div class="sc-sub">all time</div></div>
-  <div class="sc"><div class="sc-lbl">Review deadline</div><div class="sc-val" id="sumDeadline">—</div><div class="sc-sub" id="sumDeadlineSub">10 days from request</div></div>
+  <div class="sc cb"><div class="sc-lbl">Approved this month</div><div class="sc-val" id="sumMonthAmt">—</div><div class="sc-sub">ex GST</div></div>
+  <div class="sc cw"><div class="sc-lbl">Claims pending</div><div class="sc-val" id="sumPending">0</div><div class="sc-sub">awaiting approval</div></div>
+  <div class="sc"><div class="sc-lbl">Invoices pending</div><div class="sc-val" id="sumInvPending">0</div><div class="sc-sub">awaiting approval</div></div>
+  <div class="sc"><div class="sc-lbl">Total claims</div><div class="sc-val" id="sumTotal">0</div><div class="sc-sub">all time</div></div>
 </div>
 
-<!-- TAB BAR -->
-<div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface2)">
-  <button class="vi-tab active" id="vtab-claims" onclick="switchVITab('claims')">&#128221; Claims</button>
-  <button class="vi-tab" id="vtab-invoices" onclick="switchVITab('invoices')">&#129534; Invoices</button>
+<div class="toolbar">
+  <div class="search-box"><span style="color:var(--muted)">&#128269;</span><input type="text" id="searchInput" placeholder="Search vendor, period, variation…" oninput="renderClaims()"></div>
+  <select class="fsel" id="stFilter" onchange="renderClaims()">
+    <option value="">All Statuses</option>
+    <option value="Pending">Claim Pending</option>
+    <option value="Approved">Claim Approved</option>
+    <option value="Disputed">Disputed</option>
+    <option value="Invoice Pending">Invoice Pending</option>
+    <option value="Invoice Approved">Invoice Approved</option>
+  </select>
+  <select class="fsel" id="monthFilter" onchange="renderClaims()"><option value="">All Periods</option></select>
+  <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="claimCount"></span>
 </div>
-
-<!-- CLAIMS PANE -->
-<div id="viPane-claims">
-  <div class="page" id="claimsContent"></div>
-</div>
-
-<!-- INVOICES PANE -->
-<div id="viPane-invoices" style="display:none">
-  <div class="toolbar">
-    <div class="search-box"><span style="color:var(--muted)">&#128269;</span><input type="text" id="searchInput" placeholder="Search vendor, invoice no, PO ref…" oninput="renderAll()"></div>
-    <select class="fsel" id="stFilter" onchange="renderAll()">
-      <option value="">All Statuses</option>
-      <option value="Draft">Draft</option>
-      <option value="Pending">Pending review</option>
-      <option value="Approved">Approved</option>
-      <option value="Rejected">Rejected</option>
-    </select>
-    <select class="fsel" id="monthFilter" onchange="renderAll()"><option value="">All Months</option></select>
-    <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="invCount"></span>
-  </div>
-  <div class="page" id="pageContent"></div>
-</div>
+<div class="page" id="pageContent"></div>
 </div>
 
 <!-- ADD / EDIT MODAL -->
@@ -294,47 +276,25 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 <script src="db.js"></script>
 <script>
 var _viPNum='GCT001';
-
-var invoices=[],requests=[],claims=[];
-var _allPOs=[];
-var editingId=null,_uid=100;
+var claims=[],_allPOs=[],_allVariations=[];
+var _uid=100;
 function nid(){return ++_uid;}
 function num(v){return parseFloat(v)||0;}
-function fmt(n){var v=num(n);return v===0?'—':'$'+Math.round(v).toLocaleString('en-AU');}
-function fmtFull(n){var v=num(n);if(v===0)return '—';return '$'+v.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function fmtD(d){if(!d)return '—';try{var dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
-function fmtM(m){if(!m)return 'No month';try{var p=m.split('-');var dt=new Date(parseInt(p[0]),parseInt(p[1])-1,1);return dt.toLocaleDateString('en-AU',{month:'long',year:'numeric'});}catch(e){return m;}}
-function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function today(){return new Date().toISOString().split('T')[0];}
-function currentMonth(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
-function addDays(ds,n){var d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
-function daysDiff(a,b){return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/(86400000));}
+function fmt(n){var v=num(n);return v===0?'--':'$'+Math.round(v).toLocaleString('en-AU');}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function today_(){return new Date().toISOString().split('T')[0];}
+function fmtD(d){if(!d)return '--';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+function fmtM(m){if(!m)return '';try{var p=m.split('-');var dt=new Date(parseInt(p[0]),parseInt(p[1])-1,1);return dt.toLocaleDateString('en-AU',{month:'long',year:'numeric'});}catch(e){return m;}}
 
+function save(){dbSetVendorInvoices(_viPNum,{claims:claims}).catch(function(e){console.error(e);});}
 
-
-
-// applySB called after definition below
-
-
-function save(){dbSetVendorInvoices(_viPNum,{invoices:invoices,requests:requests,claims:claims}).catch(e=>console.error(e));}
-async function loadPOInvoices(){
-  var _poInvoices_=[];
+async function loadClaims(){
   try{
-    var d=await dbGetPurchaseOrders(_viPNum);
-    if(d&&d.sections){
-      d.sections.forEach(function(sec){
-        (sec.groups||[]).forEach(function(grp){
-          (grp.pos||[]).forEach(function(po){
-            (po.invoices||[]).forEach(function(inv){
-              _poInvoices_.push({id:inv.id,invnum:inv.invoiceNo,invdate:inv.invoiceDate,vendor:inv.supplier||po.supplier||'',po:po.id,amount:inv.amount,status:inv.status==='Approved'?'Approved':inv.status==='Rejected'?'Rejected':'Pending',month:inv.invoiceDate?(inv.invoiceDate.substring(0,7)):'',notes:inv.note||'',source:'po'});
-            });
-          });
-        });
-      });
-    }
-  }catch(e){console.warn('loadPOInvoices:',e);}
-  return _poInvoices_;
+    var s=await dbGetVendorInvoices(_viPNum);
+    if(s){var p=typeof s==='string'?JSON.parse(s):s;claims=Array.isArray(p.claims)?p.claims:[];}
+  }catch(e){claims=[];}
 }
+
 async function loadAllPOs(){
   _allPOs=[];
   try{
@@ -343,227 +303,173 @@ async function loadAllPOs(){
       d.sections.forEach(function(sec){
         (sec.groups||[]).forEach(function(grp){
           (grp.pos||[]).forEach(function(po){
-            _allPOs.push({id:po.id,supplier:po.supplier||'',cat:grp.parent||'',sec:sec.name||'',lineItems:po.lineItems||[]});
+            _allPOs.push({id:po.id,supplier:po.supplier||'',cat:grp.parent||'',sec:sec.name||'',value:liSubVI(po.lineItems||[]),lineItems:po.lineItems||[]});
           });
         });
       });
     }
   }catch(e){}
 }
-async function load(){
+
+async function loadVariations(){
+  _allVariations=[];
   try{
-    var s=await dbGetVendorInvoices(_viPNum);
-    if(s){var p=JSON.parse(s);invoices=Array.isArray(p.invoices)?p.invoices:[];requests=Array.isArray(p.requests)?p.requests:[];claims=Array.isArray(p.claims)?p.claims:[];}
-  }catch(e){invoices=[];requests=[];}
-}
-load();
-
-function updateSummary(poInvs){
-  window._poInvoicesCache=poInvs||window._poInvoicesCache||[];
-  var cm=currentMonth();
-  var thisAmt=invoices.filter(function(i){return i.month===cm&&i.status==='Approved';}).reduce(function(a,i){return a+num(i.amount);},0);
-  var pending=invoices.filter(function(i){return i.status==='Pending';}).length;
-  var rejected=invoices.filter(function(i){return i.status==='Rejected';}).length;
-  document.getElementById('sumMonthAmt').textContent=fmt(thisAmt);
-  document.getElementById('sumMonthLbl').textContent=fmtM(cm)+' · ex GST';
-  document.getElementById('sumPending').textContent=pending;
-  document.getElementById('sumRejected').textContent=rejected;
-  document.getElementById('sumTotal').textContent=invoices.length;
-  var latestReq=requests.filter(function(r){return r.month===cm;}).sort(function(a,b){return a.date<b.date?1:-1;})[0];
-  if(latestReq&&latestReq.deadline){
-    var d=daysDiff(today(),latestReq.deadline);
-    var dEl=document.getElementById('sumDeadline');
-    var dSub=document.getElementById('sumDeadlineSub');
-    if(d<0){dEl.textContent='Overdue';dEl.style.color='var(--danger)';dSub.textContent=Math.abs(d)+' days past';}
-    else if(d===0){dEl.textContent='Today';dEl.style.color='var(--danger)';dSub.textContent='deadline is today';}
-    else{dEl.textContent=d+'d';dEl.style.color=d<=3?'var(--danger)':d<=5?'var(--warn)':'var(--green)';dSub.textContent='days remaining';}
-  } else {
-    document.getElementById('sumDeadline').textContent='—';
-    document.getElementById('sumDeadlineSub').textContent='no request logged';
-  }
+    var d=await dbGetVariations(_viPNum);
+    if(d&&d.variations)_allVariations=d.variations;
+  }catch(e){}
 }
 
-function renderAll(poInvs){
-  window._poInvoicesCache=poInvs||window._poInvoicesCache||[];
-  var q=(document.getElementById('searchInput').value||'').toLowerCase();
-  var sf=document.getElementById('stFilter').value;
-  var mf=document.getElementById('monthFilter').value;
-  // Rebuild month filter
-  var ms={};invoices.forEach(function(i){if(i.month)ms[i.month]=true;});
-  var mSel=document.getElementById('monthFilter'),mv=mSel.value;
-  mSel.innerHTML='<option value="">All Months</option>';
-  Object.keys(ms).sort().reverse().forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=fmtM(m);if(m===mv)o.selected=true;mSel.appendChild(o);});
-  var filtered=invoices.filter(function(i){
-    return(!q||(i.invnum||'').toLowerCase().includes(q)||(i.vendor||'').toLowerCase().includes(q)||(i.po||'').toLowerCase().includes(q))
-      &&(!sf||i.status===sf)&&(!mf||i.month===mf);
+function liSubVI(items){return (items||[]).reduce(function(a,i){return a+num(i.qty)*num(i.price||i.rate||0);},0);}
+
+function getVendorsFromPOs(){
+  var seen={};
+  return _allPOs.filter(function(po){if(!po.supplier||seen[po.supplier])return false;seen[po.supplier]=true;return true;}).map(function(po){return po.supplier;}).sort();
+}
+
+function getPOsForVendor(vendor){
+  return _allPOs.filter(function(po){return po.supplier===vendor;});
+}
+
+function getVariationsForVendor(vendor){
+  var vPOs=getPOsForVendor(vendor);
+  if(!vPOs.length)return _allVariations;
+  return _allVariations.filter(function(v){
+    return vPOs.some(function(po){
+      return (po.lineItems||[]).some(function(li){return (li.desc||'').toLowerCase().includes((v.num||'').toLowerCase());});
+    });
   });
-  document.getElementById('invCount').textContent=filtered.length+' invoice'+(filtered.length!==1?'s':'');
-  updateSummary();
-  var page=document.getElementById('pageContent');page.innerHTML='';
+}
+
+function getPORemaining(poId){
+  var po=_allPOs.find(function(p){return p.id===poId;});
+  if(!po)return null;
+  var prev=0;
+  claims.forEach(function(c){
+    if(_editingClaimId&&c.id===_editingClaimId)return;
+    (c.lines||[]).forEach(function(l){if(l.poId===poId&&c.status!=='Disputed')prev+=num(l.amount);});
+  });
+  return {poValue:po.value,previouslyClaimed:prev,remaining:po.value-prev};
+}
+
+function updateSummary(){
+  var claimPending=claims.filter(function(c){return c.status==='Pending';}).length;
+  var invPending=claims.filter(function(c){return c.status==='Invoice Pending';}).length;
+  var cm=new Date().toISOString().substring(0,7);
+  var monthAmt=claims.filter(function(c){return c.period===cm&&c.status==='Invoice Approved';}).reduce(function(a,c){return a+num(c.invoiceAmount||c.totalAmount||0);},0);
+  var sp=document.getElementById('sumPending');if(sp)sp.textContent=claimPending;
+  var sip=document.getElementById('sumInvPending');if(sip)sip.textContent=invPending;
+  var sm=document.getElementById('sumMonthAmt');if(sm)sm.textContent=fmt(monthAmt);
+  var st=document.getElementById('sumTotal');if(st)st.textContent=claims.length;
+  var mf=document.getElementById('monthFilter');
+  if(mf){var ms={};claims.forEach(function(c){if(c.period)ms[c.period]=true;});var cur=mf.value;mf.innerHTML='<option value="">All Periods</option>';Object.keys(ms).sort().reverse().forEach(function(m){mf.innerHTML+='<option value="'+m+'"'+(m===cur?' selected':'')+'>'+fmtM(m)+'</option>';});}
+}
+
+function renderClaims(){
+  var page=document.getElementById('pageContent');if(!page)return;
+  var q=(document.getElementById('searchInput').value||'').toLowerCase();
+  var sf=(document.getElementById('stFilter').value||'');
+  var mf=(document.getElementById('monthFilter').value||'');
+  var filtered=claims.filter(function(c){
+    if(sf&&c.status!==sf)return false;
+    if(mf&&c.period!==mf)return false;
+    if(q){var s=(c.vendor||'')+' '+(c.claimNo||'')+' '+(c.period||'')+' '+(c.lines||[]).map(function(l){return (l.varNum||'')+' '+(l.description||'');}).join(' ');if(s.toLowerCase().indexOf(q)<0)return false;}
+    return true;
+  });
+  var cc=document.getElementById('claimCount');if(cc)cc.textContent=filtered.length+' claim'+(filtered.length!==1?'s':'');
   if(!filtered.length){
-    page.innerHTML='<div class="empty-state"><div class="empty-icon">🧾</div><div>'+(invoices.length?'No invoices match filters.':'No invoices yet. Click <strong>＋ Add Invoice</strong> to get started.')+'</div></div>';
+    page.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">&#128221;</div><div style="font-size:14px;font-weight:600;margin-bottom:6px">No claims yet</div><div style="font-size:13px">Click <strong>+ Log Claim</strong> to get started.</div></div>';
     return;
   }
-  var groups={};
-  filtered.forEach(function(i){var k=i.month||'zz-no-month';if(!groups[k])groups[k]=[];groups[k].push(i);});
-  Object.keys(groups).sort().reverse().forEach(function(m){
-    var items=groups[m];
-    var approvedAmt=items.filter(function(i){return i.status==='Approved';}).reduce(function(a,i){return a+num(i.amount);},0);
-    var pendingCt=items.filter(function(i){return i.status==='Pending';}).length;
-    var rejCt=items.filter(function(i){return i.status==='Rejected';}).length;
-    var allApproved=items.length>0&&items.every(function(i){return i.status==='Approved';});
-    var pillCls=allApproved?'month-pill all-good':pendingCt>0?'month-pill has-pending':rejCt>0?'month-pill has-rejected':'month-pill';
-    var pillTxt=allApproved?'All approved':pendingCt>0?pendingCt+' pending':rejCt>0?rejCt+' rejected':items.length+' invoices';
-    var grp=document.createElement('div');grp.className='month-group';
-    var hdr=document.createElement('div');hdr.className='month-hdr';
-    hdr.innerHTML='<span class="month-name">'+(m==='zz-no-month'?'No month assigned':fmtM(m))+'</span>'
-      +'<div class="month-stats">'
-      +'<span class="'+pillCls+'">'+pillTxt+'</span>'
-      +'<span style="font-size:11px;color:var(--text2)">Approved ex GST</span>'
-      +'<span class="month-total">'+fmt(approvedAmt)+'</span>'
-      +'<span class="month-chev">▾</span></div>';
-    hdr.addEventListener('click',function(){grp.classList.toggle('collapsed');});
-    var body=document.createElement('div');body.className='month-body';
-    var tbl=document.createElement('table');tbl.className='inv-tbl';
-    tbl.innerHTML='<thead><tr><th>Invoice No.</th><th>Vendor</th><th>Date</th><th>PO Ref</th><th class="r">Amount (ex GST)</th><th class="r">GST</th><th class="r">Total (incl GST)</th><th>Status</th><th>Age</th></tr></thead>';
-    var tbody=document.createElement('tbody');
-    items.sort(function(a,b){return (b.invdate||'')<(a.invdate||'')?-1:1;}).forEach(function(inv){
-      var tr=document.createElement('tr');tr.className='data-row';
-      var stMap={Draft:'st-draft',Pending:'st-pending',Approved:'st-approved',Rejected:'st-rejected'};
-      var gst=num(inv.amount)*0.1;var total=num(inv.amount)+gst;
-      var ageBadge='';
-      if((inv.status==='Pending'||inv.status==='Draft')&&inv.invdate){
-        var age=daysDiff(inv.invdate,today());
-        var acls=age<=7?'d-ok':age<=10?'d-warn':'d-over';
-        ageBadge='<span class="days-badge '+acls+'">'+age+'d</span>';
-      }
-      tr.innerHTML='<td class="inv-num">'+escH(inv.invnum||'—')+'</td>'
-        +'<td style="font-weight:500;color:var(--text)">'+escH(inv.vendor||'—')+'</td>'
-        +'<td style="color:var(--text2);font-size:12px">'+fmtD(inv.invdate)+'</td>'
-        +'<td class="inv-po">'+escH(inv.po||'—')+'</td>'
-        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmtFull(inv.amount)+'</td>'
-        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmtFull(gst)+'</td>'
-        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:600">'+fmtFull(total)+'</td>'
-        +'<td><span class="sb-badge '+(stMap[inv.status]||'st-draft')+'">'+escH(inv.status)+'</span>'
-        +(inv.rejectReason?'<div style="font-size:10px;color:var(--danger);margin-top:3px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(inv.rejectReason)+'">'+escH(inv.rejectReason)+'</div>':'')
-        +'</td>'
-        +'<td>'+ageBadge+'</td>';
-      (function(id){tr.addEventListener('click',function(){openEditModal(id);});})(inv.id);
-      tbody.appendChild(tr);
-    });
-    // Subtotal row
-    var sub=document.createElement('tr');sub.className='tot-row';
-    sub.innerHTML='<td colspan="4" style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Monthly approved total</td>'
-      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--green)">'+fmtFull(approvedAmt)+'</td>'
-      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmtFull(approvedAmt*0.1)+'</td>'
-      +'<td class="r" style="font-family:DM Mono,monospace;font-size:13px;color:var(--green)">'+fmtFull(approvedAmt*1.1)+'</td>'
-      +'<td colspan="2"></td>';
-    tbody.appendChild(sub);
-    tbl.appendChild(tbody);body.appendChild(tbl);grp.appendChild(hdr);grp.appendChild(body);page.appendChild(grp);
+  var sorted=filtered.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  var stMap={'Pending':['var(--warn)','rgba(255,184,48,.1)'],'Approved':['var(--green)','rgba(0,200,100,.1)'],'Disputed':['var(--danger)','rgba(255,77,109,.1)'],'Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Invoice Approved':['var(--green)','rgba(0,200,100,.1)']};
+  var html='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--surface2);border-bottom:1px solid var(--border)">'
+    +'<th style="padding:9px 20px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Vendor</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Claim No</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Period</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Lines</th>'
+    +'<th style="padding:9px 12px;text-align:right;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Amount</th>'
+    +'<th style="padding:9px 12px;text-align:center;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Status</th>'
+    +'<th style="padding:9px 20px;width:180px"></th>'
+    +'</tr></thead><tbody>';
+  sorted.forEach(function(c){
+    var stColors=stMap[c.status]||['var(--text2)','var(--surface2)'];
+    var linesSummary=(c.lines||[]).map(function(l){return '<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 5px;border-radius:3px;background:'+(l.type==='base'?'var(--accent-dim)':'var(--warn-dim)')+';color:'+(l.type==='base'?'var(--accent)':'var(--warn)')+'">'+(l.type==='base'?'BASE':'VAR '+(l.varNum||''))+'</span>';}).join(' ');
+    var actions='';
+    if(c.status==='Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveClaim(this.dataset.cid)">Approve</button> <button class="btn bsm" style="color:var(--danger);border-color:rgba(255,77,109,.3);background:var(--surface2)" data-cid="'+c.id+'" onclick="disputeClaim(this.dataset.cid)">Dispute</button>';}
+    else if(c.status==='Approved'){actions='<button class="btn bsm" style="color:#a78bfa;border-color:rgba(167,139,250,.3);background:var(--surface2)" data-cid="'+c.id+'" onclick="openConvertModal(this.dataset.cid)">+ Log Invoice</button>';}
+    else if(c.status==='Invoice Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveInvoice(this.dataset.cid)">Approve Invoice</button>';}
+    actions+=' <button class="btn bsm" style="color:var(--muted);border-color:var(--border);background:var(--surface2)" data-cid="'+c.id+'" onclick="openClaimModal(this.dataset.cid)">Edit</button>';
+    html+='<tr style="border-bottom:1px solid var(--border);background:var(--surface)" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'+'<td style="padding:11px 20px;font-weight:600;color:var(--text)">'+escH(c.vendor||'--')+'</td>'+'<td style="padding:11px 12px;font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+escH(c.claimNo||'--')+'</td>'+'<td style="padding:11px 12px;font-size:12px;color:var(--text2)">'+fmtM(c.period||'')+'</td>'+'<td style="padding:11px 12px">'+linesSummary+'</td>'+'<td style="padding:11px 12px;text-align:right;font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:var(--text)">'+fmt(c.totalAmount||0)+'</td>'+'<td style="padding:11px 12px;text-align:center"><span style="font-family:DM Mono,monospace;font-size:9px;padding:3px 8px;border-radius:20px;font-weight:600;color:'+stColors[0]+';background:'+stColors[1]+'">'+escH(c.status||'Pending')+'</span></td>'+'<td style="padding:8px 20px;text-align:right;white-space:nowrap">'+actions+'</td>'+'</tr>';
+    if(c.invoiceNo){var varAmt=num(c.invoiceAmount||0)-num(c.totalAmount||0);var varColor=varAmt>0?'var(--danger)':varAmt<0?'var(--warn)':'var(--green)';html+='<tr style="border-bottom:1px solid var(--border);background:rgba(167,139,250,.04)"><td colspan="3" style="padding:7px 20px 7px 36px;font-size:11px;color:var(--muted)">Invoice: '+escH(c.invoiceNo||'')+(c.invoiceDate?' &nbsp;|&nbsp; '+fmtD(c.invoiceDate):'')+'</td><td colspan="2" style="padding:7px 12px;text-align:right;font-family:DM Mono,monospace;font-size:12px;font-weight:600;color:var(--text)">'+fmt(c.invoiceAmount||0)+(varAmt!==0?'&nbsp;<span style="font-size:10px;color:'+varColor+'">'+(varAmt>0?'+':'')+fmt(Math.abs(varAmt))+' vs claim</span>':'')+'</td><td colspan="2"></td></tr>';}
   });
+  html+='</tbody></table>';
+  page.innerHTML=html;
 }
 
-// ADD MODAL
-function openAddModal(){
-  editingId=null;
-  document.getElementById('modalTitle').textContent='Add Invoice';
-  document.getElementById('f-num').value='';
-  document.getElementById('f-date').value=today();
-  document.getElementById('f-vendor').value='';
-  document.getElementById('f-po').value='';
-  document.getElementById('f-amount').value='';
-  document.getElementById('f-month').value=currentMonth();
-  document.getElementById('f-status').value='Draft';
-  onStatusChange();
-  document.getElementById('f-reject').value='';
-  document.getElementById('f-notes').value='';
-  document.getElementById('rejectBlock').classList.remove('show');
-  document.getElementById('deleteBtn').style.display='none';
-  document.getElementById('addModal').classList.add('open');
-  setTimeout(function(){document.getElementById('f-num').focus();},80);
-}
-function openEditModal(id){
-  var inv=invoices.find(function(i){return i.id===id;});if(!inv)return;
-  editingId=id;
-  document.getElementById('modalTitle').textContent='Edit Invoice';
-  document.getElementById('f-num').value=inv.invnum||'';
-  document.getElementById('f-date').value=inv.invdate||'';
-  document.getElementById('f-vendor').value=inv.vendor||'';
-  document.getElementById('f-po').value=inv.po||'';
-  document.getElementById('f-amount').value=inv.amount||'';
-  document.getElementById('f-month').value=inv.month||currentMonth();
-  document.getElementById('f-status').value=inv.status||'Draft';
-  onStatusChange();
-  document.getElementById('f-reject').value=inv.rejectReason||'';
-  document.getElementById('f-notes').value=inv.notes||'';
-  document.getElementById('rejectBlock').classList.toggle('show',inv.status==='Rejected');
-  document.getElementById('deleteBtn').style.display='';
-  document.getElementById('addModal').classList.add('open');
-}
-function onStatusChange(){
-  var st=document.getElementById('f-status').value;
-  var isDraft=st==='Draft';
-  document.getElementById('rejectBlock').classList.toggle('show',st==='Rejected');
-  var rn=document.getElementById('invnum-req'),rd=document.getElementById('invdate-req');
-  if(rn){rn.style.color=isDraft?'var(--muted)':'var(--danger)';}
-  if(rd){rd.style.color=isDraft?'var(--muted)':'var(--danger)';}
-  document.getElementById('f-num').style.opacity=isDraft?'0.4':'1';
-  document.getElementById('f-date').style.opacity=isDraft?'0.4':'1';
-}
-function closeAddModal(){document.getElementById('addModal').classList.remove('open');}
-function saveInv(){
-  var num_val=document.getElementById('f-num').value.trim();
-  var vendor=document.getElementById('f-vendor').value.trim();
-  var amount=document.getElementById('f-amount').value;
-  var status=document.getElementById('f-status').value;
-  if(!vendor){alert('Vendor name is required.');return;}
-  if(!amount){alert('Amount is required.');return;}
-  if(!document.getElementById('f-month').value){alert('Billing month is required.');return;}
-  if(status!=='Draft'&&!num_val){alert('Invoice number is required for '+status+' status.');return;}
-  if(status==='Rejected'&&!document.getElementById('f-reject').value.trim()){alert('Please provide a rejection reason.');return;}
-  var inv={id:editingId||('inv'+nid()),invnum:num_val,invdate:document.getElementById('f-date').value,vendor:vendor,po:document.getElementById('f-po').value.trim(),amount:num(amount),month:document.getElementById('f-month').value,status:status,rejectReason:document.getElementById('f-reject').value.trim(),notes:document.getElementById('f-notes').value.trim()};
-  if(editingId){var idx=invoices.findIndex(function(i){return i.id===editingId;});if(idx>=0)invoices[idx]=inv;else invoices.push(inv);}
-  else invoices.push(inv);
-  save();closeAddModal();renderAll();
-}
-function deleteInv(){
-  if(!editingId||!confirm('Delete this invoice?'))return;
-  invoices=invoices.filter(function(i){return i.id!==editingId;});
-  save();closeAddModal();renderAll();
-}
+function approveClaim(id){var c=claims.find(function(x){return x.id===id;});if(!c)return;var u=dbGetCurrentUser();c.status='Approved';c.approvedBy=(u&&(u.name||u.username))||'PM';c.approvedDate=today_();save();renderClaims();updateSummary();}
+function disputeClaim(id){var c=claims.find(function(x){return x.id===id;});if(!c)return;var note=prompt('Dispute reason:');if(note===null)return;c.status='Disputed';c.disputeNote=note;save();renderClaims();updateSummary();}
+function approveInvoice(id){var c=claims.find(function(x){return x.id===id;});if(!c)return;var u=dbGetCurrentUser();c.status='Invoice Approved';c.invoiceApprovedBy=(u&&(u.name||u.username))||'PM';c.invoiceApprovedDate=today_();save();renderClaims();updateSummary();}
 
-// REQUEST MODAL
-function openRequestModal(){
-  var t=today();
-  document.getElementById('r-month').value=currentMonth();
-  document.getElementById('r-date').value=t;
-  document.getElementById('r-deadline').value=addDays(t,10);
-  document.getElementById('r-notes').value='';
-  document.getElementById('requestModal').classList.add('open');
-}
-function updateDeadline(){
-  var d=document.getElementById('r-date').value;
-  if(d) document.getElementById('r-deadline').value=addDays(d,10);
-}
-function closeRequestModal(){document.getElementById('requestModal').classList.remove('open');}
-function saveRequest(){
-  var r={id:'req'+nid(),month:document.getElementById('r-month').value,date:document.getElementById('r-date').value,deadline:document.getElementById('r-deadline').value,notes:document.getElementById('r-notes').value.trim()};
-  requests.push(r);save();closeRequestModal();updateSummary();
-  alert('Invoice request logged. 10-day deadline: '+fmtD(r.deadline));
-}
+var _convertClaimId=null;
+function openConvertModal(id){_convertClaimId=id;var c=claims.find(function(x){return x.id===id;});if(!c)return;document.getElementById('cv-invno').value='';document.getElementById('cv-invdate').value=today_();document.getElementById('cv-amount').value=c.totalAmount||'';document.getElementById('cv-claim-ref').textContent=c.claimNo+' -- '+c.vendor+' -- '+fmt(c.totalAmount);document.getElementById('cv-variance').style.display='none';document.getElementById('convertModal').classList.add('open');}
+function closeConvertModal(){document.getElementById('convertModal').classList.remove('open');}
+function checkInvVariance(){var c=claims.find(function(x){return x.id===_convertClaimId;});if(!c)return;var invAmt=num(document.getElementById('cv-amount').value);var claimAmt=num(c.totalAmount||0);var vEl=document.getElementById('cv-variance');if(!invAmt){vEl.style.display='none';return;}var diff=invAmt-claimAmt;if(diff>0){vEl.style.display='block';vEl.style.cssText='display:block;padding:8px 12px;border-radius:7px;font-size:12px;background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.3)';vEl.textContent='Invoice exceeds claim by '+fmt(diff)+'. Vendor must issue a credit note.';}else if(diff<0){vEl.style.display='block';vEl.style.cssText='display:block;padding:8px 12px;border-radius:7px;font-size:12px;background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)';vEl.textContent='Invoice is '+fmt(Math.abs(diff))+' less than claim. OK to pay as invoiced.';}else{vEl.style.display='block';vEl.style.cssText='display:block;padding:8px 12px;border-radius:7px;font-size:12px;background:rgba(0,200,100,.08);color:var(--green);border:1px solid rgba(0,200,100,.3)';vEl.textContent='Invoice matches claim exactly.';}}
+function saveConvert(){var c=claims.find(function(x){return x.id===_convertClaimId;});if(!c)return;var invNo=document.getElementById('cv-invno').value.trim();if(!invNo){alert('Invoice number is required.');return;}var invAmt=num(document.getElementById('cv-amount').value);if(!invAmt){alert('Amount is required.');return;}if(invAmt>num(c.totalAmount||0)){if(!confirm('Invoice exceeds claim. Save anyway?'))return;}c.invoiceNo=invNo;c.invoiceDate=document.getElementById('cv-invdate').value;c.invoiceAmount=invAmt;c.status='Invoice Pending';save();closeConvertModal();renderClaims();updateSummary();}
 
-(async function(){
-  try{
-    _viPNum=(dbGetCurrentProject()||{}).num||'GCT001';
-    await load();
-    await loadAllPOs();
-    var poInvs=await loadPOInvoices();
-    window._poInvoicesCache=poInvs||[];
-    updateSummary();
-    renderAll();
-    renderClaimsPane();
-  }catch(e){console.error('Init error:',e);}
-})();
+var _editingClaimId=null,_claimLines=[];
+function openClaimModal(id){
+  _editingClaimId=id||null;
+  var existing=id?claims.find(function(c){return c.id===id;}):null;
+  _claimLines=existing?JSON.parse(JSON.stringify(existing.lines||[])):[{id:'cl_'+Date.now(),type:'base',description:'',poId:'',varNum:'',amount:0}];
+  var vendorSel=document.getElementById('cm-vendor');
+  var vendors=getVendorsFromPOs();
+  vendorSel.innerHTML='<option value="">-- Select Vendor --</option>';
+  vendors.forEach(function(v){vendorSel.innerHTML+='<option value="'+escH(v)+'"'+(existing&&existing.vendor===v?' selected':'')+'>'+escH(v)+'</option>';});
+  document.getElementById('cm-claimno').value=existing?existing.claimNo:'CLM-'+String(claims.length+1).padStart(3,'0');
+  document.getElementById('cm-date').value=existing?existing.date:today_();
+  document.getElementById('cm-period').value=existing?existing.period:today_().substring(0,7);
+  document.getElementById('cm-dup-warn').style.display='none';
+  renderClaimLines();
+  document.getElementById('claimModal').classList.add('open');
+}
+function closeClaimModal(){document.getElementById('claimModal').classList.remove('open');}
+function onVendorChange(){checkDupWarn();renderClaimLines();}
+function checkDupWarn(){var vendor=(document.getElementById('cm-vendor').value||'').trim();var period=document.getElementById('cm-period').value;var w=document.getElementById('cm-dup-warn');if(!w)return;if(vendor&&period){var dup=claims.find(function(c){return c.vendor===vendor&&c.period===period&&(!_editingClaimId||c.id!==_editingClaimId);});if(dup){w.style.display='block';w.textContent='Warning: A claim already exists for '+vendor+' for '+fmtM(period)+' ('+dup.claimNo+')';}else w.style.display='none';}else w.style.display='none';}
+
+function renderClaimLines(){
+  var el=document.getElementById('cm-lines');if(!el)return;
+  var vendor=(document.getElementById('cm-vendor').value||'').trim();
+  var vendorPOs=vendor?getPOsForVendor(vendor):[];
+  var vendorVars=vendor?getVariationsForVendor(vendor):_allVariations;
+  var html=_claimLines.map(function(line,i){
+    var isBase=line.type==='base';
+    var poOpts='<option value="">-- Select PO --</option>';
+    vendorPOs.forEach(function(po){poOpts+='<option value="'+escH(po.id)+'"'+(line.poId===po.id?' selected':'')+'>'+escH(po.id)+(po.cat?' ('+escH(po.cat)+')':'')+'</option>';});
+    var varOpts='<option value="">-- Select Variation --</option>';
+    vendorVars.forEach(function(v){varOpts+='<option value="'+escH(v.num||v.id)+'"'+(line.varNum===v.num?' selected':'')+'>'+escH(v.num||'')+(v.desc?' -- '+v.desc.substring(0,40):'')+'</option>';});
+    var remainHtml='';
+    if(line.poId){var rem=getPORemaining(line.poId);if(rem){var remColor=rem.remaining<0?'var(--danger)':rem.remaining<rem.poValue*0.1?'var(--warn)':'var(--green)';remainHtml='<div style="margin-top:6px;padding:8px 12px;background:var(--surface2);border-radius:6px;font-family:DM Mono,monospace;font-size:11px;display:flex;gap:16px;flex-wrap:wrap"><span>PO Value: <strong>'+fmt(rem.poValue)+'</strong></span><span>Previously Claimed: <strong style="color:var(--warn)">'+fmt(rem.previouslyClaimed)+'</strong></span><span>Remaining: <strong style="color:'+remColor+'">'+fmt(rem.remaining)+'</strong></span></div>';}}
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+        +'<div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden">'
+          +'<button style="padding:5px 12px;font-size:11px;font-family:DM Sans,sans-serif;font-weight:600;border:none;cursor:pointer;background:'+(isBase?'var(--accent)':'var(--surface2)')+';color:'+(isBase?'#000':'var(--text2)')+';" data-li="'+i+'" onclick="_claimLines[this.dataset.li*1].type=\'base\';_claimLines[this.dataset.li*1].varNum=\'\';renderClaimLines()">Base Contract</button>'
+          +'<button style="padding:5px 12px;font-size:11px;font-family:DM Sans,sans-serif;font-weight:600;border:none;cursor:pointer;background:'+(isBase?'var(--surface2)':'var(--warn)')+';color:'+(isBase?'var(--text2)':'#000')+';" data-li="'+i+'" onclick="_claimLines[this.dataset.li*1].type=\'variation\';renderClaimLines()">Variation</button>'
+        +'</div>'
+        +(_claimLines.length>1?'<button data-li="'+i+'" onclick="_claimLines.splice(this.dataset.li*1,1);renderClaimLines()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;margin-left:auto">x</button>':'')
+      +'</div>'
+      +(!isBase?'<div style="margin-bottom:8px"><label class="ml">Variation</label><select class="ms" style="width:100%" data-li="'+i+'" onchange="_claimLines[this.dataset.li*1].varNum=this.value;renderClaimLines()">'+varOpts+'</select></div>':'')
+      +'<div style="margin-bottom:8px"><label class="ml">Description</label><input class="mi" value="'+escH(line.description||'')+'" placeholder="What is being claimed..." data-li="'+i+'" oninput="_claimLines[this.dataset.li*1].description=this.value"/></div>'
+      +'<div style="margin-bottom:8px"><label class="ml">Linked PO</label><select class="ms" style="width:100%" data-li="'+i+'" onchange="_claimLines[this.dataset.li*1].poId=this.value;renderClaimLines()">'+poOpts+'</select></div>'
+      +remainHtml
+      +'<div style="margin-top:8px"><label class="ml">Amount (ex GST) *</label><input class="mi" type="number" value="'+(line.amount||'')+'" placeholder="0.00" data-li="'+i+'" oninput="_claimLines[this.dataset.li*1].amount=parseFloat(this.value)||0;updateClaimTotal()"/></div>'
+      +'</div>';
+  }).join('');
+  el.innerHTML=html;
+  updateClaimTotal();
+}
+function updateClaimTotal(){var t=_claimLines.reduce(function(a,l){return a+num(l.amount);},0);var el=document.getElementById('cm-total');if(el)el.textContent=fmt(t);}
+function addClaimLine(){_claimLines.push({id:'cl_'+Date.now(),type:'base',description:'',poId:'',varNum:'',amount:0});renderClaimLines();}
+function saveClaim(){var vendor=(document.getElementById('cm-vendor').value||'').trim();var period=document.getElementById('cm-period').value;if(!vendor){alert('Please select a vendor.');return;}if(!period){alert('Billing period is required.');return;}if(!_claimLines.some(function(l){return num(l.amount)>0;})){alert('At least one line must have an amount.');return;}var total=_claimLines.reduce(function(a,l){return a+num(l.amount);},0);var existing=_editingClaimId?claims.find(function(c){return c.id===_editingClaimId;}):null;var claim={id:_editingClaimId||('clm_'+Date.now()),claimNo:(document.getElementById('cm-claimno').value||'').trim(),vendor:vendor,date:document.getElementById('cm-date').value,period:period,lines:JSON.parse(JSON.stringify(_claimLines)),totalAmount:total,status:existing?existing.status:'Pending',invoiceNo:existing?existing.invoiceNo:null,invoiceDate:existing?existing.invoiceDate:null,invoiceAmount:existing?existing.invoiceAmount:null};if(_editingClaimId){var idx=claims.findIndex(function(c){return c.id===_editingClaimId;});if(idx>=0)claims[idx]=claim;else claims.push(claim);}else claims.push(claim);save();closeClaimModal();renderClaims();updateSummary();}
 </script>
 <script>
 (function(){try{var cp=localStorage.getItem('hvacnexus_current_project');if(cp){var p=JSON.parse(cp);document.querySelectorAll('.bc-proj-name').forEach(function(el){el.textContent=p.name||el.textContent;});}}catch(e){}})();
@@ -573,7 +479,6 @@ var SBK='hvacnexus_sb_collapsed';
 function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
 function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
-applySB(localStorage.getItem(SBK)==='1');
 function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
@@ -602,276 +507,66 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 </script>
 </body>
 </html>
-<script>
-// ── SWITCH TABS ──
-function switchVITab(tab){
-  ['claims','invoices'].forEach(function(t){
-    var pane=document.getElementById('viPane-'+t);
-    var btn=document.getElementById('vtab-'+t);
-    if(pane)pane.style.display=t===tab?'block':'none';
-    if(btn)btn.classList.toggle('active',t===tab);
-  });
-  var tb=document.getElementById('viToolbar');
-  if(tb)tb.style.display=tab==='invoices'?'':'none';
-  if(tab==='claims')renderClaimsPane();
-}
 
-// ── CLAIMS RENDER ──
-function fmtVI(v){var n=parseFloat(v)||0;return n===0?'--':'$'+n.toLocaleString('en-AU',{minimumFractionDigits:0,maximumFractionDigits:0});}
-function fmtDVI(d){if(!d)return '--';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
-function escVI(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-function renderClaimsPane(){
-  var el=document.getElementById('claimsContent');
-  if(!el)return;
-  var totalClaims=claims.length;
-  var pendingCt=claims.filter(function(c){return c.status==='Pending';}).length;
-  var approvedCt=claims.filter(function(c){return c.status==='Approved';}).length;
-  var totalApproved=claims.filter(function(c){return c.status==='Approved';}).reduce(function(a,c){return a+(parseFloat(c.totalAmount)||0);},0);
-
-  var html='<div style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface2)">'
-    +'<div style="flex:1;padding:12px 20px;border-right:1px solid var(--border)"><div style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px">Total Claims</div><div style="font-family:DM Mono,monospace;font-size:18px;font-weight:700;color:var(--text)">'+totalClaims+'</div></div>'
-    +'<div style="flex:1;padding:12px 20px;border-right:1px solid var(--border)"><div style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px">Pending</div><div style="font-family:DM Mono,monospace;font-size:18px;font-weight:700;color:var(--warn)">'+pendingCt+'</div></div>'
-    +'<div style="flex:1;padding:12px 20px;border-right:1px solid var(--border)"><div style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px">Approved</div><div style="font-family:DM Mono,monospace;font-size:18px;font-weight:700;color:var(--green)">'+approvedCt+'</div></div>'
-    +'<div style="flex:1;padding:12px 20px"><div style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px">Total Approved</div><div style="font-family:DM Mono,monospace;font-size:18px;font-weight:700;color:var(--accent)">'+fmtVI(totalApproved)+'</div></div>'
-    +'</div>';
-
-  html+='<div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">'
-    +'<button class="btn bp bsm" onclick="openAddClaimModal(null)">+ Log Claim</button>'
-    +'<span style="font-size:12px;color:var(--muted)">One claim per vendor per billing period</span>'
-    +'</div>';
-
-  if(!claims.length){
-    html+='<div style="padding:48px;text-align:center;color:var(--muted);font-size:13px">No claims logged yet</div>';
-  } else {
-    var sorted=claims.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
-    sorted.forEach(function(c){
-      var stColor=c.status==='Approved'?'var(--green)':c.status==='Disputed'?'var(--danger)':'var(--warn)';
-      var lines=c.lines||[];
-      html+='<div style="border-bottom:1px solid var(--border)">'
-        +'<div style="display:flex;align-items:center;padding:12px 20px;gap:12px;cursor:pointer;background:var(--surface)" onclick="toggleClaimDetail(\''+c.id+'\')">'
-          +'<div style="flex:1;min-width:0">'
-            +'<div style="font-weight:600;font-size:13px;color:var(--text)">'+escVI(c.vendor||'--')+'</div>'
-            +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+escVI(c.claimNo||'')+(c.period?' \u00b7 '+escVI(c.period):'')+(c.date?' \u00b7 '+fmtDVI(c.date):'')+'</div>'
-          +'</div>'
-          +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:3px 9px;border-radius:20px;font-weight:600;border:1px solid;color:'+stColor+'">'+escVI(c.status||'Pending')+'</span>'
-          +'<span style="font-family:DM Mono,monospace;font-size:15px;font-weight:700;color:var(--text)">'+fmtVI(c.totalAmount||0)+'</span>'
-        +'</div>'
-        +'<div id="cd_'+c.id+'" style="display:none;border-top:1px solid var(--border);background:var(--surface2)">'
-          +'<table style="width:100%;border-collapse:collapse;font-size:12px">'
-          +'<thead><tr style="background:var(--surface3)">'
-            +'<th style="padding:6px 20px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Type</th>'
-            +'<th style="padding:6px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Description</th>'
-            +'<th style="padding:6px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">PO</th>'
-            +'<th style="padding:6px 20px;text-align:right;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Amount</th>'
-          +'</tr></thead><tbody>'
-          +lines.map(function(l){
-            return '<tr style="border-bottom:1px solid var(--border)">'
-              +'<td style="padding:8px 20px"><span style="font-family:DM Mono,monospace;font-size:9px;padding:2px 7px;border-radius:4px;font-weight:600;background:'+(l.type==='base'?'var(--accent-dim)':'var(--warn-dim)')+';color:'+(l.type==='base'?'var(--accent)':'var(--warn)')+';">'+(l.type==='base'?'BASE':'VAR')+'</span></td>'
-              +'<td style="padding:8px 12px;color:var(--text)">'+escVI(l.description||'')+(l.varNum?' <span style="font-family:DM Mono,monospace;font-size:10px;color:var(--warn)">'+escVI(l.varNum)+'</span>':'')+'</td>'
-              +'<td style="padding:8px 12px;font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+escVI(l.poId||'--')+'</td>'
-              +'<td style="padding:8px 20px;text-align:right;font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:var(--text)">'+fmtVI(l.amount||0)+'</td>'
-            +'</tr>';
-          }).join('')
-          +'</tbody></table>'
-          +'<div style="padding:10px 20px;display:flex;gap:8px;border-top:1px solid var(--border)">'
-            +(c.status==='Pending'
-              ?'<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveClaim(this.dataset.cid)">Approve</button>'
-               +'<button class="btn bsm" style="color:var(--danger);border-color:rgba(255,77,109,.3);background:var(--surface2)" data-cid="'+c.id+'" onclick="disputeClaim(this.dataset.cid)">Dispute</button>'
-              :'')
-            +'<button class="btn bsm" style="color:var(--muted);border-color:var(--border);background:var(--surface2);margin-left:auto" data-cid="'+c.id+'" onclick="editClaim(this.dataset.cid)">Edit</button>'
-          +'</div>'
-        +'</div>'
-        +'</div>';
-    });
-  }
-  el.innerHTML=html;
-}
-
-function toggleClaimDetail(id){
-  var el=document.getElementById('cd_'+id);
-  if(el)el.style.display=el.style.display==='none'?'block':'none';
-}
-
-function approveClaim(id){
-  var c=claims.find(function(x){return x.id===id;});if(!c)return;
-  var u=dbGetCurrentUser();
-  c.status='Approved';
-  c.approvedBy=(u&&(u.name||u.username))||'PM';
-  save();renderClaimsPane();
-}
-function disputeClaim(id){
-  var c=claims.find(function(x){return x.id===id;});if(!c)return;
-  var note=prompt('Dispute reason:');if(note===null)return;
-  c.status='Disputed';c.disputeNote=note;
-  save();renderClaimsPane();
-}
-function editClaim(id){
-  var c=claims.find(function(x){return x.id===id;});
-  if(c)openAddClaimModal(c);
-}
-
-// ── ADD CLAIM MODAL ──
-var _editingClaimId=null;
-var _claimLines=[];
-var _claimVariations=[];
-
-async function openAddClaimModal(existing){
-  _editingClaimId=existing?existing.id:null;
-  _claimLines=existing?JSON.parse(JSON.stringify(existing.lines||[])):[{id:'cl_'+Date.now(),type:'base',description:'',poId:'',varNum:'',amount:0}];
-  try{var d=await dbGetVariations(_viPNum);_claimVariations=(d&&d.variations)?d.variations:[];}catch(e){_claimVariations=[];}
-  var today_=new Date().toISOString().split('T')[0];
-  document.getElementById('cm-claimno').value=existing?existing.claimNo:'CLM-'+String(claims.length+1).padStart(3,'0');
-  document.getElementById('cm-vendor').value=existing?existing.vendor:'';
-  document.getElementById('cm-date').value=existing?existing.date:today_;
-  document.getElementById('cm-period').value=existing?existing.period:today_.substring(0,7);
-  renderClaimLines();
-  document.getElementById('claimAddModal').classList.add('open');
-  checkDupWarn();
-}
-function closeClaimModal(){document.getElementById('claimAddModal').classList.remove('open');}
-
-function checkDupWarn(){
-  var vendor=(document.getElementById('cm-vendor').value||'').trim().toLowerCase();
-  var period=document.getElementById('cm-period').value;
-  var w=document.getElementById('cm-dup-warn');if(!w)return;
-  if(vendor&&period){
-    var dup=claims.find(function(c){return c.vendor.toLowerCase()===vendor&&c.period===period&&(!_editingClaimId||c.id!==_editingClaimId);});
-    w.style.display=dup?'block':'none';
-    if(dup)w.textContent='\u26a0 A claim has already been submitted for '+dup.vendor+' for '+period+' ('+dup.claimNo+')';
-  }else{w.style.display='none';}
-}
-
-function renderClaimLines(){
-  var el=document.getElementById('cm-lines');if(!el)return;
-  var varOpts='<option value="">-- Select Variation --</option>';
-  _claimVariations.forEach(function(v){varOpts+='<option value="'+escVI(v.num||v.id)+'"'+(v.num?' data-desc="'+escVI((v.desc||'').substring(0,40))+'"':'')+'>'+escVI(v.num||'')+(v.desc?' - '+v.desc.substring(0,35):'')+'</option>';});
-  var html=_claimLines.map(function(line,i){
-    var isBase=line.type==='base';
-    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px" id="cline_'+i+'">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
-        +'<div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden">'
-          +'<button style="padding:4px 10px;font-size:11px;font-family:DM Sans,sans-serif;font-weight:600;border:none;cursor:pointer;background:'+(isBase?'var(--accent)':'var(--surface2)')+';color:'+(isBase?'#000':'var(--text2)')+'" data-li="'+i+'" onclick="_claimLines[this.dataset.li].type=\'base\';_claimLines[this.dataset.li].varNum=\'\';renderClaimLines()">Base Contract</button>'
-          +'<button style="padding:4px 10px;font-size:11px;font-family:DM Sans,sans-serif;font-weight:600;border:none;cursor:pointer;background:'+(isBase?'var(--surface2)':'var(--warn)')+';color:'+(isBase?'var(--text2)':'#000')+'" data-li="'+i+'" onclick="_claimLines[this.dataset.li].type=\'variation\';renderClaimLines()">Variation</button>'
-        +'</div>'
-        +(_claimLines.length>1?'<button data-li="'+i+'" onclick="_claimLines.splice(this.dataset.li*1,1);renderClaimLines()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;margin-left:auto">x</button>':'')
-      +'</div>'
-      +(!isBase?'<div style="margin-bottom:8px"><label class="ml">Variation</label><select class="ms" style="width:100%" data-li="'+i+'" onchange="_claimLines[this.dataset.li*1].varNum=this.value;findPOForLine(this.dataset.li*1,this.value)">'+varOpts+'</select></div>':'')
-      +'<div style="margin-bottom:8px"><label class="ml">Description</label><input class="mi" value="'+escVI(line.description||'')+'" placeholder="What is being claimed..." data-li="'+i+'" oninput="_claimLines[this.dataset.li*1].description=this.value"/></div>'
-      +'<div style="margin-bottom:8px"><label class="ml">Linked PO</label>'
-        +'<div style="display:flex;gap:8px">'
-          +'<input class="mi" style="flex:1" value="'+escVI(line.poId||'')+'" placeholder="e.g. GCT2025-PO-001" id="po-inp-'+i+'" data-li="'+i+'" oninput="_claimLines[this.dataset.li*1].poId=this.value"/>'
-          +'<button class="btn bg bsm" data-li="'+i+'" onclick="findPOForLine(this.dataset.li*1,\'\')" style="white-space:nowrap;flex-shrink:0">Find PO</button>'
-        +'</div>'
-        +'<div id="po-sug-'+i+'" style="display:none;margin-top:6px"></div>'
-      +'</div>'
-      +'<div><label class="ml">Amount (ex GST) *</label><input class="mi" type="number" value="'+(line.amount||'')+'" placeholder="0.00" data-li="'+i+'" oninput="_claimLines[this.dataset.li*1].amount=parseFloat(this.value)||0;updateClaimTotal()"/></div>'
-      +'</div>';
-  }).join('');
-  el.innerHTML=html;
-  updateClaimTotal();
-}
-
-function updateClaimTotal(){
-  var t=_claimLines.reduce(function(a,l){return a+(parseFloat(l.amount)||0);},0);
-  var el=document.getElementById('cm-total');
-  if(el)el.textContent=fmtVI(t);
-}
-
-function findPOForLine(lineIdx,varNum){
-  var line=_claimLines[lineIdx];
-  var sug=document.getElementById('po-sug-'+lineIdx);
-  if(!sug)return;
-  var vendor=(document.getElementById('cm-vendor').value||'').trim().toLowerCase();
-  var matches=[];
-  if(line.type==='base'){
-    matches=_allPOs.filter(function(po){return !vendor||po.supplier.toLowerCase().includes(vendor);});
-    if(!matches.length)matches=_allPOs.slice(0,5);
-  } else {
-    var vn=varNum||line.varNum||'';
-    if(vn){matches=_allPOs.filter(function(po){return (po.lineItems||[]).some(function(li){return (li.desc||'').toLowerCase().includes(vn.toLowerCase());});});}
-    if(!matches.length)matches=_allPOs.slice(0,5);
-  }
-  if(!matches.length){
-    sug.style.display='block';
-    sug.innerHTML='<div style="font-size:11px;color:var(--warn);padding:4px 0">No POs found - enter manually above</div>';
-    return;
-  }
-  var html='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Select PO to link:</div><div style="display:flex;flex-wrap:wrap;gap:5px">';
-  matches.slice(0,5).forEach(function(po){
-    html+='<button class="btn bg bsm" style="font-size:11px" data-poid="'+escVI(po.id)+'" data-li="'+lineIdx+'" onclick="confirmLink(this.dataset.li*1,this.dataset.poid)">'+escVI(po.id)+(po.supplier?' - '+escVI(po.supplier.substring(0,20)):'')+'</button>';
-  });
-  html+='</div>';
-  sug.style.display='block';
-  sug.innerHTML=html;
-}
-
-function confirmLink(lineIdx,poId){
-  if(confirm('Link to '+poId+'?')){
-    _claimLines[lineIdx].poId=poId;
-    var inp=document.getElementById('po-inp-'+lineIdx);
-    if(inp)inp.value=poId;
-    var sug=document.getElementById('po-sug-'+lineIdx);
-    if(sug)sug.innerHTML='<div style="font-size:11px;color:var(--green)">Linked to '+escVI(poId)+'</div>';
-  }
-}
-
-function addClaimLine(){
-  _claimLines.push({id:'cl_'+Date.now(),type:'base',description:'',poId:'',varNum:'',amount:0});
-  renderClaimLines();
-}
-
-function saveClaim(){
-  var vendor=document.getElementById('cm-vendor').value.trim();
-  var period=document.getElementById('cm-period').value;
-  if(!vendor){alert('Vendor is required.');return;}
-  if(!period){alert('Billing period is required.');return;}
-  if(!_claimLines.some(function(l){return parseFloat(l.amount)>0;})){alert('At least one line must have an amount.');return;}
-  var total=_claimLines.reduce(function(a,l){return a+(parseFloat(l.amount)||0);},0);
-  var existing=_editingClaimId?claims.find(function(c){return c.id===_editingClaimId;}):null;
-  var claim={
-    id:_editingClaimId||('clm_'+Date.now()),
-    claimNo:document.getElementById('cm-claimno').value.trim(),
-    vendor:vendor,date:document.getElementById('cm-date').value,
-    period:period,lines:JSON.parse(JSON.stringify(_claimLines)),
-    totalAmount:total,
-    status:existing?existing.status:'Pending',
-    invoiceId:existing?existing.invoiceId:null
-  };
-  if(_editingClaimId){var idx=claims.findIndex(function(c){return c.id===_editingClaimId;});if(idx>=0)claims[idx]=claim;else claims.push(claim);}
-  else claims.push(claim);
-  save();closeClaimModal();renderClaimsPane();
-}
-</script>
-
-<!-- CLAIM MODAL -->
-<div class="mo" id="claimAddModal" onclick="if(event.target===this)closeClaimModal()">
+<!-- LOG CLAIM MODAL -->
+<div class="mo" id="claimModal" onclick="if(event.target===this)closeClaimModal()">
   <div class="modal" style="width:560px">
     <div class="modal-hdr">
       <h3>Log Vendor Claim</h3>
       <p>Record a claim submitted by the vendor. Add one line per contract type.</p>
     </div>
     <div class="modal-body" style="max-height:65vh;overflow-y:auto">
+      <div>
+        <label class="ml">Vendor *</label>
+        <select class="ms" id="cm-vendor" style="width:100%" onchange="onVendorChange()">
+          <option value="">-- Select Vendor --</option>
+        </select>
+      </div>
+      <div id="cm-dup-warn" style="display:none;padding:8px 12px;background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);border-radius:7px;font-size:12px;font-weight:600;color:var(--danger)"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label class="ml">Claim No.</label><input class="mi" id="cm-claimno" placeholder="e.g. CLM-001"/></div>
         <div><label class="ml">Claim Date</label><input class="mi" id="cm-date" type="date"/></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label class="ml">Vendor *</label><input class="mi" id="cm-vendor" placeholder="Vendor name..." oninput="checkDupWarn()"/></div>
-        <div><label class="ml">Billing Period *</label><input class="mi" id="cm-period" type="month" oninput="checkDupWarn()"/></div>
-      </div>
-      <div id="cm-dup-warn" style="display:none;padding:8px 12px;background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);border-radius:7px;font-size:12px;font-weight:600;color:var(--danger)"></div>
-      <div style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;margin-top:4px">Claim Lines</div>
+      <div><label class="ml">Billing Period *</label><input class="mi" id="cm-period" type="month" oninput="checkDupWarn()"/></div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px">Claim Lines</div>
       <div id="cm-lines"></div>
-      <button class="btn bg bsm" onclick="addClaimLine()" style="width:100%;justify-content:center;margin-top:4px">+ Add Line</button>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 0;border-top:1px solid var(--border);margin-top:10px">
+      <button class="btn bg bsm" onclick="addClaimLine()" style="width:100%;justify-content:center">+ Add Line</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 0;border-top:1px solid var(--border)">
         <span style="font-size:13px;color:var(--text2)">Total Claim (ex GST)</span>
-        <span id="cm-total" style="font-family:DM Mono,monospace;font-size:16px;font-weight:700;color:var(--accent)">--</span>
+        <span id="cm-total" style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--accent)">--</span>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn bg bsm" onclick="closeClaimModal()">Cancel</button>
       <button class="btn bp bsm" onclick="saveClaim()">Save Claim</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONVERT TO INVOICE MODAL -->
+<div class="mo" id="convertModal" onclick="if(event.target===this)closeConvertModal()">
+  <div class="modal" style="width:460px">
+    <div class="modal-hdr">
+      <h3>Log Invoice</h3>
+      <p>Convert approved claim to invoice when tax invoice is received from vendor.</p>
+    </div>
+    <div class="modal-body">
+      <div style="padding:8px 12px;background:var(--surface2);border-radius:7px;font-size:12px;color:var(--text2)">
+        Claim: <strong id="cv-claim-ref" style="color:var(--text)"></strong>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label class="ml">Invoice No. *</label><input class="mi" id="cv-invno" placeholder="e.g. INV-2025-001"/></div>
+        <div><label class="ml">Invoice Date</label><input class="mi" id="cv-invdate" type="date"/></div>
+      </div>
+      <div>
+        <label class="ml">Invoice Amount (ex GST) *</label>
+        <input class="mi" id="cv-amount" type="number" placeholder="0.00" oninput="checkInvVariance()"/>
+      </div>
+      <div id="cv-variance" style="display:none;padding:8px 12px;border-radius:7px;font-size:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bg bsm" onclick="closeConvertModal()">Cancel</button>
+      <button class="btn bp bsm" onclick="saveConvert()">Save Invoice</button>
     </div>
   </div>
 </div>

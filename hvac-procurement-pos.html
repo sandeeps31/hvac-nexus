@@ -441,8 +441,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
           <div class="cs-cell"><div class="cs-lbl">Remaining to Claim</div><div class="cs-val" id="cl-remaining">—</div></div>
         </div>
         <div id="claimsList"></div>
-        <div style="padding:14px 20px;border-top:1px solid var(--border)">
-          <button class="btn bp bsm" onclick="openAddClaim()">＋ Log Claim</button>
+        <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:12px;color:var(--muted)">Claims are managed in Vendor Claims</span>
+          <button class="btn bg bsm" style="color:var(--accent);border-color:rgba(0,200,255,.3)" onclick="navTo('hvac-vendor-invoices.html')">Open Vendor Claims &#8594;</button>
         </div>
       </div>
 
@@ -455,8 +456,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
           <div class="cs-cell"><div class="cs-lbl">Outstanding</div><div class="cs-val" id="inv-outstanding">—</div></div>
         </div>
         <div id="invoicesList"></div>
-        <div style="padding:14px 20px;border-top:1px solid var(--border)">
-          <button class="btn bp bsm" onclick="openAddInvoice()">＋ Log Invoice</button>
+        <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:12px;color:var(--muted)">Invoices are managed in Vendor Claims</span>
+          <button class="btn bg bsm" style="color:var(--accent);border-color:rgba(0,200,255,.3)" onclick="navTo('hvac-vendor-invoices.html')">Open Vendor Claims &#8594;</button>
         </div>
       </div>
 
@@ -1100,10 +1102,10 @@ function switchPOTab(tab){
   if(tab==='claims')renderClaimsTab();
   if(tab==='invoices')renderInvoicesTab();
 }
-function updatePOTabBadges(po){
+function updatePOTabBadges(po,claimCount,invCount){
   var liEl=document.getElementById('poTabBadge-lineitems');if(liEl)liEl.textContent=(po.lineItems||[]).length;
-  var clEl=document.getElementById('poTabBadge-claims');if(clEl)clEl.textContent=(po.claims||[]).length;
-  var inEl=document.getElementById('poTabBadge-invoices');if(inEl)inEl.textContent=(po.invoices||[]).length;
+  var clEl=document.getElementById('poTabBadge-claims');if(clEl)clEl.textContent=claimCount!=null?claimCount:'';
+  var inEl=document.getElementById('poTabBadge-invoices');if(inEl)inEl.textContent=invCount!=null?invCount:'';
 }
 
 // ── HELPERS ──
@@ -1180,43 +1182,47 @@ function updateBudgetPanel(){
     if(alertMsg)alertMsg.innerHTML='\u26a0 Warning: '+Math.round(pct)+'% of budget consumed';
   } else {
     if(alert)alert.className='bp-alert';
-  }
 }
-
-// ── CLAIMS TAB ──
 function renderClaimsTab(){
   var po=getCurrentPO();if(!po)return;
-  if(!po.claims)po.claims=[];
+  var poId=po.id;
   var poVal=liSub(po.lineItems||[]);
-  var totalClaimed=po.claims.reduce(function(a,c){return a+parseFloat(c.amount||0);},0);
-  var totalApproved=po.claims.filter(function(c){return c.status==='Approved';}).reduce(function(a,c){return a+parseFloat(c.amount||0);},0);
-  document.getElementById('cl-po-val').textContent=fmtMoney(poVal);
-  document.getElementById('cl-total').textContent=fmtMoney(totalClaimed);
-  document.getElementById('cl-approved').textContent=fmtMoney(totalApproved);
-  document.getElementById('cl-remaining').textContent=fmtMoney(poVal-totalApproved);
-  var html='';
-  if(!po.claims.length){
-    html='<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No claims logged yet \u2014 click \uFF0B Log Claim to add one</div>';
-  } else {
-    po.claims.slice().reverse().forEach(function(c){
-      var stCls=c.status==='Approved'?'cs-approved':c.status==='Disputed'?'cs-disputed':'cs-pending';
-      html+='<div class="claim-row">'
-        +'<div style="flex:1;min-width:0">'
-          +'<div class="claim-desc">'+escH(c.desc||c.claimNo||'Claim')+'</div>'
-          +'<div class="claim-meta">'+escH(c.claimNo||'')+(c.period?' \u00B7 '+escH(c.period):'')+(c.date?' \u00B7 '+fmtDateShort(c.date):'')+'</div>'
-          +(c.invoiceId?'<div class="claim-meta" style="color:var(--green)">\u2713 Invoice logged</div>':'')
-          +(c.fileName?'<div class="claim-meta">\uD83D\uDCCE '+escH(c.fileName)+'</div>':'')
-        +'</div>'
-        +'<span class="claim-status '+stCls+'">'+escH(c.status)+'</span>'
-        +'<span class="claim-amount">'+fmtMoney(c.amount)+'</span>'
-        +'<div style="display:flex;gap:6px;flex-shrink:0">'
-          +(c.status==='Pending'?'<button class="btn bp bsm" data-cid="'+escH(c.id)+'" onclick="approveClaim(this.dataset.cid)">\u2713 Approve</button>'
-            +'<button class="btn bsm" style="color:var(--danger)" data-cid="'+escH(c.id)+'" onclick="disputeClaim(this.dataset.cid)">\u2717 Dispute</button>':'')
-        +'</div>'
-        +'</div>';
-    });
-  }
-  document.getElementById('claimsList').innerHTML=html;
+  // Load claims from vendor invoices data
+  dbGetVendorInvoices(_poPNum).then(function(s){
+    var allClaims=[];
+    try{if(s){var p=typeof s==='string'?JSON.parse(s):s;allClaims=Array.isArray(p.claims)?p.claims:[];}}catch(e){}
+    // Filter claims that have a line linked to this PO
+    var poClaims=allClaims.filter(function(c){return (c.lines||[]).some(function(l){return l.poId===poId;});});
+    var totalClaimed=poClaims.reduce(function(a,c){return a+(parseFloat(c.totalAmount)||0);},0);
+    var totalApproved=poClaims.filter(function(c){return c.status==='Approved'||c.status==='Invoice Pending'||c.status==='Invoice Approved';}).reduce(function(a,c){return a+(parseFloat(c.totalAmount)||0);},0);
+    document.getElementById('cl-po-val').textContent=fmtMoney(poVal);
+    document.getElementById('cl-total').textContent=fmtMoney(totalClaimed);
+    document.getElementById('cl-approved').textContent=fmtMoney(totalApproved);
+    document.getElementById('cl-remaining').textContent=fmtMoney(poVal-totalApproved);
+    updatePOTabBadges(po,poClaims.length);
+    var html='';
+    if(!poClaims.length){
+      html='<div style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No claims linked to this PO yet</div>';
+    } else {
+      var stMap={'Pending':['var(--warn)','rgba(255,184,48,.1)'],'Approved':['var(--green)','rgba(0,200,100,.1)'],'Disputed':['var(--danger)','rgba(255,77,109,.1)'],'Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Invoice Approved':['var(--green)','rgba(0,200,100,.1)']};
+      poClaims.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).forEach(function(c){
+        var stColors=stMap[c.status]||['var(--text2)','var(--surface2)'];
+        var poLine=(c.lines||[]).find(function(l){return l.poId===poId;});
+        html+='<div style="border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;background:var(--surface)">'
+          +'<div style="flex:1;min-width:0">'
+            +'<div style="font-weight:600;font-size:13px;color:var(--text)">'+escH(c.claimNo||'--')+'</div>'
+            +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+escH(c.vendor||'')+(c.period?' · '+escH(c.period):'')+'</div>'
+            +(poLine?'<div style="font-size:11px;color:var(--text2);margin-top:2px">'+escH(poLine.description||'')+'</div>':'')
+          +'</div>'
+          +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:3px 8px;border-radius:20px;font-weight:600;color:'+stColors[0]+';background:'+stColors[1]+'">'+escH(c.status||'Pending')+'</span>'
+          +'<span style="font-family:DM Mono,monospace;font-size:14px;font-weight:700;color:var(--text)">'+fmtMoney(poLine?poLine.amount:c.totalAmount)+'</span>'
+          +'</div>';
+      });
+    }
+    document.getElementById('claimsList').innerHTML=html;
+  }).catch(function(){document.getElementById('claimsList').innerHTML='<div style="padding:20px;color:var(--muted);font-size:12px">Could not load claims</div>';});
+}
+    document.getElementById('claimsList').innerHTML=html;
 }
 
 function openAddClaim(){
@@ -1273,50 +1279,43 @@ function disputeClaim(claimId){
 // ── INVOICES TAB ──
 function renderInvoicesTab(){
   var po=getCurrentPO();if(!po)return;
-  if(!po.invoices)po.invoices=[];
-  var approvedClaims=(po.claims||[]).filter(function(c){return c.status==='Approved';}).reduce(function(a,c){return a+parseFloat(c.amount||0);},0);
-  var totalInvoiced=po.invoices.reduce(function(a,i){return a+parseFloat(i.amount||0);},0);
-  var totalApprovedInv=po.invoices.filter(function(i){return i.status==='Approved';}).reduce(function(a,i){return a+parseFloat(i.amount||0);},0);
-  document.getElementById('inv-claims-approved').textContent=fmtMoney(approvedClaims);
-  document.getElementById('inv-total').textContent=fmtMoney(totalInvoiced);
-  document.getElementById('inv-approved').textContent=fmtMoney(totalApprovedInv);
-  document.getElementById('inv-outstanding').textContent=fmtMoney(approvedClaims-totalApprovedInv);
-  var html='';
-  if(!po.invoices.length){
-    html='<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No invoices logged yet \u2014 click \uFF0B Log Invoice to add one</div>';
-  } else {
-    po.invoices.slice().reverse().forEach(function(inv){
-      var stCls=inv.status==='Approved'?'is-approved':inv.status==='Rejected'?'is-rejected':'is-pending';
-      var linkedTotal=0;
-      (inv.claimIds||[]).forEach(function(cid){
-        var c=(po.claims||[]).find(function(x){return x.id===cid;});
-        if(c)linkedTotal+=parseFloat(c.amount||0);
+  var poId=po.id;
+  dbGetVendorInvoices(_poPNum).then(function(s){
+    var allClaims=[];
+    try{if(s){var p=typeof s==='string'?JSON.parse(s):s;allClaims=Array.isArray(p.claims)?p.claims:[];}}catch(e){}
+    var poClaims=allClaims.filter(function(c){return (c.lines||[]).some(function(l){return l.poId===poId;});});
+    var invoiced=poClaims.filter(function(c){return c.invoiceNo;});
+    var totalApprovedClaims=poClaims.filter(function(c){return c.status==='Approved'||c.status==='Invoice Pending'||c.status==='Invoice Approved';}).reduce(function(a,c){return a+(parseFloat(c.totalAmount)||0);},0);
+    var totalInvoiced=invoiced.reduce(function(a,c){return a+(parseFloat(c.invoiceAmount||c.totalAmount)||0);},0);
+    var totalApprovedInv=invoiced.filter(function(c){return c.status==='Invoice Approved';}).reduce(function(a,c){return a+(parseFloat(c.invoiceAmount||c.totalAmount)||0);},0);
+    document.getElementById('inv-claims-approved').textContent=fmtMoney(totalApprovedClaims);
+    document.getElementById('inv-total').textContent=fmtMoney(totalInvoiced);
+    document.getElementById('inv-approved').textContent=fmtMoney(totalApprovedInv);
+    document.getElementById('inv-outstanding').textContent=fmtMoney(totalApprovedClaims-totalApprovedInv);
+    var html='';
+    if(!invoiced.length){
+      html='<div style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No invoices received for this PO yet</div>';
+    } else {
+      var stMap={'Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Invoice Approved':['var(--green)','rgba(0,200,100,.1)']};
+      invoiced.slice().sort(function(a,b){return (b.invoiceDate||'').localeCompare(a.invoiceDate||'');}).forEach(function(c){
+        var stColors=stMap[c.status]||['var(--text2)','var(--surface2)'];
+        var diff=(parseFloat(c.invoiceAmount)||0)-(parseFloat(c.totalAmount)||0);
+        var varColor=diff>0?'var(--danger)':diff<0?'var(--warn)':'var(--green)';
+        html+='<div style="border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;background:var(--surface)">'
+          +'<div style="flex:1;min-width:0">'
+            +'<div style="font-weight:600;font-size:13px;color:var(--text)">'+escH(c.invoiceNo||'--')+'</div>'
+            +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+escH(c.vendor||'')+(c.invoiceDate?' · '+escH(c.invoiceDate):'')+'</div>'
+            +'<div style="font-size:11px;color:var(--text2);margin-top:2px">Claim: '+escH(c.claimNo||'')+'</div>'
+          +'</div>'
+          +(diff!==0?'<span style="font-family:DM Mono,monospace;font-size:10px;padding:2px 7px;border-radius:4px;color:'+varColor+';background:'+varColor.replace('var(--','rgba(').replace(')',', .1)')+'">'+( diff>0?'+':'')+fmtMoney(Math.abs(diff))+' vs claim</span>':'')
+          +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:3px 8px;border-radius:20px;font-weight:600;color:'+stColors[0]+';background:'+stColors[1]+'">'+escH(c.status||'')+'</span>'
+          +'<span style="font-family:DM Mono,monospace;font-size:14px;font-weight:700;color:var(--text)">'+fmtMoney(c.invoiceAmount||c.totalAmount)+'</span>'
+          +'</div>';
       });
-      var variance=inv.amount-linkedTotal;
-      var varCls=variance>0?'inv-var-danger':variance<0?'inv-var-warn':'inv-var-ok';
-      var varTxt=variance===0?'\u2713 Matches claim':variance>0?'Over $'+Math.abs(variance).toLocaleString('en-AU'):'Under $'+Math.abs(variance).toLocaleString('en-AU');
-      html+='<div class="inv-row">'
-        +'<div style="flex:1;min-width:0">'
-          +'<div style="font-weight:600;font-size:13px">'+escH(inv.invoiceNo||'\u2014')+'</div>'
-          +'<div class="claim-meta">'+escH(inv.supplier||po.supplier||'')+(inv.invoiceDate?' \u00B7 '+fmtDateShort(inv.invoiceDate):'')+(inv.receivedDate?' \u00B7 Received '+fmtDateShort(inv.receivedDate):'')+'</div>'
-          +((inv.claimIds||[]).length?'<div class="claim-meta">Linked to '+(inv.claimIds.length)+' claim'+(inv.claimIds.length!==1?'s':'')+'</div>':'<div class="claim-meta" style="color:var(--warn)">\u26a0 No claims linked</div>')
-          +(inv.fileName?'<div class="claim-meta">📎 '+escH(inv.fileName)+'</div>':'')
-        +'</div>'
-        +'<span class="inv-variance '+varCls+'">'+varTxt+'</span>'
-        +'<span class="claim-amount">'+fmtMoney(inv.amount)+'</span>'
-        +'<span class="inv-status '+stCls+'">'+escH(inv.status)+'</span>'
-        +'<div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">'
-          +(inv.status==='Pending Review'
-            ?'<button class="btn bp bsm" data-iid="'+escH(inv.id)+'" onclick="approveInvoice(this.dataset.iid)">\u2713 Approve</button>'
-             +'<button class="btn bsm" style="color:var(--danger)" data-iid="'+escH(inv.id)+'" onclick="rejectInvoice(this.dataset.iid)">\u2717 Reject</button>'
-            :'')
-        +'</div>'
-        +'</div>';
-    });
-  }
-  document.getElementById('invoicesList').innerHTML=html;
+    }
+    document.getElementById('invoicesList').innerHTML=html;
+  }).catch(function(){document.getElementById('invoicesList').innerHTML='<div style="padding:20px;color:var(--muted);font-size:12px">Could not load invoices</div>';});
 }
-
 function openAddInvoice(){
   var po=getCurrentPO();
   if(!po||!po.id){alert('Save the PO first.');return;}
