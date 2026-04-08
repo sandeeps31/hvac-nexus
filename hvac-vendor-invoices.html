@@ -229,11 +229,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
     <label class="ml">Vendor Name *</label>
     <input class="mi" id="f-vendor" placeholder="e.g. Acme HVAC Supplies"/>
     <div class="mgrid">
-      <div><label class="ml">Assign to PO</label>
-        <select class="mi" id="f-po" style="cursor:pointer">
-          <option value="">— Select PO (optional) —</option>
-        </select>
-      </div>
+      <div><label class="ml">PO Reference</label><input class="mi" id="f-po" placeholder="e.g. PO-001"/></div>
       <div><label class="ml">Amount (ex GST) *</label><input class="mi" id="f-amount" type="number" placeholder="0.00"/></div>
     </div>
     <label class="ml">Billing Month</label>
@@ -283,6 +279,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 var _viProj=dbGetCurrentProject();var _viPNum=_viProj.num||_viProj.number||'GCT001';
 
 var invoices=[],requests=[];
+var _poInvoices=[]; // invoices from PO claims workflow
 var editingId=null,_uid=100;
 function nid(){return ++_uid;}
 function num(v){return parseFloat(v)||0;}
@@ -303,6 +300,39 @@ function daysDiff(a,b){return Math.round((new Date(b+'T00:00:00')-new Date(a+'T0
 
 
 function save(){dbSetVendorInvoices(_viPNum,{invoices:invoices,requests:requests}).catch(e=>console.error(e));}
+async function loadPOInvoices(){
+  _poInvoices=[];
+  try{
+    var d=await dbGetPurchaseOrders(_viPNum);
+    if(d&&d.sections){
+      d.sections.forEach(function(sec){
+        sec.groups.forEach(function(grp){
+          (grp.pos||[]).forEach(function(po){
+            (po.invoices||[]).forEach(function(inv){
+              _poInvoices.push({
+                id:inv.id,
+                invnum:inv.invoiceNo,
+                invdate:inv.invoiceDate,
+                vendor:inv.supplier||po.supplier||'',
+                po:po.id,
+                poNum:po.id,
+                amount:inv.amount,
+                status:inv.status==='Approved'?'Approved':inv.status==='Rejected'?'Rejected':'Pending',
+                month:inv.invoiceDate?(inv.invoiceDate.substring(0,7)):'',
+                notes:inv.note||'',
+                source:'po', // marks as coming from PO workflow
+                claimCount:(inv.claimIds||[]).length,
+                secName:sec.name,
+                grpName:grp.parent
+              });
+            });
+          });
+        });
+      });
+    }
+  }catch(e){console.warn('loadPOInvoices failed:',e);}
+}
+
 async function load(){
   try{
     var s=await dbGetVendorInvoices(_viPNum);
@@ -320,7 +350,7 @@ function updateSummary(){
   document.getElementById('sumMonthLbl').textContent=fmtM(cm)+' · ex GST';
   document.getElementById('sumPending').textContent=pending;
   document.getElementById('sumRejected').textContent=rejected;
-  document.getElementById('sumTotal').textContent=invoices.length;
+  document.getElementById('sumTotal').textContent=allInvoices.length;
   var latestReq=requests.filter(function(r){return r.month===cm;}).sort(function(a,b){return a.date<b.date?1:-1;})[0];
   if(latestReq&&latestReq.deadline){
     var d=daysDiff(today(),latestReq.deadline);
@@ -340,11 +370,13 @@ function renderAll(){
   var sf=document.getElementById('stFilter').value;
   var mf=document.getElementById('monthFilter').value;
   // Rebuild month filter
-  var ms={};invoices.forEach(function(i){if(i.month)ms[i.month]=true;});
+  var ms={};allInvoices.forEach(function(i){if(i.month)ms[i.month]=true;});
   var mSel=document.getElementById('monthFilter'),mv=mSel.value;
   mSel.innerHTML='<option value="">All Months</option>';
   Object.keys(ms).sort().reverse().forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=fmtM(m);if(m===mv)o.selected=true;mSel.appendChild(o);});
-  var filtered=invoices.filter(function(i){
+  // Combine manual invoices + PO-sourced invoices
+  var allInvoices=invoices.concat(_poInvoices);
+  var filtered=allInvoices.filter(function(i){
     return(!q||(i.invnum||'').toLowerCase().includes(q)||(i.vendor||'').toLowerCase().includes(q)||(i.po||'').toLowerCase().includes(q))
       &&(!sf||i.status===sf)&&(!mf||i.month===mf);
   });
@@ -391,7 +423,7 @@ function renderAll(){
       tr.innerHTML='<td class="inv-num">'+escH(inv.invnum||'—')+'</td>'
         +'<td style="font-weight:500;color:var(--text)">'+escH(inv.vendor||'—')+'</td>'
         +'<td style="color:var(--text2);font-size:12px">'+fmtD(inv.invdate)+'</td>'
-        +'<td class="inv-po">'+escH(inv.po||'—')+'</td>'
+        +'<td class="inv-po">'+escH(inv.po||'—')+(inv.source==='po'?'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 5px;border-radius:3px;background:var(--accent-dim);color:var(--accent);margin-left:4px">PO</span>':'')+'</td>'
         +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmtFull(inv.amount)+'</td>'
         +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmtFull(gst)+'</td>'
         +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:600">'+fmtFull(total)+'</td>'
@@ -431,7 +463,6 @@ function openAddModal(){
   document.getElementById('rejectBlock').classList.remove('show');
   document.getElementById('deleteBtn').style.display='none';
   document.getElementById('addModal').classList.add('open');
-  loadPOsForDropdown('');
   setTimeout(function(){document.getElementById('f-num').focus();},80);
 }
 function openEditModal(id){
@@ -441,7 +472,7 @@ function openEditModal(id){
   document.getElementById('f-num').value=inv.invnum||'';
   document.getElementById('f-date').value=inv.invdate||'';
   document.getElementById('f-vendor').value=inv.vendor||'';
-  loadPOsForDropdown(inv.po||'');
+  document.getElementById('f-po').value=inv.po||'';
   document.getElementById('f-amount').value=inv.amount||'';
   document.getElementById('f-month').value=inv.month||currentMonth();
   document.getElementById('f-status').value=inv.status||'Draft';
@@ -463,28 +494,6 @@ function onStatusChange(){
   document.getElementById('f-date').style.opacity=isDraft?'0.4':'1';
 }
 function closeAddModal(){document.getElementById('addModal').classList.remove('open');}
-async function loadPOsForDropdown(selectedVal){
-  var sel=document.getElementById('f-po');if(!sel)return;
-  var cur=selectedVal||sel.value;
-  sel.innerHTML='<option value="">— Select PO (optional) —</option>';
-  try{
-    var d=await dbGetPurchaseOrders(_viPNum);
-    if(d&&d.sections){
-      d.sections.forEach(function(sec){
-        sec.groups.forEach(function(g){
-          (g.pos||[]).forEach(function(po){
-            var opt=document.createElement('option');
-            opt.value=po.id;
-            opt.textContent=po.id+' — '+(po.supplier||'')+(g.parent?' ('+g.parent+')':'');
-            if(cur&&opt.value===cur)opt.selected=true;
-            sel.appendChild(opt);
-          });
-        });
-      });
-    }
-  }catch(e){console.warn('PO load failed:',e);}
-}
-
 function saveInv(){
   var num_val=document.getElementById('f-num').value.trim();
   var vendor=document.getElementById('f-vendor').value.trim();
@@ -561,6 +570,9 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   });
 })();
 
+</script>
+<script>
+window.addEventListener('focus',function(){loadPOInvoices().then(renderAll);});
 </script>
 </body>
 </html>

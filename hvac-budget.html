@@ -445,11 +445,21 @@ function liTot(items){return liSub(items)+liGST(items);}
 function grpBudget(g){return num(g.budget)||0;}
 function grpCommitted(g){return g.pos.reduce((a,p)=>a+liSub(p.lineItems||[]),0);}
 function grpActual(g){
-  // Sum approved invoices linked to any PO in this group
-  var poIds=g.pos.map(function(p){return p.id;});
-  return _invoiceData.filter(function(i){
-    return i.status==='Approved'&&i.po&&poIds.some(function(id){return i.po===id||i.po.includes(id)||id.includes(i.po);});
-  }).reduce(function(a,i){return a+parseFloat(i.amount||0);},0);
+  var total=0;
+  // Source 1: invoices logged via PO claims workflow (po.invoices[])
+  (g.pos||[]).forEach(function(po){
+    (po.invoices||[]).forEach(function(inv){
+      if(inv.status==='Approved')total+=parseFloat(inv.amount||0);
+    });
+  });
+  // Source 2: legacy vendor invoices linked by PO ref
+  var poIds=(g.pos||[]).map(function(p){return p.id;});
+  _invoiceData.forEach(function(i){
+    if(i.status==='Approved'&&i.po&&poIds.some(function(id){return i.po===id||i.po.includes(id)||id.includes(i.po);})){
+      total+=parseFloat(i.amount||0);
+    }
+  });
+  return total;
 }
 
 function grpFTC(g){return g.pos.reduce((a,p)=>a+Math.max(0,liSub(p.lineItems||[])-num(p.actual)),0);}
