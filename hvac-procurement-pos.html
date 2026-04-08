@@ -325,10 +325,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
       <!-- BUDGET HEALTH PANEL -->
       <div class="budget-panel" id="budgetPanel">
         <div class="bp-grid">
-          <div class="bp-cell"><span class="bp-lbl">Budget</span><span class="bp-val" id="bp-budget">—</span></div>
-          <div class="bp-cell"><span class="bp-lbl" id="bp-committed-lbl">Committed POs</span><span class="bp-val" id="bp-committed">—</span></div>
-          <div class="bp-cell"><span class="bp-lbl">This PO</span><span class="bp-val" id="bp-this">—</span></div>
-          <div class="bp-cell"><span class="bp-lbl">Remaining After</span><span class="bp-val" id="bp-remaining">—</span></div>
+          <div class="bp-cell"><span class="bp-lbl">Budget (ex GST)</span><span class="bp-val" id="bp-budget">—</span></div>
+          <div class="bp-cell"><span class="bp-lbl" id="bp-committed-lbl">Committed POs (ex GST)</span><span class="bp-val" id="bp-committed">—</span></div>
+          <div class="bp-cell"><span class="bp-lbl">This PO (ex GST)</span><span class="bp-val" id="bp-this">—</span></div>
+          <div class="bp-cell"><span class="bp-lbl">Remaining After (ex GST)</span><span class="bp-val" id="bp-remaining">—</span></div>
         </div>
         <div class="bp-bar-wrap" id="bp-bar-wrap"><div class="bp-bar" id="bp-bar" style="width:0%"></div></div>
         <div class="bp-alert" id="bp-alert"><span id="bp-alert-msg"></span></div>
@@ -501,7 +501,7 @@ function getCommittedForGroup(secName,grpName){
   var grp=sec.groups.find(function(g){return g.parent===grpName;});if(!grp)return 0;
   return (grp.pos||[]).reduce(function(a,po){
     if(editingPO&&po.id===editingPO.pid)return a;
-    return a+liTot(po.lineItems||[]);
+    return a+liSub(po.lineItems||[]);
   },0);
 }
 function updateBudgetPanel(){
@@ -513,7 +513,7 @@ function updateBudgetPanel(){
   var secName=parts[0]||'',grpName=parts[1]||'';
   var budget=getBudgetForGroup(secName,grpName);
   var committed=getCommittedForGroup(secName,grpName);
-  var thisPO=liTot(lineItems);
+  var thisPO=liSub(lineItems);
   var budgetEl=document.getElementById('bp-budget');
   var barWrap=document.getElementById('bp-bar-wrap');
   var bar=document.getElementById('bp-bar');
@@ -550,7 +550,7 @@ function updateBudgetPanel(){
   if(bar){bar.style.width=pct+'%';bar.style.background=pct>=100?'var(--danger)':pct>=80?'var(--warn)':'var(--green)';}
   if(remaining<0){
     if(alert)alert.className='bp-alert visible danger';
-    if(alertMsg)alertMsg.innerHTML='&#9888; Exceeds budget by '+fmtZ(Math.abs(remaining))+' incl GST';
+    if(alertMsg)alertMsg.innerHTML='&#9888; Exceeds budget by '+fmtZ(Math.abs(remaining))+' excl GST';
   } else if(pct>=80){
     if(alert)alert.className='bp-alert visible warn';
     if(alertMsg)alertMsg.innerHTML='&#9888; Warning: '+Math.round(pct)+'% of budget consumed';
@@ -624,7 +624,7 @@ function liTot(items){return liSub(items)+liGST(items);}
 function updateSummary(){
   const all=getAllPOs();
   document.getElementById('s-total').textContent=all.length;
-  document.getElementById('s-committed').textContent=fmtZ(all.reduce((a,p)=>a+liTot(p.lineItems||[]),0));
+  document.getElementById('s-committed').textContent=fmtZ(all.reduce((a,p)=>a+liSub(p.lineItems||[]),0));
   document.getElementById('s-actual').textContent=fmtZ(all.reduce((a,p)=>a+num(p.actual),0));
 }
 
@@ -831,7 +831,7 @@ function savePO(){
   const catVal=document.getElementById('po-cat').value;
   if(!catVal){document.getElementById('po-cat').focus();return;}
   var _bp2=catVal.split('||');var _bBudget=getBudgetForGroup(_bp2[0]||'',_bp2[1]||'');
-  if(_bBudget>0){var _bComm=getCommittedForGroup(_bp2[0]||'',_bp2[1]||'');if((_bComm+liTot(lineItems))>_bBudget){if(!confirm('\u26a0\ufe0f This PO exceeds the budget for this line by '+fmtZ(_bComm+liTot(lineItems)-_bBudget)+' incl GST.\n\nSave anyway?'))return;}}
+  if(_bBudget>0){var _bComm=getCommittedForGroup(_bp2[0]||'',_bp2[1]||'');if((_bComm+liSub(lineItems))>_bBudget){if(!confirm('\u26a0\ufe0f This PO exceeds the budget for this line by '+fmtZ(_bComm+liSub(lineItems)-_bBudget)+' excl GST.\n\nSave anyway?'))return;}}
   const [secName,grpName]=catVal.split('||');
   const sec=sections.find(s=>s.name===secName);
   const grp=sec?.groups.find(g=>g.parent===grpName);
