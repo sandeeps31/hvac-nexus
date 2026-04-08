@@ -167,14 +167,19 @@ var _editingId=null;
 function nid(){return 'p'+(++_uid)+Date.now();}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function save(){
-  dbSetProjects(projects).catch(function(e){console.error('saveProjects:',e);});
+  return dbSetProject('projects','__projects__',projects).catch(function(e){console.error('saveProjects:',e);});
 }
 async function load(){
   try{
-    var s=await dbGetProjects();
+    // Try new path first (project_num-aware)
+    var s=await dbGetProject('projects','__projects__');
     if(s&&Array.isArray(s)){projects=s;return;}
-    // s===null means never set — seed
-    if(s===null){_neverSet=true;}
+    if(s===null){
+      // Try legacy path (single-row dbGet)
+      var s2=await dbGetProjects();
+      if(s2&&Array.isArray(s2)&&s2.length){projects=s2;return;}
+      _neverSet=true;
+    }
   }catch(e){}
   projects=[];
 }
@@ -311,14 +316,18 @@ function saveProject(){
     data.id=nid();data.created=today;
     projects.push(data);
   }
-  save().then(function(){renderProjects();}).catch(function(e){console.error('Save failed:',e);renderProjects();});
+  var r=save();
+  if(r&&r.then){r.then(function(){renderProjects();}).catch(function(){renderProjects();});}
+  else{renderProjects();}
   closeModal();
 }
 function deleteProject(id){
   var p=projects.find(function(x){return x.id===id;});if(!p)return;
   if(!confirm('Delete "'+p.name+'"? This cannot be undone.'))return;
   projects=projects.filter(function(x){return x.id!==id;});
-  save().then(function(){renderProjects();}).catch(function(e){renderProjects();});
+  var rd=save();
+  if(rd&&rd.then){rd.then(function(){renderProjects();}).catch(function(){renderProjects();});}
+  else{renderProjects();}
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
 
