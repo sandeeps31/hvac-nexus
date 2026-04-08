@@ -903,35 +903,68 @@ async function initBudgetTemplateBuilder(){
 }
 
 function renderBudgetTplList(){
-  var el=document.getElementById('budgetTplList');
-  if(!el)return;
+  var el=document.getElementById('budgetTplList');if(!el)return;
   if(!_btRows.length){
-    el.innerHTML='<div class="tpl-empty">No rows yet — add a Level 1 header to get started.</div>';
+    el.innerHTML='<div class="tpl-empty">No rows yet — click <strong>+ Level 1 Header</strong> to get started.</div>';
     return;
   }
-  el.innerHTML=_btRows.map(function(r,i){
-    var cls='tpl-row '+r.type;
-    var badge='',bc='';
-    if(r.type==='level1'){badge='L1';bc='badge-l1';}
-    else if(r.type==='level2'){badge='L2';bc='badge-l2';}
-    else{badge='Item';bc='badge-li';}
-    return '<div class="'+cls+'" draggable="true" data-id="'+r.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondrop="_btDrop(event,this.dataset.id)">'
-      +'<span class="tpl-row-drag">&#8597;</span>'
-      +'<span class="tpl-badge '+bc+'">'+badge+'</span>'
-      +'<input class="tpl-name-input" value="'+_btEscH(r.name)+'" placeholder="'+(r.type==='level1'?'Level 1 header…':r.type==='level2'?'Level 2 header…':'Line item name…')+'" oninput="_btRows['+i+'].name=this.value"/>'
-      +'<div class="tpl-row-actions">'
-        +(i>0?'<button class="tpl-action-btn" onclick="_btMove('+i+',-1)" title="Up">↑</button>':'')
-        +(i<_btRows.length-1?'<button class="tpl-action-btn" onclick="_btMove('+i+',1)" title="Down">↓</button>':'')
-        +'<button class="tpl-action-btn del" data-delid="'+r.id+'" onclick="_btDelete(this.dataset.delid)" title="Delete">×</button>'
+  var groups=[],ungrouped=[];
+  _btRows.forEach(function(r,i){
+    if(r.type==='level1'){groups.push({l1idx:i,l1row:r,children:[]});}
+    else if(groups.length){groups[groups.length-1].children.push({type:r.type,idx:i,row:r});}
+    else{ungrouped.push({type:r.type,idx:i,row:r});}
+  });
+  var html='';
+  if(ungrouped.length){
+    html+='<div class="bt-card"><div class="bt-card-body">';
+    ungrouped.forEach(function(c){html+=_btRenderChildRow(c);});
+    html+='</div></div>';
+  }
+  groups.forEach(function(g){
+    html+='<div class="bt-card" draggable="true" data-id="'+g.l1row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondrop="_btDrop(event,this.dataset.id)">'
+      +'<div class="bt-card-hdr">'
+        +'<span class="bt-drag">↕</span>'
+        +'<span class="tpl-badge badge-l1">L1</span>'
+        +'<input class="bt-card-hdr-input" value="'+_btEscH(g.l1row.name)+'" placeholder="Level 1 header…" data-idx="'+g.l1idx+'" oninput="_btRows[this.dataset.idx*1].name=this.value"/>'
+        +'<button class="bt-act" data-delid="'+g.l1row.id+'" onclick="_btDelete(this.dataset.delid)">×</button>'
       +'</div>'
-      +'</div>';
-  }).join('');
+      +'<div class="bt-card-body">';
+    g.children.forEach(function(c){
+      if(c.type==='level2'){
+        html+='<div class="bt-l2-hdr" draggable="true" data-id="'+c.row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondrop="_btDrop(event,this.dataset.id)">'
+          +'<span class="bt-drag" style="font-size:11px">↕</span>'
+          +'<span class="tpl-badge badge-l2">L2</span>'
+          +'<input class="bt-l2-input" value="'+_btEscH(c.row.name)+'" placeholder="Sub-category…" data-idx="'+c.idx+'" oninput="_btRows[this.dataset.idx*1].name=this.value"/>'
+          +'<button class="bt-act" data-delid="'+c.row.id+'" onclick="_btDelete(this.dataset.delid)">×</button>'
+        +'</div>';
+      } else {
+        html+=_btRenderChildRow(c);
+      }
+    });
+    html+='<div class="bt-card-footer">'
+      +'<button class="bt-add-item" style="color:var(--text2)" data-l1id="'+g.l1row.id+'" data-type="lineitem" onclick="_btAddAfter(this.dataset.l1id,this.dataset.type)">＋ Line Item</button>'
+      +'<button class="bt-add-item" style="color:var(--warn)" data-l1id="'+g.l1row.id+'" data-type="level2" onclick="_btAddAfter(this.dataset.l1id,this.dataset.type)">＋ Sub-category</button>'
+    +'</div>'
+    +'</div></div>';
+  });
+  el.innerHTML=html;
 }
-
-function budgetTplAddRow(type){
-  _btRows.push({id:_btNid(),type:type,name:''});
+function _btRenderChildRow(c){
+  return '<div class="bt-item-row" draggable="true" data-id="'+c.row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondrop="_btDrop(event,this.dataset.id)">'
+    +'<span class="bt-drag">↕</span>'
+    +'<span class="tpl-badge badge-li">Item</span>'
+    +'<input class="bt-item-input" value="'+_btEscH(c.row.name)+'" placeholder="Line item name…" data-idx="'+c.idx+'" oninput="_btRows[this.dataset.idx*1].name=this.value"/>'
+    +'<button class="bt-act" data-delid="'+c.row.id+'" onclick="_btDelete(this.dataset.delid)">×</button>'
+    +'</div>';
+}
+function _btAddAfter(l1id,type){
+  var l1idx=_btRows.findIndex(function(r){return r.id===l1id;});
+  if(l1idx<0)return;
+  var insertAt=l1idx+1;
+  while(insertAt<_btRows.length&&_btRows[insertAt].type!=='level1'){insertAt++;}
+  _btRows.splice(insertAt,0,{id:_btNid(),type:type,name:''});
   renderBudgetTplList();
-  setTimeout(function(){var inputs=document.querySelectorAll('.tpl-name-input');if(inputs.length)inputs[inputs.length-1].focus();},50);
+  setTimeout(function(){var inputs=document.querySelectorAll('.bt-item-input,.bt-l2-input');if(inputs.length)inputs[inputs.length-1].focus();},50);
 }
 function _btDelete(id){_btRows=_btRows.filter(function(r){return r.id!==id;});renderBudgetTplList();}
 function _btMove(idx,dir){
