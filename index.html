@@ -170,12 +170,19 @@ function save(){
   dbSetProjects(projects).catch(function(e){console.error('saveProjects:',e);});
 }
 async function load(){
-  try{var s=await dbGetProjects();if(s&&Array.isArray(s)&&s.length){projects=s;return;}}catch(e){}
+  try{
+    var s=await dbGetProjects();
+    if(s&&Array.isArray(s)){projects=s;return;}
+    // s===null means never set — seed
+    if(s===null){_neverSet=true;}
+  }catch(e){}
   projects=[];
 }
 
+var _neverSet=false;
 function seedIfEmpty(){
-  if(projects.length===0){
+  // Only seed if Supabase returned null (first-ever use), not if user deleted all projects
+  if(_neverSet&&projects.length===0){
     projects.push({id:'gct001',num:'GCT001',name:'Greenfield Commercial Tower',
       client:'CPB Contractors',value:'$2,400,000',type:'Commercial',status:'Active',
       start:'2025-01-01',end:'2026-12-31',location:'Sydney, NSW',
@@ -304,13 +311,14 @@ function saveProject(){
     data.id=nid();data.created=today;
     projects.push(data);
   }
-  save();closeModal();renderProjects();
+  save().then(function(){renderProjects();}).catch(function(e){console.error('Save failed:',e);renderProjects();});
+  closeModal();
 }
 function deleteProject(id){
   var p=projects.find(function(x){return x.id===id;});if(!p)return;
   if(!confirm('Delete "'+p.name+'"? This cannot be undone.'))return;
   projects=projects.filter(function(x){return x.id!==id;});
-  save();renderProjects();
+  save().then(function(){renderProjects();}).catch(function(e){renderProjects();});
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
 
