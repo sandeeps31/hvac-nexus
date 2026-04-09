@@ -233,6 +233,7 @@ function budgetTplAddRow(type){
   },50);
 }
 </script>
+
 <script>
 // Access check - only Admins
 (async function(){
@@ -252,6 +253,7 @@ function budgetTplAddRow(type){
   } catch(e) {}
 })();
 </script>
+
 
 
 <!-- SIDEBAR -->
@@ -620,6 +622,7 @@ function budgetTplAddRow(type){
   <span style="font-size:12px;color:var(--muted)">Changes apply across all modules immediately</span>
   <button class="bp btn" onclick="saveAll()">Save Settings</button>
 </div>
+
 
 <script>
 const SETTINGS_KEY    = 'hvacnexus_company_settings';
@@ -1146,3 +1149,136 @@ function _btDrop(e,targetId){
   renderBudgetTplList();
 }
 
+// ── BUDGET TEMPLATE EDIT MODE ──
+function enterBTEditMode(){
+  _btEditMode=true;
+  var eb=document.getElementById('btEditBtn');
+  var sb=document.getElementById('btSaveBtn');
+  if(eb)eb.style.display='none';
+  if(sb)sb.style.display='';
+  renderBudgetTplList();
+}
+function lockBTView(){
+  document.querySelectorAll('.bt-card-hdr-input,.bt-l2-input,.bt-item-input').forEach(function(el){el.readOnly=true;el.style.cursor='default';});
+  document.querySelectorAll('.bt-drag').forEach(function(el){el.style.display='none';});
+  document.querySelectorAll('.bt-act').forEach(function(el){el.style.display='none';});
+  document.querySelectorAll('.bt-card-footer,.tpl-add-btns').forEach(function(el){el.style.display='none';});
+}
+async function saveBudgetTemplateSettings(){
+  try{
+    var s=await dbGetCompanySettings()||{};
+    s.budgetTemplate={rows:_btRows,updatedAt:new Date().toISOString()};
+    await dbSetCompanySettings(s);
+    _btRowsBackup=JSON.parse(JSON.stringify(_btRows));
+    _btEditMode=false;
+    var eb=document.getElementById('btEditBtn');
+    var sb=document.getElementById('btSaveBtn');
+    if(eb)eb.style.display='';
+    if(sb)sb.style.display='none';
+    renderBudgetTplList();
+    lockBTView();
+    showToast('Budget template saved');
+  }catch(e){alert('Save failed: '+e.message);}
+}
+
+// ── LOGO ──
+function clearLogo(){
+  var s=document.getElementById('logoPreview');
+  var b=document.getElementById('logoActions');
+  var i=document.getElementById('logoInput');
+  if(s)s.style.display='none';
+  if(b)b.style.display='none';
+  if(i)i.value='';
+  showToast('Logo cleared');
+}
+
+// ── CONTACTS ──
+var _contacts=[];
+function openAddContactModal(){
+  document.getElementById('cm-name').value='';
+  document.getElementById('cm-role').value='';
+  document.getElementById('cm-email').value='';
+  document.getElementById('cm-phone').value='';
+  document.getElementById('contactModal').classList.add('open');
+}
+function closeContactModal(){document.getElementById('contactModal').classList.remove('open');}
+function saveContact(){
+  var name=document.getElementById('cm-name').value.trim();
+  if(!name){alert('Name is required.');return;}
+  _contacts.push({id:'c'+Date.now(),name:name,role:document.getElementById('cm-role').value.trim(),email:document.getElementById('cm-email').value.trim(),phone:document.getElementById('cm-phone').value.trim()});
+  renderContacts();
+  closeContactModal();
+  showToast('Contact added');
+}
+function renderContacts(){
+  var el=document.getElementById('contactsList');
+  if(!el)return;
+  if(!_contacts.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No contacts yet</div>';return;}
+  el.innerHTML=_contacts.map(function(c,i){
+    return '<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border)">'
+      +'<div style="flex:1"><div style="font-weight:600;font-size:13px">'+escH(c.name)+'</div>'
+      +(c.role?'<div style="font-size:11px;color:var(--muted)">'+escH(c.role)+'</div>':'')+'</div>'
+      +(c.email?'<span style="font-size:12px;color:var(--text2)">'+escH(c.email)+'</span>':'')
+      +(c.phone?'<span style="font-size:12px;color:var(--text2);margin-left:12px">'+escH(c.phone)+'</span>':'')
+      +'<button data-i="'+i+'" onclick="deleteContact(+this.dataset.i)" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">x</button>'
+      +'</div>';
+  }).join('');
+}
+function deleteContact(i){if(confirm('Delete this contact?')){_contacts.splice(i,1);renderContacts();}}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── USERS ──
+function openSwitchUser(){
+  try{
+    var users=dbGetUsers()||[];
+    if(!users.length){alert('No users set up yet. Add a member first.');return;}
+    var names=users.map(function(u,i){return (i+1)+'. '+u.name+' ('+u.role+')'}).join('\n');
+    var choice=prompt('Switch to user (enter number):\n'+names);
+    if(!choice)return;
+    var idx=parseInt(choice)-1;
+    if(idx>=0&&idx<users.length){
+      dbSetCurrentUser(users[idx]);
+      showToast('Switched to '+users[idx].name);
+    }
+  }catch(e){alert('Error: '+e.message);}
+}
+function openAddUserModal(){
+  document.getElementById('um-name').value='';
+  document.getElementById('um-role').value='PM';
+  document.getElementById('um-pin').value='';
+  document.getElementById('userModal').classList.add('open');
+}
+function closeUserModal(){document.getElementById('userModal').classList.remove('open');}
+function saveUser(){
+  var name=document.getElementById('um-name').value.trim();
+  if(!name){alert('Name is required.');return;}
+  try{
+    var users=dbGetUsers()||[];
+    users.push({id:'u'+Date.now(),name:name,role:document.getElementById('um-role').value,pin:document.getElementById('um-pin').value.trim()});
+    dbSetUsers(users);
+    renderUsers();
+    closeUserModal();
+    showToast('User added');
+  }catch(e){alert('Error: '+e.message);}
+}
+function renderUsers(){
+  var el=document.getElementById('usersList');
+  if(!el)return;
+  try{
+    var users=dbGetUsers()||[];
+    if(!users.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No users yet</div>';return;}
+    el.innerHTML=users.map(function(u,i){
+      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border)">'
+        +'<div style="width:32px;height:32px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);font-size:14px">'+escH((u.name||'?').charAt(0).toUpperCase())+'</div>'
+        +'<div style="flex:1"><div style="font-weight:600;font-size:13px">'+escH(u.name)+'</div>'
+        +'<div style="font-size:11px;color:var(--muted)">'+escH(u.role)+'</div></div>'
+      +'<button data-i="'+i+'" onclick="deleteUser(+this.dataset.i)" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">x</button>'
+        +'</div>';
+    }).join('');
+  }catch(e){}
+}
+function deleteUser(i){if(confirm('Delete this user?')){try{var u=dbGetUsers()||[];u.splice(i,1);dbSetUsers(u);renderUsers();}catch(e){}}}
+</script>
+
+</body>
+</html>
