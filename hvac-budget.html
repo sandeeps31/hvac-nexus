@@ -92,6 +92,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 .sec-card.collapsed .sec-body{display:none}
 .sec-chevron{font-size:11px;color:var(--muted);transition:transform .2s;flex-shrink:0}
 .sec-card.collapsed .sec-chevron{transform:rotate(-90deg)}
+.grp-collapsed .grp-row-body{display:none}
+.grp-section-hdr{display:flex;align-items:center;padding:7px 16px 4px 24px;background:rgba(255,184,48,.04);border-bottom:1px solid rgba(255,184,48,.1);cursor:pointer;gap:8px}
+.grp-section-hdr:hover{background:rgba(255,184,48,.08)}
+.grp-section-name{font-size:12px;font-weight:600;color:var(--warn);font-style:italic;flex:1}
+.grp-section-chev{font-size:10px;color:var(--warn);transition:transform .2s;flex-shrink:0}
+.grp-section-hdr.collapsed .grp-section-chev{transform:rotate(-90deg)}
 .sec-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1;padding-left:10px;min-width:160px;padding-right:16px}
 .sec-totals{display:flex;align-items:center;gap:0;flex-shrink:0;margin-right:28px}
 .sec-tot{text-align:right;padding:0 8px}
@@ -703,27 +709,36 @@ function renderAll(){
         <button style="width:28px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;text-align:center" onclick="event.stopPropagation();delSec('${sec.id}')" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'" title="Delete category">x</button>
       </div>
       <div class="sec-body">
-        ${filteredGroups.map(g=>{
-          const gb=grpBudget(g),gc=grpCommitted(g),ga=grpActual(g),gv=grpVar(g);
-          const gvCls=gv>0?'v-pos':gv<0?'v-neg':'v-zero';
-          const poCt=g.pos.length;
-          return `<div class="grp-row" id="gr_${g.id}" onclick="togglePOPanel('${sec.id}','${g.id}')">
-            <span class="grp-name">${g.parent}</span>
-            ${(_canEditBudget && _budgetEditMode)
-              ? `<input class="budget-inp" type="number" value="${g.budget||''}" placeholder="0" onclick="event.stopPropagation()" onblur="saveBudgetInline('${g.id}',this.value)" />`
-              : `<span class="grp-val" style="width:110px;color:${gb>0?'var(--accent)':'var(--muted)'}">${fmt(gb)}</span>`
+        ${(function(){
+          var html='';
+          var currentL2=null;
+          var l2Buffer=[];
+          function flushL2(){
+            if(!currentL2)return;
+            var l2g=currentL2;
+            var isCollapsed=l2g.collapsed||false;
+            html+='<div id="gsh_'+l2g.id+'" class="grp-section-hdr'+(isCollapsed?' collapsed':'')+'" data-secid="'+sec.id+'" data-grpid="'+l2g.id+'" onclick="toggleGrpSection(this.dataset.secid,this.dataset.grpid,event)">'
+              +'<span class="grp-section-chev">&#9660;</span>'
+              +'<span class="grp-section-name">'+l2g.parent+'</span>'
+              +'</div>';
+            html+='<div id="gsb_'+l2g.id+'" style="'+(isCollapsed?'display:none':'')+'">';
+            l2Buffer.forEach(function(g){html+=renderGrpRow(g,sec.id);});
+            html+='</div>';
+            currentL2=null;l2Buffer=[];
+          }
+          filteredGroups.forEach(function(g){
+            if(g.isL2Header){
+              flushL2();
+              currentL2=g;l2Buffer=[];
+            } else if(currentL2){
+              l2Buffer.push(g);
+            } else {
+              html+=renderGrpRow(g,sec.id);
             }
-            <span class="grp-val" style="width:110px;color:${gc>0?'var(--warn)':'var(--muted)'}">${fmt(gc)}</span>
-            <span class="grp-val" style="width:110px;color:${ga>0?'var(--green)':'var(--muted)'}">${fmt(ga)}</span>
-            <span class="grp-val ${gvCls}" style="width:100px">${gb>0||gc>0?fmtV(gv):'--'}</span>
-            <span class="grp-po-count" style="width:70px;text-align:center">${poCt} PO${poCt!==1?'s':''}</span>
-            <span class="grp-arrow" style="width:28px;text-align:center">></span>
-          </div>
-          <div class="po-panel" id="pop_${g.id}">
-            <div class="po-panel-hdr"><span class="po-panel-title">Purchase Orders -- ${g.parent}</span><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif" onclick="togglePOPanel('${sec.id}','${g.id}')">x Close</button></div>
-            ${renderPOPanel(g,sec.id)}
-          </div>`;
-        }).join('')}
+          });
+          flushL2();
+          return html;
+        })()}
         <div class="add-item-wrap"><button class="add-item-btn" onclick="addGrp('${sec.id}')">+ Add Line Item</button></div>
         <div class="subtotal-row">
           <span class="subtotal-lbl">Subtotal — ${namePart}</span>
@@ -895,9 +910,42 @@ function renderAll(){
 
 }
 
+function renderGrpRow(g,secId){
+  var gb=grpBudget(g),gc=grpCommitted(g),ga=grpActual(g),gv=grpVar(g);
+  var gvCls=gv>0?'v-pos':gv<0?'v-neg':'v-zero';
+  var poCt=g.pos.length;
+  return '<div class="grp-row" id="gr_'+g.id+'" data-secid="'+secId+'" data-gid="'+g.id+'" onclick="togglePOPanel(this.dataset.secid,this.dataset.gid)">'
+    +'<span class="grp-name">'+g.parent+'</span>'
+    +(_canEditBudget&&_budgetEditMode
+      ?'<input class="budget-inp" type="number" value="'+(g.budget||'')+'" placeholder="0" onclick="event.stopPropagation()" data-gid="'+g.id+'" onblur="saveBudgetInline(this.dataset.gid,this.value)" />'
+      :'<span class="grp-val" style="width:110px;color:'+(gb>0?'var(--accent)':'var(--muted)')+'">'+fmt(gb)+'</span>'
+    )
+    +'<span class="grp-val" style="width:110px;color:'+(gc>0?'var(--warn)':'var(--muted)')+'">'+fmt(gc)+'</span>'
+    +'<span class="grp-val" style="width:110px;color:'+(ga>0?'var(--green)':'var(--muted)')+'">'+fmt(ga)+'</span>'
+    +'<span class="grp-val '+gvCls+'" style="width:100px">'+(gb>0||gc>0?fmtV(gv):'--')+'</span>'
+    +'<span class="grp-po-count" style="width:70px;text-align:center">'+poCt+' PO'+(poCt!==1?'s':'')+'</span>'
+    +'<span class="grp-arrow" style="width:28px;text-align:center">></span>'
+    +'</div>'
+    +'<div class="po-panel" id="pop_'+g.id+'">'
+      +'<div class="po-panel-hdr"><span class="po-panel-title">Purchase Orders -- '+g.parent+'</span>'
+      +'<button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif" data-secid="'+secId+'" data-gid="'+g.id+'" onclick="togglePOPanel(this.dataset.secid,this.dataset.gid)">x Close</button></div>'
+      +renderPOPanel(g,secId)
+    +'</div>';
+}
 function getSec(id){return sections.find(s=>s.id===id);}
 function getGrp(sid,gid){return getSec(sid)?.groups.find(g=>g.id===gid);}
 
+function toggleGrpSection(secId,grpId,e){
+  if(e)e.stopPropagation();
+  var sec=getSec(secId);if(!sec)return;
+  var grp=sec.groups.find(function(g){return g.id===grpId;});if(!grp)return;
+  grp.collapsed=!grp.collapsed;
+  var hdr=document.getElementById('gsh_'+grpId);
+  var body=document.getElementById('gsb_'+grpId);
+  if(hdr)hdr.classList.toggle('collapsed',grp.collapsed);
+  if(body)body.style.display=grp.collapsed?'none':'';
+  saveData();
+}
 function toggleSec(sid,e){
   if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON')return;
   const sec=getSec(sid);if(!sec)return;
@@ -1078,19 +1126,46 @@ function showTemplateToast(msg){
   try{var vi=await dbGetVendorInvoices(_pNum);if(vi&&vi.invoices)_invoiceData=vi.invoices;}catch(e){_invoiceData=[];}
   await loadVariations();
   if(!saved){
-    var tmpl = await dbGetBudget('__template__');
-    if(tmpl){
-      try{
-        var td = (typeof tmpl==='string')?JSON.parse(tmpl):tmpl;
-        if(td&&td.catOrder&&td.grouped){
-          sections = td.catOrder.map(function(catName,si){
-            return {id:'s'+si,name:catName,collapsed:false,
-              groups:(td.grouped[catName]||[]).map(function(g,gi){
-                return {id:'g'+si+'_'+gi,parent:g.parent,budget:g.budget||'',pos:[]};
-              })};
-          });
-        }
-      }catch(e){}
+    // Try company settings budget template first (new format)
+    var tplLoaded=false;
+    try{
+      var cs=await dbGetCompanySettings();
+      if(cs&&cs.budgetTemplate&&Array.isArray(cs.budgetTemplate.rows)&&cs.budgetTemplate.rows.length){
+        var rows=cs.budgetTemplate.rows;
+        var newSections=[];
+        var curSec=null;
+        rows.forEach(function(r,ri){
+          if(r.type==='level1'){
+            curSec={id:'s'+ri,name:r.name||'Section',collapsed:false,groups:[]};
+            newSections.push(curSec);
+          } else if(r.type==='lineitem'&&curSec){
+            curSec.groups.push({id:'g'+ri,parent:r.name||'Item',budget:'',pos:[]});
+          }
+          // level2 becomes a visual grouping only - treated as line items for now
+          else if(r.type==='level2'&&curSec){
+            // L2 becomes a group header - store as group with l2:true flag
+            curSec.groups.push({id:'g'+ri,parent:r.name||'Sub',budget:'',pos:[],isL2Header:true});
+          }
+        });
+        if(newSections.length){sections=newSections;tplLoaded=true;}
+      }
+    }catch(e){console.warn('Company template load failed:',e);}
+    // Fallback: old __template__ format
+    if(!tplLoaded){
+      var tmpl = await dbGetBudget('__template__');
+      if(tmpl){
+        try{
+          var td = (typeof tmpl==='string')?JSON.parse(tmpl):tmpl;
+          if(td&&td.catOrder&&td.grouped){
+            sections = td.catOrder.map(function(catName,si){
+              return {id:'s'+si,name:catName,collapsed:false,
+                groups:(td.grouped[catName]||[]).map(function(g,gi){
+                  return {id:'g'+si+'_'+gi,parent:g.parent,budget:g.budget||'',pos:[]};
+                })};
+            });
+          }
+        }catch(e){}
+      }
     }
   }
   try{ renderAll(); }
