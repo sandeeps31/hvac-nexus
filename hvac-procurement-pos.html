@@ -639,9 +639,16 @@ function updateSummary(){
 }
 
 function populateFilters(){
-  const cats=[...new Set(CATEGORIES.map(c=>c.name))];
+  var cats=[];
+  if(_budgetData&&_budgetData.sections&&_budgetData.sections.length){
+    _budgetData.sections.forEach(function(sec){
+      sec.groups.forEach(function(g){if(!g.isL2Header)cats.push(g.parent);});
+    });
+  } else {
+    cats=[...new Set(CATEGORIES.map(c=>c.name))];
+  }
   const cf=document.getElementById('catFil'),cur=cf.value;
-  cf.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+  cf.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option${c===cur?' selected':''}>${escH(c)}</option>`).join('');
 }
 
 // ── VIEWS ──
@@ -732,14 +739,31 @@ function openPO(sid,gid,pid){
 function populateCatDD(selectedVal){
   const sel=document.getElementById('po-cat');
   sel.innerHTML='<option value="">Select category…</option>';
-  let lastSec='';
-  CATEGORIES.forEach(c=>{
-    if(c.section!==lastSec){const og=document.createElement('optgroup');og.label=c.section_short;sel.appendChild(og);lastSec=c.section;}
-    const opt=document.createElement('option');
-    opt.value=c.section+'||'+c.name;opt.textContent=c.name;
-    if(selectedVal&&opt.value===selectedVal)opt.selected=true;
-    sel.lastChild.appendChild(opt);
-  });
+  // Always build from live project budget if available; fall back to hardcoded CATEGORIES
+  var budSecs=(_budgetData&&_budgetData.sections&&_budgetData.sections.length)?_budgetData.sections:null;
+  if(budSecs){
+    budSecs.forEach(function(sec){
+      var lineItems=sec.groups.filter(function(g){return !g.isL2Header;});
+      if(!lineItems.length)return;
+      var secShort=sec.name.replace(/^\d+\.\s*/,'');
+      var og=document.createElement('optgroup');og.label=secShort;sel.appendChild(og);
+      lineItems.forEach(function(g){
+        var opt=document.createElement('option');
+        opt.value=sec.name+'||'+g.parent;opt.textContent=g.parent;
+        if(selectedVal&&opt.value===selectedVal)opt.selected=true;
+        og.appendChild(opt);
+      });
+    });
+  } else {
+    let lastSec='';
+    CATEGORIES.forEach(c=>{
+      if(c.section!==lastSec){const og=document.createElement('optgroup');og.label=c.section_short;sel.appendChild(og);lastSec=c.section;}
+      const opt=document.createElement('option');
+      opt.value=c.section+'||'+c.name;opt.textContent=c.name;
+      if(selectedVal&&opt.value===selectedVal)opt.selected=true;
+      sel.lastChild.appendChild(opt);
+    });
+  }
   onCatChange(selectedVal||'');
 }
 
