@@ -323,10 +323,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
       <div class="tw"><table class="dt">
         <thead><tr>
           <th style="width:150px">PO Number</th><th>Supplier</th><th>Budget Category</th>
-          <th class="r" style="min-width:100px">Subtotal</th>
-          <th class="r" style="min-width:80px">GST</th>
-          <th class="r" style="min-width:110px">Total incl GST</th>
-          <th style="width:110px">Order Date</th><th style="width:110px">Delivery</th><th style="width:40px"></th>
+          <th class="r" style="min-width:120px">Order Cost (ex GST)</th>
+          <th style="width:120px">Order Date</th><th style="width:120px">Delivery</th><th style="width:20px"></th>
         </tr></thead>
         <tbody id="poBody"></tbody>
       </table></div>
@@ -431,6 +429,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
       <div class="save-bar">
         <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" id="deletePOBtn" onclick="deleteCurrentPO()">🗑 Delete</button>
         <span style="flex:1"></span>
+        <button class="bg bsm btn" id="editPOBtn" onclick="enterPOEditMode()" style="display:none">✏️ Edit PO</button>
         <button class="bp btn" id="savePOBtn" onclick="savePO()">💾 Save PO</button>
       </div>
       </div><!-- /poPane-lineitems -->
@@ -680,21 +679,18 @@ function renderList(){
   document.getElementById('poCount').textContent=all.length+' purchase orders';
   updateSummary();
   if(!all.length){
-    document.getElementById('poBody').innerHTML=`<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">No purchase orders yet — <button onclick="openNewPO()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">＋ Create PO</button></td></tr>`;
+    document.getElementById('poBody').innerHTML=`<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted)">No purchase orders yet — <button onclick="openNewPO()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">＋ Create PO</button></td></tr>`;
     return;
   }
   document.getElementById('poBody').innerHTML=all.map(p=>{
     const items=p.lineItems||[],sub=liSub(items),gst=liGST(items),tot=liTot(items);
-    return `<tr onclick="openPO('${p._secId}','${p._grpId}','${p.id}')">
+    return `<tr onclick="openPOReadOnly('${p._secId}','${p._grpId}','${p.id}')">
       <td class="po-num-c">${p.id}</td>
       <td style="font-weight:500;color:var(--text)">${p.supplier||'—'}</td>
       <td><span style="font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:20px;background:var(--surface3);border:1px solid var(--border);color:var(--text2)">${p._grpName}</span></td>
-      <td class="r" style="font-family:'DM Mono',monospace;font-size:12px">${fmtZ(sub)}</td>
-      <td class="r" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${fmtZ(gst)}</td>
-      <td class="r" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">${fmtZ(tot)}</td>
+      <td class="r" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">${fmtZ(sub)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.orderDate)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.delivery)}</td>
-      <td><span class="po-st ${p.status==='Approved'?'ps-a':'ps-r'}">● ${p.status}</span></td>
       <td onclick="event.stopPropagation()"><div class="ra"><button class="ia del" onclick="delPO('${p._secId}','${p._grpId}','${p.id}')">✕</button></div></td>
     </tr>`;
   }).join('');
@@ -709,6 +705,7 @@ function setPOView(poId){
 }
 
 function openNewPO(preCatVal){
+  _poReadOnly=false;
   editingPO=null; lineItems=[{id:nid(),desc:'',qty:'',price:''}];
   document.getElementById('po-page-num').textContent=genPONum();
   document.getElementById('po-page-title').textContent='New Purchase Order';
@@ -717,6 +714,9 @@ function openNewPO(preCatVal){
   document.getElementById('po-notes').value='';
   document.getElementById('po-file-lbl').textContent='Attach PDF (optional)';
   document.getElementById('deletePOBtn').style.display='none';
+  document.getElementById('savePOBtn').style.display='';
+  document.getElementById('editPOBtn').style.display='none';
+  setFieldsReadOnly(false);
   document.getElementById('po-order-date').value=new Date().toISOString().split('T')[0];
   populateCatDD('');
   renderLI();
@@ -737,9 +737,48 @@ function openPO(sid,gid,pid){
   document.getElementById('po-file-lbl').textContent=po.fileName||'Attach PDF (optional)';
   document.getElementById('po-order-date').value=po.orderDate||'';
   document.getElementById('deletePOBtn').style.display='';
+  document.getElementById('savePOBtn').style.display='';
+  document.getElementById('editPOBtn').style.display='none';
+  setFieldsReadOnly(false);
   populateCatDD(sec&&g?sec.name+'||'+g.parent:'');
   renderLI();
   setPOView(po.id, true);
+  if(_poReadOnly) setTimeout(function(){setFieldsReadOnly(true);},0);
+}
+
+// ── VIEW-ONLY / EDIT MODE ──
+var _poReadOnly = false;
+
+function openPOReadOnly(sid,gid,pid){
+  _poReadOnly = true;
+  openPO(sid,gid,pid);
+  setFieldsReadOnly(true);
+  document.getElementById('savePOBtn').style.display='none';
+  document.getElementById('editPOBtn').style.display='';
+  document.getElementById('deletePOBtn').style.display='none';
+}
+
+function enterPOEditMode(){
+  _poReadOnly = false;
+  setFieldsReadOnly(false);
+  document.getElementById('savePOBtn').style.display='';
+  document.getElementById('editPOBtn').style.display='none';
+  document.getElementById('deletePOBtn').style.display='';
+}
+
+function setFieldsReadOnly(ro){
+  ['po-supplier','po-delivery','po-notes','po-order-date'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el){el.disabled=ro;}
+  });
+  var catSel=document.getElementById('po-cat');
+  if(catSel) catSel.disabled=ro;
+  // Line items — disable all inputs
+  document.querySelectorAll('.li-desc-ta,.li-ci').forEach(function(el){el.disabled=ro;});
+  // Add LI / delete LI buttons
+  var addBtn=document.querySelector('[onclick="addLI()"]');
+  if(addBtn) addBtn.style.display=ro?'none':'';
+  document.querySelectorAll('.li-del').forEach(function(b){b.style.display=ro?'none':'';});
 }
 
 // ── CATEGORY DROPDOWN ──
@@ -1054,6 +1093,13 @@ window.addEventListener('DOMContentLoaded', async function(){
       }
     }
     setSrcTab('subvar');
+  } else if(params.get('viewpo')){
+    renderList();
+    var vpId=decodeURIComponent(params.get('viewpo'));
+    // Find the PO across all sections
+    var found=null;
+    sections.forEach(function(s){s.groups.forEach(function(g){g.pos.forEach(function(po){if(po.id===vpId)found={sid:s.id,gid:g.id,pid:po.id};});});});
+    if(found) openPOReadOnly(found.sid,found.gid,found.pid);
   } else if(params.get('newpo')==='1'){
     renderList();
     var preSecName=decodeURIComponent(params.get('sec')||'');
