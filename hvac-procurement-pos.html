@@ -616,7 +616,15 @@ function buildDefault(){
 sections=buildDefault(); // populated in async init
 
 // ── PO NUMBER ──
-function genPONum(){return PROJECT_NO+'-PO-'+String(getAllPOs().length+1).padStart(3,'0');}
+function genPONum(){
+  var proj=_poPNum||PROJECT_NO;
+  // Monotonic counter — find highest existing PO number for this project
+  var existing=getAllPOs().map(function(p){
+    var m=p.id&&p.id.match(/-(\d+)$/);return m?parseInt(m[1]):0;
+  });
+  var next=(existing.length?Math.max.apply(null,existing):0)+1;
+  return proj+'-PO-'+String(next).padStart(2,'0');
+}
 
 // ── DATA ──
 function getAllPOs(){
@@ -718,10 +726,10 @@ function openNewPO(preCatVal){
   document.getElementById('editPOBtn').style.display='none';
   setFieldsReadOnly(false);
   document.getElementById('po-order-date').value=new Date().toISOString().split('T')[0];
-  populateCatDD('');
+  populateCatDD(preCatVal||'');
   renderLI();
   setPOView('New PO');
-  setTimeout(()=>document.getElementById('po-cat').focus(),100);
+  if(!preCatVal) setTimeout(()=>document.getElementById('po-cat').focus(),100);
 }
 
 function openPO(sid,gid,pid){
@@ -783,19 +791,22 @@ function setFieldsReadOnly(ro){
 
 // ── CATEGORY DROPDOWN ──
 function populateCatDD(selectedVal){
+  var sv=(selectedVal||'').trim();
   const sel=document.getElementById('po-cat');
   sel.innerHTML='<option value="">Select category…</option>';
   var budSecs=(_budgetData&&_budgetData.sections&&_budgetData.sections.length)?_budgetData.sections:null;
   if(budSecs){
     budSecs.forEach(function(sec){
-      var lineItems=sec.groups.filter(function(g){return !g.isL2Header;});
-      if(!lineItems.length)return;
+      var grpItems=sec.groups.filter(function(g){return !g.isL2Header;});
+      if(!grpItems.length)return;
       var secShort=sec.name.replace(/^\d+\.\s*/,'');
       var og=document.createElement('optgroup');og.label=secShort;sel.appendChild(og);
-      lineItems.forEach(function(g){
+      grpItems.forEach(function(g){
         var opt=document.createElement('option');
-        opt.value=sec.name+'||'+g.parent;opt.textContent=g.parent;
-        if(selectedVal&&opt.value===selectedVal)opt.selected=true;
+        opt.value=sec.name+'||'+g.parent;
+        opt.textContent=g.parent;
+        // Match on full value OR just the grp name (fallback for URL-passed grp-only matches)
+        if(sv&&(opt.value===sv||g.parent===sv.split('||')[1]))opt.selected=true;
         og.appendChild(opt);
       });
     });
@@ -805,11 +816,13 @@ function populateCatDD(selectedVal){
       if(c.section!==lastSec){const og=document.createElement('optgroup');og.label=c.section_short;sel.appendChild(og);lastSec=c.section;}
       const opt=document.createElement('option');
       opt.value=c.section+'||'+c.name;opt.textContent=c.name;
-      if(selectedVal&&opt.value===selectedVal)opt.selected=true;
+      if(sv&&opt.value===sv)opt.selected=true;
       sel.lastChild.appendChild(opt);
     });
   }
-  onCatChange(selectedVal||'');
+  // Force-set value then fire change with whatever was actually selected
+  if(sv) sel.value=sv;
+  onCatChange(sel.value||'');
 }
 
 
