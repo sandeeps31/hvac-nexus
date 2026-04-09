@@ -93,9 +93,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 .sec-chevron{font-size:11px;color:var(--muted);transition:transform .2s;flex-shrink:0}
 .sec-card.collapsed .sec-chevron{transform:rotate(-90deg)}
 .grp-collapsed .grp-row-body{display:none}
-.grp-section-hdr{display:flex;align-items:center;padding:7px 16px 4px 24px;background:rgba(255,184,48,.04);border-bottom:1px solid rgba(255,184,48,.1);cursor:pointer;gap:8px}
+.grp-section-hdr{display:flex;align-items:center;padding:6px 16px;min-height:38px;background:rgba(255,184,48,.04);border-bottom:1px solid rgba(255,184,48,.1);cursor:pointer;gap:0}
 .grp-section-hdr:hover{background:rgba(255,184,48,.08)}
-.grp-section-name{font-size:12px;font-weight:600;color:var(--warn);font-style:italic;flex:1}
+.grp-section-name{font-size:12px;font-weight:600;color:var(--warn);font-style:italic;flex:1;padding-left:38px}
 .grp-section-chev{font-size:10px;color:var(--warn);transition:transform .2s;flex-shrink:0}
 .grp-section-hdr.collapsed .grp-section-chev{transform:rotate(-90deg)}
 .sec-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1;padding-left:10px;min-width:160px;padding-right:16px}
@@ -106,10 +106,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 .sec-tot-val.has{color:var(--text)}
 
 /* GROUP ROW */
-.grp-row{display:flex;align-items:center;padding:6px 16px 6px 24px;min-height:42px;border-bottom:1px solid var(--border);gap:0;background:var(--surface);transition:background .15s;cursor:pointer}
+.grp-row{display:flex;align-items:center;padding:6px 16px;min-height:42px;border-bottom:1px solid var(--border);gap:0;background:var(--surface);transition:background .15s;cursor:pointer}
 .grp-row:hover{background:var(--surface2)}
 .grp-row.active{background:var(--accent-dim);border-left:3px solid var(--accent)}
-.grp-name{font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:160px;padding-right:16px;white-space:normal;line-height:1.4;padding-top:6px;padding-bottom:6px}
+.grp-name{font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:160px;padding-right:16px;padding-left:22px;white-space:normal;line-height:1.4;padding-top:6px;padding-bottom:6px}
 .grp-val{font-family:'DM Mono',monospace;font-size:12px;text-align:right;flex-shrink:0;display:block}
 .grp-po-count{font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;background:var(--surface3);border:1px solid var(--border);color:var(--muted);flex-shrink:0}
 .grp-row.active .grp-po-count{background:var(--accent-dim);border-color:rgba(0,200,255,.2);color:var(--accent)}
@@ -756,7 +756,7 @@ function renderAll(){
   const colHdrEl = document.createElement('div');
   colHdrEl.className='col-header';
   colHdrEl.style.cssText='';
-  colHdrEl.innerHTML='<span style="flex:1;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding-left:24px">Category</span>'
+  colHdrEl.innerHTML='<span style="flex:1;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Category</span>'
     +'<span class="col-h" style="width:110px">Budget</span>'
     +'<span class="col-h" style="width:110px">Committed</span>'
     +'<span class="col-h" style="width:110px">Actuals</span>'
@@ -801,9 +801,21 @@ function renderAll(){
             if(!currentL2)return;
             var l2g=currentL2;
             var isCollapsed=l2g.collapsed||false;
+            var l2sb=l2Buffer.reduce(function(a,g){return a+grpBudget(g);},0);
+            var l2sc=l2Buffer.reduce(function(a,g){return a+grpCommitted(g);},0);
+            var l2sa=l2Buffer.reduce(function(a,g){return a+grpActual(g);},0);
+            var l2sv=l2Buffer.reduce(function(a,g){return a+grpVar(g);},0);
+            var l2vCls=l2sv>0?'v-pos':l2sv<0?'v-neg':'v-zero';
             html+='<div id="gsh_'+l2g.id+'" class="grp-section-hdr'+(isCollapsed?' collapsed':'')+'" data-secid="'+sec.id+'" data-grpid="'+l2g.id+'" onclick="toggleGrpSection(this.dataset.secid,this.dataset.grpid,event)">'
-              +'<span class="grp-section-chev">&#9660;</span>'
+              +'<span class="grp-section-chev" style="flex-shrink:0;width:14px;text-align:center;font-size:9px;color:var(--warn)">&#9660;</span>'
               +'<span class="grp-section-name">'+l2g.parent+'</span>'
+              +'<span style="width:110px;text-align:right;font-family:DM Mono,monospace;font-size:11px;color:'+(l2sb>0?'var(--accent)':'var(--muted)')+'">'+fmt(l2sb)+'</span>'
+              +'<span style="width:110px;text-align:right;font-family:DM Mono,monospace;font-size:11px;color:'+(l2sc>0?'var(--warn)':'var(--muted)')+'">'+fmt(l2sc)+'</span>'
+              +'<span style="width:110px;text-align:right;font-family:DM Mono,monospace;font-size:11px;color:'+(l2sa>0?'var(--green)':'var(--muted)')+'">'+fmt(l2sa)+'</span>'
+              +'<span class="'+l2vCls+'" style="width:100px;text-align:right;font-family:DM Mono,monospace;font-size:11px">'+(l2sb>0||l2sc>0?fmtV(l2sv):'--')+'</span>'
+              +'<span style="width:16px"></span>'
+              +'<span style="width:70px"></span>'
+              +'<span style="width:28px"></span>'
               +'</div>';
             html+='<div id="gsb_'+l2g.id+'" style="'+(isCollapsed?'display:none':'')+'">';
             l2Buffer.forEach(function(g){html+=renderGrpRow(g,sec.id);});
@@ -825,7 +837,7 @@ function renderAll(){
         })()}
         <div class="add-item-wrap"><button class="add-item-btn" onclick="addGrp('${sec.id}')">+ Add Line Item</button></div>
         <div class="subtotal-row">
-          <span class="subtotal-lbl">Subtotal — ${namePart}</span>
+          <span class="subtotal-lbl" style="padding-left:0">Subtotal — ${namePart}</span>
           <span class="subtotal-num" data-col="budget" style="width:110px;color:var(--accent)">${fmt(sb)}</span>
           <span class="subtotal-num" data-col="committed" style="width:110px;color:var(--warn)">${fmt(sc2)}</span>
           <span class="subtotal-num" data-col="actuals" style="width:110px;color:var(--green)">${fmt(sa)}</span>
