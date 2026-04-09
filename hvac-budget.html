@@ -156,7 +156,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 .t-lbl{color:var(--text2)}.t-val{text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--text)}
 .t-val.green{color:var(--green)}.t-val.warn{color:var(--warn)}.t-val.accent{color:var(--accent)}.t-val.danger{color:var(--danger)}
 .big-row td{background:var(--surface3);font-size:14px;font-weight:700}
-.budget-inp{background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;padding:3px 7px;outline:none;width:100px;text-align:right;transition:border-color .15s}
+.budget-inp{background:var(--surface3);border:1.5px solid var(--border);border-radius:5px;color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;padding:3px 7px;outline:none;width:110px;text-align:right;transition:border-color .15s}
 .budget-inp:focus{border-color:var(--accent);background:var(--surface2)}
 .budget-inp:hover{border-color:var(--muted)}
 .margin-input{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;padding:4px 10px;outline:none;width:70px;text-align:right;transition:border-color .2s}
@@ -393,11 +393,20 @@ function makeSellPriceEditable(){
 }
 function onSellPriceInput(val){
   var gb=grandBudget();
-  var sp=parseFloat(val)||0;
-  if(sp>0&&gb>0)margin=(sp-gb)/sp*100;
-  else if(sp>0)margin=0;
+  var sp=parseFloat(String(val).replace(/,/g,''))||0;
+  if(sp>0)margin=(sp-gb)/sp*100;
+  else margin=0;
+  var profit=sp-gb;
   var md=document.getElementById('marginDisplay');
   if(md)md.textContent=margin.toFixed(1)+'%';
+  var mv=document.getElementById('marginVal');
+  if(mv){mv.textContent=margin.toFixed(1)+'%';mv.style.color=margin>=0?'var(--green)':'var(--danger)';}
+  var pv=document.getElementById('profitVal');
+  if(pv){pv.textContent=fmt(profit);pv.style.color=profit>=0?'var(--green)':'var(--danger)';}
+  var gstEl=document.getElementById('gstVal');
+  if(gstEl)gstEl.textContent=fmt(sp*0.1);
+  var siEl=document.getElementById('sellInclVal');
+  if(siEl)siEl.textContent=fmt(sp*1.1);
 }
 function saveBudgetEdit(){
   _budgetEditMode=false;
@@ -422,12 +431,87 @@ function cancelBudgetEdit(){
   var ub=document.getElementById('uploadBudgetBtn');if(ub)ub.style.display='none';
 }
 function saveBudgetInline(grpId,val){
+  var n=parseFloat(String(val).replace(/,/g,''))||0;
   sections.forEach(function(sec){
     sec.groups.forEach(function(g){
-      if(g.id===grpId){g.budget=val;}
+      if(g.id===grpId){g.budget=n;}
     });
   });
   saveData();
+  // Update subtotals, totals and variance without full re-render
+  refreshBudgetNumbers();
+}
+function refreshBudgetNumbers(){
+  // Re-render just the numeric values in-place
+  sections.forEach(function(sec){
+    var sb=secBudget(sec),sc2=secCommitted(sec),sa=secActual(sec),sv=secVar(sec);
+    var svCls=sv>0?'v-pos':sv<0?'v-neg':'v-zero';
+    // Sec header values
+    var hdr=document.querySelector('[data-sec-id="'+sec.id+'"] .sec-header');
+    if(hdr){
+      var spans=hdr.querySelectorAll('span[data-col]');
+      spans.forEach(function(sp){
+        var col=sp.dataset.col;
+        if(col==='budget')sp.textContent=sb>0?fmt(sb):'--';
+        if(col==='committed')sp.textContent=sc2>0?fmt(sc2):'--';
+        if(col==='actuals')sp.textContent=sa>0?fmt(sa):'--';
+        if(col==='variance'){sp.textContent=sv===0?'--':fmtV(sv);sp.className=svCls;}
+      });
+    }
+    // Subtotal row
+    var sub=document.querySelector('[data-sec-id="'+sec.id+'"] .subtotal-row');
+    if(sub){
+      var spans=sub.querySelectorAll('span[data-col]');
+      spans.forEach(function(sp){
+        var col=sp.dataset.col;
+        if(col==='budget')sp.textContent=fmt(sb);
+        if(col==='committed')sp.textContent=fmt(sc2);
+        if(col==='actuals')sp.textContent=fmt(sa);
+        if(col==='variance'){sp.textContent=sv===0?'--':fmtV(sv);sp.className='subtotal-num '+svCls;}
+      });
+    }
+    // Grp rows
+    sec.groups.forEach(function(g){
+      var gb=grpBudget(g),gc=grpCommitted(g),ga=grpActual(g),gv=grpVar(g);
+      var gvCls=gv>0?'v-pos':gv<0?'v-neg':'v-zero';
+      var row=document.getElementById('gr_'+g.id);
+      if(row){
+        var spans=row.querySelectorAll('span[data-col]');
+        spans.forEach(function(sp){
+          var col=sp.dataset.col;
+          if(col==='budget'){sp.textContent=gb>0?fmt(gb):'--';sp.style.color=gb>0?'var(--accent)':'var(--muted)';}
+          if(col==='committed'){sp.textContent=gc>0?fmt(gc):'--';sp.style.color=gc>0?'var(--warn)':'var(--muted)';}
+          if(col==='actuals'){sp.textContent=ga>0?fmt(ga):'--';sp.style.color=ga>0?'var(--green)':'var(--muted)';}
+          if(col==='variance'){sp.textContent=gb>0||gc>0?fmtV(gv):'--';sp.className='grp-val '+gvCls;}
+        });
+      }
+    });
+  });
+  // Grand total row
+  var gb=grandBudget(),gc=grandCommitted(),ga=grandActual(),gv=gb-gc;
+  var gvCls=gv>0?'v-pos':gv<0?'v-neg':'v-zero';
+  var gtRow=document.querySelector('.grand-total-row');
+  if(gtRow){
+    gtRow.querySelectorAll('span[data-col]').forEach(function(sp){
+      if(sp.dataset.col==='budget')sp.textContent=fmt(gb);
+      if(sp.dataset.col==='committed')sp.textContent=fmt(gc);
+      if(sp.dataset.col==='actuals')sp.textContent=fmt(ga);
+      if(sp.dataset.col==='variance'){sp.textContent=gv===0?'--':fmtV(gv);sp.className=gvCls;}
+    });
+  }
+  // Totals card - sell price, margin, etc
+  var baseSellEx=gb*(1+margin/100);
+  var baseProfit=baseSellEx-gb;
+  var baseMarginPct=baseSellEx>0?(baseProfit/baseSellEx*100):0;
+  ['budgetVal','sellPriceVal','profitVal','marginVal','gstVal','sellInclVal'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    if(id==='budgetVal')el.textContent=fmt(gb);
+    if(id==='profitVal'){el.textContent=fmt(baseProfit);el.style.color=baseProfit>=0?'var(--green)':'var(--danger)';}
+    if(id==='marginVal'){el.textContent=baseMarginPct.toFixed(1)+'%';el.style.color=baseMarginPct>=0?'var(--green)':'var(--danger)';}
+    if(id==='gstVal')el.textContent=fmt(baseSellEx*0.1);
+    if(id==='sellInclVal')el.textContent=fmt(baseSellEx*1.1);
+  });
   updateSummary();
 }
 
@@ -701,10 +785,10 @@ function renderAll(){
       <div class="sec-header" onclick="toggleSec('${sec.id}',event)">
         <span class="sec-chevron">v</span>
         <span class="sec-name">${namePart}</span>
-        <span style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;${sb>0?'color:var(--accent)':'color:var(--muted)'}">${fmt(sb)}</span>
-        <span style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;${sc2>0?'color:var(--warn)':'color:var(--muted)'}">${fmt(sc2)}</span>
-        <span style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;${sa>0?'color:var(--green)':'color:var(--muted)'}">${fmt(sa)}</span>
-        <span style="width:100px;text-align:right;font-family:'DM Mono',monospace;font-size:12px" class="${svCls}">${fmtV(sv)==='--'?'--':fmtV(sv)}</span>
+        <span data-col="budget" style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;${sb>0?'color:var(--accent)':'color:var(--muted)'}">${fmt(sb)}</span>
+        <span data-col="committed" style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;${sc2>0?'color:var(--warn)':'color:var(--muted)'}">${fmt(sc2)}</span>
+        <span data-col="actuals" style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;${sa>0?'color:var(--green)':'color:var(--muted)'}">${fmt(sa)}</span>
+        <span data-col="variance" style="width:100px;text-align:right;font-family:'DM Mono',monospace;font-size:12px" class="${svCls}">${fmtV(sv)==='--'?'--':fmtV(sv)}</span>
         <span style="width:70px"></span>
         <button style="width:28px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;text-align:center" onclick="event.stopPropagation();delSec('${sec.id}')" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'" title="Delete category">x</button>
       </div>
@@ -742,10 +826,10 @@ function renderAll(){
         <div class="add-item-wrap"><button class="add-item-btn" onclick="addGrp('${sec.id}')">+ Add Line Item</button></div>
         <div class="subtotal-row">
           <span class="subtotal-lbl">Subtotal — ${namePart}</span>
-          <span class="subtotal-num" style="width:110px;color:var(--accent)">${fmt(sb)}</span>
-          <span class="subtotal-num" style="width:110px;color:var(--warn)">${fmt(sc2)}</span>
-          <span class="subtotal-num" style="width:110px;color:var(--green)">${fmt(sa)}</span>
-          <span class="subtotal-num ${svCls}" style="width:100px">${fmtV(sv)==='--'?'--':fmtV(sv)}</span>
+          <span class="subtotal-num" data-col="budget" style="width:110px;color:var(--accent)">${fmt(sb)}</span>
+          <span class="subtotal-num" data-col="committed" style="width:110px;color:var(--warn)">${fmt(sc2)}</span>
+          <span class="subtotal-num" data-col="actuals" style="width:110px;color:var(--green)">${fmt(sa)}</span>
+          <span class="subtotal-num ${svCls}" data-col="variance" style="width:100px">${fmtV(sv)==='--'?'--':fmtV(sv)}</span>
           <span style="width:70px"></span><span style="width:28px"></span>
         </div>
       </div>`;
@@ -757,12 +841,12 @@ function renderAll(){
   const gvCls=gv>0?'v-pos':gv<0?'v-neg':'v-zero';
   const totalsRow = document.createElement('div');
   totalsRow.innerHTML=`
-    <div style="display:flex;align-items:center;padding:0 16px;height:44px;background:var(--surface3);border-top:2px solid rgba(0,200,255,.3)">
+    <div class="grand-total-row" style="display:flex;align-items:center;padding:0 16px;height:44px;background:var(--surface3);border-top:2px solid rgba(0,200,255,.3)">
       <span style="flex:1;font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--text)">Total</span>
-      <span style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${fmt(gb)}</span>
-      <span style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--warn)">${fmt(gc)}</span>
-      <span style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--green)">${fmt(ga)}</span>
-      <span style="width:100px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700" class="${gvCls}">${gv===0?'--':fmtV(gv)}</span>
+      <span data-col="budget" style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${fmt(gb)}</span>
+      <span data-col="committed" style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--warn)">${fmt(gc)}</span>
+      <span data-col="actuals" style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--green)">${fmt(ga)}</span>
+      <span data-col="variance" style="width:100px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700" class="${gvCls}">${gv===0?'--':fmtV(gv)}</span>
       <span style="width:70px"></span>
       <span style="width:28px"></span>
     </div>`;
@@ -844,26 +928,31 @@ function renderAll(){
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Sell Price (ex GST)</td>
               <td style="padding:9px 14px;text-align:right" id="sellPriceTd">
-                <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--green)">${fmt(baseSellEx)}</span>
+                <input class="margin-input" type="text" inputmode="numeric" id="sellPriceInput"
+                  value="${fmtComma(baseSellEx)}"
+                  style="width:120px;text-align:right"
+                  onfocus="btFocus(this)"
+                  oninput="btNumOnly(this)"
+                  onblur="onSellPriceInput(this.value);this.value=fmtComma(this.value);saveData()" />
               </td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Profit (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${baseProfit>=0?'color:var(--green)':'color:var(--danger)'}">${fmt(baseProfit)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600" id="profitVal" style="${baseProfit>=0?'color:var(--green)':'color:var(--danger)'}">${fmt(baseProfit)}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Margin %</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${baseMarginPct>=0?'color:var(--green)':'color:var(--danger)'}">
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600" id="marginVal" style="${baseMarginPct>=0?'color:var(--green)':'color:var(--danger)'}">
                 <span id="marginDisplay">${baseMarginPct.toFixed(1)}%</span>
               </td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.12)">
               <td style="padding:9px 14px;font-size:13px;color:var(--muted)">GST @ 10%</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${fmt(baseSellEx*0.1)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)" id="gstVal">${fmt(baseSellEx*0.1)}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08);background:rgba(0,200,255,.03)">
               <td style="padding:9px 14px;font-size:13px;font-weight:600;color:var(--text)">Sell Price (incl GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${fmt(baseSellEx*1.1)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)" id="sellInclVal">${fmt(baseSellEx*1.1)}</td>
             </tr>
           </table>
         </div>
@@ -878,27 +967,23 @@ function renderAll(){
             </tr>
             <tr style="border-top:1px solid rgba(255,184,48,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">New Budget (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--warn)">${fmt(newBudgetEx)}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(255,184,48,.08)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">New Contract Value (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--text)">${fmt(newContractEx)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--warn)">${totalVarExGst>0?fmt(newBudgetEx):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(255,184,48,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Profit (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${newProfit>=0?'color:var(--green)':'color:var(--danger)'}">${fmt(newProfit)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${newProfit>=0?'color:var(--green)':'color:var(--danger)'}">${totalVarExGst>0?fmt(newProfit):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(255,184,48,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Margin %</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${newMarginPct>=0?'color:var(--green)':'color:var(--danger)'}">${newMarginPct.toFixed(1)}%</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${newMarginPct>=0?'color:var(--green)':'color:var(--danger)'}">${totalVarExGst>0?newMarginPct.toFixed(1)+'%':'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(255,184,48,.12)">
               <td style="padding:9px 14px;font-size:13px;color:var(--muted)">GST @ 10%</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${fmt(newContractGst)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${totalVarExGst>0?fmt(newContractGst):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(255,184,48,.08);background:rgba(255,184,48,.03)">
               <td style="padding:9px 14px;font-size:13px;font-weight:600;color:var(--text)">New Contract Value (incl GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${fmt(newContractIncl)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${totalVarExGst>0?fmt(newContractIncl):'--'}</td>
             </tr>
           </table>
         </div>
@@ -909,21 +994,28 @@ function renderAll(){
 
 }
 
+function btFocus(el){el.value=el.value.replace(/,/g,'');el.select();}
+function btNumOnly(el){var v=el.value.replace(/[^0-9]/g,'');el.value=v;}
+function fmtComma(n){var v=parseFloat(n)||0;return v===0?'':Math.round(v).toLocaleString('en-AU');}
 function renderGrpRow(g,secId){
   var gb=grpBudget(g),gc=grpCommitted(g),ga=grpActual(g),gv=grpVar(g);
   var gvCls=gv>0?'v-pos':gv<0?'v-neg':'v-zero';
   var poCt=g.pos.length;
-  return '<div class="grp-row" id="gr_'+g.id+'" data-secid="'+secId+'" data-gid="'+g.id+'" onclick="togglePOPanel(this.dataset.secid,this.dataset.gid)">'
+  var editing=_canEditBudget&&_budgetEditMode;
+  return '<div class="grp-row" id="gr_'+g.id+'" data-secid="'+secId+'" data-gid="'+g.id+'" onclick="'+(editing?'event.stopPropagation()':'togglePOPanel(this.dataset.secid,this.dataset.gid)')+'">'
     +'<span class="grp-name">'+g.parent+'</span>'
-    +(_canEditBudget&&_budgetEditMode
-      ?'<input class="budget-inp" type="number" value="'+(g.budget||'')+'" placeholder="0" onclick="event.stopPropagation()" data-gid="'+g.id+'" onblur="saveBudgetInline(this.dataset.gid,this.value)" />'
-      :'<span class="grp-val" style="width:110px;color:'+(gb>0?'var(--accent)':'var(--muted)')+'">'+fmt(gb)+'</span>'
+    +(editing
+      ?'<input class="budget-inp" type="text" inputmode="numeric" value="'+fmtComma(g.budget)+'" placeholder="0" onclick="event.stopPropagation()" data-gid="'+g.id+'" '
+        +'onfocus="btFocus(this)" '
+        +'oninput="btNumOnly(this)" '
+        +'onblur="saveBudgetInline(this.dataset.gid,this.value);this.value=fmtComma(this.value)" />'
+      :'<span class="grp-val" data-col="budget" style="width:110px;color:'+(gb>0?'var(--accent)':'var(--muted)')+'">'+fmt(gb)+'</span>'
     )
-    +'<span class="grp-val" style="width:110px;color:'+(gc>0?'var(--warn)':'var(--muted)')+'">'+fmt(gc)+'</span>'
-    +'<span class="grp-val" style="width:110px;color:'+(ga>0?'var(--green)':'var(--muted)')+'">'+fmt(ga)+'</span>'
-    +'<span class="grp-val '+gvCls+'" style="width:100px">'+(gb>0||gc>0?fmtV(gv):'--')+'</span>'
+    +'<span class="grp-val" data-col="committed" style="width:110px;color:'+(gc>0?'var(--warn)':'var(--muted)')+'">'+fmt(gc)+'</span>'
+    +'<span class="grp-val" data-col="actuals" style="width:110px;color:'+(ga>0?'var(--green)':'var(--muted)')+'">'+fmt(ga)+'</span>'
+    +'<span class="grp-val '+gvCls+'" data-col="variance" style="width:100px">'+(gb>0||gc>0?fmtV(gv):'--')+'</span>'
     +'<span class="grp-po-count" style="width:70px;text-align:center">'+poCt+' PO'+(poCt!==1?'s':'')+'</span>'
-    +'<span class="grp-arrow" style="width:28px;text-align:center">></span>'
+    +'<span class="grp-arrow" style="width:28px;text-align:center">'+(editing?'':'›')+'</span>'
     +'</div>'
     +'<div class="po-panel" id="pop_'+g.id+'">'
       +'<div class="po-panel-hdr"><span class="po-panel-title">Purchase Orders -- '+g.parent+'</span>'
