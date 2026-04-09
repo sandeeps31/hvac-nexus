@@ -829,6 +829,30 @@ function populateCatDD(selectedVal){
 // ── LINE ITEMS ──
 function autoResize(ta){ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';}
 
+function fmtCommaVal(v){
+  var n=parseFloat(String(v).replace(/,/g,''));
+  if(isNaN(n)||n===0)return '';
+  // Format with commas, up to 2 decimal places but strip trailing zeros
+  var s=n.toFixed(2);
+  var parts=s.split('.');
+  parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  // Strip .00 but keep .5 as .50
+  if(parts[1]==='00') return parts[0];
+  return parts.join('.');
+}
+function liCiFocus(el){
+  // Strip commas on focus so user can edit raw number
+  el.value=String(el.value).replace(/,/g,'');
+  el.select&&el.select();
+}
+function liCiBlur(el,i,field){
+  var raw=String(el.value).replace(/,/g,'');
+  var n=parseFloat(raw)||0;
+  if(field==='qty') lineItems[i].qty=n?String(n):'';
+  if(field==='price') lineItems[i].price=n?String(n):'';
+  el.value=n?fmtCommaVal(n):'';
+  updateRowTotal(i);
+}
 function updateRowTotal(i){
   const li=lineItems[i];
   const tot=num(li.qty)&&num(li.price)?fmt(num(li.qty)*num(li.price)):'—';
@@ -884,8 +908,8 @@ function renderLI(){
     const base=(i*3)+1;
     return `<tr>
       <td><textarea class="li-desc-ta" rows="1" placeholder="Description…" tabindex="${base}" id="liDesc_${i}" oninput="lineItems[${i}].desc=this.value;autoResize(this)" onkeydown="liKey(event,${i},'desc')">${li.desc||''}</textarea></td>
-      <td style="text-align:right"><input class="li-ci" type="number" value="${li.qty||''}" placeholder="0" tabindex="${base+1}" id="liQty_${i}" oninput="lineItems[${i}].qty=this.value" onblur="updateRowTotal(${i})" onkeydown="liKey(event,${i},'qty')"/></td>
-      <td style="text-align:right"><input class="li-ci" type="number" value="${li.price||''}" placeholder="0.00" tabindex="${base+2}" id="liPrice_${i}" oninput="lineItems[${i}].price=this.value" onblur="updateRowTotal(${i})" onkeydown="liKey(event,${i},'price')"/></td>
+      <td style="text-align:right"><input class="li-ci" type="text" inputmode="numeric" value="${li.qty?fmtCommaVal(li.qty):''}" placeholder="0" tabindex="${base+1}" id="liQty_${i}" oninput="lineItems[${i}].qty=this.value.replace(/,/g,'')" onfocus="liCiFocus(this)" onblur="liCiBlur(this,${i},'qty')" onkeydown="liKey(event,${i},'qty')"/></td>
+      <td style="text-align:right"><input class="li-ci" type="text" inputmode="numeric" value="${li.price?fmtCommaVal(li.price):''}" placeholder="0.00" tabindex="${base+2}" id="liPrice_${i}" oninput="lineItems[${i}].price=this.value.replace(/,/g,'')" onfocus="liCiFocus(this)" onblur="liCiBlur(this,${i},'price')" onkeydown="liKey(event,${i},'price')"/></td>
       <td style="text-align:right"><span class="li-total-val" id="liTot_${i}">${num(li.qty)&&num(li.price)?fmt(num(li.qty)*num(li.price)):'—'}</span></td>
       <td><button class="li-del" tabindex="-1" onclick="pushUndo();lineItems.splice(${i},1);renderLI()">✕</button></td>
     </tr>`;
