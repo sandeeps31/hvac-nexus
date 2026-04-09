@@ -1125,7 +1125,14 @@ function showTemplateToast(msg){
   // Load vendor invoices for actuals
   try{var vi=await dbGetVendorInvoices(_pNum);if(vi&&vi.invoices)_invoiceData=vi.invoices;}catch(e){_invoiceData=[];}
   await loadVariations();
-  if(!saved){
+  // Check if this project has any budget values set
+  function hasBudgetValues(s){
+    if(!s||!s.sections)return false;
+    return s.sections.some(function(sec){
+      return (sec.groups||[]).some(function(g){return num(g.budget)>0;});
+    });
+  }
+  if(!saved || !hasBudgetValues(saved)){
     // Try company settings budget template first (new format)
     var tplLoaded=false;
     try{
