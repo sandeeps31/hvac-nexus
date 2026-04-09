@@ -124,6 +124,26 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 .tpl-add-btn.l1{border-color:rgba(0,200,255,.3);color:var(--accent)}.tpl-add-btn.l1:hover{background:var(--accent-dim)}
 .tpl-add-btn.l2{border-color:rgba(255,184,48,.3);color:var(--warn)}.tpl-add-btn.l2:hover{background:var(--warn-dim)}
 .tpl-empty{text-align:center;padding:32px;color:var(--muted);font-size:13px}
+.bt-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px}
+.bt-card-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(0,200,255,.06);border-bottom:1px solid rgba(0,200,255,.12);cursor:default}
+.bt-card-hdr-input{flex:1;background:transparent;border:none;color:var(--accent);font-size:13px;font-weight:700;font-family:'Syne',sans-serif;outline:none;letter-spacing:.5px}
+.bt-card-hdr-input::placeholder{color:rgba(0,200,255,.4)}
+.bt-card-body{padding:6px 10px}
+.bt-l2-hdr{display:flex;align-items:center;gap:8px;padding:7px 6px 5px;border-bottom:1px solid var(--border);margin-bottom:3px;margin-top:6px}
+.bt-l2-input{flex:1;background:transparent;border:none;color:var(--warn);font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;outline:none;font-style:italic}
+.bt-l2-input::placeholder{color:rgba(255,184,48,.4)}
+.bt-item-row{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:5px;transition:background .13s}
+.bt-item-row:hover{background:var(--surface2)}
+.bt-item-input{flex:1;background:transparent;border:none;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;outline:none}
+.bt-item-input::placeholder{color:var(--muted)}
+.bt-drag{cursor:grab;color:var(--muted);font-size:12px;flex-shrink:0;}
+
+.bt-act{background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 4px;border-radius:4px;opacity:0;transition:all .13s;flex-shrink:0}
+.bt-item-row:hover .bt-act,.bt-card-hdr:hover .bt-act,.bt-l2-hdr:hover .bt-act{opacity:1}
+.bt-act:hover{color:var(--danger);background:var(--surface3)}
+.bt-add-item{display:flex;align-items:center;gap:5px;padding:5px 6px;color:var(--muted);font-size:12px;cursor:pointer;border-radius:5px;transition:all .13s;border:none;background:none;font-family:'DM Sans',sans-serif;width:100%}
+.bt-add-item:hover{color:var(--text);background:var(--surface2)}
+.bt-card-footer{padding:6px 10px;border-top:1px dashed var(--border);display:flex;gap:6px}
 .stab-inner{padding:8px 16px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent;transition:all .15s;font-family:'DM Sans',sans-serif;white-space:nowrap}
 .stab-inner:hover{color:var(--text)}
 .stab-inner.active{color:var(--accent);border-bottom-color:var(--accent)}
@@ -384,8 +404,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
               <div class="card-hdr-sub">Company-level structure used across all projects. Estimators fill in Budget and Sell Price per line item.</div>
             </div>
             <div style="display:flex;gap:7px">
-              <button class="bg bsm btn" onclick="downloadBudgetTemplate()">⬇ Download</button>
-              <button class="bp bsm btn" onclick="saveBudgetTemplateSettings()">💾 Save</button>
+              <button class="bg bsm btn" id="btEditBtn" onclick="enterBTEditMode()" style="color:var(--accent);border-color:rgba(0,200,255,.3)">&#9998; Edit</button>
+              <button class="bp bsm btn" id="btSaveBtn" onclick="saveBudgetTemplateSettings()" style="display:none">&#128190; Save</button>
             </div>
           </div>
           <div class="card-body" style="padding:14px 16px">
@@ -868,6 +888,18 @@ async function clearPrecxTemplate(){
 
 // ── BUDGET TEMPLATE BUILDER ──
 var _btRows=[];
+var _btEditMode=false;
+var _btDragId=null;
+var _btDragOverId=null;
+
+function budgetTplAddRow(type){
+  _btRows.push({id:_btNid(),type:type,name:''});
+  renderBudgetTplList();
+  setTimeout(function(){
+    var inputs=document.querySelectorAll('.bt-item-input,.bt-l2-input,.bt-card-hdr-input');
+    if(inputs.length)inputs[inputs.length-1].focus();
+  },50);
+}
 var _btUid=0;
 function _btNid(){return 'bt'+(++_btUid)+Date.now();}
 function _btEscH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -880,61 +912,157 @@ async function initBudgetTemplateBuilder(){
     }
   }catch(e){_btRows=[];}
   renderBudgetTplList();
+  _btRowsBackup=JSON.parse(JSON.stringify(_btRows));
+  lockBTView();
 }
 
 function renderBudgetTplList(){
-  var el=document.getElementById('budgetTplList');
-  if(!el)return;
+  var el=document.getElementById('budgetTplList');if(!el)return;
   if(!_btRows.length){
-    el.innerHTML='<div class="tpl-empty">No rows yet — add a Level 1 header to get started.</div>';
+    el.innerHTML='<div class="tpl-empty">No rows yet — click <strong>+ Level 1 Header</strong> to get started.</div>';
     return;
   }
-  el.innerHTML=_btRows.map(function(r,i){
-    var cls='tpl-row '+r.type;
-    var badge='',bc='';
-    if(r.type==='level1'){badge='L1';bc='badge-l1';}
-    else if(r.type==='level2'){badge='L2';bc='badge-l2';}
-    else{badge='Item';bc='badge-li';}
-    return '<div class="'+cls+'" draggable="true" data-id="'+r.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondrop="_btDrop(event,this.dataset.id)">'
-      +'<span class="tpl-row-drag">&#8597;</span>'
-      +'<span class="tpl-badge '+bc+'">'+badge+'</span>'
-      +'<input class="tpl-name-input" value="'+_btEscH(r.name)+'" placeholder="'+(r.type==='level1'?'Level 1 header…':r.type==='level2'?'Level 2 header…':'Line item name…')+'" oninput="_btRows['+i+'].name=this.value"/>'
-      +'<div class="tpl-row-actions">'
-        +(i>0?'<button class="tpl-action-btn" onclick="_btMove('+i+',-1)" title="Up">↑</button>':'')
-        +(i<_btRows.length-1?'<button class="tpl-action-btn" onclick="_btMove('+i+',1)" title="Down">↓</button>':'')
-        +'<button class="tpl-action-btn del" data-delid="'+r.id+'" onclick="_btDelete(this.dataset.delid)" title="Delete">×</button>'
+  var groups=[],ungrouped=[];
+  _btRows.forEach(function(r,i){
+    if(r.type==='level1'){groups.push({l1idx:i,l1row:r,children:[]});}
+    else if(groups.length){groups[groups.length-1].children.push({type:r.type,idx:i,row:r});}
+    else{ungrouped.push({type:r.type,idx:i,row:r});}
+  });
+  var html='';
+  if(ungrouped.length){
+    html+='<div class="bt-card"><div class="bt-card-body">';
+    ungrouped.forEach(function(c){html+=_btRenderChildRow(c);});
+    html+='</div></div>';
+  }
+  groups.forEach(function(g){
+    html+='<div class="bt-card" draggable="true" data-id="'+g.l1row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondragenter="_btDragEnter(event,this.dataset.id)" ondragend="_btDragEnd(event)" ondrop="_btDrop(event,this.dataset.id)">'
+      +'<div class="bt-card-hdr">'
+        +'<span class="bt-drag">↕</span>'
+        +'<span class="tpl-badge badge-l1">L1</span>'
+        +'<input class="bt-card-hdr-input" value="'+_btEscH(g.l1row.name)+'" placeholder="Level 1 header…" data-idx="'+g.l1idx+'" oninput="_btRows[this.dataset.idx*1].name=this.value"/>'
+        +'<button class="bt-act" data-delid="'+g.l1row.id+'" onclick="_btDelete(this.dataset.delid)">×</button>'
       +'</div>'
-      +'</div>';
-  }).join('');
+      +'<div class="bt-card-body">';
+    g.children.forEach(function(c){
+      if(c.type==='level2'){
+        html+='<div class="bt-l2-hdr" draggable="true" data-id="'+c.row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondragenter="_btDragEnter(event,this.dataset.id)" ondragend="_btDragEnd(event)" ondrop="_btDrop(event,this.dataset.id)">'
+          +'<span class="bt-drag" style="font-size:11px">↕</span>'
+          +'<span class="tpl-badge badge-l2">L2</span>'
+          +'<input class="bt-l2-input" value="'+_btEscH(c.row.name)+'" placeholder="Sub-category…" data-idx="'+c.idx+'" oninput="_btRows[this.dataset.idx*1].name=this.value"/>'
+          +'<button class="bt-act" data-delid="'+c.row.id+'" onclick="_btDelete(this.dataset.delid)">×</button>'
+        +'</div>';
+      } else {
+        html+=_btRenderChildRow(c);
+      }
+    });
+    html+='<div class="bt-card-footer">'
+      +'<button class="bt-add-item" style="color:var(--text2)" data-l1id="'+g.l1row.id+'" data-type="lineitem" onclick="_btAddAfter(this.dataset.l1id,this.dataset.type)">＋ Line Item</button>'
+      +'<button class="bt-add-item" style="color:var(--warn)" data-l1id="'+g.l1row.id+'" data-type="level2" onclick="_btAddAfter(this.dataset.l1id,this.dataset.type)">＋ Sub-category</button>'
+    +'</div>'
+    +'</div></div>';
+  });
+  el.innerHTML=html;
 }
-
-function budgetTplAddRow(type){
-  _btRows.push({id:_btNid(),type:type,name:''});
+function _btRenderChildRow(c){
+  return '<div class="bt-item-row" draggable="true" data-id="'+c.row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondragenter="_btDragEnter(event,this.dataset.id)" ondragend="_btDragEnd(event)" ondrop="_btDrop(event,this.dataset.id)">'
+    +'<span class="bt-drag">↕</span>'
+    +'<span class="tpl-badge badge-li">Item</span>'
+    +'<input class="bt-item-input" value="'+_btEscH(c.row.name)+'" placeholder="Line item name…" data-idx="'+c.idx+'" oninput="_btRows[this.dataset.idx*1].name=this.value"/>'
+    +'<button class="bt-act" data-delid="'+c.row.id+'" onclick="_btDelete(this.dataset.delid)">×</button>'
+    +'</div>';
+}
+function _btAddAfter(l1id,type){
+  var l1idx=_btRows.findIndex(function(r){return r.id===l1id;});
+  if(l1idx<0)return;
+  var insertAt=l1idx+1;
+  while(insertAt<_btRows.length&&_btRows[insertAt].type!=='level1'){insertAt++;}
+  _btRows.splice(insertAt,0,{id:_btNid(),type:type,name:''});
   renderBudgetTplList();
-  setTimeout(function(){var inputs=document.querySelectorAll('.tpl-name-input');if(inputs.length)inputs[inputs.length-1].focus();},50);
+  setTimeout(function(){var inputs=document.querySelectorAll('.bt-item-input,.bt-l2-input');if(inputs.length)inputs[inputs.length-1].focus();},50);
 }
 function _btDelete(id){_btRows=_btRows.filter(function(r){return r.id!==id;});renderBudgetTplList();}
 function _btMove(idx,dir){
   var ni=idx+dir;if(ni<0||ni>=_btRows.length)return;
   var t=_btRows[idx];_btRows[idx]=_btRows[ni];_btRows[ni]=t;renderBudgetTplList();
 }
-var _btDragId=null;
-function _btDragStart(e,id){_btDragId=id;e.dataTransfer.effectAllowed='move';}
+function _btDragStart(e,id){
+  _btDragId=id;
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(function(){
+    document.querySelectorAll('[data-id="'+id+'"]').forEach(function(el){el.style.opacity='0.4';});
+  },0);
+}
+function _btDragEnd(e){
+  _btDragId=null;_btDragOverId=null;
+  document.querySelectorAll('.bt-card,.bt-item-row,.bt-l2-hdr').forEach(function(el){
+    el.style.opacity='';el.style.borderTop='';el.style.borderBottom='';
+  });
+}
+function _btDragEnter(e,id){
+  if(!_btDragId||_btDragId===id)return;
+  _btDragOverId=id;
+  // Clear all indicators first
+  document.querySelectorAll('.bt-card,.bt-item-row,.bt-l2-hdr').forEach(function(el){
+    el.style.borderTop='';el.style.borderBottom='';
+  });
+  // Show drop line above target
+  var target=document.querySelector('[data-id="'+id+'"]');
+  if(target)target.style.borderTop='2px solid var(--accent)';
+}
 function _btDrop(e,targetId){
-  e.preventDefault();if(!_btDragId||_btDragId===targetId)return;
+  e.preventDefault();
+  document.querySelectorAll('.bt-card,.bt-item-row,.bt-l2-hdr').forEach(function(el){
+    el.style.opacity='';el.style.borderTop='';el.style.borderBottom='';
+  });
+  if(!_btDragId||_btDragId===targetId)return;
   var fi=_btRows.findIndex(function(r){return r.id===_btDragId;});
   var ti=_btRows.findIndex(function(r){return r.id===targetId;});
   if(fi<0||ti<0)return;
-  var item=_btRows.splice(fi,1)[0];_btRows.splice(ti,0,item);
-  _btDragId=null;renderBudgetTplList();
+  var item=_btRows.splice(fi,1)[0];
+  _btRows.splice(ti,0,item);
+  _btDragId=null;_btDragOverId=null;
+  renderBudgetTplList();
 }
 
+function enterBTEditMode(){
+  _btEditMode=true;
+  document.getElementById('btEditBtn').style.display='none';
+  document.getElementById('btSaveBtn').style.display='';
+  document.getElementById('budgetTplList').style.pointerEvents='';
+  // Enable all inputs
+  document.querySelectorAll('.bt-card-hdr-input,.bt-l2-input,.bt-item-input').forEach(function(el){el.readOnly=false;el.style.cursor='text';});
+  document.querySelectorAll('.bt-drag').forEach(function(el){el.style.display='';});
+  document.querySelectorAll('.bt-act').forEach(function(el){el.style.display='';});
+  document.querySelectorAll('.bt-card-footer,.tpl-add-btns').forEach(function(el){el.style.display='';});
+}
+var _btRowsBackup=[];
+// cancelBTEditMode removed
+function _cancelBTEditMode_unused(){
+  _btEditMode=false;
+  _btRows=JSON.parse(JSON.stringify(_btRowsBackup));
+  document.getElementById('btEditBtn').style.display='';
+  document.getElementById('btSaveBtn').style.display='none';
+  renderBudgetTplList();
+  lockBTView();
+}
+function lockBTView(){
+  document.querySelectorAll('.bt-card-hdr-input,.bt-l2-input,.bt-item-input').forEach(function(el){el.readOnly=true;el.style.cursor='default';});
+  document.querySelectorAll('.bt-drag').forEach(function(el){el.style.display='none';});
+  document.querySelectorAll('.bt-act').forEach(function(el){el.style.display='none';});
+  document.querySelectorAll('.bt-card-footer,.tpl-add-btns').forEach(function(el){el.style.display='none';});
+}
 async function saveBudgetTemplateSettings(){
   try{
     var s=await dbGetCompanySettings()||{};
     s.budgetTemplate={rows:_btRows,updatedAt:new Date().toISOString()};
     await dbSetCompanySettings(s);
     showToast('Budget template saved');
+    _btRowsBackup=JSON.parse(JSON.stringify(_btRows));
+    document.getElementById('btEditBtn').style.display='';
+    document.getElementById('btSaveBtn').style.display='none';
+    document.getElementById('btCancelBtn').style.display='none';
+    lockBTView();
+    _btEditMode=false;
   }catch(e){alert('Save failed: '+e.message);}
 }
 
