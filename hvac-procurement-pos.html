@@ -175,6 +175,7 @@ tr:hover .ra{opacity:1}
 .li-desc-ta::placeholder{color:var(--muted)}
 .li-ci{background:var(--surface3);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:12.5px;outline:none;text-align:right;padding:5px 8px;border-radius:6px;transition:border-color .15s,background .15s;width:100%}
 .li-ci:focus{background:var(--surface2);border-color:var(--accent)}
+.cat-opt:hover{background:var(--surface3)!important}.cat-opt-sel{color:var(--accent)!important;font-weight:500}
 .li-ci::placeholder{color:var(--muted)}
 .li-total-val{font-family:'DM Mono',monospace;font-size:12.5px;color:var(--text)}
 .li-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;opacity:0;padding:0 2px;transition:opacity .13s}
@@ -344,7 +345,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
         </div>
         <div class="meta-row">
           <div class="mf"><span class="ml">Budget Category *</span>
-            <select class="ms" id="po-cat" style="min-width:220px" onchange="onCatChange(this.value)"><option value="">Select category…</option></select>
+            <div class="cat-combo" id="catCombo" style="position:relative;min-width:220px">
+              <input class="mi" id="po-cat-input" placeholder="Search or select category…" autocomplete="off"
+                oninput="catComboFilter(this.value)"
+                onfocus="catComboOpen()"
+                onblur="setTimeout(catComboClose,150)"
+                onkeydown="catComboKey(event)"/>
+              <input type="hidden" id="po-cat"/>
+              <div id="catComboList" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--surface2);border:1.5px solid var(--accent);border-top:none;border-radius:0 0 7px 7px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
+            </div>
           </div>
           <div class="mf"><span class="ml">Supplier *</span>
             <input class="mi" id="po-supplier" placeholder="Supplier name…"/>
@@ -784,8 +793,8 @@ function setFieldsReadOnly(ro){
     var el=document.getElementById(id);
     if(el){el.disabled=ro;}
   });
-  var catSel=document.getElementById('po-cat');
-  if(catSel) catSel.disabled=ro;
+  var catInp=document.getElementById('po-cat-input');
+  if(catInp) catInp.disabled=ro;
   // Line items — disable all inputs
   document.querySelectorAll('.li-desc-ta,.li-ci').forEach(function(el){el.disabled=ro;});
   // Add LI / delete LI buttons
@@ -795,39 +804,119 @@ function setFieldsReadOnly(ro){
 }
 
 // ── CATEGORY DROPDOWN ──
+// ── SEARCHABLE CATEGORY COMBO ──
+var _catOptions = []; // [{value, label, group}]
+var _catComboIdx = -1;
+
 function populateCatDD(selectedVal){
   var sv=(selectedVal||'').trim();
-  const sel=document.getElementById('po-cat');
-  sel.innerHTML='<option value="">Select category…</option>';
+  _catOptions=[];
   var budSecs=(_budgetData&&_budgetData.sections&&_budgetData.sections.length)?_budgetData.sections:null;
   if(budSecs){
     budSecs.forEach(function(sec){
       var grpItems=sec.groups.filter(function(g){return !g.isL2Header;});
       if(!grpItems.length)return;
       var secShort=sec.name.replace(/^\d+\.\s*/,'');
-      var og=document.createElement('optgroup');og.label=secShort;sel.appendChild(og);
       grpItems.forEach(function(g){
-        var opt=document.createElement('option');
-        opt.value=sec.name+'||'+g.parent;
-        opt.textContent=g.parent;
-        // Match on full value OR just the grp name (fallback for URL-passed grp-only matches)
-        if(sv&&(opt.value===sv||g.parent===sv.split('||')[1]))opt.selected=true;
-        og.appendChild(opt);
+        _catOptions.push({value:sec.name+'||'+g.parent,label:g.parent,group:secShort});
       });
     });
   } else {
-    let lastSec='';
-    CATEGORIES.forEach(c=>{
-      if(c.section!==lastSec){const og=document.createElement('optgroup');og.label=c.section_short;sel.appendChild(og);lastSec=c.section;}
-      const opt=document.createElement('option');
-      opt.value=c.section+'||'+c.name;opt.textContent=c.name;
-      if(sv&&opt.value===sv)opt.selected=true;
-      sel.lastChild.appendChild(opt);
+    CATEGORIES.forEach(function(c){
+      _catOptions.push({value:c.section+'||'+c.name,label:c.name,group:c.section_short});
     });
   }
-  // Force-set value then fire change with whatever was actually selected
-  if(sv) sel.value=sv;
-  onCatChange(sel.value||'');
+  // Set selected value
+  var matched=_catOptions.find(function(o){return o.value===sv||(sv&&o.label===sv.split('||')[1]);});
+  var hiddenSel=document.getElementById('po-cat');
+  var inp=document.getElementById('po-cat-input');
+  if(matched){
+    if(hiddenSel)hiddenSel.value=matched.value;
+    if(inp)inp.value=matched.label;
+    onCatChange(matched.value);
+  } else {
+    if(hiddenSel)hiddenSel.value='';
+    if(inp)inp.value='';
+    onCatChange('');
+  }
+}
+
+function catComboFilter(q){
+  catComboOpen(q);
+}
+
+function catComboOpen(q){
+  var list=document.getElementById('catComboList');
+  if(!list)return;
+  var query=(q||document.getElementById('po-cat-input').value||'').toLowerCase().trim();
+  var filtered=query?_catOptions.filter(function(o){
+    return o.label.toLowerCase().includes(query)||o.group.toLowerCase().includes(query);
+  }):_catOptions;
+  if(!filtered.length){list.style.display='none';return;}
+  var lastGroup='';
+  var html='';
+  filtered.forEach(function(o,i){
+    if(o.group!==lastGroup){
+      html+='<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:6px 12px 2px;background:var(--surface3)">'
+        +escH(o.group)+'</div>';
+      lastGroup=o.group;
+    }
+    var cur=document.getElementById('po-cat').value===o.value;
+    html+='<div class="cat-opt'+(cur?' cat-opt-sel':'')+'" data-val="'+escH(o.value)+'" data-lbl="'+escH(o.label)+'" data-idx="'+i+'"'
+      +' onmousedown="catComboSelect(this.dataset.val,this.dataset.lbl)"'
+      +' style="padding:7px 14px;cursor:pointer;font-size:13px;color:'+(cur?'var(--accent)':'var(--text)')+';">'
+      +escH(o.label)+'</div>';
+  });
+  list.innerHTML=html;
+  list.style.display='block';
+  _catComboIdx=-1;
+}
+
+function catComboClose(){
+  var list=document.getElementById('catComboList');
+  if(list)list.style.display='none';
+  // If input doesn't match a valid option, clear it
+  var inp=document.getElementById('po-cat-input');
+  var hid=document.getElementById('po-cat');
+  if(inp&&hid){
+    var val=hid.value;
+    var matched=_catOptions.find(function(o){return o.value===val;});
+    if(!matched){inp.value='';hid.value='';onCatChange('');}
+  }
+}
+
+function catComboSelect(val,lbl){
+  document.getElementById('po-cat').value=val;
+  document.getElementById('po-cat-input').value=lbl;
+  document.getElementById('catComboList').style.display='none';
+  onCatChange(val);
+}
+
+function catComboKey(e){
+  var list=document.getElementById('catComboList');
+  if(!list||list.style.display==='none'){
+    if(e.key==='ArrowDown'||e.key==='Enter'){catComboOpen();return;}
+    return;
+  }
+  var opts=list.querySelectorAll('.cat-opt');
+  if(!opts.length)return;
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    _catComboIdx=Math.min(_catComboIdx+1,opts.length-1);
+    opts.forEach(function(o,i){o.style.background=i===_catComboIdx?'var(--surface)':'';});
+    opts[_catComboIdx]&&opts[_catComboIdx].scrollIntoView({block:'nearest'});
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    _catComboIdx=Math.max(_catComboIdx-1,0);
+    opts.forEach(function(o,i){o.style.background=i===_catComboIdx?'var(--surface)':'';});
+    opts[_catComboIdx]&&opts[_catComboIdx].scrollIntoView({block:'nearest'});
+  } else if(e.key==='Enter'&&_catComboIdx>=0){
+    e.preventDefault();
+    var o=opts[_catComboIdx];
+    if(o)catComboSelect(o.dataset.val,o.dataset.lbl);
+  } else if(e.key==='Escape'){
+    list.style.display='none';
+  }
 }
 
 
@@ -1314,7 +1403,7 @@ function updateBudgetPanel(){
     if(barWrap)barWrap.style.display='none';
     if(committed===0&&thisPO===0){
       if(alert)alert.className='bp-alert visible info';
-      if(alertMsg)alertMsg.innerHTML='No budget set for this line \u2014 contact your Estimator.';
+      if(alertMsg)alertMsg.innerHTML='No budget set for this line';
     } else {
       if(alert)alert.className='bp-alert visible danger';
       if(alertMsg)alertMsg.innerHTML='\u26a0 Budget exceeded \u2014 no budget set for this line.';
