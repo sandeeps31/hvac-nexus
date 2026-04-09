@@ -888,6 +888,18 @@ async function clearPrecxTemplate(){
 
 // ── BUDGET TEMPLATE BUILDER ──
 var _btRows=[];
+var _btEditMode=false;
+var _btDragId=null;
+var _btDragOverId=null;
+
+function budgetTplAddRow(type){
+  _btRows.push({id:_btNid(),type:type,name:''});
+  renderBudgetTplList();
+  setTimeout(function(){
+    var inputs=document.querySelectorAll('.bt-item-input,.bt-l2-input,.bt-card-hdr-input');
+    if(inputs.length)inputs[inputs.length-1].focus();
+  },50);
+}
 var _btUid=0;
 function _btNid(){return 'bt'+(++_btUid)+Date.now();}
 function _btEscH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -900,6 +912,8 @@ async function initBudgetTemplateBuilder(){
     }
   }catch(e){_btRows=[];}
   renderBudgetTplList();
+  _btRowsBackup=JSON.parse(JSON.stringify(_btRows));
+  lockBTView();
 }
 
 function renderBudgetTplList(){
@@ -921,7 +935,7 @@ function renderBudgetTplList(){
     html+='</div></div>';
   }
   groups.forEach(function(g){
-    html+='<div class="bt-card" draggable="true" data-id="'+g.l1row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondrop="_btDrop(event,this.dataset.id)">'
+    html+='<div class="bt-card" draggable="true" data-id="'+g.l1row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondragenter="_btDragEnter(event,this.dataset.id)" ondragend="_btDragEnd(event)" ondrop="_btDrop(event,this.dataset.id)">'
       +'<div class="bt-card-hdr">'
         +'<span class="bt-drag">↕</span>'
         +'<span class="tpl-badge badge-l1">L1</span>'
@@ -931,7 +945,7 @@ function renderBudgetTplList(){
       +'<div class="bt-card-body">';
     g.children.forEach(function(c){
       if(c.type==='level2'){
-        html+='<div class="bt-l2-hdr" draggable="true" data-id="'+c.row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondrop="_btDrop(event,this.dataset.id)">'
+        html+='<div class="bt-l2-hdr" draggable="true" data-id="'+c.row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondragenter="_btDragEnter(event,this.dataset.id)" ondragend="_btDragEnd(event)" ondrop="_btDrop(event,this.dataset.id)">'
           +'<span class="bt-drag" style="font-size:11px">↕</span>'
           +'<span class="tpl-badge badge-l2">L2</span>'
           +'<input class="bt-l2-input" value="'+_btEscH(c.row.name)+'" placeholder="Sub-category…" data-idx="'+c.idx+'" oninput="_btRows[this.dataset.idx*1].name=this.value"/>'
@@ -950,7 +964,7 @@ function renderBudgetTplList(){
   el.innerHTML=html;
 }
 function _btRenderChildRow(c){
-  return '<div class="bt-item-row" draggable="true" data-id="'+c.row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondrop="_btDrop(event,this.dataset.id)">'
+  return '<div class="bt-item-row" draggable="true" data-id="'+c.row.id+'" ondragstart="_btDragStart(event,this.dataset.id)" ondragover="event.preventDefault()" ondragenter="_btDragEnter(event,this.dataset.id)" ondragend="_btDragEnd(event)" ondrop="_btDrop(event,this.dataset.id)">'
     +'<span class="bt-drag">↕</span>'
     +'<span class="tpl-badge badge-li">Item</span>'
     +'<input class="bt-item-input" value="'+_btEscH(c.row.name)+'" placeholder="Line item name…" data-idx="'+c.idx+'" oninput="_btRows[this.dataset.idx*1].name=this.value"/>'
@@ -971,23 +985,85 @@ function _btMove(idx,dir){
   var ni=idx+dir;if(ni<0||ni>=_btRows.length)return;
   var t=_btRows[idx];_btRows[idx]=_btRows[ni];_btRows[ni]=t;renderBudgetTplList();
 }
-var _btDragId=null;
-function _btDragStart(e,id){_btDragId=id;e.dataTransfer.effectAllowed='move';}
+function _btDragStart(e,id){
+  _btDragId=id;
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(function(){
+    document.querySelectorAll('[data-id="'+id+'"]').forEach(function(el){el.style.opacity='0.4';});
+  },0);
+}
+function _btDragEnd(e){
+  _btDragId=null;_btDragOverId=null;
+  document.querySelectorAll('.bt-card,.bt-item-row,.bt-l2-hdr').forEach(function(el){
+    el.style.opacity='';el.style.borderTop='';el.style.borderBottom='';
+  });
+}
+function _btDragEnter(e,id){
+  if(!_btDragId||_btDragId===id)return;
+  _btDragOverId=id;
+  // Clear all indicators first
+  document.querySelectorAll('.bt-card,.bt-item-row,.bt-l2-hdr').forEach(function(el){
+    el.style.borderTop='';el.style.borderBottom='';
+  });
+  // Show drop line above target
+  var target=document.querySelector('[data-id="'+id+'"]');
+  if(target)target.style.borderTop='2px solid var(--accent)';
+}
 function _btDrop(e,targetId){
-  e.preventDefault();if(!_btDragId||_btDragId===targetId)return;
+  e.preventDefault();
+  document.querySelectorAll('.bt-card,.bt-item-row,.bt-l2-hdr').forEach(function(el){
+    el.style.opacity='';el.style.borderTop='';el.style.borderBottom='';
+  });
+  if(!_btDragId||_btDragId===targetId)return;
   var fi=_btRows.findIndex(function(r){return r.id===_btDragId;});
   var ti=_btRows.findIndex(function(r){return r.id===targetId;});
   if(fi<0||ti<0)return;
-  var item=_btRows.splice(fi,1)[0];_btRows.splice(ti,0,item);
-  _btDragId=null;renderBudgetTplList();
+  var item=_btRows.splice(fi,1)[0];
+  _btRows.splice(ti,0,item);
+  _btDragId=null;_btDragOverId=null;
+  renderBudgetTplList();
 }
 
+function enterBTEditMode(){
+  _btEditMode=true;
+  document.getElementById('btEditBtn').style.display='none';
+  document.getElementById('btSaveBtn').style.display='';
+  document.getElementById('btCancelBtn').style.display='';
+  document.getElementById('budgetTplList').style.pointerEvents='';
+  // Enable all inputs
+  document.querySelectorAll('.bt-card-hdr-input,.bt-l2-input,.bt-item-input').forEach(function(el){el.readOnly=false;el.style.cursor='text';});
+  document.querySelectorAll('.bt-drag').forEach(function(el){el.style.display='';});
+  document.querySelectorAll('.bt-act').forEach(function(el){el.style.display='';});
+  document.querySelectorAll('.bt-card-footer,.tpl-add-btns').forEach(function(el){el.style.display='';});
+}
+var _btRowsBackup=[];
+function cancelBTEditMode(){
+  _btEditMode=false;
+  _btRows=JSON.parse(JSON.stringify(_btRowsBackup));
+  document.getElementById('btEditBtn').style.display='';
+  document.getElementById('btSaveBtn').style.display='none';
+  document.getElementById('btCancelBtn').style.display='none';
+  renderBudgetTplList();
+  lockBTView();
+}
+function lockBTView(){
+  document.querySelectorAll('.bt-card-hdr-input,.bt-l2-input,.bt-item-input').forEach(function(el){el.readOnly=true;el.style.cursor='default';});
+  document.querySelectorAll('.bt-drag').forEach(function(el){el.style.display='none';});
+  document.querySelectorAll('.bt-act').forEach(function(el){el.style.display='none';});
+  document.querySelectorAll('.bt-card-footer,.tpl-add-btns').forEach(function(el){el.style.display='none';});
+}
 async function saveBudgetTemplateSettings(){
   try{
     var s=await dbGetCompanySettings()||{};
     s.budgetTemplate={rows:_btRows,updatedAt:new Date().toISOString()};
     await dbSetCompanySettings(s);
     showToast('Budget template saved');
+    _btRowsBackup=JSON.parse(JSON.stringify(_btRows));
+    document.getElementById('btEditBtn').style.display='';
+    document.getElementById('btSaveBtn').style.display='none';
+    document.getElementById('btCancelBtn').style.display='none';
+    lockBTView();
+    _btEditMode=false;
   }catch(e){alert('Save failed: '+e.message);}
 }
 
