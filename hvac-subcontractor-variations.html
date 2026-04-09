@@ -110,6 +110,41 @@ input[type=number]{-moz-appearance:textfield}
 .sv-tot-row.final .sv-tot-val{font-size:14px;font-weight:700;color:var(--accent)}
 .sv-add-li{width:100%;background:none;border:none;border-top:1px dashed var(--border);color:var(--muted);font-size:12px;font-family:'DM Sans',sans-serif;padding:7px 10px;cursor:pointer;text-align:left;transition:color .15s}
 .sv-add-li:hover{color:var(--accent)}
+/* Full-page SV detail view */
+.view{display:none}.view.active{display:block}
+.sv-detail-hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:18px 28px}
+.sv-detail-title-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.sv-detail-num{font-family:'DM Mono',monospace;font-size:12px;color:var(--purple);background:var(--surface3);border:1px solid var(--border);padding:3px 10px;border-radius:20px}
+.sv-detail-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--text);flex:1}
+.sv-meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.sv-mf{display:flex;flex-direction:column;gap:4px}
+.sv-ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.sv-mv{font-size:13px;color:var(--text);font-weight:500}
+.sv-mv.mono{font-family:'DM Mono',monospace}
+.sv-section{margin:0 28px 20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.sv-section-hdr{padding:10px 16px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)}
+.sv-section-body{padding:14px 16px}
+/* Company summary */
+.co-sum-wrap{margin:0 0 0;background:var(--surface);border-bottom:1px solid var(--border)}
+.co-sum-hdr{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;user-select:none}
+.co-sum-hdr-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);flex:1}
+.co-sum-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.co-sum-tbl th{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:6px 16px;text-align:left;border-bottom:1px solid var(--border)}
+.co-sum-tbl th.r,.co-sum-tbl td.r{text-align:right}
+.co-sum-tbl td{padding:8px 16px;border-bottom:1px solid var(--border);color:var(--text)}
+.co-sum-tbl tr:last-child td{border-bottom:none}
+.co-sum-tbl tr{cursor:pointer;transition:background .12s}
+.co-sum-tbl tr:hover{background:var(--surface2)}
+/* Doc attach */
+.doc-drop{border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+.doc-drop.over{border-color:var(--accent);background:var(--accent-dim)}
+.doc-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.doc-drop-lbl{color:var(--muted);font-size:12.5px}
+.doc-drop-lbl strong{color:var(--accent)}
+.doc-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;margin-top:8px}
+.doc-item-name{flex:1;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-item-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;flex-shrink:0}
+.doc-item-del:hover{color:var(--danger)}
 
 /* LINK VAR SECTION inside modal */
 .link-section{margin-top:12px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;overflow:hidden}
@@ -225,17 +260,18 @@ input[type=number]{-moz-appearance:textfield}
   </div>
   <div style="display:flex;gap:8px">
     <button class="bg bsm btn" onclick="navTo('hvac-variations.html')">My Variations →</button>
-    <button class="bp bsm btn" onclick="openAddModal()">＋ Add Subbie Var</button>
+    <button class="bp bsm btn" id="topAddBtn" onclick="openNewSV()">＋ Add Subbie Var</button>
   </div>
 </div>
 
 <!-- SUMMARY BAR -->
 <div class="sum-bar">
   <div class="sc cb"><div class="sc-lbl">Total</div><div class="sc-val" id="sTotal">0</div><div class="sc-sub">subbie variations</div></div>
+  <div class="sc cg"><div class="sc-lbl">Approved</div><div class="sc-val" id="sApprovedCount">0</div><div class="sc-sub">variations approved</div></div>
+  <div class="sc cg"><div class="sc-lbl">Approved Value</div><div class="sc-val" id="sApproved">—</div><div class="sc-sub">ex GST</div></div>
   <div class="sc cw"><div class="sc-lbl">Pending</div><div class="sc-val" id="sPending">0</div><div class="sc-sub">awaiting decision</div></div>
-  <div class="sc cg"><div class="sc-lbl">Approved</div><div class="sc-val" id="sApproved">—</div><div class="sc-sub">total value ex GST</div></div>
+  <div class="sc cw"><div class="sc-lbl">Pending Value</div><div class="sc-val" id="sPendingVal">—</div><div class="sc-sub">ex GST</div></div>
   <div class="sc cd"><div class="sc-lbl">Rejected</div><div class="sc-val" id="sRejected">0</div><div class="sc-sub">not proceeding</div></div>
-  <div class="sc"><div class="sc-lbl">Unlinked</div><div class="sc-val" id="sUnlinked" style="color:var(--warn)">0</div><div class="sc-sub">no variation linked</div></div>
 </div>
 
 <!-- TOOLBAR -->
@@ -255,6 +291,21 @@ input[type=number]{-moz-appearance:textfield}
   <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="svCount"></span>
 </div>
 
+<!-- VIEW: LIST -->
+<div class="view active" id="view-list">
+<!-- COMPANY SUMMARY -->
+<div class="co-sum-wrap">
+  <div class="co-sum-hdr" onclick="toggleCoSum()">
+    <span class="co-sum-hdr-lbl">Summary by Subcontractor</span>
+    <span id="coSumChev" style="font-size:11px;color:var(--muted)">▾</span>
+  </div>
+  <div id="coSumBody" style="display:none;overflow:auto">
+    <table class="co-sum-tbl">
+      <thead><tr><th>Subcontractor</th><th class="r"># SVs</th><th class="r">Pending (ex GST)</th><th class="r">Approved (ex GST)</th><th class="r">Total (ex GST)</th></tr></thead>
+      <tbody id="coSumRows"></tbody>
+    </table>
+  </div>
+</div>
 <div class="page">
   <div class="tw">
     <table class="dt">
@@ -264,12 +315,9 @@ input[type=number]{-moz-appearance:textfield}
           <th>Subcontractor</th>
           <th>Description</th>
           <th class="r">Value (ex GST)</th>
-          <th class="r">GST</th>
-          <th class="r">Total (incl GST)</th>
           <th>Status</th>
-          <th>Linked variation</th>
+          <th>Linked Variation</th>
           <th style="width:110px">PO</th>
-          <th style="width:36px"></th>
         </tr>
       </thead>
       <tbody id="svBody"></tbody>
@@ -278,65 +326,90 @@ input[type=number]{-moz-appearance:textfield}
 </div>
 </div>
 
-<!-- ADD / EDIT SUBBIE VAR MODAL -->
-<div class="mo" id="addModal" onclick="if(event.target===this)closeAddModal()">
-  <div class="modal">
-    <h3 id="modalTitle">Add Subbie Variation</h3>
-    <p class="msub">Record a variation raised by a subcontractor.</p>
-    <div class="mgrid">
-      <div><label class="ml">SV Number *</label><input class="mi mono" id="f-num" placeholder="e.g. SV-001"/></div>
-      <div><label class="ml">Subcontractor *</label><input class="mi" id="f-subbie" placeholder="e.g. Acme Duct Co."/></div>
+<!-- VIEW: DETAIL -->
+<div class="view" id="view-detail">
+  <div class="sv-detail-hdr">
+    <div class="sv-detail-title-row">
+      <div class="sv-detail-num" id="det-num">SV-001</div>
+      <div class="sv-detail-title" id="det-title">—</div>
+      <button class="bg bsm btn" id="det-editBtn" onclick="enterSVEditMode()" style="display:none">✏️ Edit</button>
+      <button class="bp bsm btn" id="det-saveBtn" onclick="saveSV()" style="display:none">💾 Save</button>
+      <button class="bg bsm btn" id="det-cancelBtn" onclick="cancelSVEdit()" style="display:none">Cancel</button>
+      <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" id="det-deleteBtn" onclick="deleteSV()" style="display:none">🗑 Delete</button>
+      <button class="bg bsm btn" onclick="goList()">← Back</button>
     </div>
-    <label class="ml">Description *</label>
-    <input class="mi" id="f-desc" placeholder="Brief description of the variation claim"/>
-    <label class="ml">Scope of works</label>
-    <textarea class="mta" id="f-sow" placeholder="Detailed scope of works for this subbie variation…"></textarea>
-    <div style="margin-top:4px">
-      <label class="ml">Status</label>
-      <select class="ms" id="f-status" style="width:auto;min-width:160px">
-        <option value="Pending">Pending</option>
-        <option value="Approved">Approved</option>
-        <option value="Rejected">Rejected</option>
-      </select>
-    </div>
-    <label class="ml">Line Items (ex GST)</label>
-    <div class="sv-li-wrap">
-      <table class="sv-li-tbl">
-        <thead><tr>
-          <th style="width:40%">Description</th>
-          <th class="r" style="width:15%">Qty</th>
-          <th class="r" style="width:22%">Price / Unit</th>
-          <th class="r" style="width:18%">Total</th>
-          <th style="width:5%"></th>
-        </tr></thead>
-        <tbody id="svLiBody"></tbody>
-      </table>
-      <button class="sv-add-li" onclick="svAddLI()">＋ Add line item</button>
-    </div>
-    <div class="sv-tot-row"><span class="sv-tot-lbl">Subtotal (ex GST)</span><span class="sv-tot-val" id="svTotSub">$0.00</span></div>
-    <div class="sv-tot-row"><span class="sv-tot-lbl">GST (10%)</span><span class="sv-tot-val" id="svTotGst">$0.00</span></div>
-    <div class="sv-tot-row final"><span class="sv-tot-lbl">Total (incl GST)</span><span class="sv-tot-val" id="svTotIncl">$0.00</span></div>
-
-    <!-- LINKED VARIATION SECTION -->
-    <div class="link-section" style="margin-top:14px">
-      <div class="link-section-hdr">
-        <span class="link-section-title">Linked variation</span>
-        <div style="display:flex;gap:6px">
-          <button class="bsm btn bg" onclick="openVarPicker()" id="linkVarBtn">＋ Link to variation</button>
-          <button class="bsm btn" style="background:var(--purple-dim);color:var(--purple);border:1px solid rgba(167,139,250,.3)" onclick="openQuickCreateVar()">✦ Create new variation</button>
-        </div>
-      </div>
-      <div id="linkedVarDisplay" style="padding:14px;color:var(--muted);font-size:12.5px;text-align:center">
-        Not linked — link or create a variation above
-      </div>
-    </div>
-
-    <div class="mac">
-      <button class="bdanger bsm btn" id="deleteBtn" style="display:none;margin-right:auto" onclick="deleteSV()">Delete</button>
-      <button class="bg bsm btn" onclick="closeAddModal()">Cancel</button>
-      <button class="bp bsm btn" onclick="saveSV()">Save</button>
+    <div class="sv-meta-grid">
+      <div class="sv-mf"><span class="sv-ml">SV Number</span><div><input class="mi mono" id="f-num" style="display:none"/><span class="sv-mv mono" id="det-num-val">—</span></div></div>
+      <div class="sv-mf"><span class="sv-ml">Subcontractor</span><div><input class="mi" id="f-subbie" style="display:none"/><span class="sv-mv" id="det-subbie-val">—</span></div></div>
+      <div class="sv-mf"><span class="sv-ml">Status</span><div><select class="ms" id="f-status" style="display:none"><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select><span class="sv-mv" id="det-status-val">—</span></div></div>
+      <div class="sv-mf"><span class="sv-ml">Value (ex GST)</span><span class="sv-mv mono" id="det-value-val" style="color:var(--accent)">—</span></div>
     </div>
   </div>
+
+  <!-- Description + Scope -->
+  <div class="sv-section" style="margin-top:20px">
+    <div class="sv-section-hdr">Description &amp; Scope</div>
+    <div class="sv-section-body">
+      <div style="margin-bottom:10px">
+        <span class="sv-ml">Description</span>
+        <input class="mi" id="f-desc" style="display:none;margin-top:4px"/>
+        <div class="sv-mv" id="det-desc-val" style="margin-top:4px">—</div>
+      </div>
+      <div>
+        <span class="sv-ml">Scope of Works</span>
+        <textarea class="mta" id="f-sow" style="display:none;margin-top:4px"></textarea>
+        <div class="sv-mv" id="det-sow-val" style="margin-top:4px;white-space:pre-wrap;color:var(--text2);font-size:12.5px">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Line Items -->
+  <div class="sv-section">
+    <div class="sv-section-hdr">Line Items (ex GST)</div>
+    <div>
+      <div class="sv-li-wrap" style="border-radius:0;border:none;border-bottom:1px solid var(--border)">
+        <table class="sv-li-tbl">
+          <thead><tr>
+            <th style="width:40%">Description</th>
+            <th class="r" style="width:15%">Qty</th>
+            <th class="r" style="width:22%">Price / Unit</th>
+            <th class="r" style="width:18%">Total</th>
+            <th style="width:5%"></th>
+          </tr></thead>
+          <tbody id="svLiBody"></tbody>
+        </table>
+        <button class="sv-add-li" id="svAddLiBtn" onclick="svAddLI()" style="display:none">＋ Add line item</button>
+      </div>
+      <div class="sv-tot-row"><span class="sv-tot-lbl">Subtotal (ex GST)</span><span class="sv-tot-val" id="svTotSub">$0.00</span></div>
+      <div class="sv-tot-row"><span class="sv-tot-lbl">GST (10%)</span><span class="sv-tot-val" id="svTotGst">$0.00</span></div>
+      <div class="sv-tot-row final"><span class="sv-tot-lbl">Total (incl GST)</span><span class="sv-tot-val" id="svTotIncl">$0.00</span></div>
+    </div>
+  </div>
+
+  <!-- Linked Variation -->
+  <div class="sv-section">
+    <div class="sv-section-hdr" style="display:flex;align-items:center;gap:8px">
+      <span style="flex:1">Linked Variation</span>
+      <div id="det-link-btns" style="display:none;gap:6px;align-items:center">
+        <button class="bsm btn bg" onclick="openVarPicker()">＋ Link to variation</button>
+        <button class="bsm btn" style="background:var(--purple-dim);color:var(--purple);border:1px solid rgba(167,139,250,.3)" onclick="openQuickCreateVar()">✦ Create new variation</button>
+      </div>
+    </div>
+    <div class="sv-section-body" id="linkedVarDisplay">—</div>
+  </div>
+
+  <!-- Documents -->
+  <div class="sv-section">
+    <div class="sv-section-hdr">Documents &amp; Attachments</div>
+    <div class="sv-section-body">
+      <div class="doc-drop" id="docDrop" ondragover="docDragOver(event)" ondragleave="docDragLeave(event)" ondrop="docDrop(event)">
+        <input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.eml,.msg" onchange="docFileChange(event)"/>
+        <div class="doc-drop-lbl">📎 <strong>Click to attach</strong> or drag &amp; drop quotes, emails, PDFs</div>
+      </div>
+      <div id="docList"></div>
+    </div>
+  </div>
+</div>
 </div>
 
 <!-- VARIATION PICKER MODAL -->
@@ -557,18 +630,18 @@ function syncValueToVariation(svId, svNum, svSubbie, svValue){
 
 // SUMMARY
 function updateSummary(){
-  var pending=0,approvedVal=0,rejected=0,unlinked=0;
+  var pending=0,pendingVal=0,approvedCount=0,approvedVal=0,rejected=0;
   subVars.forEach(function(sv){
-    if(sv.status==='Pending') pending++;
-    else if(sv.status==='Approved') approvedVal+=num(sv.value);
+    if(sv.status==='Pending'){pending++;pendingVal+=num(sv.value);}
+    else if(sv.status==='Approved'){approvedCount++;approvedVal+=num(sv.value);}
     else if(sv.status==='Rejected') rejected++;
-    if(!sv.linkedVarId) unlinked++;
   });
   document.getElementById('sTotal').textContent=subVars.length;
+  document.getElementById('sApprovedCount').textContent=approvedCount;
+  document.getElementById('sApproved').textContent=approvedVal>0?fmtSm(approvedVal):'—';
   document.getElementById('sPending').textContent=pending;
-  document.getElementById('sApproved').textContent=fmtSm(approvedVal);
+  document.getElementById('sPendingVal').textContent=pendingVal>0?fmtSm(pendingVal):'—';
   document.getElementById('sRejected').textContent=rejected;
-  document.getElementById('sUnlinked').textContent=unlinked;
 }
 
 // RENDER LIST
@@ -597,22 +670,19 @@ function renderList(){
     if(sv.linkedVarId&&sv.linkedVarNum){
       linkCell='<span class="var-link-chip" onclick="event.stopPropagation();navTo(\'hvac-variations.html\')" title="Open in Variations">'+escH(sv.linkedVarNum)+' — '+escH(sv.linkedVarTitle||'')+'</span>';
     } else {
-      linkCell='<span class="unlinked-chip" onclick="event.stopPropagation();openEditModal(\''+sv.id+'\');setTimeout(openVarPicker,200)">＋ Link variation</span>';
+      linkCell='<span class="unlinked-chip" onclick="event.stopPropagation();openSVDetail(\''+sv.id+'\',true)">＋ Link variation</span>';
     }
     var hasPo=!!sv.poId;
-    rows+='<tr onclick="openEditModal(\''+sv.id+'\')">'
+    rows+='<tr onclick="openSVDetail(\''+sv.id+'\')">'
       +'<td class="sv-num">'+escH(sv.num||'—')+'</td>'
       +'<td style="font-weight:500;color:var(--text)">'+escH(sv.subbie||'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(sv.desc||'—')+'</td>'
-      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(sv.value)+'</td>'
-      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmt(gst)+'</td>'
-      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:600">'+fmt(total)+'</td>'
+      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">'+fmt(sv.value)+'</td>'
       +'<td><span class="sb-badge '+(stMap[sv.status]||'st-pending')+'">'+escH(sv.status)+'</span></td>'
       +'<td>'+linkCell+'</td>'
-      +'<td onclick="event.stopPropagation()"><button onclick="openEditModal(\''+sv.id+'\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 5px" onmouseover="this.style.color=\'var(--accent)\'" onmouseout="this.style.color=\'var(--muted)\'">✎</button></td>'
       +'<td onclick="event.stopPropagation()" style="white-space:nowrap">'
       +(sv.status==='Approved'&&!hasPo
-        ?'<button class="ia" onclick="raisePO(\''+sv.id+'\')" title="Raise PO" style="font-size:11px;padding:4px 10px;background:var(--accent);color:#000;border:none;border-radius:6px;cursor:pointer">&#128196; Raise PO</button>'
+        ?'<button class="ia" onclick="event.stopPropagation();raisePO(\''+sv.id+'\')" title="Raise PO" style="font-size:11px;padding:4px 10px;background:var(--accent);color:#000;border:none;border-radius:6px;cursor:pointer">&#128196; Raise PO</button>'
         :(hasPo?'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--green)">&#10003; PO '+escH(sv.poRef||'')+'</span>':'')
       )
       +'</td>'
@@ -694,41 +764,11 @@ function svRenderLI(){
   svUpdateTot();
 }
 
-function openAddModal(){
-  editingId=null;linkedVar=null;
-  _svLineItems=[{id:svNid(),desc:'',qty:'',price:''}];
-  document.getElementById('modalTitle').textContent='Add Subbie Variation';
-  document.getElementById('f-num').value=genSVNum();
-  document.getElementById('f-subbie').value='';
-  document.getElementById('f-desc').value='';
-  document.getElementById('f-sow').value='';
-  document.getElementById('f-status').value='Pending';
-  document.getElementById('deleteBtn').style.display='none';
-  renderLinkedVarDisplay();
-  svRenderLI();
-  document.getElementById('addModal').classList.add('open');
-  setTimeout(function(){document.getElementById('f-subbie').focus();},80);
-}
-function openEditModal(id){
-  var sv=subVars.find(function(x){return x.id===id;});if(!sv)return;
-  editingId=id;
-  linkedVar=sv.linkedVarId?{id:sv.linkedVarId,num:sv.linkedVarNum,title:sv.linkedVarTitle}:null;
-  document.getElementById('modalTitle').textContent='Edit Subbie Variation';
-  document.getElementById('f-num').value=sv.num||'';
-  document.getElementById('f-subbie').value=sv.subbie||'';
-  document.getElementById('f-desc').value=sv.desc||'';
-  document.getElementById('f-sow').value=sv.sow||'';
-  _svLineItems=(sv.lineItems&&sv.lineItems.length)?JSON.parse(JSON.stringify(sv.lineItems)):[{id:svNid(),desc:'',qty:'',price:''}];
-  document.getElementById('f-status').value=sv.status||'Pending';
-  document.getElementById('deleteBtn').style.display='';
-  renderLinkedVarDisplay();
-  svRenderLI();
-  document.getElementById('addModal').classList.add('open');
-}
-function closeAddModal(){document.getElementById('addModal').classList.remove('open');}
+// openAddModal/openEditModal replaced by openNewSV/openSVDetail
 
 function renderLinkedVarDisplay(){
   var el=document.getElementById('linkedVarDisplay');
+  if(!el)return;
   if(linkedVar){
     el.innerHTML='<div class="linked-var-display">'
       +'<div style="flex:1">'
@@ -777,13 +817,13 @@ function saveSV(){
   if(sv.linkedVarId){
     syncValueToVariation(sv.id, sv.num, sv.subbie, sv.value);
   }
-  save();closeAddModal();renderList();
+  save();renderList();
 }
 
 function deleteSV(){
   if(!editingId||!confirm('Delete this subbie variation?'))return;
   subVars=subVars.filter(function(x){return x.id!==editingId;});
-  save();closeAddModal();renderList();
+  save();renderList();goList();
 }
 
 // VARIATION PICKER
@@ -854,6 +894,178 @@ function confirmQuickVar(){
     saveSV(); // save the subbie var first
     navTo('hvac-variations.html');
   }
+}
+
+
+// ── VIEW MANAGEMENT ──
+var _svReadOnly = false;
+var _svEditingId = null;
+var _svDocs = []; // [{name, url, type}]
+
+function showView(v){
+  document.querySelectorAll('.view').forEach(function(el){el.classList.remove('active');});
+  document.getElementById('view-'+v).classList.add('active');
+}
+
+function goList(){
+  showView('list');
+  document.getElementById('topAddBtn').style.display='';
+}
+
+function openNewSV(){
+  _svReadOnly=false; editingId=null; linkedVar=null;
+  _svLineItems=[{id:svNid(),desc:'',qty:'',price:''}];
+  _svDocs=[];
+  document.getElementById('f-num').value=genSVNum();
+  document.getElementById('f-subbie').value='';
+  document.getElementById('f-desc').value='';
+  document.getElementById('f-sow').value='';
+  document.getElementById('f-status').value='Pending';
+  document.getElementById('det-num').textContent='New SV';
+  document.getElementById('det-title').textContent='New Subbie Variation';
+  setSVFieldVis(true);
+  document.getElementById('det-editBtn').style.display='none';
+  document.getElementById('det-saveBtn').style.display='';
+  document.getElementById('det-cancelBtn').style.display='';
+  document.getElementById('det-deleteBtn').style.display='none';
+  document.getElementById('det-link-btns').style.display='flex';
+  document.getElementById('svAddLiBtn').style.display='';
+  renderLinkedVarDisplay();
+  svRenderLI();
+  renderDocList();
+  document.getElementById('topAddBtn').style.display='none';
+  showView('detail');
+  setTimeout(function(){document.getElementById('f-subbie').focus();},80);
+}
+
+function openSVDetail(id, autoLink){
+  var sv=subVars.find(function(x){return x.id===id;});if(!sv)return;
+  _svReadOnly=true; editingId=id;
+  linkedVar=sv.linkedVarId?{id:sv.linkedVarId,num:sv.linkedVarNum,title:sv.linkedVarTitle}:null;
+  _svLineItems=(sv.lineItems&&sv.lineItems.length)?JSON.parse(JSON.stringify(sv.lineItems)):[{id:svNid(),desc:'',qty:'',price:''}];
+  _svDocs=sv.docs?JSON.parse(JSON.stringify(sv.docs)):[];
+  // Fill fields
+  document.getElementById('f-num').value=sv.num||'';
+  document.getElementById('f-subbie').value=sv.subbie||'';
+  document.getElementById('f-desc').value=sv.desc||'';
+  document.getElementById('f-sow').value=sv.sow||'';
+  document.getElementById('f-status').value=sv.status||'Pending';
+  // Display vals
+  document.getElementById('det-num').textContent=sv.num||'—';
+  document.getElementById('det-num-val').textContent=sv.num||'—';
+  document.getElementById('det-title').textContent=sv.desc||'—';
+  document.getElementById('det-subbie-val').textContent=sv.subbie||'—';
+  document.getElementById('det-desc-val').textContent=sv.desc||'—';
+  document.getElementById('det-sow-val').textContent=sv.sow||'—';
+  document.getElementById('det-status-val').textContent=sv.status||'—';
+  document.getElementById('det-value-val').textContent=fmt(sv.value);
+  setSVFieldVis(false);
+  document.getElementById('det-editBtn').style.display='';
+  document.getElementById('det-saveBtn').style.display='none';
+  document.getElementById('det-cancelBtn').style.display='none';
+  document.getElementById('det-deleteBtn').style.display='none';
+  document.getElementById('det-link-btns').style.display='none';
+  document.getElementById('svAddLiBtn').style.display='none';
+  renderLinkedVarDisplay();
+  svRenderLI();
+  renderDocList();
+  document.getElementById('topAddBtn').style.display='none';
+  showView('detail');
+  if(autoLink) setTimeout(openVarPicker,200);
+}
+
+function enterSVEditMode(){
+  _svReadOnly=false;
+  setSVFieldVis(true);
+  document.getElementById('det-editBtn').style.display='none';
+  document.getElementById('det-saveBtn').style.display='';
+  document.getElementById('det-cancelBtn').style.display='';
+  document.getElementById('det-deleteBtn').style.display='';
+  document.getElementById('det-link-btns').style.display='flex';
+  document.getElementById('svAddLiBtn').style.display='';
+  svRenderLI();
+}
+
+function cancelSVEdit(){
+  if(editingId){ openSVDetail(editingId); }
+  else goList();
+}
+
+function setSVFieldVis(edit){
+  ['f-num','f-subbie','f-desc','f-sow','f-status'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display=edit?'':'none';
+  });
+  ['det-num-val','det-subbie-val','det-desc-val','det-sow-val','det-status-val'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display=edit?'none':'';
+  });
+  // line item inputs
+  document.querySelectorAll('.sv-li-inp').forEach(function(el){el.disabled=!edit;el.style.opacity=edit?'1':'0.6';});
+  document.querySelectorAll('.sv-li-del').forEach(function(el){el.style.display=edit?'':'none';});
+}
+
+// ── COMPANY SUMMARY ──
+var _coSumOpen = false;
+function toggleCoSum(){
+  _coSumOpen=!_coSumOpen;
+  document.getElementById('coSumBody').style.display=_coSumOpen?'block':'none';
+  document.getElementById('coSumChev').textContent=_coSumOpen?'▾':'▸';
+  if(_coSumOpen) renderCoSum();
+}
+function renderCoSum(){
+  var map={};
+  subVars.forEach(function(sv){
+    var k=sv.subbie||'Unknown';
+    if(!map[k])map[k]={count:0,pending:0,approved:0};
+    map[k].count++;
+    if(sv.status==='Approved') map[k].approved+=num(sv.value);
+    else if(sv.status==='Pending') map[k].pending+=num(sv.value);
+  });
+  var html='';
+  Object.keys(map).sort().forEach(function(k){
+    var r=map[k];
+    var total=r.pending+r.approved;
+    html+='<tr data-sub="'+escH(k)+'" onclick="filterBySubbie(this.dataset.sub)">'
+      +'<td style="font-weight:500">'+escH(k)+'</td>'
+      +'<td class="r" style="color:var(--muted)">'+r.count+'</td>'
+      +'<td class="r" style="color:var(--warn)">'+fmtSm(r.pending)+'</td>'
+      +'<td class="r" style="color:var(--green)">'+fmtSm(r.approved)+'</td>'
+      +'<td class="r" style="color:var(--accent);font-weight:600">'+fmtSm(total)+'</td>'
+      +'</tr>';
+  });
+  document.getElementById('coSumRows').innerHTML=html||'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:14px">No data</td></tr>';
+}
+function filterBySubbie(name){
+  document.getElementById('srch').value=name;
+  renderList();
+  // scroll to list
+  document.querySelector('.page').scrollIntoView({behavior:'smooth'});
+}
+
+// ── DOCUMENT HANDLING ──
+function docDragOver(e){e.preventDefault();document.getElementById('docDrop').classList.add('over');}
+function docDragLeave(e){document.getElementById('docDrop').classList.remove('over');}
+function docDrop(e){
+  e.preventDefault();
+  document.getElementById('docDrop').classList.remove('over');
+  handleDocFiles(e.dataTransfer.files);
+}
+function docFileChange(e){handleDocFiles(e.target.files);}
+function handleDocFiles(files){
+  Array.from(files).forEach(function(f){
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      _svDocs.push({name:f.name,url:ev.target.result,type:f.type,size:f.size});
+      renderDocList();
+    };
+    reader.readAsDataURL(f);
+  });
+}
+function removeDoc(idx){_svDocs.splice(idx,1);renderDocList();}
+function renderDocList(){
+  var el=document.getElementById('docList');if(!el)return;
+  el.innerHTML=_svDocs.map(function(d,i){
+    return '<div class="doc-item">'      +'<span style="font-size:16px">'+(d.type&&d.type.includes('pdf')?'📄':(d.type&&d.type.includes('image')?'🖼️':'📎'))+'</span>'      +'<span class="doc-item-name">'+escH(d.name)+'</span>'      +'<a href="'+d.url+'" download="'+escH(d.name)+'" style="color:var(--accent);font-size:12px;text-decoration:none">⬇️</a>'      +'<button class="doc-item-del" onclick="removeDoc('+i+')">✕</button>'      +'</div>';
+  }).join('');
 }
 
 window.addEventListener('DOMContentLoaded',async function(){await load();renderList();});
