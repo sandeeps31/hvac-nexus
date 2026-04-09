@@ -310,8 +310,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 <div class="sum-bar">
   <div class="sc cb"><div class="sc-lbl">Budget</div><div class="sc-val" id="sum-budget">—</div><div class="sc-sub">Tender estimate</div></div>
   <div class="sc cw"><div class="sc-lbl">Committed</div><div class="sc-val" id="sum-committed">—</div><div class="sc-sub">Ex GST</div></div>
-  <div class="sc"><div class="sc-lbl">Actuals</div><div class="sc-val" id="sum-actual">—</div><div class="sc-sub">Approved invoices</div></div>
-  <div class="sc"><div class="sc-lbl">Actual (Invoiced)</div><div class="sc-val" id="sum-actual">—</div><div class="sc-sub">Ex GST</div></div>
   <div class="sc"><div class="sc-lbl">Variance</div><div class="sc-val" id="sum-var">—</div><div class="sc-sub" id="sum-var-sub">vs budget</div></div>
   <div class="sc"><div class="sc-lbl">Margin %</div><div class="sc-val" id="sum-margin">—</div><div class="sc-sub" id="sum-margin-sub">—</div></div>
 </div>
@@ -601,6 +599,7 @@ function getVarExGst(v){
 }
 function getVarTotal(v){var ex=getVarExGst(v);return ex+ex*0.1;}
 
+var varRegCollapsed=false;
 function toggleVarReg(){
   varRegCollapsed=!varRegCollapsed;
   var body=document.getElementById('varRegBody');
@@ -694,7 +693,6 @@ function updateSummary(){
   const mAmt=b*(margin/100),sell=b+mAmt;
   document.getElementById('sum-budget').textContent=fmt(b);
   document.getElementById('sum-committed').textContent=fmt(c);
-  var sumActEl=document.getElementById('sum-actual');if(sumActEl)sumActEl.textContent=fmt(grandActual());
   var _actual=grandActual();
   var actEl=document.getElementById('sum-actual');if(actEl)actEl.textContent=fmt(_actual);
   document.getElementById('sum-var').textContent=fmtV(v);
@@ -730,6 +728,7 @@ function togglePOPanel(secId,grpId){
 
 // -- RENDER --
 function renderAll(){
+  updateSummary();
   const q=(document.getElementById('searchInput').value||'').toLowerCase();
   const page=document.getElementById('pageContent');
   page.innerHTML='';
@@ -941,9 +940,17 @@ function renderAll(){
         <div style="background:rgba(0,200,255,.04);border:1px solid rgba(0,200,255,.18);border-radius:8px;overflow:hidden">
           <div style="padding:7px 14px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);border-bottom:1px solid rgba(0,200,255,.12)">Base Contract</div>
           <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:rgba(0,200,255,.06)">
+                <td style="padding:7px 14px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)"></td>
+                <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent)">Budget</td>
+                <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--warn)">Committed</td>
+              </tr>
+            </thead>
             <tr>
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Budget (ex GST)</td>
+              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Cost (ex GST)</td>
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--accent)">${fmt(gb)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${gc>0?'var(--warn)':'var(--muted)'}">${gc>0?fmt(gc):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Sell Price (ex GST)</td>
@@ -953,24 +960,31 @@ function renderAll(){
                   : '<span style="font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:var(--green)" id="sellPriceInput">'+fmt(baseSellEx)+'</span>'
                 }
               </td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--green)">${gc>0?fmt(baseSellEx):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Profit (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600" id="profitVal" style="${baseProfit>=0?'color:var(--green)':'color:var(--danger)'}">${fmt(baseProfit)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${baseProfit>=0?'color:var(--green)':'color:var(--danger)'}" id="profitVal">${fmt(baseProfit)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${(baseSellEx-gc)>=0?'color:var(--green)':'color:var(--danger)'}">${gc>0?fmt(baseSellEx-gc):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Margin %</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600" id="marginVal" style="${baseMarginPct>=0?'color:var(--green)':'color:var(--danger)'}">
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${baseMarginPct>=0?'color:var(--green)':'color:var(--danger)'}" id="marginVal">
                 <span id="marginDisplay">${baseMarginPct.toFixed(1)}%</span>
+              </td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${baseSellEx>0&&gc>0?((baseSellEx-gc)/baseSellEx*100)>=0?'color:var(--green)':'color:var(--danger)':'color:var(--muted)'}">
+                ${gc>0&&baseSellEx>0?((baseSellEx-gc)/baseSellEx*100).toFixed(1)+'%':'--'}
               </td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.12)">
               <td style="padding:9px 14px;font-size:13px;color:var(--muted)">GST @ 10%</td>
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)" id="gstVal">${fmt(baseSellEx*0.1)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${gc>0?fmt(baseSellEx*0.1):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08);background:rgba(0,200,255,.03)">
               <td style="padding:9px 14px;font-size:13px;font-weight:600;color:var(--text)">Sell Price (incl GST)</td>
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)" id="sellInclVal">${fmt(baseSellEx*1.1)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${gc>0?fmt(baseSellEx*1.1):'--'}</td>
             </tr>
           </table>
         </div>
