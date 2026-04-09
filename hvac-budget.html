@@ -929,94 +929,92 @@ function renderAll(){
   const newMarginPct    = newBudgetEx > 0 ? (newProfit / newContractEx * 100) : 0;
   const varColor        = totalVarExGst > 0 ? 'color:var(--green)' : 'color:var(--muted)';
 
+  const committedMarginPct = gc>0&&baseSellEx>0 ? (baseSellEx-gc)/baseSellEx*100 : null;
   const totalsCard = document.createElement('div');
   totalsCard.innerHTML = `<div class="totals-card">
-    <div class="totals-hdr">Totals</div>
-    <table class="totals-tbl">
-      <tr><td colspan="2" style="padding:8px 18px 4px">
-        <div style="background:rgba(0,200,255,.04);border:1px solid rgba(0,200,255,.18);border-radius:8px;overflow:hidden">
-          <div style="padding:7px 14px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);border-bottom:1px solid rgba(0,200,255,.12)">Base Contract</div>
-          <table style="width:100%;border-collapse:collapse">
-            <thead>
-              <tr style="background:rgba(0,200,255,.06)">
-                <td style="padding:7px 14px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)"></td>
-                <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent)">Budget</td>
-                <td style="padding:7px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--warn)">Committed</td>
-              </tr>
-            </thead>
-            <tr>
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Cost (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--accent)">${fmt(gb)}</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${gc>0?'var(--warn)':'var(--muted)'}">${gc>0?fmt(gc):'--'}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(0,200,255,.08)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Sell Price (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right" id="sellPriceTd">
-                ${_budgetEditMode
-                  ? '<input class="margin-input" type="text" inputmode="numeric" id="sellPriceInput" value="'+fmtComma(baseSellEx)+'" style="width:120px;text-align:right" onfocus="btFocus(this)" oninput="btNumOnly(this)" onblur="onSellPriceInput(this.value);this.value=fmtComma(this.value);saveData()" />'
-                  : '<span style="font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:var(--green)" id="sellPriceInput">'+fmt(baseSellEx)+'</span>'
-                }
-              </td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--green)">${gc>0?fmt(baseSellEx):'--'}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(0,200,255,.08)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Profit (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${baseProfit>=0?'color:var(--green)':'color:var(--danger)'}" id="profitVal">${fmt(baseProfit)}</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${(baseSellEx-gc)>=0?'color:var(--green)':'color:var(--danger)'}">${gc>0?fmt(baseSellEx-gc):'--'}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(0,200,255,.08)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Margin %</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${baseMarginPct>=0?'color:var(--green)':'color:var(--danger)'}" id="marginVal">
-                <span id="marginDisplay">${baseMarginPct.toFixed(1)}%</span>
-              </td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${baseSellEx>0&&gc>0?((baseSellEx-gc)/baseSellEx*100)>=0?'color:var(--green)':'color:var(--danger)':'color:var(--muted)'}">
-                ${gc>0&&baseSellEx>0?((baseSellEx-gc)/baseSellEx*100).toFixed(1)+'%':'--'}
-              </td>
-            </tr>
-            <tr style="border-top:1px solid rgba(0,200,255,.12)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--muted)">GST @ 10%</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)" id="gstVal">${fmt(baseSellEx*0.1)}</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${gc>0?fmt(baseSellEx*0.1):'--'}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(0,200,255,.08);background:rgba(0,200,255,.03)">
-              <td style="padding:9px 14px;font-size:13px;font-weight:600;color:var(--text)">Sell Price (incl GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)" id="sellInclVal">${fmt(baseSellEx*1.1)}</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${gc>0?fmt(baseSellEx*1.1):'--'}</td>
-            </tr>
-          </table>
-        </div>
-      </td></tr>
+    <div class="totals-hdr">Base Contract</div>
+    <table class="totals-tbl" style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:var(--surface2)">
+          <th style="padding:8px 18px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)"></th>
+          <th style="padding:8px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--border)">Budget</th>
+          <th style="padding:8px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--warn);border-bottom:1px solid var(--border)">Committed</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 18px;font-size:13px;color:var(--text2)">Cost (ex GST)</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--accent)">${fmt(gb)}</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${gc>0?'var(--warn)':'var(--muted)'}">${gc>0?fmt(gc):'--'}</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 18px;font-size:13px;color:var(--text2)">Sell Price (ex GST)</td>
+          <td style="padding:10px 18px;text-align:right" id="sellPriceTd">
+            ${_budgetEditMode
+              ? '<input class="margin-input" type="text" inputmode="numeric" id="sellPriceInput" value="'+fmtComma(baseSellEx)+'" style="width:120px;text-align:right" onfocus="btFocus(this)" oninput="btNumOnly(this)" onblur="onSellPriceInput(this.value);this.value=fmtComma(this.value);saveData()" />'
+              : '<span style="font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:var(--green)" id="sellPriceInput">'+fmt(baseSellEx)+'</span>'
+            }
+          </td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--green)">${gc>0?fmt(baseSellEx):'--'}</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 18px;font-size:13px;color:var(--text2)">Profit (ex GST)</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${baseProfit>=0?'var(--green)':'var(--danger)'}" id="profitVal">${fmt(baseProfit)}</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${gc>0?(baseSellEx-gc)>=0?'var(--green)':'var(--danger)':'var(--muted)'}">${gc>0?fmt(baseSellEx-gc):'--'}</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 18px;font-size:13px;color:var(--text2)">Margin %</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${baseMarginPct>=0?'var(--green)':'var(--danger)'}" id="marginVal"><span id="marginDisplay">${baseMarginPct.toFixed(1)}%</span></td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${committedMarginPct!==null?committedMarginPct>=0?'var(--green)':'var(--danger)':'var(--muted)'}">${committedMarginPct!==null?committedMarginPct.toFixed(1)+'%':'--'}</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 18px;font-size:13px;color:var(--muted)">GST @ 10%</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)" id="gstVal">${fmt(baseSellEx*0.1)}</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${gc>0?fmt(baseSellEx*0.1):'--'}</td>
+        </tr>
+        <tr style="background:var(--surface2)">
+          <td style="padding:10px 18px;font-size:13px;font-weight:600;color:var(--text)">Sell Price (incl GST)</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)" id="sellInclVal">${fmt(baseSellEx*1.1)}</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${gc>0?fmt(baseSellEx*1.1):'--'}</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="totals-tbl" style="width:100%;border-collapse:collapse;margin-top:12px">
+      <thead>
+        <tr style="background:var(--surface2)">
+          <th colspan="2" style="padding:8px 18px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--warn);border-bottom:1px solid var(--border)">Variations</th>
+        </tr>
+      </thead>
+      <tbody>
       <tr><td colspan="2" style="padding:2px 18px 4px">
         <div style="background:rgba(255,184,48,.04);border:1px solid rgba(255,184,48,.18);border-radius:8px;overflow:hidden;margin-bottom:4px">
           <div style="padding:7px 14px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn);border-bottom:1px solid rgba(255,184,48,.12)">Variations</div>
           <table style="width:100%;border-collapse:collapse">
-            <tr>
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Total Approved Variations (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${varColor}">${totalVarExGst>0?fmt(totalVarExGst):'--'}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(255,184,48,.08)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">New Budget (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--warn)">${totalVarExGst>0?fmt(newBudgetEx):'--'}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(255,184,48,.08)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Profit (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${newProfit>=0?'color:var(--green)':'color:var(--danger)'}">${totalVarExGst>0?fmt(newProfit):'--'}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(255,184,48,.08)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Margin %</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${newMarginPct>=0?'color:var(--green)':'color:var(--danger)'}">${totalVarExGst>0?newMarginPct.toFixed(1)+'%':'--'}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(255,184,48,.12)">
-              <td style="padding:9px 14px;font-size:13px;color:var(--muted)">GST @ 10%</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${totalVarExGst>0?fmt(newContractGst):'--'}</td>
-            </tr>
-            <tr style="border-top:1px solid rgba(255,184,48,.08);background:rgba(255,184,48,.03)">
-              <td style="padding:9px 14px;font-size:13px;font-weight:600;color:var(--text)">New Contract Value (incl GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${totalVarExGst>0?fmt(newContractIncl):'--'}</td>
-            </tr>
-          </table>
-        </div>
-      </td></tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 18px;font-size:13px;color:var(--text2)">Total Approved Variations (ex GST)</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${varColor}">${totalVarExGst>0?fmt(totalVarExGst):'--'}</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 18px;font-size:13px;color:var(--text2)">New Budget (ex GST)</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--warn)">${totalVarExGst>0?fmt(newBudgetEx):'--'}</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 18px;font-size:13px;color:var(--text2)">Profit (ex GST)</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${newProfit>=0?'color:var(--green)':'color:var(--danger)'}">${totalVarExGst>0?fmt(newProfit):'--'}</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 18px;font-size:13px;color:var(--text2)">Margin %</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;${newMarginPct>=0?'color:var(--green)':'color:var(--danger)'}">${totalVarExGst>0?newMarginPct.toFixed(1)+'%':'--'}</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 18px;font-size:13px;color:var(--muted)">GST @ 10%</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${totalVarExGst>0?fmt(newContractGst):'--'}</td>
+        </tr>
+        <tr style="background:var(--surface2)">
+          <td style="padding:10px 18px;font-size:13px;font-weight:600;color:var(--text)">New Contract Value (incl GST)</td>
+          <td style="padding:10px 18px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${totalVarExGst>0?fmt(newContractIncl):'--'}</td>
+        </tr>
+      </tbody>
     </table>
   </div>`;
   page.appendChild(totalsCard);
