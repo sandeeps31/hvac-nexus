@@ -326,7 +326,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
           <th class="r" style="min-width:100px">Subtotal</th>
           <th class="r" style="min-width:80px">GST</th>
           <th class="r" style="min-width:110px">Total incl GST</th>
-          <th style="width:110px">Order Date</th><th style="width:110px">Delivery</th><th style="width:40px"></th>
+          <th style="width:110px">Delivery</th><th style="width:40px"></th>
         </tr></thead>
         <tbody id="poBody"></tbody>
       </table></div>
@@ -345,9 +345,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
           </div>
           <div class="mf"><span class="ml">Supplier *</span>
             <input class="mi" id="po-supplier" placeholder="Supplier name…"/>
-          </div>
-          <div class="mf"><span class="ml">Order Date</span>
-            <input class="mi" id="po-order-date" type="date"/>
           </div>
           <div class="mf"><span class="ml">Delivery Date</span>
             <input class="mi" id="po-delivery" type="date" onkeydown="if(event.key==='Tab'&&!event.shiftKey){event.preventDefault();var el=document.getElementById('liDesc_0');if(el){el.focus();}}"/>
@@ -590,6 +587,7 @@ function onCatChange(catVal){
   if(panel) panel.style.display='none';
   suggPanelOpen=false;
   if(btn) btn.textContent='💡 Show Procurement Suggestions';
+  updateBudgetPanel();
 }
 
 
@@ -642,16 +640,9 @@ function updateSummary(){
 }
 
 function populateFilters(){
-  var cats=[];
-  if(_budgetData&&_budgetData.sections&&_budgetData.sections.length){
-    _budgetData.sections.forEach(function(sec){
-      sec.groups.forEach(function(g){if(!g.isL2Header)cats.push(g.parent);});
-    });
-  } else {
-    cats=[...new Set(CATEGORIES.map(c=>c.name))];
-  }
+  const cats=[...new Set(CATEGORIES.map(c=>c.name))];
   const cf=document.getElementById('catFil'),cur=cf.value;
-  cf.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option${c===cur?' selected':''}>${escH(c)}</option>`).join('');
+  cf.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
 }
 
 // ── VIEWS ──
@@ -691,7 +682,6 @@ function renderList(){
       <td class="r" style="font-family:'DM Mono',monospace;font-size:12px">${fmtZ(sub)}</td>
       <td class="r" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${fmtZ(gst)}</td>
       <td class="r" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">${fmtZ(tot)}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.orderDate)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.delivery)}</td>
       <td><span class="po-st ${p.status==='Approved'?'ps-a':'ps-r'}">● ${p.status}</span></td>
       <td onclick="event.stopPropagation()"><div class="ra"><button class="ia del" onclick="delPO('${p._secId}','${p._grpId}','${p.id}')">✕</button></div></td>
@@ -707,7 +697,7 @@ function setPOView(poId){
   document.getElementById('topCreateBtn').style.display='none';
 }
 
-function openNewPO(preCatVal){
+function openNewPO(){
   editingPO=null; lineItems=[{id:nid(),desc:'',qty:'',price:''}];
   document.getElementById('po-page-num').textContent=genPONum();
   document.getElementById('po-page-title').textContent='New Purchase Order';
@@ -716,8 +706,7 @@ function openNewPO(preCatVal){
   document.getElementById('po-notes').value='';
   document.getElementById('po-file-lbl').textContent='Attach PDF (optional)';
   document.getElementById('deletePOBtn').style.display='none';
-  document.getElementById('po-order-date').value=new Date().toISOString().split('T')[0];
-  populateCatDD(preCatVal||'');
+  populateCatDD('');
   renderLI();
   setPOView('New PO');
   setTimeout(()=>document.getElementById('po-cat').focus(),100);
@@ -734,7 +723,6 @@ function openPO(sid,gid,pid){
   document.getElementById('po-delivery').value=po.delivery||'';
   document.getElementById('po-notes').value=po.notes||'';
   document.getElementById('po-file-lbl').textContent=po.fileName||'Attach PDF (optional)';
-  document.getElementById('po-order-date').value=po.orderDate||'';
   document.getElementById('deletePOBtn').style.display='';
   populateCatDD(sec&&g?sec.name+'||'+g.parent:'');
   renderLI();
@@ -745,31 +733,14 @@ function openPO(sid,gid,pid){
 function populateCatDD(selectedVal){
   const sel=document.getElementById('po-cat');
   sel.innerHTML='<option value="">Select category…</option>';
-  // Always build from live project budget if available; fall back to hardcoded CATEGORIES
-  var budSecs=(_budgetData&&_budgetData.sections&&_budgetData.sections.length)?_budgetData.sections:null;
-  if(budSecs){
-    budSecs.forEach(function(sec){
-      var lineItems=sec.groups.filter(function(g){return !g.isL2Header;});
-      if(!lineItems.length)return;
-      var secShort=sec.name.replace(/^\d+\.\s*/,'');
-      var og=document.createElement('optgroup');og.label=secShort;sel.appendChild(og);
-      lineItems.forEach(function(g){
-        var opt=document.createElement('option');
-        opt.value=sec.name+'||'+g.parent;opt.textContent=g.parent;
-        if(selectedVal&&opt.value===selectedVal)opt.selected=true;
-        og.appendChild(opt);
-      });
-    });
-  } else {
-    let lastSec='';
-    CATEGORIES.forEach(c=>{
-      if(c.section!==lastSec){const og=document.createElement('optgroup');og.label=c.section_short;sel.appendChild(og);lastSec=c.section;}
-      const opt=document.createElement('option');
-      opt.value=c.section+'||'+c.name;opt.textContent=c.name;
-      if(selectedVal&&opt.value===selectedVal)opt.selected=true;
-      sel.lastChild.appendChild(opt);
-    });
-  }
+  let lastSec='';
+  CATEGORIES.forEach(c=>{
+    if(c.section!==lastSec){const og=document.createElement('optgroup');og.label=c.section_short;sel.appendChild(og);lastSec=c.section;}
+    const opt=document.createElement('option');
+    opt.value=c.section+'||'+c.name;opt.textContent=c.name;
+    if(selectedVal&&opt.value===selectedVal)opt.selected=true;
+    sel.lastChild.appendChild(opt);
+  });
   onCatChange(selectedVal||'');
 }
 
@@ -787,6 +758,7 @@ function updateRowTotal(i){
   document.getElementById('tot-sub').textContent=fmt(sub);
   document.getElementById('tot-gst').textContent=fmt(gst);
   document.getElementById('tot-total').textContent=fmt(total);
+  updateBudgetPanel();
 }
 
 function liKey(e,rowIdx,field){
@@ -869,24 +841,15 @@ function savePO(){
   const catVal=document.getElementById('po-cat').value;
   if(!catVal){document.getElementById('po-cat').focus();return;}
   const [secName,grpName]=catVal.split('||');
-  let sec=sections.find(s=>s.name===secName);
-  // Auto-create section in PO sections array if it exists in budget but not here yet
-  if(!sec){
-    sec={id:'s_'+Date.now().toString(36),name:secName,collapsed:false,groups:[]};
-    sections.push(sec);
-  }
-  let grp=sec.groups.find(g=>g.parent===grpName);
-  if(!grp){
-    grp={id:'g_'+Date.now().toString(36),parent:grpName,budget:'',pos:[]};
-    sec.groups.push(grp);
-  }
+  const sec=sections.find(s=>s.name===secName);
+  const grp=sec?.groups.find(g=>g.parent===grpName);
+  if(!grp){alert('Category not found');return;}
   const items=lineItems.filter(i=>i.desc||num(i.qty)||num(i.price));
   const poData={
     id:document.getElementById('po-page-num').textContent,
     supplier,
     lineItems:JSON.parse(JSON.stringify(items)),
     actual:0,
-    orderDate:document.getElementById('po-order-date').value,
     delivery:document.getElementById('po-delivery').value,
     notes:document.getElementById('po-notes').value.trim(),
     status:'Approved',
@@ -927,7 +890,6 @@ function printPO(){
   var items=po.lineItems||[];
   var sub=liSub(items), gstAmt=liGST(items), tot=liTot(items);
   var delivery=po.delivery?new Date(po.delivery).toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}):'TBC';
-  var orderDate=po.orderDate?new Date(po.orderDate).toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}):issued;
   var issued=new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'});
 
   var rowsHtml='';
@@ -968,7 +930,6 @@ function printPO(){
     +'<div class="meta">'
     +'<div><div class="ml">Supplier</div><div class="mv">'+(po.supplier||'')+'</div></div>'
     +'<div><div class="ml">Budget Category</div><div class="mv">'+(g?g.parent:'')+'</div></div>'
-    +'<div><div class="ml">Order Date</div><div class="mv">'+orderDate+'</div></div>'
     +'<div><div class="ml">Delivery Date</div><div class="mv">'+delivery+'</div></div>'
     +'<div><div class="ml">Date Issued</div><div class="mv">'+issued+'</div></div>'
     +'</div>'
@@ -1054,12 +1015,6 @@ window.addEventListener('DOMContentLoaded', async function(){
       }
     }
     setSrcTab('subvar');
-  } else if(params.get('newpo')==='1'){
-    renderList();
-    var preSecName=decodeURIComponent(params.get('sec')||'');
-    var preGrpName=decodeURIComponent(params.get('grp')||'');
-    var preCatVal=preSecName&&preGrpName?preSecName+'||'+preGrpName:'';
-    openNewPO(preCatVal);
   } else {
     renderList();
   }
@@ -1229,6 +1184,7 @@ function updateBudgetPanel(){
     if(alertMsg)alertMsg.innerHTML='\u26a0 Warning: '+Math.round(pct)+'% of budget consumed';
   } else {
     if(alert)alert.className='bp-alert';
+  }
 }
 function renderClaimsTab(){
   var po=getCurrentPO();if(!po)return;
