@@ -335,8 +335,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
   <div class="view" id="view-po">
     <div class="po-page">
       <div class="po-page-hdr">
-        <div class="po-page-num" id="po-page-num"></div>
-        <div class="po-page-title" id="po-page-title">New Purchase Order</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+          <div class="po-page-num" id="po-page-num"></div>
+          <div class="po-page-title" id="po-page-title" style="flex:1">New Purchase Order</div>
+          <button class="bg bsm btn" id="emailPOBtn" onclick="emailPO()" style="display:none;color:var(--accent);border-color:rgba(0,200,255,.3)">✉️ Email</button>
+          <button class="bg bsm btn" id="exportPOBtn" onclick="printPO()" style="display:none;color:var(--text2);border-color:var(--border)">⬇️ Export PDF</button>
+          <button class="bg bsm btn" id="editPOBtn" onclick="enterPOEditMode()" style="display:none">✏️ Edit PO</button>
+        </div>
         <div class="meta-row">
           <div class="mf"><span class="ml">Budget Category *</span>
             <select class="ms" id="po-cat" style="min-width:220px" onchange="onCatChange(this.value)"><option value="">Select category…</option></select>
@@ -357,8 +362,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
       <!-- PO TABS (hidden for new POs) -->
       <div class="po-tabs" id="poTabs" style="display:none">
         <button class="po-tab active" id="poTab-lineitems" onclick="switchPOTab('lineitems')">📋 Line Items <span class="po-tab-badge" id="poTabBadge-lineitems">0</span></button>
-        <button class="po-tab" id="poTab-claims" onclick="switchPOTab('claims')">📝 Claims <span class="po-tab-badge" id="poTabBadge-claims">0</span></button>
-        <button class="po-tab" id="poTab-invoices" onclick="switchPOTab('invoices')">🧾 Invoices <span class="po-tab-badge" id="poTabBadge-invoices">0</span></button>
+        <button class="po-tab" id="poTab-claims" onclick="switchPOTab('claims')">📝 Claims &amp; Invoices <span class="po-tab-badge" id="poTabBadge-claims">0</span></button>
       </div>
       <!-- TAB: LINE ITEMS -->
       <div class="po-tab-pane active" id="poPane-lineitems">
@@ -409,10 +413,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
       </div>
 
       <div class="totals-block">
-        <div class="tot-row"><span class="tot-lbl">Subtotal (ex GST)</span><span class="tot-val" id="tot-sub">$0</span></div>
-        <div class="tot-row"><span class="tot-lbl">GST (10%)</span><span class="tot-val" id="tot-gst">$0</span></div>
+        <div class="tot-row"><span class="tot-lbl">Subtotal (ex GST)</span><span class="tot-val" id="tot-sub">$0.00</span></div>
+        <div class="tot-row"><span class="tot-lbl">GST (10%)</span><span class="tot-val" id="tot-gst">$0.00</span></div>
         <div class="tot-divider"></div>
-        <div class="tot-final-row"><span class="tot-final-lbl">Total incl GST</span><span class="tot-final-val" id="tot-total">$0</span></div>
+        <div class="tot-final-row"><span class="tot-final-lbl">Total incl GST</span><span class="tot-final-val" id="tot-total">$0.00</span></div>
       </div>
 
 
@@ -429,12 +433,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
       <div class="save-bar">
         <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" id="deletePOBtn" onclick="deleteCurrentPO()">🗑 Delete</button>
         <span style="flex:1"></span>
-        <button class="bg bsm btn" id="editPOBtn" onclick="enterPOEditMode()" style="display:none">✏️ Edit PO</button>
         <button class="bp btn" id="savePOBtn" onclick="savePO()">💾 Save PO</button>
       </div>
       </div><!-- /poPane-lineitems -->
 
-      <!-- TAB: CLAIMS -->
+      <!-- TAB: CLAIMS & INVOICES (read-only) -->
       <div class="po-tab-pane" id="poPane-claims">
         <div class="claims-summary">
           <div class="cs-cell"><div class="cs-lbl">PO Value (ex GST)</div><div class="cs-val" id="cl-po-val">—</div></div>
@@ -442,26 +445,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
           <div class="cs-cell"><div class="cs-lbl">Approved Claims</div><div class="cs-val" id="cl-approved" style="color:var(--green)">—</div></div>
           <div class="cs-cell"><div class="cs-lbl">Remaining to Claim</div><div class="cs-val" id="cl-remaining">—</div></div>
         </div>
+        <div style="padding:10px 20px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)">Claims</div>
         <div id="claimsList"></div>
-        <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px">
-          <span style="font-size:12px;color:var(--muted)">Claims are managed in Vendor Claims</span>
-          <button class="btn bg bsm" style="color:var(--accent);border-color:rgba(0,200,255,.3)" onclick="navTo('hvac-vendor-invoices.html')">Open Vendor Claims &#8594;</button>
-        </div>
-      </div>
-
-      <!-- TAB: INVOICES -->
-      <div class="po-tab-pane" id="poPane-invoices">
-        <div class="claims-summary">
-          <div class="cs-cell"><div class="cs-lbl">Approved Claims</div><div class="cs-val" id="inv-claims-approved">—</div></div>
+        <div style="padding:14px 20px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--border);margin-top:8px">Invoices</div>
+        <div class="claims-summary" style="border-top:none;padding-top:4px">
           <div class="cs-cell"><div class="cs-lbl">Total Invoiced</div><div class="cs-val" id="inv-total">—</div></div>
           <div class="cs-cell"><div class="cs-lbl">Approved Invoices</div><div class="cs-val" id="inv-approved" style="color:var(--green)">—</div></div>
+          <div class="cs-cell"><div class="cs-lbl">Approved Claims</div><div class="cs-val" id="inv-claims-approved">—</div></div>
           <div class="cs-cell"><div class="cs-lbl">Outstanding</div><div class="cs-val" id="inv-outstanding">—</div></div>
         </div>
         <div id="invoicesList"></div>
-        <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px">
-          <span style="font-size:12px;color:var(--muted)">Invoices are managed in Vendor Claims</span>
+        <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;margin-top:8px">
+          <span style="font-size:12px;color:var(--muted)">Read only — managed in Vendor Claims</span>
           <button class="btn bg bsm" style="color:var(--accent);border-color:rgba(0,200,255,.3)" onclick="navTo('hvac-vendor-invoices.html')">Open Vendor Claims &#8594;</button>
         </div>
+      </div>
       </div>
 
     </div><!-- /po-page -->
@@ -484,6 +482,7 @@ let uidN=0;
 const nid=()=>++uidN;
 const num=v=>parseFloat(v)||0;
 const fmt=n=>'$'+Math.round(num(n)).toLocaleString('en-AU');
+const fmt2=n=>'$'+num(n).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtZ=n=>{const v=num(n);return v===0?'—':fmt(v);};
 const fmtD=d=>d?new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'—';
 
@@ -724,6 +723,8 @@ function openNewPO(preCatVal){
   document.getElementById('deletePOBtn').style.display='none';
   document.getElementById('savePOBtn').style.display='';
   document.getElementById('editPOBtn').style.display='none';
+  document.getElementById('emailPOBtn').style.display='none';
+  document.getElementById('exportPOBtn').style.display='none';
   setFieldsReadOnly(false);
   document.getElementById('po-order-date').value=new Date().toISOString().split('T')[0];
   populateCatDD(preCatVal||'');
@@ -764,6 +765,8 @@ function openPOReadOnly(sid,gid,pid){
   document.getElementById('savePOBtn').style.display='none';
   document.getElementById('editPOBtn').style.display='';
   document.getElementById('deletePOBtn').style.display='none';
+  document.getElementById('emailPOBtn').style.display='';
+  document.getElementById('exportPOBtn').style.display='';
 }
 
 function enterPOEditMode(){
@@ -772,6 +775,8 @@ function enterPOEditMode(){
   document.getElementById('savePOBtn').style.display='';
   document.getElementById('editPOBtn').style.display='none';
   document.getElementById('deletePOBtn').style.display='';
+  document.getElementById('emailPOBtn').style.display='none';
+  document.getElementById('exportPOBtn').style.display='none';
 }
 
 function setFieldsReadOnly(ro){
@@ -860,9 +865,9 @@ function updateRowTotal(i){
   if(el) el.textContent=tot;
   // Update summary totals
   const sub=liSub(lineItems),gst=liGST(lineItems),total=liTot(lineItems);
-  document.getElementById('tot-sub').textContent=fmt(sub);
-  document.getElementById('tot-gst').textContent=fmt(gst);
-  document.getElementById('tot-total').textContent=fmt(total);
+  document.getElementById('tot-sub').textContent=fmt2(sub);
+  document.getElementById('tot-gst').textContent=fmt2(gst);
+  document.getElementById('tot-total').textContent=fmt2(total);
   updateBudgetPanel();
 }
 
@@ -910,7 +915,7 @@ function renderLI(){
       <td><textarea class="li-desc-ta" rows="1" placeholder="Description…" tabindex="${base}" id="liDesc_${i}" oninput="lineItems[${i}].desc=this.value;autoResize(this)" onkeydown="liKey(event,${i},'desc')">${li.desc||''}</textarea></td>
       <td style="text-align:right"><input class="li-ci" type="text" inputmode="numeric" value="${li.qty?fmtCommaVal(li.qty):''}" placeholder="0" tabindex="${base+1}" id="liQty_${i}" oninput="lineItems[${i}].qty=this.value.replace(/,/g,'')" onfocus="liCiFocus(this)" onblur="liCiBlur(this,${i},'qty')" onkeydown="liKey(event,${i},'qty')"/></td>
       <td style="text-align:right"><input class="li-ci" type="text" inputmode="numeric" value="${li.price?fmtCommaVal(li.price):''}" placeholder="0.00" tabindex="${base+2}" id="liPrice_${i}" oninput="lineItems[${i}].price=this.value.replace(/,/g,'')" onfocus="liCiFocus(this)" onblur="liCiBlur(this,${i},'price')" onkeydown="liKey(event,${i},'price')"/></td>
-      <td style="text-align:right"><span class="li-total-val" id="liTot_${i}">${num(li.qty)&&num(li.price)?fmt(num(li.qty)*num(li.price)):'—'}</span></td>
+      <td style="text-align:right"><span class="li-total-val" id="liTot_${i}">${num(li.qty)&&num(li.price)?fmt2(num(li.qty)*num(li.price)):'—'}</span></td>
       <td><button class="li-del" tabindex="-1" onclick="pushUndo();lineItems.splice(${i},1);renderLI()">✕</button></td>
     </tr>`;
   }).join('');
@@ -995,6 +1000,22 @@ document.getElementById('po-supplier').addEventListener('input',function(){
 });
 
 // ── PDF ──
+function emailPO(){
+  // Stub — will connect to Resend API when email service is configured
+  var po=null;
+  if(editingPO){var g=getGrp(editingPO.sid,editingPO.gid);if(g)po=g.pos.find(function(p){return p.id===editingPO.pid;});}
+  if(!po){alert('Save the PO first.');return;}
+  var supplier=po.supplier||'Supplier';
+  var sub=liSub(po.lineItems||[]);
+  var proj=dbGetCurrentProject()||{};
+  // Build mailto as placeholder until Resend is connected
+  var subject='Purchase Order '+po.id+' — '+proj.name||'Project';
+  var delivery=po.delivery?new Date(po.delivery).toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}):'TBC';
+  var lineList=(po.lineItems||[]).filter(function(i){return i.desc;}).map(function(i){return '  • '+i.desc+(i.qty?' x'+i.qty:'')+(i.price?' @ $'+parseFloat(i.price).toLocaleString('en-AU'):''  );}).join('\n');
+  var body='Dear '+supplier+',\n\nPlease find below our purchase order '+po.id+'.\n\nProject: '+(proj.name||'')+' ('+( proj.num||'')+')\nOrder Date: '+(po.orderDate||new Date().toISOString().split('T')[0])+'\nDelivery Date: '+delivery+'\n\nItems:\n'+lineList+'\n\nOrder Total (ex GST): $'+Math.round(sub).toLocaleString('en-AU')+'\nGST: $'+Math.round(sub*0.1).toLocaleString('en-AU')+'\nTotal (incl GST): $'+Math.round(sub*1.1).toLocaleString('en-AU')+'\n\n'+(po.notes?'Notes: '+po.notes+'\n\n':'')+'Please confirm receipt of this purchase order.\n\nKind regards,\nHVAC NEXUS';
+  window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+}
+
 function printPO(){
   if(!editingPO){alert('Save the PO first.');return;}
   var g=getGrp(editingPO.sid,editingPO.gid);
