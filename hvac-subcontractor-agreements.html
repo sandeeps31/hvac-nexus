@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subcontractor Agreements — HVAC NEXUS</title>
+<link rel="stylesheet" href="theme.css">
+<script src="db.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* SIDEBAR */
+.sidebar{width:var(--sb);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow:hidden;transition:width .2s}
+.sidebar.sm{width:var(--sb-sm)}
+.sb-top{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);gap:8px;min-height:52px}
+.sb-brand{display:flex;align-items:center;gap:8px;overflow:hidden}
+.sb-icon{font-size:18px;flex-shrink:0}
+.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--accent);letter-spacing:1px;white-space:nowrap}
+.sidebar.sm .sb-name{display:none}
+.sb-toggle{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;margin-top:auto}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar.sm .sb-user-name{display:none}
+nav{overflow-y:auto;overflow-x:hidden;flex:1;padding:8px 0}
+.sb-section-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:10px 16px 4px;white-space:nowrap;overflow:hidden}
+.sidebar.sm .sb-section-lbl{display:none}
+.sb-item{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:pointer;border-radius:0;transition:background .12s;user-select:none}
+.sb-item:hover{background:var(--surface2)}
+.sb-item.active{background:var(--accent-dim);border-left:3px solid var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}
+.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.sidebar.sm .sb-item-label{display:none}
+.sb-group{margin-bottom:2px}
+.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:6px 16px;cursor:pointer;user-select:none}
+.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);transition:transform .2s}
+.sb-group-name{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar.sm .sb-group-name,.sidebar.sm .sb-group-chev{display:none}
+.sb-group-items .sb-item{padding-left:28px}
+.sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}
+.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
+
+/* MAIN */
+.main{margin-left:var(--sb);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin-left .2s}
+.topbar{display:flex;align-items:center;padding:0 24px;height:52px;background:var(--surface);border-bottom:1px solid var(--border);gap:16px;flex-shrink:0}
+.bc{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.bcl{font-size:12.5px;color:var(--muted);cursor:pointer}
+.bcl:hover{color:var(--accent)}
+.bcs{color:var(--muted)}
+.bcc{font-size:12.5px;color:var(--text2)}
+
+/* VIEWS */
+.view{display:none}.view.active{display:block}
+
+/* SUMMARY BAR */
+.sum-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:stretch;overflow-x:auto}
+.sc{display:flex;flex-direction:column;justify-content:center;gap:4px;padding:14px 20px;border-right:1px solid var(--border);min-width:130px}
+.sc-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.sc-val{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;line-height:1}
+.sc-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.cb .sc-val{color:var(--accent)}.cg .sc-val{color:var(--green)}.cw .sc-val{color:var(--warn)}.cd .sc-val{color:var(--danger)}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:10px;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--border)}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px;min-width:240px}
+.search-box input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%}
+.fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;cursor:pointer}
+
+/* BUTTONS */
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#000}.bp:hover{filter:brightness(1.1)}
+.bg{background:var(--surface3);color:var(--text);border:1.5px solid var(--border)}.bg:hover{border-color:var(--accent)}
+.bsm{font-size:12px;padding:4px 10px}
+.bdanger{background:var(--danger-dim);color:var(--danger);border:1.5px solid rgba(255,77,109,.3)}
+
+/* TABLE */
+.page{padding:20px 24px}
+.tw{overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+table.dt{width:100%;border-collapse:collapse}
+table.dt th{padding:10px 16px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);background:var(--surface2);white-space:nowrap}
+table.dt td{padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px}
+table.dt tr:last-child td{border-bottom:none}
+table.dt tr:hover td{background:var(--surface2);cursor:pointer}
+.r{text-align:right}
+.empty-state{padding:40px;text-align:center;color:var(--muted)}
+
+/* DETAIL VIEW */
+.det-hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:18px 28px}
+.det-title-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.det-num-badge{font-family:'DM Mono',monospace;font-size:12px;color:var(--purple);background:var(--surface3);border:1px solid var(--border);padding:3px 10px;border-radius:20px;flex-shrink:0}
+.det-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--text);flex:1}
+.det-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.det-mf{display:flex;flex-direction:column;gap:4px}
+.det-ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.det-mv{font-size:13px;color:var(--text);font-weight:500}
+.det-mv.mono{font-family:'DM Mono',monospace}
+
+/* TABS */
+.det-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px}
+.det-tab{padding:12px 16px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.det-tab:hover{color:var(--text)}
+.det-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-pane{display:none;padding:20px 28px}.tab-pane.active{display:block}
+
+/* STATUS BADGES */
+.st-badge{font-family:'DM Mono',monospace;font-size:10px;padding:3px 9px;border-radius:20px;font-weight:600}
+.st-draft{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.st-sent{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+.st-subbie{background:rgba(0,200,255,.1);color:var(--accent);border:1px solid rgba(0,200,255,.2)}
+.st-signed{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+
+/* SOW CHECKLIST */
+.sow-section{margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.sow-sec-hdr{padding:8px 14px;background:var(--surface2);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--border)}
+.sow-item{display:flex;align-items:flex-start;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border)}
+.sow-item:last-child{border-bottom:none}
+.sow-item-check{width:16px;height:16px;flex-shrink:0;margin-top:2px;accent-color:var(--accent)}
+.sow-item-text{font-size:12.5px;color:var(--text);flex:1;line-height:1.5}
+.sow-resp{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:12px;flex-shrink:0;margin-top:2px}
+.resp-sub{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.2)}
+.resp-austral{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.resp-others{background:var(--purple-dim);color:var(--purple);border:1px solid rgba(167,139,250,.2)}
+
+/* SIGNATURE PAD */
+.sig-wrap{background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
+.sig-canvas{display:block;width:100%;height:120px;cursor:crosshair;background:var(--surface2)}
+.sig-toolbar{display:flex;justify-content:flex-end;gap:6px;padding:6px 10px;border-top:1px solid var(--border)}
+
+/* FORM */
+.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;transition:border-color .2s}
+.mi:focus{border-color:var(--accent);background:var(--surface2)}
+.mi::placeholder{color:var(--muted)}
+.ms{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;cursor:pointer}
+.ms:focus{border-color:var(--accent)}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-top:12px;margin-bottom:5px}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.form-sec{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px}
+.form-sec-hdr{padding:10px 16px;background:var(--surface2);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.form-sec-body{padding:14px 16px}
+
+/* DOC DROP */
+.doc-drop{border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+.doc-drop.over{border-color:var(--accent);background:var(--accent-dim)}
+.doc-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.doc-drop-lbl{color:var(--muted);font-size:12.5px}
+.doc-drop-lbl strong{color:var(--accent)}
+.doc-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;margin-top:8px}
+.doc-item-name{flex:1;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-item-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px}
+.doc-item-del:hover{color:var(--danger)}
+
+/* TIMELINE */
+.timeline{display:flex;align-items:center;gap:0;padding:20px 0;margin-bottom:8px}
+.tl-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;position:relative}
+.tl-step:not(:last-child)::after{content:'';position:absolute;top:14px;left:50%;width:100%;height:2px;background:var(--border);z-index:0}
+.tl-step.done::after{background:var(--green)}
+.tl-dot{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;z-index:1;position:relative}
+.tl-step.done .tl-dot{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.tl-step.active .tl-dot{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.tl-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:center}
+.tl-step.active .tl-lbl{color:var(--accent)}
+.tl-step.done .tl-lbl{color:var(--green)}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <div class="sb-top">
+    <div class="sb-brand"><span class="sb-icon">❄</span><span class="sb-name">HVAC NEXUS</span></div>
+    <button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">«</button>
+  </div>
+  <nav>
+    <div class="sb-item" onclick="navTo('project.html')" style="border-bottom:1px solid var(--border);margin-bottom:4px"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Dashboard</span></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('financials')" id="ghdr-financials"><span class="sb-group-chev" id="gchev-financials">▾</span><span class="sb-group-name">Financials</span></div>
+      <div class="sb-group-items" id="gitems-financials" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
+        <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span></div>
+        <div class="sb-item" onclick="navTo('hvac-vendor-invoices.html')"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
+        <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('procurement')" id="ghdr-procurement"><span class="sb-group-chev" id="gchev-procurement">▾</span><span class="sb-group-name">Procurement</span></div>
+      <div class="sb-group-items" id="gitems-procurement" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
+        <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
+        <div class="sb-item active" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Subbie Agreements</span></div>
+        <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">⚡</span><span class="sb-item-label">Subbie Variations</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
+      <div class="sb-group-items" id="gitems-settings" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
+      </div></div>
+  </nav>
+  <div class="sb-footer"><div class="sb-av" id="sb-av">S</div><span class="sb-user-name" id="sb-user">—</span></div>
+  <div class="sb-resize-handle"></div>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="mainWrap">
+
+<div class="topbar">
+  <div class="bc">
+    <span class="bcl" onclick="navTo('index.html')">My Projects</span><span class="bcs">›</span>
+    <span class="bcl" onclick="navTo('project.html')" id="proj-bc">Project</span><span class="bcs">›</span>
+    <span class="bcc" id="top-bc-curr">Subcontractor Agreements</span>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="bp bsm btn" id="topAddBtn" onclick="openNewAgreement()">＋ New Agreement</button>
+  </div>
+</div>
+
+<!-- SUMMARY BAR -->
+<div class="sum-bar">
+  <div class="sc cb"><div class="sc-lbl">Total</div><div class="sc-val" id="sTotal">0</div><div class="sc-sub">agreements</div></div>
+  <div class="sc cw"><div class="sc-lbl">Sent</div><div class="sc-val" id="sSent">0</div><div class="sc-sub">awaiting subbie signature</div></div>
+  <div class="sc"><div class="sc-lbl">Subbie Signed</div><div class="sc-val" id="sSubSigned" style="color:var(--accent)">0</div><div class="sc-sub">awaiting PM countersign</div></div>
+  <div class="sc cg"><div class="sc-lbl">Countersigned</div><div class="sc-val" id="sCountersigned">0</div><div class="sc-sub">fully executed</div></div>
+  <div class="sc cd"><div class="sc-lbl">Draft</div><div class="sc-val" id="sDraft">0</div><div class="sc-sub">not yet sent</div></div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search subcontractor, trade…" oninput="renderList()"></div>
+  <select class="fsel" id="statusFil" onchange="renderList()">
+    <option value="">All Statuses</option>
+    <option value="Draft">Draft</option>
+    <option value="Sent">Sent</option>
+    <option value="Subbie Signed">Subbie Signed</option>
+    <option value="Countersigned">Countersigned</option>
+  </select>
+  <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="agCount"></span>
+</div>
+
+<!-- VIEW: LIST -->
+<div class="view active" id="view-list">
+<div class="page">
+  <div class="tw">
+    <table class="dt">
+      <thead><tr>
+        <th>Ref No.</th>
+        <th>Subcontractor</th>
+        <th>Trade / SOW Template</th>
+        <th>PO Link</th>
+        <th>Date Issued</th>
+        <th>Status</th>
+        <th style="width:80px"></th>
+      </tr></thead>
+      <tbody id="agBody"></tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- VIEW: DETAIL -->
+<div class="view" id="view-detail">
+  <!-- Header -->
+  <div class="det-hdr">
+    <div class="det-title-row">
+      <div class="det-num-badge" id="det-ref">SA-001</div>
+      <div class="det-title" id="det-title">New Agreement</div>
+      <button class="bg bsm btn" id="det-editBtn" onclick="enterEditMode()" style="display:none">✏️ Edit</button>
+      <button class="bp bsm btn" id="det-saveBtn" onclick="saveAgreement()" style="display:none">💾 Save</button>
+      <button class="bg bsm btn" id="det-cancelBtn" onclick="cancelEdit()" style="display:none">Cancel</button>
+      <button class="bg bsm btn" id="det-deleteBtn" onclick="deleteAgreement()" style="color:var(--danger);border-color:rgba(255,77,109,.3);display:none">🗑</button>
+      <button class="bg bsm btn" onclick="goList()">← Back</button>
+    </div>
+    <!-- Timeline -->
+    <div class="timeline" id="detTimeline"></div>
+    <!-- Meta grid -->
+    <div class="det-meta">
+      <div class="det-mf">
+        <span class="det-ml">Subcontractor</span>
+        <input class="mi" id="f-subbie" style="display:none"/>
+        <div class="det-mv" id="dv-subbie">—</div>
+      </div>
+      <div class="det-mf">
+        <span class="det-ml">Trade / Template</span>
+        <select class="ms" id="f-trade" style="display:none" onchange="onTradeChange(this.value)"></select>
+        <div class="det-mv" id="dv-trade">—</div>
+      </div>
+      <div class="det-mf">
+        <span class="det-ml">Contract Value</span>
+        <input class="mi" id="f-value" placeholder="$0.00" style="display:none"/>
+        <div class="det-mv mono" id="dv-value">—</div>
+      </div>
+      <div class="det-mf">
+        <span class="det-ml">Status</span>
+        <select class="ms" id="f-status" style="display:none">
+          <option value="Draft">Draft</option>
+          <option value="Sent">Sent</option>
+          <option value="Subbie Signed">Subbie Signed</option>
+          <option value="Countersigned">Countersigned</option>
+        </select>
+        <div class="det-mv" id="dv-status">—</div>
+      </div>
+      <div class="det-mf">
+        <span class="det-ml">Date Issued</span>
+        <input class="mi" id="f-date-issued" type="date" style="display:none"/>
+        <div class="det-mv" id="dv-date-issued">—</div>
+      </div>
+      <div class="det-mf">
+        <span class="det-ml">PO Reference</span>
+        <input class="mi" id="f-po-ref" placeholder="PO number…" style="display:none"/>
+        <div class="det-mv mono" id="dv-po-ref">—</div>
+      </div>
+      <div class="det-mf">
+        <span class="det-ml">Project No.</span>
+        <div class="det-mv mono" id="dv-proj-num">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="det-tabs">
+    <div class="det-tab active" onclick="switchTab('sow')" id="tab-sow">📋 SOW Checklist</div>
+    <div class="det-tab" onclick="switchTab('agreement')" id="tab-agreement">📄 Agreement</div>
+    <div class="det-tab" onclick="switchTab('tender')" id="tab-tender">📐 Tender Package</div>
+    <div class="det-tab" onclick="switchTab('docs')" id="tab-docs">📎 Documents</div>
+  </div>
+
+  <!-- TAB: SOW -->
+  <div class="tab-pane active" id="pane-sow">
+    <div id="sowContent"></div>
+    <!-- Subbie signature -->
+    <div class="form-sec" style="margin-top:20px">
+      <div class="form-sec-hdr">Subcontractor Signature</div>
+      <div class="form-sec-body">
+        <div class="mgrid">
+          <div><label class="ml">Name</label><input class="mi" id="sig-subbie-name" placeholder="Full name…"/></div>
+          <div><label class="ml">Date</label><input class="mi" id="sig-subbie-date" type="date"/></div>
+        </div>
+        <label class="ml">Signature</label>
+        <div class="sig-wrap">
+          <canvas class="sig-canvas" id="sigSubbieCanvas" width="800" height="120"></canvas>
+          <div class="sig-toolbar">
+            <button class="bg bsm btn" onclick="clearSig('subbie')">Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- PM signature -->
+    <div class="form-sec">
+      <div class="form-sec-hdr">PM Countersignature</div>
+      <div class="form-sec-body">
+        <div class="mgrid">
+          <div><label class="ml">Name</label><input class="mi" id="sig-pm-name" placeholder="Full name…"/></div>
+          <div><label class="ml">Date</label><input class="mi" id="sig-pm-date" type="date"/></div>
+        </div>
+        <label class="ml">Signature</label>
+        <div class="sig-wrap">
+          <canvas class="sig-canvas" id="sigPmCanvas" width="800" height="120"></canvas>
+          <div class="sig-toolbar">
+            <button class="bg bsm btn" onclick="clearSig('pm')">Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: AGREEMENT -->
+  <div class="tab-pane" id="pane-agreement">
+    <div id="agreementContent"></div>
+    <!-- Agreement subbie signature -->
+    <div class="form-sec" style="margin-top:20px">
+      <div class="form-sec-hdr">Subcontractor Signature — Agreement</div>
+      <div class="form-sec-body">
+        <div class="mgrid">
+          <div><label class="ml">Name</label><input class="mi" id="sig-ag-subbie-name" placeholder="Full name…"/></div>
+          <div><label class="ml">Date</label><input class="mi" id="sig-ag-subbie-date" type="date"/></div>
+        </div>
+        <label class="ml">Signature</label>
+        <div class="sig-wrap">
+          <canvas class="sig-canvas" id="sigAgSubbieCanvas" width="800" height="120"></canvas>
+          <div class="sig-toolbar"><button class="bg bsm btn" onclick="clearSig('ag-subbie')">Clear</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="form-sec">
+      <div class="form-sec-hdr">PM Countersignature — Agreement</div>
+      <div class="form-sec-body">
+        <div class="mgrid">
+          <div><label class="ml">Name</label><input class="mi" id="sig-ag-pm-name" placeholder="Full name…"/></div>
+          <div><label class="ml">Date</label><input class="mi" id="sig-ag-pm-date" type="date"/></div>
+        </div>
+        <label class="ml">Signature</label>
+        <div class="sig-wrap">
+          <canvas class="sig-canvas" id="sigAgPmCanvas" width="800" height="120"></canvas>
+          <div class="sig-toolbar"><button class="bg bsm btn" onclick="clearSig('ag-pm')">Clear</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: TENDER PACKAGE -->
+  <div class="tab-pane" id="pane-tender">
+    <div class="form-sec">
+      <div class="form-sec-hdr">Drawings Issued at Tender</div>
+      <div class="form-sec-body">
+        <p style="font-size:12.5px;color:var(--text2);margin-bottom:12px">Select drawings from the Drawing Register. The revision at time of selection is frozen — updates later won't change this record.</p>
+        <div id="drawingPickerWrap"></div>
+        <div id="frozenDrawings" style="margin-top:10px"></div>
+      </div>
+    </div>
+    <div class="form-sec">
+      <div class="form-sec-hdr">Specifications Issued at Tender</div>
+      <div class="form-sec-body">
+        <div id="specsList"></div>
+        <button class="bg bsm btn" onclick="addSpecLine()" style="margin-top:8px">＋ Add Specification</button>
+      </div>
+    </div>
+    <div class="form-sec">
+      <div class="form-sec-hdr">Issue Details</div>
+      <div class="form-sec-body">
+        <div class="mgrid">
+          <div><label class="ml">Date Issued</label><input class="mi" id="tender-date" type="date"/></div>
+          <div><label class="ml">Method</label>
+            <select class="ms" id="tender-method">
+              <option>Email</option><option>Hand Delivered</option><option>Project Portal</option>
+            </select>
+          </div>
+          <div><label class="ml">Issued By</label><input class="mi" id="tender-issued-by" placeholder="Name…"/></div>
+        </div>
+        <label class="ml">Subcontractor Acknowledgement — Date Received</label>
+        <input class="mi" id="tender-ack-date" type="date" style="max-width:200px"/>
+        <label class="ml">Acknowledgement Signature</label>
+        <div class="sig-wrap">
+          <canvas class="sig-canvas" id="sigTenderCanvas" width="800" height="120"></canvas>
+          <div class="sig-toolbar"><button class="bg bsm btn" onclick="clearSig('tender')">Clear</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: DOCUMENTS -->
+  <div class="tab-pane" id="pane-docs">
+    <div class="doc-drop" id="docDrop" ondragover="docDragOver(event)" ondragleave="docDragLeave(event)" ondrop="docDropHandler(event)">
+      <input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.eml,.msg" onchange="docFileChange(event)"/>
+      <div class="doc-drop-lbl">📎 <strong>Click to attach</strong> or drag &amp; drop — quotes, emails, PDFs, drawings</div>
+    </div>
+    <div id="docList" style="margin-top:8px"></div>
+  </div>
+</div><!-- /view-detail -->
+
+</div><!-- /main -->
+
+<script src="db.js"></script>
+<script>
+var SBK='hvacnexus_sb_collapsed';
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'var(--sb-sm)':'';if(btn)btn.textContent=c?'»':'«';}
+function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'▸':'▾';}
+(function(){applySB(localStorage.getItem(SBK)==='1');try{var p=dbGetCurrentProject();if(p.name)document.getElementById('proj-bc').textContent=p.name;if(p.num)document.getElementById('dv-proj-num').textContent=p.num;}catch(e){}})();
+
+// ── DATA ──
+var SOW_TEMPLATES = [{"id": "sow_bms_install", "trade": "BMS Install", "title": "BMS Install", "sections": [{"name": "Operational", "items": [{"text": "Site foreman", "responsibility": "Subcontractor"}, {"text": "First aid representative", "responsibility": "Subcontractor"}, {"text": "Safety representative for safety walks", "responsibility": "Subcontractor"}, {"text": "Coordination on site with other trades", "responsibility": "Subcontractor"}, {"text": "Toolbox talks (weekly)", "responsibility": "Subcontractor"}, {"text": "Safe work method statement (SWMS) signed by all workers on site", "responsibility": "Subcontractor"}, {"text": "Site induction", "responsibility": "Subcontractor"}, {"text": "Storage and security of material and tools", "responsibility": "Subcontractor"}, {"text": "Workers compensation insurance", "responsibility": "Subcontractor"}, {"text": "Workers superannuation", "responsibility": "Subcontractor"}, {"text": "Public liability insurance", "responsibility": "Subcontractor"}, {"text": "Electrical tagging of own equipment", "responsibility": "Subcontractor"}, {"text": "Daily cleaning of working areas", "responsibility": "Subcontractor"}, {"text": "Provision of wheely bins", "responsibility": "Others"}, {"text": "Removal of rubbish to waste bin provided on site by builder", "responsibility": "Subcontractor"}, {"text": "Permanent crane on site, ammenities, first aid, temporary power, lunch sheed", "responsibility": "Others"}, {"text": "6 working days per week as per builders' working hours", "responsibility": "Subcontractor"}, {"text": "Mechanical workshop drawings", "responsibility": "Others"}, {"text": "Mechanical specifications", "responsibility": "Others"}, {"text": "Acoustic specifications", "responsibility": "Others"}, {"text": "Workshop and As Built drawings", "responsibility": "Subcontractor"}, {"text": "Functional description", "responsibility": "Subcontractor"}, {"text": "Electrical schematics", "responsibility": "Subcontractor"}, {"text": "Points list", "responsibility": "Subcontractor"}, {"text": "Motorized valve schedule", "responsibility": "Subcontractor"}, {"text": "Attendance to design meetings", "responsibility": "Subcontractor"}, {"text": "Defect liability period / warranty (12 months)", "responsibility": "Subcontractor"}, {"text": "Progressive QA documentation - subject to progress claim approval", "responsibility": "Subcontractor"}]}, {"name": "Variations:", "items": [{"text": "Note: Proceeding of variation work to be carried out upon receival of written instruction and price estimate aproval by Austral representative only.", "responsibility": "TBD"}, {"text": "Schedules of rates - Normal time", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Time and half", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Double time", "responsibility": "Subcontractor"}]}], "type": "sow"}, {"id": "sow_ca_pol_install", "trade": "CA/POL Install", "title": "CA/POL Install", "sections": [{"name": "General", "items": [{"text": "Accepting and offloading of all deliveries of mech. equipment proposed for installation (delivery docket sign.)", "responsibility": "Subcontractor"}, {"text": "Site movement & positioning of all pipework & free issue equipment to AAC & builder's direction", "responsibility": "TBD"}, {"text": "Supply and movement around site of sufficient lifters hoists to complete installation to meet programme", "responsibility": "TBD"}, {"text": "Co-ordinate site Cranage with Austral management and Builder", "responsibility": "TBD"}]}, {"name": "Provision of ladders", "items": [{"text": "Lifting gear for equipment and materials (other than crane)", "responsibility": "TBD"}, {"text": "Lifting of pipework between levels if crane unavailable", "responsibility": "TBD"}, {"text": "Provision of access and lift equipment under and over 3m", "responsibility": "TBD"}, {"text": "Provision of access equipment scissor lift, boom lift, mobile scaffold or similar", "responsibility": "TBD"}, {"text": "Supply and movement around site of scaffold (4 meter) & scissor lifts as required  to complete installation to meet programme", "responsibility": "TBD"}, {"text": "Coordination with other trades (including gyprocker/partiotioner)", "responsibility": "TBD"}, {"text": "Coordinate with surveyors for as built surveys (underground piping)", "responsibility": "TBD"}, {"text": "Coordinate with builder for in ground pipes to meet dates", "responsibility": "TBD"}, {"text": "Supply and install all hangers, supports, secondary supports stands, riser supports as required.", "responsibility": "TBD"}, {"text": "Supply and installation of all fixings (nuts, bolts, washers, booker rods, angles, unistrut,\u2026\u2026.. etc.)", "responsibility": "TBD"}, {"text": "Supply & installation of spring hangers", "responsibility": "TBD"}, {"text": "Rod & fittings to be gal or hot dipped as required by the project specification", "responsibility": "TBD"}, {"text": "Provision of taped, double thickness wood blocks", "responsibility": "TBD"}, {"text": "All nuts, bolts, tech screws and fittings used externally to be hot dipped galv coated", "responsibility": "TBD"}, {"text": "Supply of all consumables required to complete installation", "responsibility": "TBD"}]}, {"name": "Certified engineered pipe supports", "items": [{"text": "No spray paint / markers on any concrete to be exposed final finish", "responsibility": "TBD"}, {"text": "Installation certificate for pipework systems", "responsibility": "TBD"}, {"text": "Pipe and cable tray coverings - exposed to weather", "responsibility": "TBD"}, {"text": "Installation of seimsic hangers as per seismic drawings & AS1170.4", "responsibility": "TBD"}, {"text": "Stepover protection for pipeson ground level for trip hazards", "responsibility": "TBD"}]}, {"name": "Vacuum attachment for drilling", "items": [{"text": "Allow to print own set of drawings", "responsibility": "TBD"}, {"text": "Subcontractor acknowledges that neither the builder nor AAC are able to guarantee continuity of work on site", "responsibility": "TBD"}, {"text": "No costs  for site closures are to be borne By Austral air", "responsibility": "TBD"}, {"text": "Supply of underground as built surveyed drawings", "responsibility": "TBD"}, {"text": "Any gas leaks for undergroundpipework will be the responsbility of contractor tofix including any assocaiated costs for rectificationof builder's works (including pouring of concrete, etc..)", "responsibility": "TBD"}]}, {"name": "Demolition", "items": [{"text": "Remove all CA/POL pipework and equipments as per mech spec and mech drawings", "responsibility": "TBD"}, {"text": "Pipe freeze to cut back pipework", "responsibility": "TBD"}, {"text": "Cap off pipework where requiredand install all required vaves (isolation valves, etc\u2026)", "responsibility": "TBD"}]}, {"name": "Equipment installation", "items": [{"text": "Installation of free issue equipment", "responsibility": "TBD"}, {"text": "Allow to bolt down floor mounted equipment", "responsibility": "TBD"}]}, {"name": "Installation of Air receivers", "items": [{"text": "Installation of Oil water separator", "responsibility": "TBD"}, {"text": "Installation of Air Hose Reel.", "responsibility": "TBD"}, {"text": "Installation of SIL approved Pneumatic Sampling control panel", "responsibility": "TBD"}, {"text": "Installation of SIL approved Solenoid valves", "responsibility": "TBD"}, {"text": "Installation of Compressed air filtration station", "responsibility": "TBD"}, {"text": "Installation of Filter and pressure regulators", "responsibility": "TBD"}]}, {"name": "Installation of Lubricator units", "items": [{"text": "Installation of In ground Service pits", "responsibility": "TBD"}, {"text": "Installation of other equipment required to complete the piping systems", "responsibility": "TBD"}]}, {"name": "Installation of  Control valves", "items": [{"text": "Installation of Valves, strainers, check valves etc.", "responsibility": "TBD"}]}, {"name": "Installation of Flow meters", "items": [{"text": "Install energy meters and all valves as per drawings", "responsibility": "TBD"}, {"text": "Supply and install gauges as indicated on schematics.", "responsibility": "TBD"}, {"text": "Supply and Installation of vibration mountings equipment - as per mech. spec.", "responsibility": "TBD"}, {"text": "Other equipment required to complete the piping systems", "responsibility": "TBD"}, {"text": "Installation of equipment flexible connections", "responsibility": "TBD"}, {"text": "Protection of all supplied and free-issue equipment during construction", "responsibility": "TBD"}]}, {"name": "CA/POL installation", "items": [{"text": "Underground pipework type & class - Class A Copper / Class B Copper Stainless Steel (ABS not allowed) asproject specs and AS stds", "responsibility": "TBD"}, {"text": "Underground fittings - Fully Welded / Victaulic fittings / Victaulic Flex couplings / Victaulic pumpsets", "responsibility": "TBD"}]}, {"name": "HDPE pipes for underground", "items": [{"text": "Welded fittings for underground (no compressor fittings)", "responsibility": "TBD"}, {"text": "Above ground pipework type & class - Class A Copper / Class B Copper Stainless Steel (ABS not allowed)", "responsibility": "TBD"}, {"text": "Above ground fittings - Fully Welded / Victaulic fittings / Victaulic Flex couplings / Victaulic pumpsets", "responsibility": "TBD"}, {"text": "Air vents/bottles at all high points, supply of autobleeds as required", "responsibility": "TBD"}, {"text": "Drain valves at all low points", "responsibility": "TBD"}, {"text": "Test points across all equipment & control valves, sufficient length for lagging", "responsibility": "TBD"}, {"text": "Compressed air pipework c/w valves to air compressor and other equipment", "responsibility": "TBD"}, {"text": "POL pipework c/w valves to POL systems", "responsibility": "TBD"}, {"text": "Supply & installation of headers", "responsibility": "TBD"}, {"text": "Install underground pipework as per RLs indicated on drawings/models or as per specs", "responsibility": "TBD"}, {"text": "Allowance for extra elbows as required for extra change indirectoinsas persite conditions", "responsibility": "TBD"}, {"text": "Gas connections to boilers & other plant including gas train", "responsibility": "TBD"}, {"text": "TA or Oventrop balancing valves only, to AAC schedules", "responsibility": "TBD"}, {"text": "Looping of pipework for flushing to meet AAC commissioning / staging requirements", "responsibility": "TBD"}, {"text": "Flushing of pipework to AAC direction and commissioning procedure", "responsibility": "TBD"}, {"text": "Flushing and filling of secondary chilled water temperature water system as per BSRIA standards", "responsibility": "TBD"}, {"text": "Cleaning of all strainers after flushing", "responsibility": "TBD"}, {"text": "Design of expansion loops where required", "responsibility": "TBD"}, {"text": "Install tracer wire for underground piping", "responsibility": "TBD"}, {"text": "Pressure testing of all pipework systems and/or particular runs if required", "responsibility": "TBD"}, {"text": "Cap all future connections and drains", "responsibility": "TBD"}, {"text": "Supply and installation of all pipework stickers on pipes and sheathing as per AS standards", "responsibility": "TBD"}, {"text": "Supply and install of labels for valves", "responsibility": "TBD"}]}, {"name": "Overflashings for pipework systems", "items": [{"text": "Supply & installation of flanges", "responsibility": "TBD"}, {"text": "Pressure test to be carried out by area/ building as per AAC direction (allowed for multiple compressor hires)", "responsibility": "TBD"}, {"text": "Pipework sealing for pressure testing incrementally as required to meet programme requirements or as required by AAC.", "responsibility": "TBD"}, {"text": "Pressure testing to AS / spec / consultant / AAC requirements and provide ITPs", "responsibility": "TBD"}, {"text": "CA system testing to achieve ISA 7.0.0.1 quality standard", "responsibility": "TBD"}, {"text": "Bleeding air out of pipework system", "responsibility": "TBD"}]}, {"name": "Sealing and penetrations", "items": [{"text": "Allow mark out of required openings and penetrations in ceilings and walls for grilles, dampers and fire  dampers.", "responsibility": "TBD"}, {"text": "Cutting out of blockwork for duct installation if penos not marked out in time", "responsibility": "TBD"}]}, {"name": "Supply all required sealants", "items": [{"text": "Sealing of penetrations (non-fire rated) caulking of bare pipework only including submission of sample & approval", "responsibility": "TBD"}, {"text": "Acoustic mastic sealing through acoustic walls to client requirements/acoustic report (non fire rated walls)", "responsibility": "TBD"}, {"text": "Allow tidy sealant application for exposed to view pipework (non fire rated walls)", "responsibility": "TBD"}, {"text": "Cutting out mesh and bondek for penetrations", "responsibility": "TBD"}, {"text": "Provision and positioning of all pipe sleeves for penos through fire and smoke rated walls", "responsibility": "TBD"}]}, {"name": "Labour and programme", "items": [{"text": "The subcontractor has reviewed the contract documents issued to date and agree to carry out all works as required for the trade listed above", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the construction programme (subject to change by the builder or AAC) and commits to providing the required resources & working the necessary hours including overtime & weekends to meet the programme & minimise disruption to building works and other trades.", "responsibility": "TBD"}, {"text": "AAC reserves the right to engage another contractor at subcontractors expense in order to meet programme if deemed necessary", "responsibility": "TBD"}, {"text": "The subcontractor has allowed for coordination and interface with other trades", "responsibility": "TBD"}, {"text": "6 working days per week as per builders' working hours", "responsibility": "TBD"}, {"text": "Defect rectifications to be attended to immediately.", "responsibility": "TBD"}]}, {"name": "First aid representative", "items": [{"text": "Safety representative for safety walks", "responsibility": "TBD"}, {"text": "Representative for weekly site walks with Builder & AAC", "responsibility": "TBD"}, {"text": "Supply of Hi Vis Orange full sleeve shirts with cross on back and vertical stripes on front", "responsibility": "TBD"}, {"text": "Supply of all PPE as required for the workers on site", "responsibility": "TBD"}, {"text": "Attend site meetings as request by Austral management", "responsibility": "TBD"}]}, {"name": "Toolbox talks (weekly)", "items": [{"text": "Safe work method statement (SWMS) signed by all workers on site", "responsibility": "TBD"}]}, {"name": "Site inductions for allworkers", "items": [{"text": "Provide task lighting as required", "responsibility": "TBD"}, {"text": "Storage and security of material and tools", "responsibility": "TBD"}, {"text": "Provide test & tag registers", "responsibility": "TBD"}, {"text": "Electrical tagging of own equipment", "responsibility": "TBD"}, {"text": "All work areas to be cleaned daily", "responsibility": "TBD"}]}, {"name": "Provision of bins", "items": [{"text": "Removal of rubbish to waste bin provided on site by builder", "responsibility": "TBD"}]}, {"name": "Qualtiy and complaince", "items": [{"text": "Compliance with all the Project specifications", "responsibility": "TBD"}, {"text": "Compliance with all the Mechanical specifications", "responsibility": "TBD"}]}, {"name": "Compliance to acoustic specifications", "items": [{"text": "Fully document QA and ITPs and provide to PM on completion", "responsibility": "TBD"}, {"text": "Time stamp photos to accompany Pressuretest ITPs", "responsibility": "TBD"}]}, {"name": "Construction award compliant", "items": [{"text": "Relevant EBA rates & compliance", "responsibility": "TBD"}]}, {"name": "Indegenuos inclusions", "items": [{"text": "Adherence to all site, State & National legislated safety requirements", "responsibility": "TBD"}, {"text": "Strict enforcement of the safe use of all scissor lifts, ladders, hoists & PPE", "responsibility": "TBD"}, {"text": "Representation on safety committee if elected or nominated", "responsibility": "TBD"}, {"text": "Provision, maintenance and implementation of an approved site safety plan", "responsibility": "TBD"}, {"text": "Compliance with all relevant Standards", "responsibility": "TBD"}, {"text": "Compliance with Hot Work AS 1674.1", "responsibility": "TBD"}, {"text": "Progress claims & general contractual requirements", "responsibility": "TBD"}, {"text": "Retention 5% (cash or 2 off BG 2.5%)", "responsibility": "TBD"}, {"text": "Progressive QA documentation - subject to progress claim approval (Lineal m or sqm installation details may be required)", "responsibility": "TBD"}, {"text": "Itemised progress claim to AAC no later than 20th of each month with relevant documentation (including Statutory Declaration)", "responsibility": "TBD"}, {"text": "Progress claims breakdown format to be provided as requested by AAC", "responsibility": "TBD"}, {"text": "Public Liability Insurance (min. $20 million)", "responsibility": "TBD"}]}, {"name": "Workers Compensation Insurance", "items": [{"text": "Sub- Subcontractors will also require $20 million PLI, workers compensation and Statutory declaration", "responsibility": "TBD"}, {"text": "12 mths DLP concurrent with AAC DLP", "responsibility": "TBD"}]}, {"name": "Relevant EBA rates", "items": [{"text": "Schedule of rates (to be used for VO provided below)", "responsibility": "TBD"}, {"text": "Submit variations within 3 days to allow AAC to submit to the builder within timebar limits. Timebar restrictions to be back-to-back with AAC contract.", "responsibility": "TBD"}, {"text": "Proceeding of variation workupon receival of written instruction from AAC", "responsibility": "TBD"}, {"text": "Only client/AAC generated and approved variations may be claimed", "responsibility": "TBD"}, {"text": "Schedules of rates - Normal time", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Time and half", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Double time", "responsibility": "Subcontractor"}]}], "type": "sow"}, {"id": "sow_drafting", "trade": "Drafting", "title": "Drafting", "sections": [{"name": "General", "items": [{"text": "Follow client and builder's naming conventions, layer standards, and file formats", "responsibility": "TBD"}, {"text": "Cordination with other trades and builders for clash detection", "responsibility": "TBD"}, {"text": "Use Aconex/Procore or other project communication platform with design team", "responsibility": "TBD"}, {"text": "RFIs to be issued in a timely manner if clashcannot be solved", "responsibility": "TBD"}, {"text": "Timelines for shop drawings conveyed to AAC", "responsibility": "TBD"}]}, {"name": "Participate in clash detection", "items": [{"text": "Clash detection report will be provided with resolution directed to Builder where required", "responsibility": "TBD"}, {"text": "Coordinate with ceiling levels, architectural features, and structural elements", "responsibility": "TBD"}, {"text": "2D drawings", "responsibility": "TBD"}, {"text": "Provide 2D shop drawings from BIM model", "responsibility": "TBD"}, {"text": "Tagging and annotation consistent with site install requirements", "responsibility": "TBD"}, {"text": "Include model revisions and date stamps", "responsibility": "TBD"}, {"text": "Issue drawing register (AAC template) with every submission", "responsibility": "TBD"}, {"text": "Shop drawing submitted as preliminary set", "responsibility": "TBD"}, {"text": "Shop drawing submitted as Issued for approval set", "responsibility": "TBD"}, {"text": "Shop drawing submitted as Issued for Construction set", "responsibility": "TBD"}, {"text": "Shop drawing submitted as As Built set", "responsibility": "TBD"}, {"text": "Cover sheet, Drawing Index and Legends sheet to be submited as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Air Schematics to be submited as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Refrigerant Schematics to be submited as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Water Schematics to be submited as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Equipment schedules to be submited as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Standard installation details submitted as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Demo drawings in 1:100 scale submitted as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Demo drawings in 1:50 scale submitted as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Layout drawings in 1:100 scale submitted as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Layout drawings in 1:50 scale submitted as prelim, IFA, IFC and AB sets (incl duct, refrig piping, elec cable trays and pipes)", "responsibility": "TBD"}, {"text": "Layout drawings in 1:50 scale to include hanger set out details submitted as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Equipment dimensions off walls to be included on drawings", "responsibility": "TBD"}, {"text": "Section drawings in 1:50 scale submitted as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Section drawings may will be requested progressively during the project at no additional cost to AAC", "responsibility": "TBD"}, {"text": "Compressed air layout drawings in 1:50 scale to include hanger set out details submitted as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Seismic drawings submitted as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "BWIC drawings to include plinths,duct/cable and pipe penos submitted as prelim, IFA, IFC and AB sets", "responsibility": "TBD"}, {"text": "Architectural updates allowed as required through shop drawing stages", "responsibility": "TBD"}, {"text": "PDF  & DWG files to be provided as requested", "responsibility": "TBD"}, {"text": "AAC to provide design change markups for each shop drawing stage and actioned by Drafter", "responsibility": "TBD"}]}, {"name": "Labour and programme", "items": [{"text": "The subcontractor has reviewed the contract documents issued to date and agree to carry out all works as required for the trade listed above", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the construction programme (subject to change by the builder or AAC) and commits to providing the required resources & working the necessary hours including overtime & weekends to meet the programme & minimise disruption to building works and other trades.", "responsibility": "TBD"}, {"text": "AAC reserves the right to engage another contractor at subcontractors expense in order to meet programme if deemed necessary", "responsibility": "TBD"}]}, {"name": "Qualtiy and complaince", "items": [{"text": "Compliance with all the Project specifications", "responsibility": "TBD"}, {"text": "Compliance with all the Mechanical specifications", "responsibility": "TBD"}]}, {"name": "Compliance with project drawings", "items": [{"text": "Compliance with all relevant Standards", "responsibility": "TBD"}, {"text": "Progress claims & general contractual requirements", "responsibility": "TBD"}, {"text": "Retention 5% (cash or 2 off BG 2.5%)", "responsibility": "TBD"}, {"text": "Progressive QA documentation - subject to progress claim approval (Lineal m or sqm installation details may be required)", "responsibility": "TBD"}, {"text": "Itemised progress claim to AAC no later than 20th of each month with relevant documentation (including Statutory Declaration)", "responsibility": "TBD"}, {"text": "Progress claims breakdown format to be provided as requested by AAC", "responsibility": "TBD"}, {"text": "Public Liability Insurance (min. $20 million)", "responsibility": "TBD"}]}, {"name": "Workers Compensation Insurance", "items": [{"text": "Sub- Subcontractors will also require $20 million PLI, workers compensation and Statutory declaration", "responsibility": "TBD"}, {"text": "Submit variations within 3 days to allow AAC to submit to the builder within timebar limits. Timebar restrictions to be back-to-back with AAC contract.", "responsibility": "TBD"}, {"text": "Proceeding of variation workupon receival of written instruction from AAC", "responsibility": "TBD"}, {"text": "Only client/AAC generated and approved variations may be claimed", "responsibility": "TBD"}, {"text": "Schedules of rates - Normal time", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Time and half", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Double time", "responsibility": "Subcontractor"}]}], "type": "sow"}, {"id": "sow_duct_install", "trade": "Duct Install", "title": "Duct Install", "sections": [{"name": "General", "items": [{"text": "Accepting and offloading of all deliveries of mech. equipment proposed for installation (delivery docket sign.)", "responsibility": "Subcontractor"}, {"text": "Site movement & positioning of all ductwork & free issue equipment to AAC & builder's direction", "responsibility": "TBD"}, {"text": "Supply and movement around site of sufficient Duct lifters hoists to complete installation to meet programme", "responsibility": "TBD"}, {"text": "Co-ordinate site Cranage with Austral management and Builder", "responsibility": "TBD"}]}, {"name": "Provision of ladders", "items": [{"text": "Lifting gear for equipment and materials (other than crane)", "responsibility": "TBD"}, {"text": "Provision of access and lift equipment under and over 3m", "responsibility": "TBD"}, {"text": "Provision of access equipment scissor lift, boom lift, mobile scaffold or similar", "responsibility": "TBD"}, {"text": "Supply and movement around site of scaffold (4 meter) & scissor lifts as required  to complete installation to meet programme", "responsibility": "TBD"}, {"text": "Coordination with other trades (including gyprocker/partiotioner)", "responsibility": "TBD"}, {"text": "Supply and install all hangers, supports, secondary supports, AHU stacked support stands, duct supports off floor, duct riser supports as required.", "responsibility": "TBD"}, {"text": "Supply and installation of all fixings (tex screws, nuts, bolts, washers, booker rods, angles, unistrut, duct tape, silver tape, blue straps\u2026\u2026.. etc.)", "responsibility": "TBD"}, {"text": "Rod & fittings to be gal or hot dipped as required by the project specification", "responsibility": "TBD"}, {"text": "Supply & installation of duct hanging strap", "responsibility": "TBD"}, {"text": "Supply of heavy gauge angle", "responsibility": "TBD"}, {"text": "All nuts, bolts, tech screws and fittings used externally to be hot dipped galv coated", "responsibility": "TBD"}, {"text": "All cut ends of heavy gauge steel such as angle or unistrut to be galmet zinc primer coated, whether inside or external. Minimum 2 coats", "responsibility": "TBD"}, {"text": "Supply of all consumables required to complete installation", "responsibility": "TBD"}]}, {"name": "Vacuum attachment for drilling", "items": [{"text": "No spray paint / markers on any concrete to be exposed final finish", "responsibility": "TBD"}, {"text": "Spray paint all  internal plenums exposed to view matt black", "responsibility": "TBD"}, {"text": "Allow to print own set of drawings", "responsibility": "TBD"}, {"text": "Site measure and install low level drain pipe covers", "responsibility": "TBD"}, {"text": "Pipe and cable tray coverings - exposed to weather", "responsibility": "TBD"}, {"text": "Installation of seimsic hangers as per seismic drawings & AS1170.4", "responsibility": "TBD"}, {"text": "Subcontractor acknowledges that neither the builder nor AAC are able to guarantee continuity of work on site", "responsibility": "TBD"}, {"text": "No costs  for site closures are to be borne By Austral air", "responsibility": "TBD"}]}, {"name": "Demolition", "items": [{"text": "Remove all ductwork,flex connection, grilles, cushion boxes and equipments as per mech spec and mech drawings", "responsibility": "TBD"}]}, {"name": "Equipment installation", "items": [{"text": "Installation of free issue equipment", "responsibility": "TBD"}, {"text": "Allow to bolt down floor mounted equipment", "responsibility": "TBD"}, {"text": "Supply and Installation of vibration mountings &/or waffle pads for all FCUs & condensers units- as per mech. spec.", "responsibility": "TBD"}, {"text": "Installation of fans (including fixing & installation of anti-vibration mounts)", "responsibility": "TBD"}, {"text": "Installation of silencers/attenuators (including fixing & installation of anti-vibration mounts)", "responsibility": "TBD"}, {"text": "Installation of sheetmetal and proprietary roof cowls", "responsibility": "TBD"}, {"text": "Installation of AHUs (including fixing & installation of anti-vibration mounts)", "responsibility": "TBD"}, {"text": "Installation of all compartments of AHUs to form a single AHU system", "responsibility": "TBD"}]}, {"name": "Installation of Cassette units", "items": [{"text": "Installation of Heating / Cooling / Reclaim coils", "responsibility": "TBD"}, {"text": "Installation of equipment flexible connections", "responsibility": "TBD"}, {"text": "Installation of drip trays (under FCUs or DX units)   incl correct grading for fall", "responsibility": "TBD"}, {"text": "Installation of drip trays for cooling coils in stainless steel incl grading for fall", "responsibility": "TBD"}, {"text": "Installation of Electrostatic precipitation filters", "responsibility": "TBD"}]}, {"name": "Installation of  exhaust hoods", "items": [{"text": "Installation of  exhaust hood filters", "responsibility": "TBD"}, {"text": "Installation of  filter slide tracks", "responsibility": "TBD"}, {"text": "Installation of  filter frames including stiffening as required", "responsibility": "TBD"}, {"text": "Cleaning out of AHUs, plenums, fan chambers prior to commissioning", "responsibility": "TBD"}, {"text": "Installation of  filter media when directed for commissioning", "responsibility": "TBD"}, {"text": "Installation of pre-filter media when directed for commissioning", "responsibility": "TBD"}, {"text": "Installation of  air handling units coil/filter baffles (blanking panels)", "responsibility": "TBD"}, {"text": "Electric duct heater installation into ductwork", "responsibility": "TBD"}, {"text": "VCD, MVCD, single blade dampers, push pull dampers, NRD\u2026\u2026..etc.", "responsibility": "TBD"}, {"text": "Install of pressure relief dampers/Barometric dampers", "responsibility": "TBD"}, {"text": "Protection of all supplied and free-issue equipment during construction", "responsibility": "TBD"}]}, {"name": "Ductwork Installation", "items": [{"text": "Ductwork install as per project  specification, Mechanical specifaction and mech. workshop drawings. Subject to project duct can be aluminium, galvanised, stainless, shape can rectangular, round or oval", "responsibility": "TBD"}]}, {"name": "Installation of rectangular ductwork", "items": [{"text": "Installation of circular / spiro ductwork", "responsibility": "TBD"}]}, {"name": "Installation of oval duct", "items": [{"text": "Installation of  stainless steel duct", "responsibility": "TBD"}]}, {"name": "Install of PVC ductwork", "items": [{"text": "Remove backing plate from louvers for duct connection", "responsibility": "TBD"}, {"text": "Markup and issue site measures for manufacture", "responsibility": "TBD"}, {"text": "Coordinate manufacture & delivery of all site measures to meet programme requirements", "responsibility": "TBD"}, {"text": "Set out and marking of all mechanical equipment (plants, plinths, duct, grilles, access panels, etc.)", "responsibility": "TBD"}, {"text": "Mark out blade position for damper on shaft and cordinate with mech elec trade", "responsibility": "TBD"}, {"text": "Mark out ceiling access panel locations on floor, coordinat6e with builder/partitioner", "responsibility": "TBD"}, {"text": "Allow to remove all duct and equipment stickers exposed to view", "responsibility": "TBD"}, {"text": "Remove plastic covering from all ductwork.", "responsibility": "TBD"}]}, {"name": "Install Relief/ Transfer ducts", "items": [{"text": "Install risers and remove safety mesh as required", "responsibility": "TBD"}, {"text": "Install non fume cupboard discharge stacks and supports", "responsibility": "TBD"}, {"text": "Installation of frames for stacked units", "responsibility": "TBD"}, {"text": "Install filters and associated frames in equipment and back of plantroom louvers", "responsibility": "TBD"}, {"text": "Install required weather flashing to external ductwork/ flex connections on roof", "responsibility": "TBD"}]}, {"name": "Installation of under-flashing", "items": [{"text": "Install duct covers for canvas connections exposed to weather", "responsibility": "TBD"}, {"text": "Install TDF covers for flanges exposed to weather", "responsibility": "TBD"}, {"text": "Install duct access panels etc.", "responsibility": "TBD"}, {"text": "Install of Sheet metal sleeves", "responsibility": "TBD"}, {"text": "Installation incl levelling of plinth surrounds", "responsibility": "TBD"}, {"text": "Duct cleaning before installation (if required)", "responsibility": "TBD"}, {"text": "Supply & installation of external ductwork insulation", "responsibility": "TBD"}, {"text": "Access panels to be the maximum size that will fit in the ductwork", "responsibility": "TBD"}, {"text": "Installation of coolroom panelling and built up plant installation", "responsibility": "TBD"}, {"text": "Sealing open duct ends & resealing where plastic has torn during movement on site at the end of every shift", "responsibility": "TBD"}]}, {"name": "Flex installation", "items": [{"text": "Flexible connections, ductwork, spigots / starting collars....etc.", "responsibility": "TBD"}, {"text": "Flexible duct, plenum boxes, outlets, diffusers\u2026\u2026..etc.", "responsibility": "TBD"}, {"text": "Installation of spigot take offs c/w butterfly damper left closed prior to flex being installed, left open once flex is installed", "responsibility": "TBD"}, {"text": "Installation of flexible ductwork, note flex to be cut to minimum length required and laid out to minimise airflow restrictions", "responsibility": "TBD"}, {"text": "Installation of flex to AAC, SMACNA & AS standards including certified hanging strap & cradles, All flexes ziptied and taped to spigots, insulation pushed fully onto spigot, balancing quadrant to be left accessible.", "responsibility": "TBD"}]}, {"name": "Grille & Louvre installation", "items": [{"text": "Installation of all grilles / registers / diffusers incl coordination with partitioner & marking out according to RCPs", "responsibility": "TBD"}, {"text": "Cutting out of plasterboard for grille installation", "responsibility": "TBD"}]}, {"name": "Installation of mesh grilles", "items": [{"text": "Installation of external louvres as required", "responsibility": "TBD"}, {"text": "Install security grilles in duct as indicated on drawings", "responsibility": "TBD"}, {"text": "Blanking off for internal & external louvres as required", "responsibility": "TBD"}]}, {"name": "Fire damper installation", "items": [{"text": "Install fire dampers as per manufactures instructions and provide QA documents as per AS code", "responsibility": "TBD"}, {"text": "Verification of penetration sizes ( allowed 2 visit per penetration)", "responsibility": "TBD"}, {"text": "Allow to install fireboard on top of fire dampers that are hard under slab", "responsibility": "TBD"}, {"text": "Certify fire damper installation in accordance with Australian standards & manufacturers installation details", "responsibility": "TBD"}, {"text": "Provision of installation ITP/QA report with photos complete with pictures (template provided by Austral)", "responsibility": "TBD"}, {"text": "Supply and install of fire rated mastic as per manufacturers specifications", "responsibility": "TBD"}]}, {"name": "Sealing and penetrations", "items": [{"text": "On site verification of penetration sizes for dameprs and ducts.", "responsibility": "TBD"}, {"text": "Allow mark out of required openings and penetrations in ceilings and walls for grilles, dampers and fire  dampers.", "responsibility": "TBD"}, {"text": "Install screws in all 4 corners when marking out grilles to not l;oose marks if painted over", "responsibility": "TBD"}, {"text": "Cutting out of blockwork for duct installation if penos not marked out in time", "responsibility": "TBD"}]}, {"name": "Supply all required sealants", "items": [{"text": "Sealing of penetrations (non-fire rated) including submission of sample & approval", "responsibility": "TBD"}, {"text": "Install flashing where duct passes through, PC2 walls / ceilings ,gyprock walls & acoustic walls pack with insulation and where exposed to view on both sides of the wall", "responsibility": "TBD"}, {"text": "Acoustic mastic sealing through acoustic walls to client requirements/acoustic report (non fire rated walls)", "responsibility": "TBD"}, {"text": "Allow tidy sealant application for exposed to view duct (non fire rated walls)", "responsibility": "TBD"}, {"text": "Allow to seal grilles in PC2 labs as per design detail", "responsibility": "TBD"}, {"text": "Allow to seal S/S humidifiers ducts water tight", "responsibility": "TBD"}, {"text": "Duct sealed as per specification and assist with  pressure test of duct to meet Australian standards", "responsibility": "TBD"}, {"text": "Installation of airtight chamber including wall/floor/ceiling sealing", "responsibility": "TBD"}, {"text": "Cutting out mesh and bondek for penetrations", "responsibility": "TBD"}]}, {"name": "Labour and programme", "items": [{"text": "The subcontractor has reviewed the contract documents issued to date and agree to carry out all works as required for the trade listed above", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the construction programme (subject to change by the builder or AAC) and commits to providing the required resources & working the necessary hours including overtime & weekends to meet the programme & minimise disruption to building works and other trades.", "responsibility": "TBD"}, {"text": "AAC reserves the right to engage another contractor at subcontractors expense in order to meet programme if deemed necessary", "responsibility": "TBD"}, {"text": "The subcontractor has allowed for coordination and interface with other trades", "responsibility": "TBD"}, {"text": "6 working days per week as per builders' working hours", "responsibility": "TBD"}, {"text": "Defect rectifications to be attended to immediately.", "responsibility": "TBD"}]}, {"name": "First aid representative", "items": [{"text": "Safety representative for safety walks", "responsibility": "TBD"}, {"text": "Representative for weekly site walks withBuilder& AAC", "responsibility": "TBD"}, {"text": "Supply of Hi Vis Orange full sleeve shirts with cross on back and vertical stripes on front", "responsibility": "TBD"}, {"text": "Supply of all PPE as required for the workers on site", "responsibility": "TBD"}, {"text": "Attend site meetings as request by Austral management", "responsibility": "TBD"}]}, {"name": "Toolbox talks (weekly)", "items": [{"text": "Safe work method statement (SWMS) signed by all workers on site", "responsibility": "TBD"}]}, {"name": "Site inductions for allworkers", "items": [{"text": "Provide task lighting as required", "responsibility": "TBD"}, {"text": "Storage and security of material and tools", "responsibility": "TBD"}, {"text": "Provide test & tag registers", "responsibility": "TBD"}, {"text": "Electrical tagging of own equipment", "responsibility": "TBD"}, {"text": "All work areas to be cleaned daily", "responsibility": "TBD"}]}, {"name": "Provision of bins", "items": [{"text": "Removal of rubbish to waste bin provided on site by builder", "responsibility": "TBD"}]}, {"name": "Qualtiy and complaince", "items": [{"text": "Compliance with all the Project specifications", "responsibility": "TBD"}, {"text": "Compliance with all the Mechanical specifications", "responsibility": "TBD"}]}, {"name": "Compliance to acoustic specifications", "items": [{"text": "Fully document QA and ITPs and provide to PM on completion", "responsibility": "TBD"}, {"text": "Time stamp photos to accompany Pressuretest ITPs", "responsibility": "TBD"}]}, {"name": "Construction award compliant", "items": [{"text": "Relevant EBA rates & compliance", "responsibility": "TBD"}]}, {"name": "Indegenuos inclusions", "items": [{"text": "Adherence to all site, State & National legislated safety requirements", "responsibility": "TBD"}, {"text": "Strict enforcement of the safe use of all scissor lifts, ladders, hoists & PPE", "responsibility": "TBD"}, {"text": "Representation on safety committee if elected or nominated", "responsibility": "TBD"}, {"text": "Provision, maintenance and implementation of an approved site safety plan", "responsibility": "TBD"}, {"text": "Compliance with all relevant Standards", "responsibility": "TBD"}, {"text": "Compliance with Hot Work AS 1674.1", "responsibility": "TBD"}, {"text": "Progress claims & general contractual requirements", "responsibility": "TBD"}, {"text": "Retention 5% (cash or 2 off BG 2.5%)", "responsibility": "TBD"}, {"text": "Progressive QA documentation - subject to progress claim approval (Lineal m or sqm installation details may be required)", "responsibility": "TBD"}, {"text": "Itemised progress claim to AAC no later than 20th of each month with relevant documentation (including Statutory Declaration)", "responsibility": "TBD"}, {"text": "Progress claims breakdown format to be provided as requested by AAC", "responsibility": "TBD"}, {"text": "Public Liability Insurance (min. $20 million)", "responsibility": "TBD"}]}, {"name": "Workers Compensation Insurance", "items": [{"text": "Sub- Subcontractors will also require $20 million PLI, workers compensation and Statutory declaration", "responsibility": "TBD"}, {"text": "12 mths DLP concurrent with AAC DLP", "responsibility": "TBD"}]}, {"name": "Relevant EBA rates", "items": [{"text": "Schedule of rates (to be used for VO provided below)", "responsibility": "TBD"}, {"text": "Submit variations within 3 days to allow AAC to submit to the builder within timebar limits. Timebar restrictions to be back-to-back with AAC contract.", "responsibility": "TBD"}, {"text": "Proceeding of variation workupon receival of written instruction from AAC", "responsibility": "TBD"}, {"text": "Only client/AAC generated and approved variations may be claimed", "responsibility": "TBD"}, {"text": "Schedules of rates - Normal time", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Time and half", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Double time", "responsibility": "Subcontractor"}]}], "type": "sow"}, {"id": "sow_duct_supply", "trade": "Duct Supply", "title": "Duct Supply", "sections": [{"name": "General", "items": [{"text": "Ductwork supply as per project  specification, mechanical specifaction and mech. workshop drawings.", "responsibility": "TBD"}, {"text": "Supply of rectangular Galvabond ductwork", "responsibility": "TBD"}, {"text": "Supply of circular / spiro ductwork", "responsibility": "TBD"}]}, {"name": "Supply of oval duct", "items": [{"text": "Supply of  SS316 stainless steel duct", "responsibility": "TBD"}, {"text": "Supply of SS duct for 2m off Humidifiers sealed water tight with drains and Access panel.", "responsibility": "TBD"}]}, {"name": "Supply of PVC ductwork", "items": [{"text": "Supply of circular ductwork for Fume cupboards", "responsibility": "TBD"}, {"text": "Supply of Internal insulation for ductwork", "responsibility": "TBD"}, {"text": "Supply of internal perforated metal lining as per mech spec and mech drawings", "responsibility": "TBD"}, {"text": "Supply of external ductwork insulation", "responsibility": "TBD"}]}, {"name": "Supply of canvas connections", "items": [{"text": "Supply and install all Duct hanging straps, cleats and other consumables as required.", "responsibility": "TBD"}, {"text": "Supply of light gauge angle", "responsibility": "TBD"}, {"text": "Supply of heavy gauge angle", "responsibility": "TBD"}, {"text": "Plastic wrap ends of all ductwork for dust protection", "responsibility": "TBD"}]}, {"name": "Supply Relief/ Transfer ducts", "items": [{"text": "Turning vanes for all 90 degree bends except transfer ducts", "responsibility": "TBD"}, {"text": "Sealing of duct seams for air leakage", "responsibility": "TBD"}, {"text": "Kitchen duct to be min 1.2mm for width <500mm and 1.6mm for width >500mm", "responsibility": "TBD"}, {"text": "Access panels for kitchen every 3m", "responsibility": "TBD"}]}, {"name": "Supply of filter boxes", "items": [{"text": "Insulated drip tray as per specifications", "responsibility": "TBD"}, {"text": "Supply of Return air boxes for FCUs", "responsibility": "TBD"}, {"text": "Supply of Supply air boxes for FCUs", "responsibility": "TBD"}, {"text": "Supply of filter channels for assosciated equipment", "responsibility": "TBD"}, {"text": "Supply of OA filter boxes", "responsibility": "TBD"}, {"text": "Cutting of holes for shoe pieces", "responsibility": "TBD"}]}, {"name": "Supply of risers", "items": [{"text": "Supply of Blade dampers within duct", "responsibility": "TBD"}]}, {"name": "Supply of blanking plates", "items": [{"text": "Supply of duct access panels", "responsibility": "TBD"}, {"text": "Access panels to be the maximum size that will fit in the ductwork", "responsibility": "TBD"}]}, {"name": "Supply of Security grilles", "items": [{"text": "Supply of tamper proof Security grille bolts", "responsibility": "TBD"}, {"text": "Supply of insulated sheet metal sleeves to pass through gyprock walls", "responsibility": "TBD"}]}, {"name": "Supply of over-flashings", "items": [{"text": "Supply of duct covers for canvas connections exposed to weather", "responsibility": "TBD"}, {"text": "Supply of TDF covers for external ductwork", "responsibility": "TBD"}, {"text": "Supply of cross break for external ductwork", "responsibility": "TBD"}, {"text": "Supply of pipe and cable tray coverings - exposed to weather", "responsibility": "TBD"}]}, {"name": "Labour and programme", "items": [{"text": "Bulk order to manufactured and delivered within 5 working days", "responsibility": "TBD"}, {"text": "Site measures to manufactured and delivered within 3 working days", "responsibility": "TBD"}, {"text": "If duct pieces are manufactured incorrectly or low quality ductwork has been manufacturedcorrect pieces need to manufcatured and delivered by the following woking day", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the contract documents issued to date and agree to carry out all works as required for the trade listed above", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the construction programme (subject to change by the builder or AAC) and commits to providing the required resources & working the necessary hours including overtime & weekends to meet the programme & minimise disruption to building works and other trades.", "responsibility": "TBD"}, {"text": "AAC reserves the right to engage another contractor at subcontractors expense in order to meet programme if deemed necessary", "responsibility": "TBD"}, {"text": "The subcontractor has allowed for coordination and interface with duct install trade", "responsibility": "TBD"}, {"text": "Coordinate manufacture & delivery of all site measures to meet programme requirements", "responsibility": "TBD"}]}, {"name": "Site conditions & requirements", "items": [{"text": "Delivery truck provision as per project requirements", "responsibility": "TBD"}, {"text": "Responsibility to check height clearence for loading docks", "responsibility": "TBD"}, {"text": "Delivery of duct in cages", "responsibility": "TBD"}, {"text": "Delivery dockets to have every duct to be numbered on the duct pieces and drawings", "responsibility": "TBD"}, {"text": "Delivery driver to cordinate with Duct installer supervisor for deliveries", "responsibility": "TBD"}, {"text": "All deliveries to be notified 48 hrs in advance to allow delivery bookings", "responsibility": "TBD"}, {"text": "Acknowledgement that there will be waitng times for deliveries that is outside AAC's control", "responsibility": "TBD"}, {"text": "Soft copies of all delivery dockets to be provided at the end of the job", "responsibility": "TBD"}]}, {"name": "Qualtiy and complaince", "items": [{"text": "Ductwork quality to be of an acceptable level", "responsibility": "TBD"}, {"text": "Security grilles should have welding points QA checked and sent to site", "responsibility": "TBD"}, {"text": "Compliance with all the Project specifications", "responsibility": "TBD"}, {"text": "Compliance with all the Mechanical specifications", "responsibility": "TBD"}]}, {"name": "Compliance to acoustic specifications", "items": [{"text": "Fully document QA and ITPs and provide to PM on completion", "responsibility": "TBD"}, {"text": "Adherence to all site, State & National legislated safety requirements", "responsibility": "TBD"}, {"text": "Compliance with all relevant Standards", "responsibility": "TBD"}, {"text": "Progress claims & general contractual requirements", "responsibility": "TBD"}, {"text": "Retention 5% (cash or 2 off BG 2.5%)", "responsibility": "TBD"}, {"text": "Progressive QA documentation - subject to progress claim approval", "responsibility": "TBD"}, {"text": "Itemised progress claim to AAC no later than 20th of each month with relevant documentation (including Statutory Declaration)", "responsibility": "TBD"}, {"text": "Progress claims breakdown format to be provided as requested by AAC", "responsibility": "TBD"}, {"text": "Public Liability Insurance (min. $20 million)", "responsibility": "TBD"}]}, {"name": "Workers Compensation Insurance", "items": [{"text": "Sub- Subcontractors will also require $20 million PLI, workers compensation and Statutory declaration", "responsibility": "TBD"}, {"text": "12 mths DLP concurrent with AAC DLP", "responsibility": "TBD"}, {"text": "Schedule of rates (to be used for VO provided below", "responsibility": "TBD"}, {"text": "Submit variations within 3 days to allow AAC to submit to the builder within timebar limits. Timebar restrictions to be back-to-back with AAC contract.", "responsibility": "TBD"}, {"text": "Proceeding of variation workupon receival of written instruction from AAC", "responsibility": "TBD"}, {"text": "Only client/AAC generated and approved variations may be claimed", "responsibility": "TBD"}, {"text": "Schedules of sqm rates - Nude duct", "responsibility": "Subcontractor"}, {"text": "Schedules of sqm rates - Insulated duct (50mm)", "responsibility": "TBD"}, {"text": "Schedules of sqm rates - Insulated duct (100mm)", "responsibility": "Subcontractor"}, {"text": "Schedules of sqm rates - Kitchen duct", "responsibility": "TBD"}, {"text": "Schedules of sqm rates - SS duct", "responsibility": "TBD"}, {"text": "Schedules of sqm rates - Aluminium duct", "responsibility": "TBD"}]}], "type": "sow"}, {"id": "sow_fire_rating", "trade": "Fire Rating", "title": "Fire Rating", "sections": [{"name": "General", "items": [{"text": "Accepting and offloading of fire rating materials", "responsibility": "Subcontractor"}, {"text": "Site movement & positioning of all materials and equipment to AAC & builder's direction", "responsibility": "TBD"}, {"text": "Co-ordinate site Cranage with Austral management and Builder", "responsibility": "TBD"}]}, {"name": "Provision of ladders", "items": [{"text": "Provision of access equipment scissor lift, boom lift, mobile scaffold or similar", "responsibility": "TBD"}, {"text": "Supply and movement around site of scaffold (4 meter) & scissor lifts as required  to complete installation to meet programme", "responsibility": "TBD"}, {"text": "Coordination with other trades (including gyprocker/partiotioner)", "responsibility": "TBD"}, {"text": "Subcontractor acknowledges that neither the builder nor AAC are able to guarantee continuity of work on site", "responsibility": "TBD"}, {"text": "No costs  for site closures are to be borne By Austral air", "responsibility": "TBD"}, {"text": "Allow to print own set of drawings", "responsibility": "TBD"}]}, {"name": "Fire stopping", "items": [{"text": "Review all Architectural, Structural and Fire compartment drawings for correct FRL ratings", "responsibility": "Subcontractor"}, {"text": "Fire stopping of services as per project  specification, Mechanical specifaction and mech. workshop drawings through fire rated walls, ceilings and floor slabs", "responsibility": "TBD"}, {"text": "Supply and installation of fire stopping materials for refrigerant pipes", "responsibility": "TBD"}, {"text": "Supply and installation of fire stopping materials for mechanical pipework", "responsibility": "TBD"}, {"text": "Supply and installation of fire stopping materials for mechanical electrical cables", "responsibility": "TBD"}, {"text": "Supply and installation of fire stopping materials for hanger rods through fire rated ceilings", "responsibility": "TBD"}, {"text": "Supply and installation of fire collars", "responsibility": "TBD"}, {"text": "Supply and installation of fyrewarp for ductwork", "responsibility": "TBD"}, {"text": "Supply and installation of fire rated access panel for ductwork", "responsibility": "TBD"}, {"text": "Fyrewrap for ductwork to match the insualtion thickness on drawings to maintain thermal insulation (R-value)", "responsibility": "TBD"}, {"text": "Supply and installation of Intubatt", "responsibility": "TBD"}, {"text": "Supply and installation of Fire mastic", "responsibility": "TBD"}, {"text": "Supply and installation of Penowrap", "responsibility": "TBD"}, {"text": "Coordination of penetration sizes for compliance  to assist with Builders works drawings", "responsibility": "TBD"}, {"text": "Coordination of penetration sizes with duct installers/mech elec/refrigeration/plumbing trades to assist the relevant trade in marking out the correct penos/corehole sizes", "responsibility": "TBD"}, {"text": "Supply of all consumables required to complete installation", "responsibility": "TBD"}, {"text": "Ensure penetrations are installed in line with fire-tested systems", "responsibility": "TBD"}, {"text": "Avoid \"cut-and-patch\" scenarios; install systems before wall/ceiling closure", "responsibility": "TBD"}, {"text": "Supply and installation of smoke seal sealants", "responsibility": "TBD"}, {"text": "Allow tidy sealant application for exposed to view services", "responsibility": "TBD"}, {"text": "Cordinate with builder for access requirements to be able fire stop services", "responsibility": "TBD"}, {"text": "Allow mark out of required openings and penetrations in ceilings and walls", "responsibility": "TBD"}]}, {"name": "Fire damper certification", "items": [{"text": "Installation of fire dampers in accordance with Australian standards & manufacturers installation details", "responsibility": "TBD"}, {"text": "Installation of fire rated pressure relief dampers in accordance with Australian standards & manufacturers installation details", "responsibility": "TBD"}, {"text": "Certify fire damper installation in accordance with Australian standards & manufacturers installation details", "responsibility": "TBD"}, {"text": "Install of labels after dampers are certified", "responsibility": "TBD"}, {"text": "Provision of installation ITP/QA report complete with pictures (template provided by Austral)", "responsibility": "TBD"}]}, {"name": "Labour and programme", "items": [{"text": "The subcontractor has reviewed the contract documents issued to date and agree to carry out all works as required for the trade listed above", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the construction programme (subject to change by the builder or AAC) and commits to providing the required resources & working the necessary hours including overtime & weekends to meet the programme & minimise disruption to building works and other trades.", "responsibility": "TBD"}, {"text": "AAC reserves the right to engage another contractor at subcontractors expense in order to meet programme if deemed necessary", "responsibility": "TBD"}, {"text": "6 working days per week as per builders' working hours", "responsibility": "TBD"}, {"text": "Defect rectifications to be attended to immediately.", "responsibility": "TBD"}]}, {"name": "First aid representative", "items": [{"text": "Safety representative for safety walks", "responsibility": "TBD"}, {"text": "Representative for weekly site walks with Builder & AAC", "responsibility": "TBD"}, {"text": "Supply of Hi Vis Orange full sleeve shirts with cross on back and vertical stripes on front", "responsibility": "TBD"}, {"text": "Supply of all PPE as required for the workers on site", "responsibility": "TBD"}, {"text": "Attend site meetings as request by Austral management", "responsibility": "TBD"}]}, {"name": "Toolbox talks (weekly)", "items": [{"text": "Safe work method statement (SWMS) signed by all workers on site", "responsibility": "TBD"}]}, {"name": "Site inductions for allworkers", "items": [{"text": "Provide task lighting as required", "responsibility": "TBD"}, {"text": "Storage and security of material and tools", "responsibility": "TBD"}, {"text": "Provide test & tag registers", "responsibility": "TBD"}, {"text": "Electrical tagging of own equipment", "responsibility": "TBD"}, {"text": "All work areas to be cleaned daily", "responsibility": "TBD"}]}, {"name": "Provision of bins", "items": [{"text": "Removal of rubbish to waste bin provided on site by builder", "responsibility": "TBD"}]}, {"name": "Qualtiy and complaince", "items": [{"text": "Compliance with all the Project specifications", "responsibility": "TBD"}, {"text": "Compliance with all the Mechanical specifications", "responsibility": "TBD"}]}, {"name": "Compliance to acoustic specifications", "items": [{"text": "Fully document QA and ITPs and provide to PM on completion", "responsibility": "TBD"}, {"text": "Maintain a Fire Penetration Register, live and updated throughout the job to be shared with AAC", "responsibility": "TBD"}, {"text": "Provide photographic evidence of each installed fire stopping system", "responsibility": "TBD"}, {"text": "Submission of a complete fire stopping report for OC", "responsibility": "TBD"}, {"text": "All installed systems must have current fire test certificates or assessments (FCOs)", "responsibility": "TBD"}, {"text": "Ensure systems are installed in accordance with test reports and manufacturer instructions", "responsibility": "TBD"}]}, {"name": "Construction award compliant", "items": [{"text": "Relevant EBA rates & compliance", "responsibility": "TBD"}]}, {"name": "Indegenuos inclusions", "items": [{"text": "Adherence to all site, State & National legislated safety requirements", "responsibility": "TBD"}, {"text": "Strict enforcement of the safe use of all scissor lifts, ladders, hoists & PPE", "responsibility": "TBD"}, {"text": "Representation on safety committee if elected or nominated", "responsibility": "TBD"}, {"text": "Provision, maintenance and implementation of an approved site safety plan", "responsibility": "TBD"}]}, {"name": "Compliance to NCC codes", "items": [{"text": "Compliance with all relevant Standards", "responsibility": "TBD"}, {"text": "Compliance with Hot Work AS 1674.1", "responsibility": "TBD"}, {"text": "Progress claims & general contractual requirements", "responsibility": "TBD"}, {"text": "Retention 5% (cash or 2 off BG 2.5%)", "responsibility": "TBD"}, {"text": "Progressive QA documentation - subject to progress claim approval (Lineal m or sqm installation details may be required)", "responsibility": "TBD"}, {"text": "Itemised progress claim to AAC no later than 20th of each month with relevant documentation (including Statutory Declaration)", "responsibility": "TBD"}, {"text": "Progress claims breakdown format to be provided as requested by AAC", "responsibility": "TBD"}, {"text": "Public Liability Insurance (min. $20 million)", "responsibility": "TBD"}]}, {"name": "Workers Compensation Insurance", "items": [{"text": "Sub- Subcontractors will also require $20 million PLI, workers compensation and Statutory declaration", "responsibility": "TBD"}, {"text": "12 mths DLP concurrent with AAC DLP", "responsibility": "TBD"}, {"text": "Schedule of rates (to be used for VO provided below)", "responsibility": "TBD"}, {"text": "Submit variations within 3 days to allow AAC to submit to the builder within timebar limits. Timebar restrictions to be back-to-back with AAC contract.", "responsibility": "TBD"}, {"text": "Proceeding of variation work upon recieval of written instruction from AAC", "responsibility": "TBD"}, {"text": "Only client/AAC generated and approved variations may be claimed", "responsibility": "TBD"}, {"text": "Schedules of rates - Inspection rate per damper", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Normal time", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Time and half", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Double time", "responsibility": "Subcontractor"}]}], "type": "sow"}, {"id": "sow_fume_cupboards_install", "trade": "Fume Cupboards Install", "title": "Fume Cupboards Install", "sections": [{"name": "General", "items": [{"text": "Accepting and offloading of all deliveries of mech. equipment proposed for installation (delivery docket sign.)", "responsibility": "Subcontractor"}, {"text": "Site movement & positioning of all ductwork & free issue equipment to AAC & builder's direction", "responsibility": "TBD"}, {"text": "Supply and movement around site of sufficient Duct lifters hoists to complete installation to meet programme", "responsibility": "TBD"}, {"text": "Co-ordinate site Cranage with Austral management and Builder", "responsibility": "TBD"}]}, {"name": "Provision of ladders", "items": [{"text": "Lifting gear for equipment and materials (other than crane)", "responsibility": "TBD"}, {"text": "Provision of access and lift equipment under and over 3m", "responsibility": "TBD"}, {"text": "Provision of access equipment scissor lift, boom lift, mobile scaffold or similar", "responsibility": "TBD"}, {"text": "Supply and movement around site of scaffold (4 meter) & scissor lifts as required  to complete installation to meet programme", "responsibility": "TBD"}]}, {"name": "Coordination with other trades", "items": [{"text": "Supply and install all hangers, supports, secondary supports, AHU stacked support stands, duct stands, duct riser supports as required.", "responsibility": "TBD"}, {"text": "Supply and installation of all fixings (tex screws, nuts, bolts, washers, booker rods, angles, unistrut, duct tape, silver tape, blue straps\u2026\u2026.. etc.)", "responsibility": "TBD"}, {"text": "Rod & fittings to be gal or hot dipped as required by the project specification", "responsibility": "TBD"}, {"text": "Supply & installation of duct hanging strap", "responsibility": "TBD"}, {"text": "Supply of heavy gauge angle", "responsibility": "TBD"}, {"text": "All nuts, bolts, tech screws and fittings used externally to be hot dipped galv coated", "responsibility": "TBD"}, {"text": "All cut ends of heavy gauge steel such as angle or unistrut to be galmet zinc primer coated, whether inside or external. Minimum 2 coats", "responsibility": "TBD"}, {"text": "Supply of all consumables required to complete installation", "responsibility": "TBD"}, {"text": "No spray paint / markers on any concrete to be exposed final finish", "responsibility": "TBD"}, {"text": "Spray paint all  internal plenums exposed to view matt black", "responsibility": "TBD"}, {"text": "Allow to print own set of drawings", "responsibility": "TBD"}, {"text": "Pipe and cable tray coverings - exposed to weather", "responsibility": "TBD"}, {"text": "Installation of seimsic hangers as per seismic drawings & AS1170.4", "responsibility": "TBD"}, {"text": "Subcontractor acknowledges that neither the builder nor AAC are able to guarantee continuity of work on site", "responsibility": "TBD"}, {"text": "No costs  for site closures are to be borne By Austral air", "responsibility": "TBD"}]}, {"name": "Fume cupboard Installation", "items": [{"text": "PVC ductwork and connection to Fume cupboard", "responsibility": "TBD"}, {"text": "Discharge cones with S/S sheathing", "responsibility": "TBD"}, {"text": "Weather proofing duct penetration and system on roof. Provide Welded PVC over flashings to seal PVC pipe as it exits building.", "responsibility": "TBD"}]}, {"name": "Fan  (Fume cupboard only)", "items": [{"text": "Support stands/ Support cables/ Duct supports / Structural certificate", "responsibility": "TBD"}, {"text": "Rigging & Positioning of cupboard", "responsibility": "TBD"}]}, {"name": "Sealing and penetrations", "items": [{"text": "Allow mark out of required openings and penetrations in ceilings and walls for grilles, dampers and fire  dampers.", "responsibility": "TBD"}, {"text": "Cutting out of blockwork for duct installation if penos not marked out in time", "responsibility": "TBD"}]}, {"name": "Supply all required sealants", "items": [{"text": "Sealing of penetrations (non-fire rated) including submission of sample & approval", "responsibility": "TBD"}, {"text": "Acoustic mastic sealing through acoustic walls to client requirements/acoustic report (non fire rated walls)", "responsibility": "TBD"}, {"text": "Allow tidy sealant application for exposed to view pipework (non fire rated walls)", "responsibility": "TBD"}, {"text": "Acoustic mastic sealing and flashing off through acoustic walls to client requirements", "responsibility": "TBD"}, {"text": "Allow to seal S/S humidifiers ducts water tight", "responsibility": "TBD"}, {"text": "Allow tidy sealant application for exposed to view duct", "responsibility": "TBD"}, {"text": "Duct sealed as per specification and assist with  pressure test of duct to meet Australian standards", "responsibility": "TBD"}, {"text": "Installation of airtight chamber including wall/floor/ceiling sealing", "responsibility": "TBD"}, {"text": "Cutting out mesh and bondek for penetrations", "responsibility": "TBD"}]}, {"name": "Labour and programme", "items": [{"text": "The subcontractor has reviewed the contract documents issued to date and agree to carry out all works as required for the trade listed above", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the construction programme (subject to change by the builder or AAC) and commits to providing the required resources & working the necessary hours including overtime & weekends to meet the programme & minimise disruption to building works and other trades.", "responsibility": "TBD"}, {"text": "AAC reserves the right to engage another contractor at subcontractors expense in order to meet programme if deemed necessary", "responsibility": "TBD"}, {"text": "The subcontractor has allowed for coordination and interface with other trades", "responsibility": "TBD"}, {"text": "6 working days per week as per builders' working hours", "responsibility": "TBD"}, {"text": "Defect rectifications to be attended to immediately.", "responsibility": "TBD"}]}, {"name": "First aid representative", "items": [{"text": "Safety representative for safety walks", "responsibility": "TBD"}, {"text": "Representative for weekly site walks withBuilder& AAC", "responsibility": "TBD"}, {"text": "Supply of Hi Vis Orange full sleeve shirts with cross on back and vertical stripes on front", "responsibility": "TBD"}, {"text": "Supply of all PPE as required for the workers on site", "responsibility": "TBD"}, {"text": "Attend site meetings as request by Austral management", "responsibility": "TBD"}]}, {"name": "Toolbox talks (weekly)", "items": [{"text": "Safe work method statement (SWMS) signed by all workers on site", "responsibility": "TBD"}]}, {"name": "Site inductions for allworkers", "items": [{"text": "Provide task lighting as required", "responsibility": "TBD"}, {"text": "Storage and security of material and tools", "responsibility": "TBD"}, {"text": "Provide test & tag registers", "responsibility": "TBD"}, {"text": "Electrical tagging of own equipment", "responsibility": "TBD"}, {"text": "All work areas to be cleaned daily", "responsibility": "TBD"}]}, {"name": "Provision of bins", "items": [{"text": "Removal of rubbish to waste bin provided on site by builder", "responsibility": "TBD"}]}, {"name": "Qualtiy and complaince", "items": [{"text": "Compliance with all the Project specifications", "responsibility": "TBD"}, {"text": "Compliance with all the Mechanical specifications", "responsibility": "TBD"}]}, {"name": "Compliance to acoustic specifications", "items": [{"text": "Fully document QA and ITPs and provide to PM on completion", "responsibility": "TBD"}]}, {"name": "Construction award compliant", "items": [{"text": "Relevant EBA rates & compliance", "responsibility": "TBD"}]}, {"name": "Indegenuos inclusions", "items": [{"text": "Adherence to all site, State & National legislated safety requirements", "responsibility": "TBD"}, {"text": "Strict enforcement of the safe use of all scissor lifts, ladders, hoists & PPE", "responsibility": "TBD"}, {"text": "Representation on safety committee if elected or nominated", "responsibility": "TBD"}, {"text": "Provision, maintenance and implementation of an approved site safety plan", "responsibility": "TBD"}, {"text": "Compliance with all relevant Standards", "responsibility": "TBD"}, {"text": "Compliance with Hot Work AS 1674.1", "responsibility": "TBD"}, {"text": "Progress claims & general contractual requirements", "responsibility": "TBD"}, {"text": "Retention 5% (cash or 2 off BG 2.5%)", "responsibility": "TBD"}, {"text": "Progressive QA documentation - subject to progress claim approval (Lineal m or sqm installation details may be required)", "responsibility": "TBD"}, {"text": "Itemised progress claim to AAC no later than 20th of each month with relevant documentation (including Statutory Declaration)", "responsibility": "TBD"}, {"text": "Progress claims breakdown format to be provided as requested by AAC", "responsibility": "TBD"}, {"text": "Public Liability Insurance (min. $20 million)", "responsibility": "TBD"}]}, {"name": "Workers Compensation Insurance", "items": [{"text": "Sub- Subcontractors will also require $20 million PLI, workers compensation and Statutory declaration", "responsibility": "TBD"}, {"text": "12 mths DLP concurrent with AAC DLP", "responsibility": "TBD"}]}, {"name": "Relevant EBA rates", "items": [{"text": "Schedule of rates (to be used for VO provided below)", "responsibility": "TBD"}, {"text": "Submit variations within 3 days to allow AAC to submit to the builder within timebar limits. Timebar restrictions to be back-to-back with AAC contract.", "responsibility": "TBD"}, {"text": "Proceeding of variation workupon receival of written instruction from AAC", "responsibility": "TBD"}, {"text": "Only client/AAC generated and approved variations may be claimed", "responsibility": "TBD"}, {"text": "Schedules of rates - Normal time", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Time and half", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Double time", "responsibility": "Subcontractor"}]}], "type": "sow"}, {"id": "sow_insulation_install", "trade": "Insulation Install", "title": "Insulation Install", "sections": [{"name": "General", "items": [{"text": "Accepting and offloading of all deliveries of material proposed for installation (delivery docket sign.)", "responsibility": "TBD"}, {"text": "Site movement & positioning of all material to AAC & builder's direction", "responsibility": "TBD"}]}, {"name": "Provision of ladders", "items": [{"text": "Provision of access and lift equipment under and over 3m", "responsibility": "TBD"}, {"text": "Provision of access equipment scissor lift, boom lift, mobile scaffold or similar", "responsibility": "TBD"}, {"text": "Supply and movement around site of scaffold (4 meter) & scissor lifts as required  to complete installation to meet programme", "responsibility": "TBD"}]}, {"name": "Coordination with other trades", "items": [{"text": "Supply of all consumables required to complete installation", "responsibility": "TBD"}, {"text": "No spray paint / markers on any concrete to be exposed final finish", "responsibility": "TBD"}, {"text": "Spray paint all  internal plenums exposed to view matt black", "responsibility": "TBD"}, {"text": "Allow to print own set of drawings", "responsibility": "TBD"}, {"text": "Subcontractor acknowledges that neither the builder nor AAC are able to guarantee continuity of work on site", "responsibility": "TBD"}, {"text": "No costs  for site closures are to be borne By Austral air", "responsibility": "TBD"}]}, {"name": "Insulation", "items": [{"text": "Supply and install pipe insulation all CHW, HHW and CW pipework", "responsibility": "TBD"}, {"text": "CHW valves to be lagged", "responsibility": "TBD"}, {"text": "Supply and install metal pipe cladding where exposed to weather or mechanical damage (plantrooms, etc\u2026)", "responsibility": "TBD"}, {"text": "Supply and installation of external insulation of ductwork as per project specs and drawings.", "responsibility": "TBD"}, {"text": "Supply and installation of duct cladding", "responsibility": "TBD"}, {"text": "Reinstall insualtion where patch up is required", "responsibility": "TBD"}, {"text": "Preinsulate ductwork before install by duct install trade where required", "responsibility": "TBD"}, {"text": "External wrap and sheath PVC duct as per markup", "responsibility": "TBD"}, {"text": "Insulation thickness as specified and to meet section J compliance and project specs", "responsibility": "TBD"}, {"text": "Fire rate pipework as per Tested System and in compliance with Australian Standards", "responsibility": "TBD"}]}, {"name": "Labour and programme", "items": [{"text": "The subcontractor has reviewed the contract documents issued to date and agree to carry out all works as required for the trade listed above", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the construction programme (subject to change by the builder or AAC) and commits to providing the required resources & working the necessary hours including overtime & weekends to meet the programme & minimise disruption to building works and other trades.", "responsibility": "TBD"}, {"text": "AAC reserves the right to engage another contractor at subcontractors expense in order to meet programme if deemed necessary", "responsibility": "TBD"}, {"text": "The subcontractor has allowed for coordination and interface with other trades", "responsibility": "TBD"}, {"text": "6 working days per week as per builders' working hours", "responsibility": "TBD"}, {"text": "Defect rectifications to be attended to immediately.", "responsibility": "TBD"}]}, {"name": "First aid representative", "items": [{"text": "Safety representative for safety walks", "responsibility": "TBD"}, {"text": "Representative for weekly site walks withBuilder& AAC", "responsibility": "TBD"}, {"text": "Supply of Hi Vis Orange full sleeve shirts with cross on back and vertical stripes on front", "responsibility": "TBD"}, {"text": "Supply of all PPE as required for the workers on site", "responsibility": "TBD"}, {"text": "Attend site meetings as request by Austral management", "responsibility": "TBD"}]}, {"name": "Toolbox talks (weekly)", "items": [{"text": "Safe work method statement (SWMS) signed by all workers on site", "responsibility": "TBD"}]}, {"name": "Site inductions for allworkers", "items": [{"text": "Provide task lighting as required", "responsibility": "TBD"}, {"text": "Storage and security of material and tools", "responsibility": "TBD"}, {"text": "All work areas to be cleaned daily", "responsibility": "TBD"}]}, {"name": "Provision of bins", "items": [{"text": "Removal of rubbish to waste bin provided on site by builder", "responsibility": "TBD"}]}, {"name": "Qualtiy and complaince", "items": [{"text": "Compliance with all the Project specifications", "responsibility": "TBD"}, {"text": "Compliance with all the Mechanical specifications", "responsibility": "TBD"}]}, {"name": "Compliance to acoustic specifications", "items": [{"text": "Fully document QA and ITPs and provide to PM on completion", "responsibility": "TBD"}]}, {"name": "Construction award compliant", "items": [{"text": "Relevant EBA rates & compliance", "responsibility": "TBD"}]}, {"name": "Indegenuos inclusions", "items": [{"text": "Adherence to all site, State & National legislated safety requirements", "responsibility": "TBD"}, {"text": "Strict enforcement of the safe use of all scissor lifts, ladders, hoists & PPE", "responsibility": "TBD"}, {"text": "Representation on safety committee if elected or nominated", "responsibility": "TBD"}, {"text": "Provision, maintenance and implementation of an approved site safety plan", "responsibility": "TBD"}, {"text": "Compliance with all relevant Standards", "responsibility": "TBD"}, {"text": "Progress claims & general contractual requirements", "responsibility": "TBD"}, {"text": "Retention 5% (cash or 2 off BG 2.5%)", "responsibility": "TBD"}, {"text": "Progressive QA documentation - subject to progress claim approval (Lineal m or sqm installation details may be required)", "responsibility": "TBD"}, {"text": "Itemised progress claim to AAC no later than 20th of each month with relevant documentation (including Statutory Declaration)", "responsibility": "TBD"}, {"text": "Progress claims breakdown format to be provided as requested by AAC", "responsibility": "TBD"}, {"text": "Public Liability Insurance (min. $20 million)", "responsibility": "TBD"}]}, {"name": "Workers Compensation Insurance", "items": [{"text": "Sub- Subcontractors will also require $20 million PLI, workers compensation and Statutory declaration", "responsibility": "TBD"}, {"text": "12 mths DLP concurrent with AAC DLP", "responsibility": "TBD"}, {"text": "Schedule of rates (to be used for VO provided below)", "responsibility": "TBD"}, {"text": "Submit variations within 3 days to allow AAC to submit to the builder within timebar limits. Timebar restrictions to be back-to-back with AAC contract.", "responsibility": "TBD"}, {"text": "Proceeding of variation workupon receival of written instruction from AAC", "responsibility": "TBD"}, {"text": "Only client/AAC generated and approved variations may be claimed", "responsibility": "TBD"}, {"text": "Schedules of rates - Normal time", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Time and half", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Double time", "responsibility": "Subcontractor"}]}], "type": "sow"}, {"id": "sow_mechanical_electrical", "trade": "Mechanical Electrical", "title": "Mechanical Electrical", "sections": [{"name": "General", "items": [{"text": "Accepting and offloading of free issue equipment proposed for installation (delivery docket sign.)", "responsibility": "Subcontractor"}, {"text": "Site movement & positioning of all material and free issue equipment to AAC & builder's direction", "responsibility": "TBD"}, {"text": "Co-ordinate site Cranage with Austral management and Builder", "responsibility": "TBD"}]}, {"name": "Provision of ladders", "items": [{"text": "Lifting gear for equipment and materials (other than crane)", "responsibility": "TBD"}, {"text": "Provision of access equipment scissor lift, boom lift, mobile scaffold or similar", "responsibility": "TBD"}, {"text": "Supply and movement around site of scaffold (4 meter) & scissor lifts as required  to complete installation to meet programme", "responsibility": "TBD"}, {"text": "The subcontractor has allowed for coordination and interface with other trades (not limited to BMS/Fire trade/Refrigerant trade, etc..)", "responsibility": "TBD"}, {"text": "Supply and installation of all fixings (cable trays, tex screws, nuts, bolts, washers, booker rods, angles, unistrut, \u2026\u2026.. etc.)", "responsibility": "TBD"}, {"text": "Supply and install of fire rated cabling where required as per project specs", "responsibility": "TBD"}, {"text": "Supply of all consumables required to complete installation", "responsibility": "TBD"}, {"text": "Allow to print own set of drawings", "responsibility": "TBD"}, {"text": "Assistance in commissioning with amps measure, rotation of fans, compressors", "responsibility": "TBD"}]}, {"name": "Assistance in witness testing", "items": [{"text": "Opening and closing of ceiling panels as required to carry out any works", "responsibility": "TBD"}]}, {"name": "Switchboard drawings", "items": [{"text": "Energisation permits to include MSSB drawings, cable tray markups, compliance certificates", "responsibility": "TBD"}, {"text": "Electrical schematics/ Single line diagrams", "responsibility": "TBD"}, {"text": "Labelling of equipments MSSBs, DCPs and isolators", "responsibility": "TBD"}]}, {"name": "Labelling of equipment", "items": [{"text": "No spray paint / markers on any concrete to be exposed to final finish", "responsibility": "TBD"}]}, {"name": "Underflashing", "items": [{"text": "Cable tray coverings - exposed to weather, in Colorbond if required to match architect's requirements", "responsibility": "TBD"}, {"text": "Installation of seimsic hangers as per seismic drawings & AS1170.4", "responsibility": "TBD"}, {"text": "Subcontractor acknowledges that neither the builder nor AAC are able to guarantee continuity of work on site", "responsibility": "TBD"}, {"text": "No costs  for site closures are to be borne By Austral air", "responsibility": "TBD"}]}, {"name": "Demolition", "items": [{"text": "Remove all electrical connections to units to allow for removal as per mech spec and mech drawings", "responsibility": "TBD"}]}, {"name": "Mechanical Electrical Installation", "items": [{"text": "Provide cable tray markup for design stage", "responsibility": "TBD"}, {"text": "Mechanical electrical wiring to/from mechanical equipment and mechanical boards", "responsibility": "Subcontractor"}, {"text": "Submains install to MSSBs", "responsibility": "Others"}, {"text": "Mechanical switchboards supply & installation", "responsibility": "TBD"}, {"text": "Damper control panel supply & installation", "responsibility": "TBD"}, {"text": "Swtchboard must be built to comply with AS/NZS-61439.", "responsibility": "TBD"}, {"text": "Board manufacture in 6 weeks from date of approval of submissions", "responsibility": "TBD"}, {"text": "Electrical wiring of PAC units", "responsibility": "TBD"}, {"text": "Electrical wiring of DX units", "responsibility": "TBD"}, {"text": "Electrical wiring of VRF units", "responsibility": "TBD"}, {"text": "Electrical wiring of CRAC units", "responsibility": "TBD"}, {"text": "Electrical wiring of chilled beams", "responsibility": "TBD"}]}, {"name": "Electrical wiring of fans", "items": [{"text": "Install of free issue VSDs", "responsibility": "TBD"}, {"text": "Supply and installation of VSDs", "responsibility": "TBD"}]}, {"name": "Electrical wiring of Chillers", "items": [{"text": "Electrical wiring of Cooling towers", "responsibility": "TBD"}]}, {"name": "Electrical wiring of AHUs", "items": [{"text": "Electrical wiring of AHU lights to AHU junction box", "responsibility": "TBD"}, {"text": "Electrical wiring of Heat exchangers", "responsibility": "TBD"}]}, {"name": "Electrical wiring of VAVs", "items": [{"text": "Electrical wiring of Air compressors", "responsibility": "TBD"}, {"text": "Electrical wiring of Welding extractor", "responsibility": "TBD"}]}, {"name": "Electrical wiring of ESPs", "items": [{"text": "Electrical wiring of condensate pumps", "responsibility": "TBD"}, {"text": "Electrical wiring of Ozone generators", "responsibility": "TBD"}, {"text": "Installation of AC unit controllers", "responsibility": "TBD"}, {"text": "Installation of temp AC unit controllers and removal after mech commissioning complete", "responsibility": "TBD"}, {"text": "installation of optionards and BMS gateways for units", "responsibility": "TBD"}]}, {"name": "Installation of temp sensors", "items": [{"text": "BMS interface card installation by mech elec", "responsibility": "TBD"}, {"text": "Essential type damper actuators install (MFSDs & MSDs)", "responsibility": "TBD"}]}, {"name": "MVCD actuator install", "items": [{"text": "Supply & Installation only of current switches for BMS or contactor status", "responsibility": "TBD"}, {"text": "Supply & Installation of Pressure switches", "responsibility": "TBD"}, {"text": "Supply & Installation of PIR sensors", "responsibility": "TBD"}, {"text": "Supply & Installation Air flow switch for duct heaters and VAV boxes", "responsibility": "TBD"}, {"text": "Patch leads installation for vsds", "responsibility": "TBD"}, {"text": "Interlocking of gas solenoids with ESPs", "responsibility": "TBD"}, {"text": "Soft start on smoke exhaust fans if there are a lot of fans starting at the same time.", "responsibility": "TBD"}, {"text": "Installation of control box on indoor units for fire trade interface", "responsibility": "TBD"}, {"text": "Cables for hazardous areas as per project spec and AS standards", "responsibility": "TBD"}, {"text": "Unit controllers to be installed as per drawings or markups provided by AAC", "responsibility": "TBD"}, {"text": "Install of Potentiometers in mssbs to assist with commissioing and remove once commissioning is complete", "responsibility": "TBD"}, {"text": "Commissioning of VSD and provide paper with commissioning points", "responsibility": "TBD"}, {"text": "Installation of lables for all isolators, MSSB and DCP panels installed under the mechanical scope", "responsibility": "TBD"}, {"text": "Installation of cable labels (power only)", "responsibility": "TBD"}, {"text": "Installation of cable labels (power and control cables)", "responsibility": "TBD"}, {"text": "Addressing of condensers, BP boxes & indoor fan coil units when multi head systems are installed", "responsibility": "TBD"}, {"text": "Provide Cable tray as built markups and installation heights", "responsibility": "TBD"}]}, {"name": "Sealing and penetrations", "items": [{"text": "Provide markup of all core holes required for development of builderworks drawings", "responsibility": "TBD"}, {"text": "Marking out of all penetrations (wall, ceilings & slab)", "responsibility": "TBD"}, {"text": "Core holes <= 25mm provided", "responsibility": "TBD"}, {"text": "Coordinate with fire stopping for peno sizes for fire rated penos and seperation between services for compliance", "responsibility": "TBD"}, {"text": "Cutting out of blockwork for pipework installation if penos not marked out in time", "responsibility": "TBD"}]}, {"name": "Supply all required sealants", "items": [{"text": "Sealing of penetrations (fire rated) where only fire rated mastic sealing is required", "responsibility": "TBD"}, {"text": "Sealing of penetrations (non-fire rated) including submission of sample & approval", "responsibility": "TBD"}, {"text": "Acoustic mastic sealing through acoustic walls to client requirements/acoustic report (non fire rated walls)", "responsibility": "TBD"}, {"text": "Allow tidy sealant application for exposed to view services (non fire rated walls)", "responsibility": "TBD"}, {"text": "Provide markup locations of all penetration (fire rated & non fire rated) or capture locations on Software provided by AAC", "responsibility": "TBD"}]}, {"name": "Labour and programme", "items": [{"text": "The subcontractor has reviewed the contract documents issued to date and agree to carry out all works as required for the trade listed above", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the construction programme (subject to change by the builder or AAC) and commits to providing the required resources & working the necessary hours including overtime & weekends to meet the programme & minimise disruption to building works and other trades.", "responsibility": "TBD"}, {"text": "AAC reserves the right to engage another contractor at subcontractors expense in order to meet programme if deemed necessary", "responsibility": "TBD"}, {"text": "6 working days per week as per builders' working hours", "responsibility": "TBD"}, {"text": "Defect rectifications to be attended to immediately.", "responsibility": "TBD"}]}, {"name": "First aid representative", "items": [{"text": "Safety representative for safety walks", "responsibility": "TBD"}, {"text": "Representative for weekly site walks with Builder & AAC", "responsibility": "TBD"}, {"text": "Supply of Hi Vis Orange full sleeve shirts with cross on back and vertical stripes on front", "responsibility": "TBD"}, {"text": "Supply of all PPE as required for the workers on site", "responsibility": "TBD"}, {"text": "Attend site meetings as request by Austral management", "responsibility": "TBD"}]}, {"name": "Toolbox talks (weekly)", "items": [{"text": "Safe work method statement (SWMS) signed by all workers on site", "responsibility": "TBD"}]}, {"name": "Site inductions for allworkers", "items": [{"text": "Provide task lighting as required", "responsibility": "TBD"}, {"text": "Storage and security of material and tools", "responsibility": "TBD"}, {"text": "Provide test & tag registers", "responsibility": "TBD"}, {"text": "Electrical tagging of own equipment", "responsibility": "TBD"}, {"text": "All work areas to be cleaned daily", "responsibility": "TBD"}]}, {"name": "Provision of bins", "items": [{"text": "Removal of rubbish to waste bin provided on site by builder", "responsibility": "TBD"}]}, {"name": "Quality and compliance", "items": [{"text": "Compliance with all the Project specifications", "responsibility": "TBD"}, {"text": "Compliance with all the Mechanical specifications", "responsibility": "TBD"}]}, {"name": "Compliance to acoustic specifications", "items": [{"text": "Fully document QA and ITPs and provide to PM on completion (LOTO, energisationpermits, Pre/Post energisation ITPs, etc\u2026)", "responsibility": "TBD"}, {"text": "Provide soft copies of signed  energisation permit when powering BMS boards", "responsibility": "TBD"}]}, {"name": "Construction award compliant", "items": [{"text": "Relevant EBA rates & compliance", "responsibility": "TBD"}]}, {"name": "Indegenuos inclusions", "items": [{"text": "Adherence to all site, State & National legislated safety requirements", "responsibility": "TBD"}, {"text": "Strict enforcement of the safe use of all scissor lifts, ladders, hoists & PPE", "responsibility": "TBD"}, {"text": "Representation on safety committee if elected or nominated", "responsibility": "TBD"}, {"text": "Provision, maintenance and implementation of an approved site safety plan", "responsibility": "TBD"}, {"text": "Compliance with all relevant Standards", "responsibility": "TBD"}, {"text": "Compliance to AS 3000- Wiring rules", "responsibility": "TBD"}, {"text": "Compliance with Hot Work AS 1674.1", "responsibility": "TBD"}, {"text": "Progress claims & general contractual requirements", "responsibility": "TBD"}, {"text": "Retention 5% (cash or 2 off BG 2.5%)", "responsibility": "TBD"}, {"text": "Progressive QA documentation - subject to progress claim approval (Lineal m or sqm installation details may be required)", "responsibility": "TBD"}, {"text": "Itemised progress claim to AAC no later than 20th of each month with relevant documentation (including Statutory Declaration)", "responsibility": "TBD"}, {"text": "Progress claims breakdown format to be provided as requested by AAC", "responsibility": "TBD"}, {"text": "Public Liability Insurance (min. $20 million)", "responsibility": "TBD"}, {"text": "Professional Indeminity Insurance (D & C projects)", "responsibility": "TBD"}]}, {"name": "Workers Compensation Insurance", "items": [{"text": "Sub- Subcontractors will also require $20 million PLI, workers compensation and Statutory declaration", "responsibility": "TBD"}, {"text": "12 mths DLP concurrent with AAC DLP", "responsibility": "TBD"}, {"text": "Schedule of rates (to be used for VO provided below)", "responsibility": "TBD"}, {"text": "Submit variations within 3 days to allow AAC to submit to the builder within timebar limits. Timebar restrictions to be back-to-back with AAC contract.", "responsibility": "TBD"}, {"text": "Proceeding of variation work upon recieval of written instruction from AAC", "responsibility": "TBD"}, {"text": "Only client/AAC generated and approved variations may be claimed", "responsibility": "TBD"}, {"text": "Schedules of rates - Normal time", "responsibility": "TBD"}, {"text": "Schedules of rates - Time and half", "responsibility": "TBD"}, {"text": "Schedules of rates - Double time", "responsibility": "TBD"}]}], "type": "sow"}, {"id": "sow_plumbing_install", "trade": "Plumbing Install", "title": "Plumbing Install", "sections": [{"name": "General", "items": [{"text": "Accepting and offloading of all deliveries of mech. equipment proposed for installation (delivery docket sign.)", "responsibility": "Subcontractor"}, {"text": "Site movement & positioning of all pipework & free issue equipment to AAC & builder's direction", "responsibility": "TBD"}, {"text": "Supply and movement around site of sufficient lifters hoists to complete installation to meet programme", "responsibility": "TBD"}, {"text": "Co-ordinate site Cranage with Austral management and Builder", "responsibility": "TBD"}]}, {"name": "Provision of ladders", "items": [{"text": "Lifting gear for equipment and materials (other than crane)", "responsibility": "TBD"}, {"text": "Lifting of pipework between levels if crane unavailable", "responsibility": "TBD"}, {"text": "Provision of access and lift equipment under and over 3m", "responsibility": "TBD"}, {"text": "Provision of access equipment scissor lift, boom lift, mobile scaffold or similar", "responsibility": "TBD"}, {"text": "Supply and movement around site of scaffold (4 meter) & scissor lifts as required  to complete installation to meet programme", "responsibility": "TBD"}, {"text": "Coordination with other trades (including gyprocker/partiotioner)", "responsibility": "TBD"}, {"text": "Supply and install all hangers, supports, secondary supports stands, riser supports as required.", "responsibility": "TBD"}, {"text": "Supply and installation of all fixings (nuts, bolts, washers, booker rods, angles, unistrut,\u2026\u2026.. etc.)", "responsibility": "TBD"}, {"text": "Supply & installation of spring hangers", "responsibility": "TBD"}, {"text": "Rod & fittings to be gal or hot dipped as required by the project specification", "responsibility": "TBD"}, {"text": "Provision of taped, double thickness wood blocks", "responsibility": "TBD"}, {"text": "All nuts, bolts, tech screws and fittings used externally to be hot dipped galv coated", "responsibility": "TBD"}, {"text": "Supply of all consumables required to complete installation", "responsibility": "TBD"}]}, {"name": "Certified engineered pipe supports", "items": [{"text": "Stepover protection for pipeson ground level for trip hazards", "responsibility": "TBD"}]}, {"name": "Vacuum attachment for drilling", "items": [{"text": "No spray paint / markers on any concrete to be exposed final finish", "responsibility": "TBD"}, {"text": "Installation certificate for pipework systems", "responsibility": "TBD"}, {"text": "Pipe and cable tray coverings - exposed to weather", "responsibility": "TBD"}, {"text": "Installation of seimsic hangers as per seismic drawings & AS1170.4", "responsibility": "TBD"}]}, {"name": "Labels for valves", "items": [{"text": "Allow to print own set of drawings", "responsibility": "TBD"}, {"text": "Subcontractor acknowledges that neither the builder nor AAC are able to guarantee continuity of work on site", "responsibility": "TBD"}, {"text": "No costs  for site closures are to be borne By Austral air", "responsibility": "TBD"}]}, {"name": "Demolition", "items": [{"text": "Remove all ductwork,flex connection, grilles, cushion boxes and equipments as per mech spec and mech drawings", "responsibility": "TBD"}, {"text": "Pipe freeze to cut back pipework", "responsibility": "TBD"}, {"text": "Cap off pipework where requiredand install all required vaves (isolation valves, etc\u2026)", "responsibility": "TBD"}]}, {"name": "Equipment installation", "items": [{"text": "Installation of free issue equipment", "responsibility": "TBD"}, {"text": "Allow to bolt down floor mounted equipment", "responsibility": "TBD"}, {"text": "Aid with positioning and bolting down of Chillers (Bolting Only)", "responsibility": "TBD"}, {"text": "Aid with positioning and bolting down of Cooling towers (Boilting Only)", "responsibility": "TBD"}]}, {"name": "Installation of Heat Pumps", "items": [{"text": "Installation of Pumps & inertia bases", "responsibility": "TBD"}, {"text": "Installation of Air Cooled Condensers", "responsibility": "TBD"}]}, {"name": "Installation of chilled beams", "items": [{"text": "Installation of chemical dosing pots and associated drains", "responsibility": "TBD"}, {"text": "Installation of sand stream filtration systems", "responsibility": "TBD"}]}, {"name": "Installation of  Control valves", "items": [{"text": "Installation of Valves, strainers, check valves etc.", "responsibility": "TBD"}]}, {"name": "Installation of Flow meters", "items": [{"text": "Installation of Temp sensor pockets", "responsibility": "TBD"}]}, {"name": "Installation of Humidifiers", "items": [{"text": "Installation of Condenser water treatment systems/ side stream filtration systems", "responsibility": "TBD"}, {"text": "Installation of duct mounted Humidifier systems and associated pipework", "responsibility": "TBD"}, {"text": "Install Heater neutralization kits  and associated pipework", "responsibility": "TBD"}, {"text": "Install energy meters and all valves as per drawings", "responsibility": "TBD"}]}, {"name": "Install expansions system", "items": [{"text": "Supply and install gauges as indicated on schematics.", "responsibility": "TBD"}, {"text": "Install BMS wells and meters", "responsibility": "TBD"}, {"text": "Supply and Installation of vibration mountings &/or waffle pads for all FCUs & condensers units- as per mech. spec.", "responsibility": "TBD"}, {"text": "Other equipment required to complete the piping systems", "responsibility": "TBD"}, {"text": "Installation of equipment flexible connections", "responsibility": "TBD"}, {"text": "Protection of all supplied and free-issue equipment during construction", "responsibility": "TBD"}]}, {"name": "Plumbing", "items": [{"text": "CHW pipework type & class - Class A Copper / Class B Copper Stainless Steel (ABS not allowed)", "responsibility": "TBD"}, {"text": "CHW fittings - Fully Welded / Victaulic fittings / Victaulic Flex couplings / Victaulic pumpsets", "responsibility": "TBD"}, {"text": "HW pipework type & class - Class A Copper / Class B Copper Stainless Steel (ABS not allowed)", "responsibility": "TBD"}, {"text": "HW fittings - Fully Welded / Victaulic fittings / Victaulic Flex couplings / Victaulic pumpsets", "responsibility": "TBD"}, {"text": "CW pipework type & class- Class A Copper / Class B Copper Stainless Steel (ABS not allowed)", "responsibility": "TBD"}, {"text": "CW Fully welded / Victaulic fittings -  - Fully Welded / Victaulic fittings / Victaulic Flex couplings / Victaulic pumpsets", "responsibility": "TBD"}, {"text": "AHU condensate drains to be copper including insulation to specification and AS stds (from unit to floor waste)", "responsibility": "TBD"}, {"text": "Minimum diameter for AHU condensate drains 40mm / 32mm", "responsibility": "TBD"}, {"text": "Equipment drains to be copper including insulation / PVC pressure pipe to specification and AS stds(from equipment to floor waste)", "responsibility": "TBD"}, {"text": "Minimum diameter to Equipment drains 40mm / 32mm", "responsibility": "TBD"}, {"text": "Ductwork drains to be copper including insulation / PVC pressure pipe to specification and AS stds ( from duct to floor waste or tundish)", "responsibility": "TBD"}, {"text": "Minimum diameter to duct drains 40mm / 32mm", "responsibility": "TBD"}, {"text": "Air vents/bottles at all high points, supply of autobleeds as required", "responsibility": "TBD"}, {"text": "Drain valves at all low points", "responsibility": "TBD"}, {"text": "Test points across all equipment & control valves, sufficient length for lagging", "responsibility": "TBD"}, {"text": "Supply & installation of headers", "responsibility": "TBD"}, {"text": "CHW & HW dosing pot lines c/w valves", "responsibility": "TBD"}, {"text": "Condenser water treatment pipes & valves", "responsibility": "TBD"}, {"text": "Chiller vents run to outside the building", "responsibility": "TBD"}, {"text": "Cold water connections to header tanks", "responsibility": "TBD"}, {"text": "Cold water connections to humidifiers", "responsibility": "TBD"}, {"text": "Steam pipework & drains to humidifiers", "responsibility": "TBD"}, {"text": "Gas connections to boilers & other plant including gas train", "responsibility": "TBD"}, {"text": "TA or Oventrop balancing valves only, to AAC schedules", "responsibility": "TBD"}, {"text": "Looping of pipework for flushing to meet AAC commissioning / staging requirements", "responsibility": "TBD"}, {"text": "Flushing of pipework to AAC direction and commissioning procedure", "responsibility": "TBD"}, {"text": "Flushing and filling of secondary chilled water temperature water system as per BSRIA standards", "responsibility": "TBD"}, {"text": "Cleaning of all strainers after flushing", "responsibility": "TBD"}, {"text": "Piping up side stream filtration system incl drains", "responsibility": "TBD"}, {"text": "Design of expansion loops where required", "responsibility": "TBD"}, {"text": "Connection from gas point to boilers", "responsibility": "TBD"}, {"text": "32mm minimum humidifier / boiler condensate drain, copper only, insulated", "responsibility": "TBD"}]}, {"name": "Installation of Tundishes", "items": [{"text": "Looping of chilled beams flexible hoses prior final clean water fill", "responsibility": "TBD"}, {"text": "Pipework male fittings to flexible hoses", "responsibility": "TBD"}, {"text": "Balancing valve on either side for 3 way control valves or as per approved alternative", "responsibility": "TBD"}, {"text": "Drain valves at bottom of each riser", "responsibility": "TBD"}, {"text": "Automatic air vents where required and top of pipework risers", "responsibility": "TBD"}, {"text": "Supply and installation of anchor for pipework risers", "responsibility": "TBD"}, {"text": "Pressure testing of all pipework systems and/or particular runs if required", "responsibility": "TBD"}, {"text": "Supply and installation of all fixings (tex screws, nuts, bolts, washers, booker rods, angles, unistrut, \u2026\u2026.. etc.)", "responsibility": "TBD"}, {"text": "PVC pipe for ozone generator", "responsibility": "TBD"}, {"text": "Connect Gas to heaters from isolation valve by others in plantroom", "responsibility": "TBD"}, {"text": "Cap all future connections and drains", "responsibility": "TBD"}, {"text": "Supply and installation of all pipework stickers on pipes and sheathing as per AS standards", "responsibility": "TBD"}]}, {"name": "Overflashings for pipework systems", "items": [{"text": "Supply & installation of flanges ( pumps, chillers etc)", "responsibility": "TBD"}, {"text": "Supply and install cold water makeup lines to equipment", "responsibility": "TBD"}, {"text": "Supply & Install Equipment drains, traps & pumps that are suitable for maintenance.", "responsibility": "TBD"}, {"text": "Insulate drains in ceiling spaces for 2 metres or as per project spec (whchever is greater)", "responsibility": "TBD"}, {"text": "Supply and install duct drains in  plantroom for all vertical stacks", "responsibility": "TBD"}, {"text": "Pipework sealing for pressure testing incrementally as required to meet programme requirements or as required by AAC.", "responsibility": "TBD"}, {"text": "Pressure testing to AS / spec / consultant / AAC requirements and provide ITPs", "responsibility": "TBD"}, {"text": "Bleeding air out of pipework system", "responsibility": "TBD"}, {"text": "Supply and install Heater flues as per drawings", "responsibility": "TBD"}, {"text": "Victaulic systems NOT used in riser, Hospitals, clean rooms", "responsibility": "TBD"}]}, {"name": "Sealing and penetrations", "items": [{"text": "Allow mark out of required openings and penetrations in ceilings and walls for grilles, dampers and fire  dampers.", "responsibility": "TBD"}, {"text": "Cutting out of blockwork for duct installation if penos not marked out in time", "responsibility": "TBD"}]}, {"name": "Supply all required sealants", "items": [{"text": "Sealing of penetrations (non-fire rated) caulking of bare pipework only including submission of sample & approval", "responsibility": "TBD"}, {"text": "Acoustic mastic sealing through acoustic walls to client requirements/acoustic report (non fire rated walls)", "responsibility": "TBD"}, {"text": "Allow tidy sealant application for exposed to view pipework (non fire rated walls)", "responsibility": "TBD"}, {"text": "Allow tidy sealant application for exposed to view duct", "responsibility": "TBD"}, {"text": "Duct sealed as per specification and assist with  pressure test of duct to meet Australian standards", "responsibility": "TBD"}, {"text": "Cutting out mesh and bondek for penetrations", "responsibility": "TBD"}, {"text": "Provision and positioning of all pipe sleeves for penos through fire and smoke rated walls", "responsibility": "TBD"}]}, {"name": "Labour and programme", "items": [{"text": "The subcontractor has reviewed the contract documents issued to date and agree to carry out all works as required for the trade listed above", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the construction programme (subject to change by the builder or AAC) and commits to providing the required resources & working the necessary hours including overtime & weekends to meet the programme & minimise disruption to building works and other trades.", "responsibility": "TBD"}, {"text": "AAC reserves the right to engage another contractor at subcontractors expense in order to meet programme if deemed necessary", "responsibility": "TBD"}, {"text": "The subcontractor has allowed for coordination and interface with other trades", "responsibility": "TBD"}, {"text": "6 working days per week as per builders' working hours", "responsibility": "TBD"}, {"text": "Defect rectifications to be attended to immediately.", "responsibility": "TBD"}]}, {"name": "First aid representative", "items": [{"text": "Safety representative for safety walks", "responsibility": "TBD"}, {"text": "Representative for weekly site walks with Builder & AAC", "responsibility": "TBD"}, {"text": "Supply of Hi Vis Orange full sleeve shirts with cross on back and vertical stripes on front", "responsibility": "TBD"}, {"text": "Supply of all PPE as required for the workers on site", "responsibility": "TBD"}, {"text": "Attend site meetings as request by Austral management", "responsibility": "TBD"}]}, {"name": "Toolbox talks (weekly)", "items": [{"text": "Safe work method statement (SWMS) signed by all workers on site", "responsibility": "TBD"}]}, {"name": "Site inductions for allworkers", "items": [{"text": "Provide task lighting as required", "responsibility": "TBD"}, {"text": "Storage and security of material and tools", "responsibility": "TBD"}, {"text": "Provide test & tag registers", "responsibility": "TBD"}, {"text": "Electrical tagging of own equipment", "responsibility": "TBD"}, {"text": "All work areas to be cleaned daily", "responsibility": "TBD"}]}, {"name": "Provision of bins", "items": [{"text": "Removal of rubbish to waste bin provided on site by builder", "responsibility": "TBD"}]}, {"name": "Quality and complaince", "items": [{"text": "Compliance with all the Project specifications", "responsibility": "TBD"}, {"text": "Compliance with all the Mechanical specifications", "responsibility": "TBD"}]}, {"name": "Compliance to acoustic specifications", "items": [{"text": "Fully document QA and ITPs and provide to PM on completion", "responsibility": "TBD"}, {"text": "Time stamp photos to accompany Pressuretest ITPs", "responsibility": "TBD"}]}, {"name": "Construction award compliant", "items": [{"text": "Relevant EBA rates & compliance", "responsibility": "TBD"}]}, {"name": "Indegenuos inclusions", "items": [{"text": "Victaulic pipe grooves installed and check & couplings install as per manufcaturers instructions (if victaulic systems used)", "responsibility": "TBD"}, {"text": "QA to be provided for victaulic all groove and coupling systems (invidually)", "responsibility": "TBD"}, {"text": "Adherence to all site, State & National legislated safety requirements", "responsibility": "TBD"}, {"text": "Strict enforcement of the safe use of all scissor lifts, ladders, hoists & PPE", "responsibility": "TBD"}, {"text": "Representation on safety committee if elected or nominated", "responsibility": "TBD"}, {"text": "Provision, maintenance and implementation of an approved site safety plan", "responsibility": "TBD"}, {"text": "Compliance with all relevant Standards", "responsibility": "TBD"}, {"text": "Compliance with Hot Work AS 1674.1", "responsibility": "TBD"}, {"text": "Progress claims & general contractual requirements", "responsibility": "TBD"}, {"text": "Retention 5% (cash or 2 off BG 2.5%)", "responsibility": "TBD"}, {"text": "Progressive QA documentation - subject to progress claim approval (Lineal m or sqm installation details may be required)", "responsibility": "TBD"}, {"text": "Itemised progress claim to AAC no later than 20th of each month with relevant documentation (including Statutory Declaration)", "responsibility": "TBD"}, {"text": "Progress claims breakdown format to be provided as requested by AAC", "responsibility": "TBD"}, {"text": "Public Liability Insurance (min. $20 million)", "responsibility": "TBD"}]}, {"name": "Workers Compensation Insurance", "items": [{"text": "Sub- Subcontractors will also require $20 million PLI, workers compensation and Statutory declaration", "responsibility": "TBD"}, {"text": "12 mths DLP concurrent with AAC DLP", "responsibility": "TBD"}]}, {"name": "Relevant EBA rates", "items": [{"text": "Schedule of rates (to be used for VO provided below)", "responsibility": "TBD"}, {"text": "Submit variations within 3 days to allow AAC to submit to the builder within timebar limits. Timebar restrictions to be back-to-back with AAC contract.", "responsibility": "TBD"}, {"text": "Proceeding of variation workupon receival of written instruction from AAC", "responsibility": "TBD"}, {"text": "Only client/AAC generated and approved variations may be claimed", "responsibility": "TBD"}, {"text": "Schedules of rates - Normal time", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Time and half", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Double time", "responsibility": "Subcontractor"}]}], "type": "sow"}, {"id": "sow_refrigeration_install", "trade": "Refrigeration Install", "title": "Refrigeration Install", "sections": [{"name": "General", "items": [{"text": "Accepting and offloading of free issue equipment proposed for installation (delivery docket sign.)", "responsibility": "Subcontractor"}, {"text": "Site movement & positioning of all material and free issue equipment to AAC & builder's direction", "responsibility": "TBD"}, {"text": "Co-ordinate site Cranage with Austral management and Builder", "responsibility": "TBD"}]}, {"name": "Provision of ladders", "items": [{"text": "Lifting gear for equipment and materials (other than crane)", "responsibility": "TBD"}, {"text": "Provision of access equipment scissor lift, boom lift, mobile scaffold or similar", "responsibility": "TBD"}, {"text": "Supply and movement around site of scaffold (4 meter) & scissor lifts as required  to complete installation to meet programme", "responsibility": "TBD"}, {"text": "Coordination with other trades (including gyprocker/partiotioner)", "responsibility": "TBD"}, {"text": "Delivery of refrigerant pipework & lifting equipment to site", "responsibility": "TBD"}, {"text": "Expansion anchors to Australian Standards & the project specifications", "responsibility": "TBD"}, {"text": "Floor supporting structures for equipment as required", "responsibility": "TBD"}, {"text": "Uni-strut bracketing for hanging of refrigerant pipework", "responsibility": "TBD"}, {"text": "Anchors both temporary and permanent as required", "responsibility": "TBD"}]}, {"name": "Certified engineered pipe supports", "items": [{"text": "Supply of refrigeration insulation standard blocks", "responsibility": "TBD"}, {"text": "Thermal insulation of pipework bracketting", "responsibility": "TBD"}, {"text": "Supply of all consumables required to complete installation", "responsibility": "TBD"}, {"text": "Set out and marking of all mechanical equipment as per mechanical drawings and RCPS (cassettes, etc..)", "responsibility": "TBD"}, {"text": "Stepover protection for pipeson ground level for trip hazards", "responsibility": "TBD"}]}, {"name": "Vacuum attachment for drilling", "items": [{"text": "Overflashing & or trunking where required, in Colorbond to match architect's requirements where exposed to weather", "responsibility": "TBD"}]}, {"name": "Underflashing", "items": [{"text": "Allow to print own set of drawings", "responsibility": "TBD"}]}, {"name": "Assistance in commissioning", "items": [{"text": "No spray paint / markers on any concrete to be exposed to final finish", "responsibility": "TBD"}, {"text": "Installation of seimsic hangers as per seismic drawings & AS1170.4", "responsibility": "TBD"}, {"text": "Subcontractor acknowledges that neither the builder nor AAC are able to guarantee continuity of work on site", "responsibility": "TBD"}, {"text": "No costs  for site closures are to be borne By Austral air", "responsibility": "TBD"}]}, {"name": "Demolition", "items": [{"text": "Degas unit and recover refrigerant as per mech spec and drawings", "responsibility": "TBD"}]}, {"name": "Remove Outdoor units", "items": [{"text": "Cap refrigerant lines if multi head/VRF systems", "responsibility": "TBD"}, {"text": "Dispose units in bins provided by builder", "responsibility": "TBD"}]}, {"name": "Installation of condenser units", "items": [{"text": "Supply & Installation of frames/support stands for condenser units (incl stacked CU)", "responsibility": "TBD"}, {"text": "Allow to bolt down floor Condenser units", "responsibility": "TBD"}, {"text": "Installation of split DX system", "responsibility": "TBD"}, {"text": "Installation of wall mounted DX", "responsibility": "TBD"}, {"text": "Installation of Multi head wall mounted DX system", "responsibility": "TBD"}]}, {"name": "Install of VRF system", "items": [{"text": "Installation of Branch box,refnets and all assosciated equipment for VRF systems", "responsibility": "TBD"}, {"text": "Installation of Casette unit as per rcp drawings and to be cordinated with gyprocker", "responsibility": "TBD"}, {"text": "Supply and Installation of vibration mountings &/or waffle pads for all FCUs & condensers units (not installed by duct installer) - as per mech. spec.", "responsibility": "TBD"}, {"text": "Refrigerant pipework, drainage  & insulation installation", "responsibility": "TBD"}, {"text": "Refrigerant pipework install as per project  specification, Mechanical specifaction and mech. workshop drawings.", "responsibility": "TBD"}, {"text": "Where possible on R32 systems, flare fittings are to be replaced with welded copper", "responsibility": "TBD"}, {"text": "Supply & install of Type B copper refrigerant pipework (hard drawn)", "responsibility": "TBD"}, {"text": "Supply and Installation of refrigerant pipework & insulation to manufacturers piping schematics, the project specification and BCA Section J & R requirements", "responsibility": "TBD"}, {"text": "Insulated FCU condensate drains (from unit to floor waste/tundish) min 25mm per 1 unit (32mm for 2, 40 for 3)", "responsibility": "TBD"}, {"text": "Condenser condensate drains (from unit to floor waste) min 25mm per 1 unit (32mm for 2, 40 for 3)", "responsibility": "TBD"}, {"text": "Condensate drains in Copper or pressure pipe only as per specifications", "responsibility": "TBD"}, {"text": "Drain to PAC units (if separate plumber contractor not required- Air cooled PACs)", "responsibility": "TBD"}, {"text": "Supply and installation of Valves (refrigerant pipework)", "responsibility": "TBD"}, {"text": "Final positioning of all mechanical valves, bosses,  unions & tee-off boxes", "responsibility": "TBD"}, {"text": "Final Positioning of all mechanical control valves", "responsibility": "TBD"}, {"text": "Drain pipework and Insulation off FCUs/Pacs/AHUs Protruding Roof & Draining to Local FW", "responsibility": "TBD"}, {"text": "Refrig all open ends to be capped during construction phase if termination s to unit not complete by the end of shift", "responsibility": "TBD"}, {"text": "Pipework & equipment labelling as per project specification & AS Standards (typically traffolyte)", "responsibility": "TBD"}, {"text": "Nitrogen purging of pipework after welding", "responsibility": "TBD"}, {"text": "Evacuating pipework to <500 MICRONS", "responsibility": "TBD"}, {"text": "Measuring pipe lengths and calculating refrigerant charges for installed systems", "responsibility": "TBD"}, {"text": "Charging of installed systems to manufacturers specifications/requirements", "responsibility": "TBD"}, {"text": "Supply and installation of all additional refrigeration gas required", "responsibility": "TBD"}, {"text": "Pressure testing, witnessing & sign off", "responsibility": "TBD"}, {"text": "Measuring pipe lengths and refrigerant kg calulation accurately & recording at the condenser unit", "responsibility": "TBD"}, {"text": "Marking port numbers on the BP box if a multi-head system", "responsibility": "TBD"}, {"text": "Insulation & vapour sealing of refrigeration pipework to Project specification & Aust Standards", "responsibility": "TBD"}, {"text": "Incremental pipework pressure testing to meet project requirements, project specifications & Australian Standards", "responsibility": "TBD"}, {"text": "Design & installation of expansion loops where required", "responsibility": "TBD"}]}, {"name": "Sealing and penetrations", "items": [{"text": "Marking out of all penetrations (wall, ceilings & slab)", "responsibility": "TBD"}, {"text": "Coordinate with fire stopping for peno sizes for fire rated penos", "responsibility": "TBD"}, {"text": "Cutting out of blockwork for pipework installation if penos not marked out in time", "responsibility": "TBD"}]}, {"name": "Supply all required sealants", "items": [{"text": "Sealing of penetrations (non-fire rated) including submission of sample & approval", "responsibility": "TBD"}, {"text": "Acoustic mastic sealing through acoustic walls to client requirements/acoustic report (non fire rated walls)", "responsibility": "TBD"}, {"text": "Allow tidy sealant application for exposed to view pipework (non fire rated walls)", "responsibility": "TBD"}]}, {"name": "Labour and programme", "items": [{"text": "The subcontractor has reviewed the contract documents issued to date and agree to carry out all works as required for the trade listed above", "responsibility": "TBD"}, {"text": "The subcontractor has reviewed the construction programme (subject to change by the builder or AAC) and commits to providing the required resources & working the necessary hours including overtime & weekends to meet the programme & minimise disruption to building works and other trades.", "responsibility": "TBD"}, {"text": "AAC reserves the right to engage another contractor at subcontractors expense in order to meet programme if deemed necessary", "responsibility": "TBD"}, {"text": "6 working days per week as per builders' working hours", "responsibility": "TBD"}, {"text": "Defect rectifications to be attended to immediately.", "responsibility": "TBD"}]}, {"name": "First aid representative", "items": [{"text": "Safety representative for safety walks", "responsibility": "TBD"}, {"text": "Representative for weekly site walks with Builder & AAC", "responsibility": "TBD"}, {"text": "Supply of Hi Vis Orange full sleeve shirts with cross on back and vertical stripes on front", "responsibility": "TBD"}, {"text": "Supply of all PPE as required for the workers on site", "responsibility": "TBD"}, {"text": "Attend site meetings as request by Austral management", "responsibility": "TBD"}]}, {"name": "Toolbox talks (weekly)", "items": [{"text": "Safe work method statement (SWMS) signed by all workers on site", "responsibility": "TBD"}]}, {"name": "Site inductions for allworkers", "items": [{"text": "Provide task lighting as required", "responsibility": "TBD"}, {"text": "Storage and security of material and tools", "responsibility": "TBD"}, {"text": "Provide test & tag registers", "responsibility": "TBD"}, {"text": "Electrical tagging of own equipment", "responsibility": "TBD"}, {"text": "All work areas to be cleaned daily", "responsibility": "TBD"}]}, {"name": "Provision of bins", "items": [{"text": "Removal of rubbish to waste bin provided on site by builder", "responsibility": "TBD"}]}, {"name": "Quality and complaince", "items": [{"text": "Compliance with all the Project specifications", "responsibility": "TBD"}, {"text": "Compliance with all the Mechanical specifications", "responsibility": "TBD"}]}, {"name": "Compliance to acoustic specifications", "items": [{"text": "Fully document QA and ITPs and provide to PM on completion", "responsibility": "TBD"}, {"text": "Time stamp photos to accompany Pressuretest ITPs", "responsibility": "TBD"}]}, {"name": "Construction award compliant", "items": [{"text": "Relevant EBA rates & compliance", "responsibility": "TBD"}]}, {"name": "Indegenuos inclusions", "items": [{"text": "Adherence to all site, State & National legislated safety requirements", "responsibility": "TBD"}, {"text": "Strict enforcement of the safe use of all scissor lifts, ladders, hoists & PPE", "responsibility": "TBD"}, {"text": "Representation on safety committee if elected or nominated", "responsibility": "TBD"}, {"text": "Provision, maintenance and implementation of an approved site safety plan", "responsibility": "TBD"}, {"text": "Compliance with all relevant Standards", "responsibility": "TBD"}, {"text": "Compliance with Hot Work AS 1674.1", "responsibility": "TBD"}, {"text": "Compliance to pressure testing procedures & exclusion zones as per builders directions(supply of safety equipment/bollards/tapes, etc..)", "responsibility": "TBD"}, {"text": "Progress claims & general contractual requirements", "responsibility": "TBD"}, {"text": "Retention 5% (cash or 2 off BG 2.5%)", "responsibility": "TBD"}, {"text": "Progressive QA documentation - subject to progress claim approval (Lineal m or sqm installation details may be required)", "responsibility": "TBD"}, {"text": "Itemised progress claim to AAC no later than 20th of each month with relevant documentation (including Statutory Declaration)", "responsibility": "TBD"}, {"text": "Progress claims breakdown format to be provided as requested by AAC", "responsibility": "TBD"}, {"text": "Public Liability Insurance (min. $20 million)", "responsibility": "TBD"}]}, {"name": "Workers Compensation Insurance", "items": [{"text": "Sub- Subcontractors will also require $20 million PLI, workers compensation and Statutory declaration", "responsibility": "TBD"}, {"text": "12 mths DLP concurrent with AAC DLP", "responsibility": "TBD"}, {"text": "Schedule of rates (to be used for VO provided below)", "responsibility": "TBD"}, {"text": "Submit variations within 3 days to allow AAC to submit to the builder within timebar limits. Timebar restrictions to be back-to-back with AAC contract.", "responsibility": "TBD"}, {"text": "Proceeding of variation work upon recieval of written instruction from AAC", "responsibility": "TBD"}, {"text": "Only client/AAC generated and approved variations may be claimed", "responsibility": "TBD"}, {"text": "Schedules of rates - Normal time", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Time and half", "responsibility": "Subcontractor"}, {"text": "Schedules of rates - Double time", "responsibility": "Subcontractor"}]}], "type": "sow"}];
+
+var _pNum = (typeof dbGetCurrentProject==='function'?(dbGetCurrentProject()||{}).num:null)||'PRJ001';
+var agreements = [];
+var _editingId = null;
+var _readOnly = true;
+var _sowChecks = {}; // id -> {itemIdx: checked}
+var _docs = [];
+var _frozenDrawings = [];
+var _specs = [];
+var _uid = 1;
+function nid(){return ++_uid;}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmt(n){var v=parseFloat(n)||0;return v===0?'—':'$'+Math.round(v).toLocaleString('en-AU');}
+function fmtD(d){return d?new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'—';}
+function genRef(){
+  var max=0;
+  agreements.forEach(function(a){var m=(a.ref||'').match(/SA-(\d+)/);if(m&&parseInt(m[1])>max)max=parseInt(m[1]);});
+  return 'SA-'+String(max+1).padStart(3,'0');
+}
+
+// ── STORAGE ──
+async function loadData(){try{var d=await dbGetProject('subcontractor_agreements',_pNum);agreements=d&&Array.isArray(d.agreements)?d.agreements:[];}catch(e){agreements=[];}}
+function saveData(){dbSetProject('subcontractor_agreements',_pNum,{agreements:agreements}).catch(e=>console.error(e));}
+
+// ── VIEWS ──
+function showView(v){document.querySelectorAll('.view').forEach(function(el){el.classList.remove('active');});document.getElementById('view-'+v).classList.add('active');}
+function goList(){showView('list');document.getElementById('topAddBtn').style.display='';document.getElementById('top-bc-curr').textContent='Subcontractor Agreements';renderList();}
+function switchTab(t){
+  document.querySelectorAll('.det-tab').forEach(function(el){el.classList.remove('active');});
+  document.querySelectorAll('.tab-pane').forEach(function(el){el.classList.remove('active');});
+  document.getElementById('tab-'+t).classList.add('active');
+  document.getElementById('pane-'+t).classList.add('active');
+  if(t==='sow') renderSOW();
+  if(t==='agreement') renderAgreement();
+  if(t==='tender') renderTenderPicker();
+}
+
+// ── SUMMARY ──
+function updateSummary(){
+  var draft=0,sent=0,subSigned=0,countersigned=0;
+  agreements.forEach(function(a){
+    if(a.status==='Draft') draft++;
+    else if(a.status==='Sent') sent++;
+    else if(a.status==='Subbie Signed') subSigned++;
+    else if(a.status==='Countersigned') countersigned++;
+  });
+  document.getElementById('sTotal').textContent=agreements.length;
+  document.getElementById('sDraft').textContent=draft;
+  document.getElementById('sSent').textContent=sent;
+  document.getElementById('sSubSigned').textContent=subSigned;
+  document.getElementById('sCountersigned').textContent=countersigned;
+}
+
+// ── LIST ──
+function renderList(){
+  updateSummary();
+  var q=(document.getElementById('srch').value||'').toLowerCase();
+  var sf=document.getElementById('statusFil').value;
+  var list=agreements.filter(function(a){
+    return(!q||(a.subbie||'').toLowerCase().includes(q)||(a.trade||'').toLowerCase().includes(q)||(a.ref||'').toLowerCase().includes(q))
+      &&(!sf||a.status===sf);
+  });
+  document.getElementById('agCount').textContent=list.length+' agreement'+(list.length!==1?'s':'');
+  var stClass={Draft:'st-draft',Sent:'st-sent','Subbie Signed':'st-subbie',Countersigned:'st-signed'};
+  if(!list.length){
+    document.getElementById('agBody').innerHTML='<tr><td colspan="7"><div class="empty-state">No agreements yet — click <strong>＋ New Agreement</strong> to get started.</div></td></tr>';
+    return;
+  }
+  document.getElementById('agBody').innerHTML=list.map(function(a){
+    return '<tr onclick="openAgreement(\''+a.id+'\')">'+
+      '<td style="font-family:DM Mono,monospace;font-weight:600;color:var(--purple)">'+escH(a.ref||'—')+'</td>'+
+      '<td style="font-weight:500">'+escH(a.subbie||'—')+'</td>'+
+      '<td style="color:var(--text2)">'+escH(a.trade||'—')+'</td>'+
+      '<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent)">'+escH(a.poRef||'—')+'</td>'+
+      '<td style="font-size:12px;color:var(--text2)">'+fmtD(a.dateIssued)+'</td>'+
+      '<td><span class="st-badge '+(stClass[a.status]||'st-draft')+'">'+escH(a.status||'Draft')+'</span></td>'+
+      '<td onclick="event.stopPropagation()"><button class="bg bsm btn" onclick="openAgreement(\''+a.id+'\')">Open</button></td>'+
+      '</tr>';
+  }).join('');
+}
+
+// ── TIMELINE ──
+function renderTimeline(status){
+  var steps=[
+    {key:'Draft',label:'Draft',icon:'✎'},
+    {key:'Sent',label:'Sent to Subbie',icon:'✉'},
+    {key:'Subbie Signed',label:'Subbie Signed',icon:'✍'},
+    {key:'Countersigned',label:'Countersigned',icon:'✅'}
+  ];
+  var order=['Draft','Sent','Subbie Signed','Countersigned'];
+  var cur=order.indexOf(status);
+  var html='<div class="timeline">';
+  steps.forEach(function(s,i){
+    var cls=i<cur?'done':i===cur?'active':'';
+    html+='<div class="tl-step '+cls+'"><div class="tl-dot">'+s.icon+'</div><div class="tl-lbl">'+s.label+'</div></div>';
+  });
+  html+='</div>';
+  document.getElementById('detTimeline').innerHTML=html;
+}
+
+// ── TRADE DROPDOWN ──
+function populateTradeDD(selectedTrade){
+  var sel=document.getElementById('f-trade');
+  sel.innerHTML='<option value="">Select trade…</option>';
+  SOW_TEMPLATES.forEach(function(t){
+    var opt=document.createElement('option');
+    opt.value=t.trade;opt.textContent=t.trade;
+    if(selectedTrade&&t.trade===selectedTrade)opt.selected=true;
+    sel.appendChild(opt);
+  });
+}
+
+function onTradeChange(trade){
+  _sowChecks={};
+  renderSOW();
+}
+
+// ── SOW RENDERING ──
+function renderSOW(){
+  var trade=document.getElementById('f-trade').value||document.getElementById('dv-trade').textContent;
+  var tmpl=SOW_TEMPLATES.find(function(t){return t.trade===trade;});
+  var el=document.getElementById('sowContent');
+  if(!tmpl){el.innerHTML='<p style="color:var(--muted);padding:20px;font-size:12.5px">Select a trade template to see the SOW checklist.</p>';return;}
+  var html='';
+  var globalIdx=0;
+  tmpl.sections.forEach(function(sec){
+    if(!sec.items.length)return;
+    html+='<div class="sow-section"><div class="sow-sec-hdr">'+escH(sec.name)+'</div>';
+    sec.items.forEach(function(item){
+      var idx=globalIdx++;
+      var checked=_sowChecks[idx]?'checked':'';
+      var respCls=item.responsibility==='Subcontractor'?'resp-sub':item.responsibility==='Others'?'resp-others':'resp-austral';
+      html+='<div class="sow-item">'+
+        '<input type="checkbox" class="sow-item-check" '+((_readOnly&&!document.getElementById('det-saveBtn').style.display==='')?'disabled':'')+' '+checked+' onchange="_sowChecks['+idx+']=this.checked"/>'+
+        '<span class="sow-item-text">'+escH(item.text)+'</span>'+
+        '<span class="sow-resp '+respCls+'">'+escH(item.responsibility)+'</span>'+
+        '</div>';
+    });
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+
+// ── AGREEMENT RENDERING ──
+function renderAgreement(){
+  var ag=agreements.find(function(a){return a.id===_editingId;});
+  var proj=typeof dbGetCurrentProject==='function'?dbGetCurrentProject():{};
+  var subbie=(ag&&ag.subbie)||'[Subcontractor]';
+  var projName=proj.name||'[Project Name]';
+  var projNum=proj.num||'[Project No]';
+  var value=(ag&&ag.value)?'$'+parseFloat(ag.value).toLocaleString('en-AU')+'+ GST':'[Contract Sum]';
+  var html='<div class="form-sec"><div class="form-sec-hdr">Subcontract Supply &amp; Install Agreement</div><div class="form-sec-body" style="font-size:13px;line-height:1.7;color:var(--text2)">';
+  html+='<p style="margin-bottom:12px;font-weight:600;color:var(--text)">SUBCONTRACT SUPPLY &amp; INSTALL AGREEMENT</p>';
+  html+='<p style="margin-bottom:8px">This agreement is made between <strong style="color:var(--text)">Equilibrium Air Conditioning Pty Limited</strong> (ABN 20 135 150 337) ("Contractor") and <strong style="color:var(--accent)">'+escH(subbie)+'</strong> ("Subcontractor").</p>';
+  html+='<p style="margin-bottom:8px"><strong>Project:</strong> '+escH(projName)+' ('+escH(projNum)+')</p>';
+  html+='<p style="margin-bottom:16px"><strong>Contract Sum:</strong> '+value+'</p>';
+  html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">';
+  html+='<p style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Key Terms</p>';
+  var terms=[
+    'The Subcontractor will carry out and complete the Works as described in the attached Scope of Works checklist.',
+    'Payment claims to be submitted by the last business day of each month. Payment within 50 days of month end.',
+    'Defects Liability Period: 12 months from Practical Completion of the Head Contract.',
+    'The Subcontractor must hold and maintain Public Liability Insurance for not less than $20,000,000.',
+    'No variations will be recognised unless approved in writing by the Contractor prior to execution.',
+    'The Subcontractor must comply with all WHS obligations and the Site Safety Plan.',
+    'Liquidated damages apply as set out in Schedule 1.',
+    'The Subcontractor acknowledges receipt of the Drawings and Specifications listed in the Tender Package.',
+    'Works must comply with all relevant Australian Standards and the project specification.',
+    'Security/Retention: 5% of the Contract Sum held until end of Defects Liability Period.',
+  ];
+  terms.forEach(function(t,i){
+    html+='<div style="display:flex;gap:10px;margin-bottom:6px"><span style="color:var(--accent);font-weight:600;flex-shrink:0">'+(i+1)+'.</span><span>'+escH(t)+'</span></div>';
+  });
+  html+='</div>';
+  html+='<p style="font-size:11.5px;color:var(--muted)">Full Terms and Conditions are set out in Annexure A of the Equilibrium Air Conditioning Subcontract Agreement (EQU-036).</p>';
+  html+='</div></div>';
+  document.getElementById('agreementContent').innerHTML=html;
+}
+
+// ── TENDER PACKAGE ──
+function renderTenderPicker(){
+  var wrap=document.getElementById('drawingPickerWrap');
+  var frozen=document.getElementById('frozenDrawings');
+  // Show frozen drawings
+  if(_frozenDrawings.length){
+    frozen.innerHTML='<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Drawings Issued</div>'+
+      _frozenDrawings.map(function(d,i){
+        return '<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;margin-bottom:4px">'+
+          '<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent)">'+escH(d.num)+'</span>'+
+          '<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--purple)">Rev '+escH(d.rev)+'</span>'+
+          '<span style="flex:1;font-size:12.5px;color:var(--text2)">'+escH(d.title)+'</span>'+
+          '<span style="font-size:11px;color:var(--muted)">'+fmtD(d.frozenDate)+'</span>'+
+          '<button onclick="_frozenDrawings.splice('+i+',1);renderTenderPicker()" style="background:none;border:none;color:var(--muted);cursor:pointer">✕</button>'+
+          '</div>';
+      }).join('');
+  } else {
+    frozen.innerHTML='';
+  }
+  // Load drawings from Drawing Register
+  if(typeof dbGetDrawings==='function'){
+    dbGetDrawings(_pNum).then(function(drawings){
+      if(!drawings||!drawings.length){
+        wrap.innerHTML='<p style="font-size:12.5px;color:var(--muted)">No drawings in the Drawing Register yet.</p>';
+        return;
+      }
+      var current=drawings.filter(function(d){return d.status!=='Obsolete';});
+      var html='<label class="ml">Add Drawing from Register</label><select class="ms" id="drawingPicker" style="max-width:400px"><option value="">Select drawing…</option>';
+      current.forEach(function(d){
+        html+='<option value="'+escH(d.id)+'">'+escH(d.num)+' Rev '+escH(d.currentRev||d.rev||'—')+' — '+escH(d.title)+'</option>';
+      });
+      html+='</select><button class="bg bsm btn" onclick="addDrawingToTender()" style="margin-left:8px;margin-top:8px">＋ Add</button>';
+      wrap.innerHTML=html;
+    }).catch(function(){wrap.innerHTML='<p style="font-size:12.5px;color:var(--muted)">Could not load drawings.</p>';});
+  } else {
+    wrap.innerHTML='<p style="font-size:12.5px;color:var(--muted)">Drawing Register not available.</p>';
+  }
+  // Render specs
+  renderSpecsList();
+}
+
+function addDrawingToTender(){
+  var sel=document.getElementById('drawingPicker');
+  if(!sel||!sel.value) return;
+  var opt=sel.options[sel.selectedIndex];
+  var text=opt.textContent;
+  var parts=text.split(' — ');
+  var numRev=parts[0]||'';
+  var title=parts[1]||'';
+  var numRevParts=numRev.split(' Rev ');
+  _frozenDrawings.push({num:numRevParts[0].trim(),rev:numRevParts[1]||'—',title:title.trim(),frozenDate:new Date().toISOString().split('T')[0]});
+  renderTenderPicker();
+}
+
+function addSpecLine(){
+  _specs.push({text:'',date:''});
+  renderSpecsList();
+}
+
+function renderSpecsList(){
+  var el=document.getElementById('specsList');
+  if(!el)return;
+  if(!_specs.length){el.innerHTML='<p style="font-size:12.5px;color:var(--muted)">No specifications added.</p>';return;}
+  el.innerHTML=_specs.map(function(s,i){
+    return '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">'+
+      '<input class="mi" value="'+escH(s.text)+'" placeholder="Specification reference / section…" oninput="_specs['+i+'].text=this.value" style="flex:1"/>'+
+      '<button onclick="_specs.splice('+i+',1);renderSpecsList()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px">✕</button>'+
+      '</div>';
+  }).join('');
+}
+
+// ── SIGNATURE PADS ──
+var _sigPads = {};
+function initSigPad(id){
+  var canvas=document.getElementById('sigCanvas_'+id)||document.getElementById('sig'+id.replace(/^./, c=>c.toUpperCase())+'Canvas')||document.getElementById('sig-'+id+'-canvas');
+  // map id to canvas
+  var canvasMap={subbie:'sigSubbieCanvas',pm:'sigPmCanvas','ag-subbie':'sigAgSubbieCanvas','ag-pm':'sigAgPmCanvas',tender:'sigTenderCanvas'};
+  var c=document.getElementById(canvasMap[id]);
+  if(!c||_sigPads[id])return;
+  var ctx=c.getContext('2d');
+  var drawing=false;
+  var last={x:0,y:0};
+  function getPos(e){
+    var r=c.getBoundingClientRect();
+    var touch=e.touches?e.touches[0]:e;
+    return{x:(touch.clientX-r.left)*(c.width/r.width),y:(touch.clientY-r.top)*(c.height/r.height)};
+  }
+  ctx.strokeStyle='var(--text)';
+  ctx.lineWidth=2;
+  ctx.lineCap='round';
+  c.addEventListener('mousedown',function(e){drawing=true;last=getPos(e);});
+  c.addEventListener('mousemove',function(e){if(!drawing)return;var p=getPos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;});
+  c.addEventListener('mouseup',function(){drawing=false;});
+  c.addEventListener('mouseleave',function(){drawing=false;});
+  c.addEventListener('touchstart',function(e){e.preventDefault();drawing=true;last=getPos(e);},{passive:false});
+  c.addEventListener('touchmove',function(e){e.preventDefault();if(!drawing)return;var p=getPos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;},{passive:false});
+  c.addEventListener('touchend',function(){drawing=false;});
+  _sigPads[id]=true;
+}
+
+function clearSig(id){
+  var canvasMap={subbie:'sigSubbieCanvas',pm:'sigPmCanvas','ag-subbie':'sigAgSubbieCanvas','ag-pm':'sigAgPmCanvas',tender:'sigTenderCanvas'};
+  var c=document.getElementById(canvasMap[id]);
+  if(c){var ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);}
+}
+
+function getSigData(id){
+  var canvasMap={subbie:'sigSubbieCanvas',pm:'sigPmCanvas','ag-subbie':'sigAgSubbieCanvas','ag-pm':'sigAgPmCanvas',tender:'sigTenderCanvas'};
+  var c=document.getElementById(canvasMap[id]);
+  if(!c)return'';
+  return c.toDataURL('image/png');
+}
+
+function loadSigData(id,dataUrl){
+  if(!dataUrl)return;
+  var canvasMap={subbie:'sigSubbieCanvas',pm:'sigPmCanvas','ag-subbie':'sigAgSubbieCanvas','ag-pm':'sigAgPmCanvas',tender:'sigTenderCanvas'};
+  var c=document.getElementById(canvasMap[id]);
+  if(!c)return;
+  var img=new Image();img.onload=function(){c.getContext('2d').drawImage(img,0,0);};img.src=dataUrl;
+}
+
+function initAllSigPads(){['subbie','pm','ag-subbie','ag-pm','tender'].forEach(initSigPad);}
+
+// ── OPEN / CREATE ──
+function openNewAgreement(){
+  _editingId=null;_readOnly=false;
+  _sowChecks={};_docs=[];_frozenDrawings=[];_specs=[];
+  clearSig('subbie');clearSig('pm');clearSig('ag-subbie');clearSig('ag-pm');clearSig('tender');
+  var ref=genRef();
+  document.getElementById('det-ref').textContent=ref;
+  document.getElementById('det-title').textContent='New Agreement';
+  document.getElementById('f-subbie').value='';
+  document.getElementById('f-value').value='';
+  document.getElementById('f-po-ref').value='';
+  document.getElementById('f-date-issued').value=new Date().toISOString().split('T')[0];
+  document.getElementById('f-status').value='Draft';
+  document.getElementById('sig-subbie-name').value='';document.getElementById('sig-subbie-date').value='';
+  document.getElementById('sig-pm-name').value='';document.getElementById('sig-pm-date').value='';
+  populateTradeDD('');
+  setFieldVis(true);
+  document.getElementById('det-editBtn').style.display='none';
+  document.getElementById('det-saveBtn').style.display='';
+  document.getElementById('det-cancelBtn').style.display='';
+  document.getElementById('det-deleteBtn').style.display='none';
+  renderTimeline('Draft');
+  renderSOW();
+  renderAgreement();
+  renderDocList();
+  document.getElementById('topAddBtn').style.display='none';
+  document.getElementById('top-bc-curr').textContent=ref;
+  showView('detail');
+  switchTab('sow');
+  setTimeout(initAllSigPads,100);
+  setTimeout(function(){document.getElementById('f-subbie').focus();},100);
+}
+
+function openAgreement(id){
+  var ag=agreements.find(function(a){return a.id===id;});if(!ag)return;
+  _editingId=id;_readOnly=true;
+  _sowChecks=ag.sowChecks||{};
+  _docs=ag.docs?JSON.parse(JSON.stringify(ag.docs)):[];
+  _frozenDrawings=ag.frozenDrawings?JSON.parse(JSON.stringify(ag.frozenDrawings)):[];
+  _specs=ag.specs?JSON.parse(JSON.stringify(ag.specs)):[];
+  document.getElementById('det-ref').textContent=ag.ref||'—';
+  document.getElementById('det-title').textContent=ag.subbie||'Agreement';
+  document.getElementById('f-subbie').value=ag.subbie||'';
+  document.getElementById('f-value').value=ag.value||'';
+  document.getElementById('f-po-ref').value=ag.poRef||'';
+  document.getElementById('f-date-issued').value=ag.dateIssued||'';
+  document.getElementById('f-status').value=ag.status||'Draft';
+  document.getElementById('dv-subbie').textContent=ag.subbie||'—';
+  document.getElementById('dv-trade').textContent=ag.trade||'—';
+  document.getElementById('dv-value').textContent=fmt(ag.value);
+  document.getElementById('dv-status').textContent=ag.status||'Draft';
+  document.getElementById('dv-date-issued').textContent=fmtD(ag.dateIssued);
+  document.getElementById('dv-po-ref').textContent=ag.poRef||'—';
+  document.getElementById('sig-subbie-name').value=ag.sigSubbieName||'';document.getElementById('sig-subbie-date').value=ag.sigSubbieDate||'';
+  document.getElementById('sig-pm-name').value=ag.sigPmName||'';document.getElementById('sig-pm-date').value=ag.sigPmDate||'';
+  document.getElementById('sig-ag-subbie-name').value=ag.sigAgSubbieName||'';document.getElementById('sig-ag-subbie-date').value=ag.sigAgSubbieDate||'';
+  document.getElementById('sig-ag-pm-name').value=ag.sigAgPmName||'';document.getElementById('sig-ag-pm-date').value=ag.sigAgPmDate||'';
+  document.getElementById('tender-date').value=ag.tenderDate||'';
+  document.getElementById('tender-issued-by').value=ag.tenderIssuedBy||'';
+  document.getElementById('tender-method').value=ag.tenderMethod||'Email';
+  document.getElementById('tender-ack-date').value=ag.tenderAckDate||'';
+  populateTradeDD(ag.trade||'');
+  setFieldVis(false);
+  document.getElementById('det-editBtn').style.display='';
+  document.getElementById('det-saveBtn').style.display='none';
+  document.getElementById('det-cancelBtn').style.display='none';
+  document.getElementById('det-deleteBtn').style.display='none';
+  renderTimeline(ag.status||'Draft');
+  document.getElementById('topAddBtn').style.display='none';
+  document.getElementById('top-bc-curr').textContent=ag.ref||ag.subbie||'Agreement';
+  showView('detail');
+  switchTab('sow');
+  renderDocList();
+  setTimeout(initAllSigPads,100);
+  setTimeout(function(){
+    loadSigData('subbie',ag.sigSubbieData||'');
+    loadSigData('pm',ag.sigPmData||'');
+    loadSigData('ag-subbie',ag.sigAgSubbieData||'');
+    loadSigData('ag-pm',ag.sigAgPmData||'');
+    loadSigData('tender',ag.sigTenderData||'');
+  },200);
+}
+
+function enterEditMode(){
+  _readOnly=false;
+  setFieldVis(true);
+  document.getElementById('det-editBtn').style.display='none';
+  document.getElementById('det-saveBtn').style.display='';
+  document.getElementById('det-cancelBtn').style.display='';
+  document.getElementById('det-deleteBtn').style.display='';
+  renderSOW();
+}
+
+function cancelEdit(){
+  if(_editingId){openAgreement(_editingId);}
+  else goList();
+}
+
+function setFieldVis(edit){
+  ['f-subbie','f-trade','f-value','f-status','f-date-issued','f-po-ref'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display=edit?'':'none';
+  });
+  ['dv-subbie','dv-trade','dv-value','dv-status','dv-date-issued','dv-po-ref'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display=edit?'none':'';
+  });
+}
+
+// ── SAVE ──
+function saveAgreement(){
+  var subbie=document.getElementById('f-subbie').value.trim();
+  var trade=document.getElementById('f-trade').value;
+  if(!subbie){document.getElementById('f-subbie').focus();return;}
+  var id=_editingId||('ag'+nid());
+  var ref=_editingId?(agreements.find(function(a){return a.id===_editingId;})||{}).ref||genRef():genRef();
+  var ag={
+    id:id,ref:ref,subbie:subbie,trade:trade,
+    value:document.getElementById('f-value').value,
+    poRef:document.getElementById('f-po-ref').value,
+    dateIssued:document.getElementById('f-date-issued').value,
+    status:document.getElementById('f-status').value,
+    sowChecks:_sowChecks,
+    docs:JSON.parse(JSON.stringify(_docs)),
+    frozenDrawings:JSON.parse(JSON.stringify(_frozenDrawings)),
+    specs:JSON.parse(JSON.stringify(_specs)),
+    sigSubbieName:document.getElementById('sig-subbie-name').value,
+    sigSubbieDate:document.getElementById('sig-subbie-date').value,
+    sigSubbieData:getSigData('subbie'),
+    sigPmName:document.getElementById('sig-pm-name').value,
+    sigPmDate:document.getElementById('sig-pm-date').value,
+    sigPmData:getSigData('pm'),
+    sigAgSubbieName:document.getElementById('sig-ag-subbie-name').value,
+    sigAgSubbieDate:document.getElementById('sig-ag-subbie-date').value,
+    sigAgSubbieData:getSigData('ag-subbie'),
+    sigAgPmName:document.getElementById('sig-ag-pm-name').value,
+    sigAgPmDate:document.getElementById('sig-ag-pm-date').value,
+    sigAgPmData:getSigData('ag-pm'),
+    tenderDate:document.getElementById('tender-date').value,
+    tenderMethod:document.getElementById('tender-method').value,
+    tenderIssuedBy:document.getElementById('tender-issued-by').value,
+    tenderAckDate:document.getElementById('tender-ack-date').value,
+    sigTenderData:getSigData('tender'),
+    updatedAt:new Date().toISOString()
+  };
+  if(_editingId){
+    var idx=agreements.findIndex(function(a){return a.id===_editingId;});
+    if(idx>=0)agreements[idx]=ag;else agreements.push(ag);
+  } else {
+    agreements.push(ag);
+  }
+  saveData();
+  _editingId=id;
+  openAgreement(id);
+}
+
+function deleteAgreement(){
+  if(!_editingId||!confirm('Delete this agreement?'))return;
+  agreements=agreements.filter(function(a){return a.id!==_editingId;});
+  saveData();
+  goList();
+}
+
+// ── DOCUMENTS ──
+function docDragOver(e){e.preventDefault();document.getElementById('docDrop').classList.add('over');}
+function docDragLeave(){document.getElementById('docDrop').classList.remove('over');}
+function docDropHandler(e){e.preventDefault();document.getElementById('docDrop').classList.remove('over');handleDocFiles(e.dataTransfer.files);}
+function docFileChange(e){handleDocFiles(e.target.files);}
+function handleDocFiles(files){
+  Array.from(files).forEach(function(f){
+    var reader=new FileReader();
+    reader.onload=function(ev){_docs.push({name:f.name,url:ev.target.result,type:f.type,size:f.size});renderDocList();};
+    reader.readAsDataURL(f);
+  });
+}
+function removeDoc(idx){_docs.splice(idx,1);renderDocList();}
+function renderDocList(){
+  var el=document.getElementById('docList');if(!el)return;
+  el.innerHTML=_docs.map(function(d,i){
+    return '<div class="doc-item">'+
+      '<span style="font-size:16px">'+(d.type&&d.type.includes('pdf')?'📄':(d.type&&d.type.includes('image')?'🖼':'📎'))+'</span>'+
+      '<span class="doc-item-name">'+escH(d.name)+'</span>'+
+      '<a href="'+d.url+'" download="'+escH(d.name)+'" style="color:var(--accent);font-size:12px;text-decoration:none">⬇️</a>'+
+      '<button class="doc-item-del" onclick="removeDoc('+i+')">✕</button>'+
+      '</div>';
+  }).join('');
+}
+
+// ── INIT ──
+window.addEventListener('DOMContentLoaded', async function(){
+  _pNum=(typeof dbGetCurrentProject==='function'?(dbGetCurrentProject()||{}).num:null)||'PRJ001';
+  await loadData();
+  renderList();
+});
+</script>
+</body>
+</html>
