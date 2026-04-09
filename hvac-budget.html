@@ -764,7 +764,6 @@ function renderAll(){
   colHdrEl.innerHTML='<span style="flex:1;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding-left:24px">Category</span>'
     +'<span class="col-h" style="width:140px">Budget</span>'
     +'<span class="col-h" style="width:140px">Committed</span>'
-    +'<span class="col-h" style="width:140px">Actuals</span>'
     +'<span class="col-h" style="width:140px">Variance</span>'
     +'<span class="col-h" style="width:100px;text-align:center">POs</span>'
     +'<span style="width:28px"></span>';
@@ -792,10 +791,9 @@ function renderAll(){
         <span class="sec-name">${namePart}</span>
         <span data-col="budget" style="width:140px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;${sb>0?'color:var(--accent)':'color:var(--muted)'}">${fmt(sb)}</span>
         <span data-col="committed" style="width:140px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;${sc2>0?'color:var(--warn)':'color:var(--muted)'}">${fmt(sc2)}</span>
-        <span data-col="actuals" style="width:140px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;${sa>0?'color:var(--green)':'color:var(--muted)'}">${fmt(sa)}</span>
         <span data-col="variance" style="width:140px;text-align:right;font-family:'DM Mono',monospace;font-size:12px" class="${svCls}">${fmtV(sv)==='--'?'--':fmtV(sv)}</span>
         <span style="width:100px"></span>
-        <button style="width:28px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;text-align:center" onclick="event.stopPropagation();delSec('${sec.id}')" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'" title="Delete category">x</button>
+        ${_budgetEditMode?'<button style="width:28px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;text-align:center" onclick="event.stopPropagation();delSec(\'${sec.id}\')" onmouseover="this.style.color=\'var(--danger)\'" onmouseout="this.style.color=\'var(--muted)\'" title="Delete category">x</button>':'<span style="width:28px"></span>'}
       </div>
       <div class="sec-body">
         ${(function(){
@@ -816,7 +814,6 @@ function renderAll(){
               +'<span class="grp-section-name">'+l2g.parent+'</span>'
               +'<span style="width:140px;text-align:right;font-family:DM Mono,monospace;font-size:11px;color:'+(l2sb>0?'var(--accent)':'var(--muted)')+'">'+fmt(l2sb)+'</span>'
               +'<span style="width:140px;text-align:right;font-family:DM Mono,monospace;font-size:11px;color:'+(l2sc>0?'var(--warn)':'var(--muted)')+'">'+fmt(l2sc)+'</span>'
-              +'<span style="width:140px;text-align:right;font-family:DM Mono,monospace;font-size:11px;color:'+(l2sa>0?'var(--green)':'var(--muted)')+'">'+fmt(l2sa)+'</span>'
               +'<span class="'+l2vCls+'" style="width:140px;text-align:right;font-family:DM Mono,monospace;font-size:11px">'+(l2sb>0||l2sc>0?fmtV(l2sv):'--')+'</span>'
               +'<span style="width:20px"></span>'
               +'<span style="width:100px"></span>'
@@ -845,7 +842,6 @@ function renderAll(){
           <span class="subtotal-lbl" style="padding-left:24px">Subtotal — ${namePart}</span>
           <span class="subtotal-num" data-col="budget" style="width:140px;color:var(--accent)">${fmt(sb)}</span>
           <span class="subtotal-num" data-col="committed" style="width:140px;color:var(--warn)">${fmt(sc2)}</span>
-          <span class="subtotal-num" data-col="actuals" style="width:140px;color:var(--green)">${fmt(sa)}</span>
           <span class="subtotal-num ${svCls}" data-col="variance" style="width:140px">${fmtV(sv)==='--'?'--':fmtV(sv)}</span>
           <span style="width:20px"></span>
           <span style="width:100px"></span><span style="width:28px"></span>
@@ -860,10 +856,9 @@ function renderAll(){
   const totalsRow = document.createElement('div');
   totalsRow.innerHTML=`
     <div class="grand-total-row" style="display:flex;align-items:center;padding:0 16px;height:44px;background:var(--surface3);border-top:2px solid rgba(0,200,255,.3)">
-      <span style="flex:1;font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--text)">Total</span>
+      <span style="flex:1;font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--text);padding-left:24px">Total</span>
       <span data-col="budget" style="width:140px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${fmt(gb)}</span>
       <span data-col="committed" style="width:140px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--warn)">${fmt(gc)}</span>
-      <span data-col="actuals" style="width:140px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--green)">${fmt(ga)}</span>
       <span data-col="variance" style="width:140px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700" class="${gvCls}">${gv===0?'--':fmtV(gv)}</span>
       <span style="width:20px"></span>
       <span style="width:100px"></span>
@@ -1044,7 +1039,6 @@ function renderGrpRow(g,secId){
       :'<span class="grp-val" data-col="budget" style="width:140px;color:'+(gb>0?'var(--accent)':'var(--muted)')+'">'+fmt(gb)+'</span>'
     )
     +'<span class="grp-val" data-col="committed" style="width:140px;color:'+(gc>0?'var(--warn)':'var(--muted)')+'">'+fmt(gc)+'</span>'
-    +'<span class="grp-val" data-col="actuals" style="width:140px;color:'+(ga>0?'var(--green)':'var(--muted)')+'">'+fmt(ga)+'</span>'
     +'<span class="grp-val '+gvCls+'" data-col="variance" style="width:140px">'+(gb>0||gc>0?fmtV(gv):'--')+'</span>'
     +'<span style="width:20px;flex-shrink:0"></span>'
     +'<span class="grp-po-count" style="width:100px;text-align:center">'+poCt+' PO'+(poCt!==1?'s':'')+'</span>'
