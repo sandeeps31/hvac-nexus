@@ -344,6 +344,7 @@ input[type=number]{-moz-appearance:textfield}
       <div class="sv-mf"><span class="sv-ml">Subcontractor</span><div><input class="mi" id="f-subbie" style="display:none"/><span class="sv-mv" id="det-subbie-val">—</span></div></div>
       <div class="sv-mf"><span class="sv-ml">Status</span><div><select class="ms" id="f-status" style="display:none"><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select><span class="sv-mv" id="det-status-val">—</span></div></div>
       <div class="sv-mf"><span class="sv-ml">Value (ex GST)</span><span class="sv-mv mono" id="det-value-val" style="color:var(--accent)">—</span></div>
+      <div class="sv-mf"><span class="sv-ml">Purchase Order</span><span class="sv-mv" id="det-po-val">—</span></div>
     </div>
   </div>
 
@@ -662,8 +663,6 @@ function renderList(){
     document.getElementById('svBody').innerHTML='<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">👥</div><div>'+(subVars.length?'No results match your filters.':'No subbie variations yet. Click <strong>＋ Add Subbie Var</strong> to get started.')+'</div></div></td></tr>';
     return;
   }
-  window._svListMap={};
-  list.forEach(function(sv,_i){window._svListMap[_i]=sv.id;});
   var rows='';
   list.forEach(function(sv,_rowIdx){
     var gst=num(sv.value)*0.1;
@@ -673,10 +672,10 @@ function renderList(){
     if(sv.linkedVarId&&sv.linkedVarNum){
       linkCell='<span class="var-link-chip" onclick="event.stopPropagation();navTo(\'hvac-variations.html\')" title="Open in Variations">'+escH(sv.linkedVarNum)+' — '+escH(sv.linkedVarTitle||'')+'</span>';
     } else {
-      linkCell='<span class="unlinked-chip" data-idx="'+_rowIdx+'" onclick="event.stopPropagation();openSVDetail(window._svListMap[parseInt(this.dataset.idx)],true)">＋ Link variation</span>';
+      linkCell='<span class="unlinked-chip" data-svnum="'+escH(sv.num)+'" onclick="event.stopPropagation();openSVByNum(this.dataset.svnum,true)">＋ Link variation</span>';
     }
     var hasPo=!!sv.poId;
-    rows+='<tr data-idx="'+_rowIdx+'" onclick="openSVDetail(window._svListMap[parseInt(this.dataset.idx)])">'
+    rows+='<tr data-svnum="'+escH(sv.num)+'" onclick="openSVByNum(this.dataset.svnum)">'
       +'<td class="sv-num">'+escH(sv.num||'—')+'</td>'
       +'<td style="font-weight:500;color:var(--text)">'+escH(sv.subbie||'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(sv.desc||'—')+'</td>'
@@ -685,7 +684,7 @@ function renderList(){
       +'<td>'+linkCell+'</td>'
       +'<td style="white-space:nowrap">'
       +(sv.status==='Approved'&&!hasPo
-        ?'<button class="ia" data-idx="'+_rowIdx+'" onclick="event.stopPropagation();openSVDetail(window._svListMap[parseInt(this.dataset.idx)])" title="Raise PO" style="font-size:11px;padding:4px 10px;background:var(--warn);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600">&#128196; Raise PO</button>'
+        ?'<button class="ia" data-svnum="'+escH(sv.num)+'" onclick="event.stopPropagation();openSVByNum(this.dataset.svnum)" title="Raise PO" style="font-size:11px;padding:4px 10px;background:var(--warn);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600">&#128196; Raise PO</button>'
         :(hasPo?'<button onclick="event.stopPropagation()" style="background:none;border:none;cursor:default;font-family:DM Mono,monospace;font-size:10px;color:var(--green)">&#10003; PO '+escH(sv.poRef||'')+'</button>':'')
       )
       +'</td>'
@@ -960,6 +959,12 @@ function openNewSV(){
   setTimeout(function(){document.getElementById('f-subbie').focus();},80);
 }
 
+function openSVByNum(num, autoLink){
+  var sv=subVars.find(function(x){return x.num===num;});
+  if(!sv){console.error('SV not found for num:',num);return;}
+  openSVDetail(sv.id, autoLink);
+}
+
 function openSVDetail(id, autoLink){
   var sv=subVars.find(function(x){return x.id===id;});if(!sv)return;
   _svReadOnly=true; editingId=id;
@@ -981,6 +986,16 @@ function openSVDetail(id, autoLink){
   document.getElementById('det-sow-val').textContent=sv.sow||'—';
   document.getElementById('det-status-val').textContent=sv.status||'—';
   document.getElementById('det-value-val').textContent=fmt(sv.value);
+  // PO link
+  var _poEl=document.getElementById('det-po-val');
+  if(_poEl){
+    if(sv.poRef||sv.poId){
+      var _poRef=sv.poRef||sv.poId;
+      _poEl.innerHTML='<button onclick="navToPO(\''+_poRef+'\')" style="background:none;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:3px 10px;cursor:pointer;font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">&#128196; '+_poRef+'</button>';
+    } else {
+      _poEl.textContent='—';
+    }
+  }
   setSVFieldVis(false);
   document.getElementById('det-editBtn').style.display='';
   document.getElementById('det-saveBtn').style.display='none';
