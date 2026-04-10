@@ -675,7 +675,7 @@ function renderList(){
       linkCell='<span class="unlinked-chip" data-svnum="'+escH(sv.num)+'" onclick="event.stopPropagation();openSVByNum(this.dataset.svnum,true)">＋ Link variation</span>';
     }
     var hasPo=!!sv.poId;
-    rows+='<tr data-svnum="'+escH(sv.num)+'" onclick="openSVByNum(this.dataset.svnum)">'
+    rows+='<tr data-svnum="'+escH(sv.num)+'" data-svid="'+escH(sv.id)+'" onclick="openSVByNum(this.dataset.svnum,false,this.dataset.svid)">'
       +'<td class="sv-num">'+escH(sv.num||'—')+'</td>'
       +'<td style="font-weight:500;color:var(--text)">'+escH(sv.subbie||'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(sv.desc||'—')+'</td>'
@@ -959,9 +959,14 @@ function openNewSV(){
   setTimeout(function(){document.getElementById('f-subbie').focus();},80);
 }
 
-function openSVByNum(num, autoLink){
+function openSVByNum(num, autoLink, fallbackId){
   var sv=subVars.find(function(x){return x.num===num;});
-  if(!sv){console.error('SV not found for num:',num);return;}
+  if(!sv&&fallbackId) sv=subVars.find(function(x){return x.id===fallbackId;});
+  if(!sv){
+    // Last resort: find by rendered num text in the row
+    sv=subVars.find(function(x){return String(x.num).trim()===String(num).trim();});
+  }
+  if(!sv){console.error('SV not found for num:',num,'fallbackId:',fallbackId,'subVars:',subVars.map(function(x){return x.num+'/'+x.id;}));return;}
   openSVDetail(sv.id, autoLink);
 }
 
