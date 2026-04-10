@@ -87,8 +87,8 @@ body.sb-sm{padding-left:var(--sb-sm)}
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;gap:14px;color:var(--muted)}
 .empty-icon{font-size:40px;opacity:.4}
 /* MODAL */
-.mo{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:16px 16px 16px calc(var(--sb-w,230px) + 16px);box-sizing:border-box}
-.mo.bulk-mode{padding:16px}
+.mo{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.mo.bulk-mode{}
 .mo.open{display:flex}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:460px;max-width:96vw;max-height:90vh;overflow-y:auto}
 .mo.open .modal{}
@@ -562,7 +562,17 @@ function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 // ── ADD DRAWING MODAL ──
 var _pendingPdfData=null;
 var _pendingPdfFile=null;
+function _setModalPad(){
+  var sb=document.getElementById('sidebar');
+  var collapsed=sb&&sb.classList.contains('sm');
+  var sbW=collapsed?52:230;
+  document.querySelectorAll('.mo').forEach(function(m){
+    m.style.paddingLeft=(sbW+16)+'px';
+  });
+}
+
 function openAddModal(){
+  _setModalPad();
   _pendingPdfData=null;_pendingPdfFile=null;_bulkFiles=[];
   ['f-num','f-name','f-rev'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   var fl=document.getElementById('fileLabel');if(fl)fl.textContent='Click or drag & drop PDF here';
@@ -1027,6 +1037,7 @@ function generateTransmittal(){
 // ── BULK EDIT ──
 var _bulkEditData=[];
 function openBulkEditModal(){
+  _setModalPad();
   // Clone current non-superseded drawings
   _bulkEditData=drawings.filter(function(d){return !d.superseded;}).map(function(d){var c=Object.assign({},d);c.history=(d.history||[]).slice();c.pins=(d.pins||[]).slice();return c;});
   renderBulkEditTable();
@@ -1115,6 +1126,7 @@ function saveBulkEdit(){
 
 // ── MANAGE AREAS ──
 function openManageAreas(){
+  _setModalPad();
   renderAreaList();
   document.getElementById('manageAreasModal').classList.add('open');
 }
@@ -1151,6 +1163,7 @@ function updateSubcat(){populateSubcat('f-cat','f-subcat');}
 function updateEditSubcat(){populateSubcat('e-cat','e-subcat');}
 var _editingId=null;
 function openEditModal(id){
+  _setModalPad();
   // Always find the latest active (non-superseded) drawing with the same num
   var d=drawings.find(function(x){return x.id===id;});if(!d)return;
   _editingId=d.id;
@@ -1194,6 +1207,7 @@ function saveEditDrawing(){
 }
 function supersedeDrawing(){if(_editingId)openSupersedeConfirm(_editingId);}
 function openRevHistory(id){
+  _setModalPad();
   var d=drawings.find(function(x){return x.id===id;});if(!d)return;
   var rsub=document.getElementById('revModalSub');if(rsub)rsub.textContent=d.num+' - '+d.name;
   var tbody=document.getElementById('revModalBody');if(!tbody)return;
@@ -1240,6 +1254,7 @@ var _supersedeId=null;
 var _supersedePdfData=null;
 var _supersedePdfFile=null;
 function openSupersedeConfirm(id){
+  _setModalPad();
   var d=drawings.find(function(x){return x.id===id;});if(!d)return;
   _supersedeId=id;_supersedePdfData=null;
   var sub=document.getElementById('supersedeModalSub');
