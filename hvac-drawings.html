@@ -56,7 +56,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
 .cat-hdr{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;background:var(--surface2);border-bottom:1px solid var(--border);user-select:none;transition:background .13s}
 .cat-hdr:hover{background:var(--surface3)}
 .cat-group.collapsed .cat-hdr{border-bottom:none}.cat-group.collapsed .cat-body{display:none}
-.cat-icon{font-size:15px;flex-shrink:0}.cat-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1}
+.cat-icon{font-size:15px;flex-shrink:0}.cat-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text);flex:1}
 .cat-count{font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;background:var(--surface3);border:1px solid var(--border);color:var(--muted)}
 .cat-chev{font-size:11px;color:var(--muted);transition:transform .2s}.cat-group.collapsed .cat-chev{transform:rotate(-90deg)}
 .drw-tbl{width:100%;border-collapse:collapse}
@@ -211,7 +211,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
     <button class="bg bsm btn" onclick="openManageAreas()" style="flex-shrink:0;color:var(--text2)">⚙ Areas</button>
     <button class="bg bsm btn" id="obsToggleBtn" onclick="toggleShowObsolete()" style="flex-shrink:0;color:var(--muted);gap:5px">⊘ Show Obsolete</button>
   </div>
-  <div class="list-scroll" id="listContent" style="flex:1;overflow-y:auto;overflow-x:auto"></div>
+  <div id="batchBar" style="display:none;align-items:center;gap:10px;padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0"><span id="batchCount" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);flex:1"></span><button class="bg bsm btn" style="color:var(--text2)" onclick="batchMarkObsolete()">&#8856; Mark Obsolete</button><button class="bg bsm btn" style="color:var(--accent);border-color:rgba(0,200,255,.3)" onclick="batchDownload()">&#11015; Download PDFs</button><button class="bg bsm btn" onclick="openBulkEditModal()" style="color:var(--text2)">&#9998; Bulk Edit</button><button class="bg bsm btn" style="color:var(--muted)" onclick="batchClearSelection()">&#10005; Clear</button></div><div class="list-scroll" id="listContent" style="flex:1;overflow-y:auto;overflow-x:auto"></div>
 </div>
 
 <!-- ADD DRAWING MODAL -->
@@ -731,16 +731,16 @@ function buildDrawingRow(d){
   var pc=(d.pins||[]).length;
   var apprCls=(APPR_CLS||{})[d.approval]||'st-p';
   if(d.status==='Obsolete')tr.style.opacity='0.5';
-  var hasPdf=!!(d.pdfUrl||d.pdfData);
+  var hasPdf=!!(d.pdfUrl||d.pdfData||d.fileName);
   tr.innerHTML=
-    (hasPdf?'<td style="text-align:center;font-size:16px;cursor:pointer" title="Download PDF" onclick="event.stopPropagation();downloadPdf(this,\''+d.id+'\')">​<span style="color:var(--danger)">📄</span></td>':'<td style="text-align:center;color:var(--border)">—</td>')
+    '<td style="text-align:center;width:36px" onclick="event.stopPropagation()"><input type="checkbox" class="drw-chk" data-id="'+d.id+'" onchange="onDrawingCheck()"/></td>'
+    +(!!(d.pdfUrl||d.pdfData)?'<td style="text-align:center;font-size:16px;cursor:pointer" title="Download PDF" onclick="event.stopPropagation();downloadPdf(this,\''+d.id+'\')">​<span style="color:var(--danger)">📄</span></td>':d.fileName?'<td style="text-align:center;font-size:16px;color:var(--muted)" title="'+escH(d.fileName)+' — uploading…">📄</td>':'<td style="text-align:center;color:var(--border)">—</td>')
     +'<td class="drw-num" style="cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(d.num||'')+'</td>'
     +'<td style="color:var(--text);font-weight:500;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(d.name||'')+'</td>'
     +'<td style="white-space:nowrap"><span class="drw-rev">'+escH(d.rev||'-')+'</span></td>'
     +'<td style="white-space:nowrap"><span class="drw-status '+(ST_CLS[d.status]||'st-p')+'">'+escH(d.status||'-')+'</span></td>'
     +'<td style="white-space:nowrap"><span class="drw-status '+apprCls+'" style="font-size:9.5px">'+escH(d.approval||'Pending')+'</span></td>'
     +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);white-space:nowrap">'+escH(d.subDate||'-')+'</td>'
-    +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(d.fileName||'')+'">'+(d.pdfUrl||d.pdfData?(d.fileName?'<span style="color:var(--danger)">📄</span> '+escH(d.fileName):'📄'):'—')+'</td>'
     +'<td onclick="event.stopPropagation()">'
       +'<div class="drw-actions">'
         +'<button class="drw-act-btn" onclick="openEditModal(\''+d.id+'\')"><span class="tip">Edit</span>&#9998;</button>'
@@ -748,8 +748,64 @@ function buildDrawingRow(d){
         +'<button class="drw-act-btn" onclick="openRevHistory(\''+d.id+'\')"><span class="tip">Revision history</span>&#128336;</button>'
       +'</div>'
     +'</td>';
-  (function(id){tr.cells[1].onclick=function(){openDrawing(id);};tr.cells[2].onclick=function(){openDrawing(id);};})(d.id);
+  (function(id){tr.cells[2].onclick=function(){openDrawing(id);};tr.cells[3].onclick=function(){openDrawing(id);};})(d.id);
   return tr;
+}
+
+// ── BATCH SELECTION ──
+var _selectedDrawings=new Set();
+function onDrawingCheck(){
+  _selectedDrawings=new Set();
+  document.querySelectorAll('.drw-chk:checked').forEach(function(chk){_selectedDrawings.add(chk.dataset.id);});
+  updateBatchBar();
+}
+function toggleAllDrawings(src){
+  var chks=document.querySelectorAll('.drw-chk');
+  var allChecked=_selectedDrawings.size===chks.length&&chks.length>0;
+  chks.forEach(function(chk){chk.checked=!allChecked;});
+  _selectedDrawings=new Set();
+  if(!allChecked)chks.forEach(function(chk){_selectedDrawings.add(chk.dataset.id);});
+  var ca=document.getElementById('chkAll');if(ca)ca.checked=!allChecked;
+  updateBatchBar();
+}
+function updateBatchBar(){
+  var n=_selectedDrawings.size;
+  var bar=document.getElementById('batchBar');
+  if(!bar)return;
+  bar.style.display=n>0?'flex':'none';
+  var bc=document.getElementById('batchCount');
+  if(bc)bc.textContent=n+' drawing'+(n!==1?'s':'')+' selected';
+}
+function batchMarkObsolete(){
+  if(!_selectedDrawings.size)return;
+  if(!confirm('Mark '+_selectedDrawings.size+' drawing(s) as obsolete?'))return;
+  var today=new Date().toISOString().split('T')[0];
+  var count=0;
+  drawings.forEach(function(d){
+    if(_selectedDrawings.has(d.id)){
+      d.history.push({rev:d.rev,status:'Obsolete',approval:d.approval||'',subDate:d.subDate||'',apprDate:'',recorded:today,note:'Bulk marked obsolete'});
+      d.status='Obsolete';d.superseded=true;count++;
+    }
+  });
+  save();batchClearSelection();renderList();showToast('\u2713 Marked '+count+' drawing'+(count!==1?'s':'')+' obsolete');
+}
+function batchDownload(){
+  if(!_selectedDrawings.size){alert('No drawings selected.');return;}
+  var found=0;
+  drawings.forEach(function(d){
+    if(_selectedDrawings.has(d.id)&&(d.pdfUrl||d.pdfData)){
+      found++;
+      var url=d.pdfUrl||d.pdfData,name=d.fileName||d.num+'.pdf';
+      setTimeout(function(u,n){var a=document.createElement('a');a.href=u;a.download=n;a.target='_blank';document.body.appendChild(a);a.click();document.body.removeChild(a);},found*400,url,name);
+    }
+  });
+  if(!found)alert('None of the selected drawings have PDFs attached.');
+}
+function batchClearSelection(){
+  _selectedDrawings=new Set();
+  document.querySelectorAll('.drw-chk').forEach(function(chk){chk.checked=false;});
+  var ca=document.getElementById('chkAll');if(ca)ca.checked=false;
+  updateBatchBar();
 }
 
 // ── LIST VIEW ──
@@ -814,6 +870,7 @@ function renderList(){
     tbl.style.cssText='width:100%;table-layout:fixed';
     tbl.innerHTML='<colgroup>'
       +'<col style="width:36px">'
+      +'<col style="width:36px">'
       +'<col style="width:20%">'
       +'<col>'
       +'<col style="width:55px">'
@@ -822,7 +879,8 @@ function renderList(){
       +'<col style="width:95px">'
       +'<col style="width:120px">'
       +'</colgroup>'
-      +'<thead><tr>'
+      +'<thead><tr style="background:var(--surface2)">'
+      +'<th style="width:36px;text-align:center;cursor:pointer"><input type="checkbox" id="chkAll" onclick="event.stopPropagation();toggleAllDrawings(this)"/></th>'
       +'<th style="width:32px;text-align:center">PDF</th><th>Drawing No.</th><th>Drawing Name</th>'
       +'<th>Rev</th><th>Status</th>'
       +'<th>Approval</th><th>Submission Date</th>'
@@ -869,7 +927,7 @@ function renderList(){
         if(showAreas){
           var areaDataRows=[];
           var areaRow=document.createElement('tr');
-          areaRow.innerHTML='<td colspan="8" style="padding:0;background:var(--surface3);cursor:pointer;user-select:none;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;padding:5px 16px 5px 32px">'          +'<span class="area-chev-inner" style="font-size:10px;color:var(--accent);transition:transform .2s;display:inline-block;margin-right:5px">&#9662;</span>'          +'<span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);flex:1">'+escH(area)+'</span>'          +'<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted)">'+items.length+' drawing'+(items.length!==1?'s':'')+'</span>'          +'</div></td>';
+          areaRow.innerHTML='<td colspan="8" style="padding:0;background:var(--surface3);cursor:pointer;user-select:none;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;padding:5px 16px 5px 32px">'          +'<span class="area-chev-inner" style="font-size:10px;color:var(--accent);transition:transform .2s;display:inline-block;margin-right:5px">&#9662;</span>'          +'<span style="font-family:DM Mono,monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);flex:1;font-weight:700">'+escH(area)+'</span>'          +'<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted)">'+items.length+' drawing'+(items.length!==1?'s':'')+'</span>'          +'</div></td>';
           (function(ar){
             ar.cells[0].addEventListener('click',function(){
               var chev=ar.querySelector('.area-chev-inner');
