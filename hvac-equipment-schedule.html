@@ -269,7 +269,8 @@ body.sb-sm{padding-left:var(--sb-sm)}
   <div class="sb-top"><div class="sb-brand"><span class="sb-icon">&#10052;</span><span class="sb-name">HVAC NEXUS</span></div><button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">&laquo;</button></div>
   <div class="sb-proj-block"><div class="sb-proj-lbl">Current Project</div><div class="sb-proj-name" id="sb-proj-name">—</div><div class="sb-proj-num" id="sb-proj-num">—</div></div>
   <nav class="sb-nav" id="sbNav">
-    <div class="sb-item" onclick="navTo('project.html')" style="border-bottom:1px solid var(--border);margin-bottom:4px"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Dashboard</span></div>
+    <div class="sb-item" onclick="navTo('index.html')" style="border-bottom:none;margin-bottom:0"><span class="sb-item-icon">🏗️</span><span class="sb-item-label">Projects</span></div>
+    <div class="sb-item" onclick="navTo('project.html')" style="border-bottom:1px solid var(--border);margin-bottom:4px"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Project Dashboard</span></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('financials')" id="ghdr-financials"><span class="sb-group-chev" id="gchev-financials">▾</span><span class="sb-group-name">Financials</span></div>
       <div class="sb-group-items" id="gitems-financials" style="display:block">
         <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
@@ -305,6 +306,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
       <div class="sb-group-items" id="gitems-settings" style="display:block">
+        <div class="sb-item" onclick="navTo('hvac-project-settings.html')"><span class="sb-item-icon">🏗️</span><span class="sb-item-label">Project settings</span></div>
         <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
       </div></div>
   </nav>
@@ -543,13 +545,31 @@ function renderStrip(){
   var has=tabs.length>0;
   ['tso','abar'].forEach(function(id){document.getElementById(id).style.display=has?(id==='tso'?'block':'flex'):'none';});document.getElementById('addbar').style.display='none';
   if(!has){
-// ── Load saved data or pre-load MSSB defaults ──
+  // Show empty state
+  var mainEl=document.getElementById('mainContent')||document.querySelector('.main-content');
+  var existing=document.getElementById('eqEmptyState');
+  if(!existing){
+    var es=document.createElement('div');
+    es.id='eqEmptyState';
+    es.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;text-align:center;padding:40px';
+    es.innerHTML='<div style="font-size:48px">🗂️</div>'
+      +'<div style="font-family:Syne,sans-serif;font-size:20px;font-weight:700;color:var(--text)">No Equipment Schedules</div>'
+      +'<div style="font-size:13px;color:var(--text2);max-width:380px">Add equipment types to start tracking. You can also scan drawings to extract equipment schedules automatically.</div>'
+      +'<div style="display:flex;gap:10px;margin-top:8px">'
+        +'<button class="btn bp" onclick="openAddModal()" style="padding:10px 20px;font-size:13px">＋ Add Equipment</button>'
+        +'<button class="btn bg" onclick="openScanModal()" style="padding:10px 20px;font-size:13px;color:var(--accent);border-color:rgba(0,200,255,.3)">📄 Scan Drawings</button>'
+      +'</div>';
+    var strip=document.getElementById('tso');
+    if(strip&&strip.parentNode){strip.parentNode.insertBefore(es,strip.nextSibling);}
+  }
+// ── Load saved data ──
 (async function(){
   if(await loadEquip()){ await loadRevData(); renderStrip(); return; }
   // No saved data — start blank, user adds equipment via + Add
   renderStrip();
 })();return;}
-  document.getElementById('tstrip').innerHTML=tabs.map(function(t){
+  var es=document.getElementById('eqEmptyState');if(es)es.remove();
+    document.getElementById('tstrip').innerHTML=tabs.map(function(t){
     var d=defn(t.type),a=t.id===activeId;
     return '<div class="etab'+(a?' active':'')+'" onclick="swTab(\''+t.id+'\')" oncontextmenu="showCtx(event,\''+t.id+'\')">'
       +'<span class="etab-icon">'+(d?d.icon:'📋')+'</span>'
