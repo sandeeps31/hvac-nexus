@@ -662,8 +662,10 @@ function renderList(){
     document.getElementById('svBody').innerHTML='<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">👥</div><div>'+(subVars.length?'No results match your filters.':'No subbie variations yet. Click <strong>＋ Add Subbie Var</strong> to get started.')+'</div></div></td></tr>';
     return;
   }
+  window._svListMap={};
+  list.forEach(function(sv,_i){window._svListMap[_i]=sv.id;});
   var rows='';
-  list.forEach(function(sv){
+  list.forEach(function(sv,_rowIdx){
     var gst=num(sv.value)*0.1;
     var total=num(sv.value)+gst;
     // Linked var chip
@@ -671,10 +673,10 @@ function renderList(){
     if(sv.linkedVarId&&sv.linkedVarNum){
       linkCell='<span class="var-link-chip" onclick="event.stopPropagation();navTo(\'hvac-variations.html\')" title="Open in Variations">'+escH(sv.linkedVarNum)+' — '+escH(sv.linkedVarTitle||'')+'</span>';
     } else {
-      linkCell='<span class="unlinked-chip" data-svid="'+sv.id+'" onclick="event.stopPropagation();openSVDetail(this.dataset.svid,true)">＋ Link variation</span>';
+      linkCell='<span class="unlinked-chip" data-idx="'+_rowIdx+'" onclick="event.stopPropagation();openSVDetail(window._svListMap[parseInt(this.dataset.idx)],true)">＋ Link variation</span>';
     }
     var hasPo=!!sv.poId;
-    rows+='<tr data-svid="'+sv.id+'" onclick="openSVDetail(this.dataset.svid)">'
+    rows+='<tr data-idx="'+_rowIdx+'" onclick="openSVDetail(window._svListMap[parseInt(this.dataset.idx)])">'
       +'<td class="sv-num">'+escH(sv.num||'—')+'</td>'
       +'<td style="font-weight:500;color:var(--text)">'+escH(sv.subbie||'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(sv.desc||'—')+'</td>'
@@ -683,7 +685,7 @@ function renderList(){
       +'<td>'+linkCell+'</td>'
       +'<td onclick="event.stopPropagation()" style="white-space:nowrap">'
       +(sv.status==='Approved'&&!hasPo
-        ?'<button class="ia" data-svid="'+sv.id+'" onclick="event.stopPropagation();openSVDetail(this.dataset.svid)" title="Raise PO" style="font-size:11px;padding:4px 10px;background:var(--warn);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600">&#128196; Raise PO</button>'
+        ?'<button class="ia" data-idx="'+_rowIdx+'" onclick="event.stopPropagation();openSVDetail(window._svListMap[parseInt(this.dataset.idx)])" title="Raise PO" style="font-size:11px;padding:4px 10px;background:var(--warn);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600">&#128196; Raise PO</button>'
         :(hasPo?'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--green)">&#10003; PO '+escH(sv.poRef||'')+'</span>':'')
       )
       +'</td>'
