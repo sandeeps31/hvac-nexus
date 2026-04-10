@@ -430,47 +430,57 @@ function loadFromData(dataUrl){
   pdfjsLib.getDocument({data:arr}).promise.then(renderPdf).catch(function(e){showError('PDF error: '+e.message);});
 }
 var _pdfPage=null;
+var _hiRenderTask=null;
 
 function renderPdf(pdf){
   pdf.getPage(1).then(function(page){
     _pdfPage=page;
-    // ── Step 1: Fast render at screen-fit scale ──
-    var vpLow=page.getViewport({scale:1});
-    _canvasW=vpLow.width;_canvasH=vpLow.height;
-    var canvas=document.getElementById('pdfCanvas');
-    canvas.width=_canvasW;canvas.height=_canvasH;
-    var ctx=canvas.getContext('2d');
-    page.render({canvasContext:ctx,viewport:vpLow}).promise.then(function(){
+    renderAtScale(page,0.75,function(){
+      // Low-res is visible — now upgrade in background
       document.getElementById('loading').style.display='none';
       fitToScreen();
       renderPins();
       renderPanel();
-      // ── Step 2: Upgrade to high-res in background ──
-      setTimeout(function(){renderHighRes(page);},200);
+      setTimeout(function(){renderHighRes(page);},300);
     });
   });
 }
 
+function renderAtScale(page,scale,cb){
+  var vp=page.getViewport({scale:scale});
+  _canvasW=vp.width;_canvasH=vp.height;
+  var canvas=document.getElementById('pdfCanvas');
+  canvas.width=_canvasW;canvas.height=_canvasH;
+  var ctx=canvas.getContext('2d');
+  page.render({canvasContext:ctx,viewport:vp}).promise.then(cb).catch(function(){});
+}
+
 function renderHighRes(page){
+  if(_hiRenderTask){try{_hiRenderTask.cancel();}catch(e){}}
   var dpr=window.devicePixelRatio||1;
   var hiScale=Math.max(3,dpr*2);
   var vpHi=page.getViewport({scale:hiScale});
-  // Render into an offscreen canvas at hi-res
+  // Render into a hidden offscreen canvas — never touch main canvas until done
   var offscreen=document.createElement('canvas');
   offscreen.width=vpHi.width;
   offscreen.height=vpHi.height;
   var offCtx=offscreen.getContext('2d');
-  page.render({canvasContext:offCtx,viewport:vpHi}).promise.then(function(){
-    // Draw hi-res offscreen canvas scaled DOWN to logical canvas size
-    // Canvas pixel size stays _canvasW x _canvasH — no CSS override needed
-    // So all pan/zoom/pin logic is completely unaffected
+  _hiRenderTask=page.render({canvasContext:offCtx,viewport:vpHi});
+  _hiRenderTask.promise.then(function(){
+    _hiRenderTask=null;
+    // Only NOW swap — draw hi-res into main canvas without changing its size
+    // This avoids any white flash because we never clear the visible canvas
     var canvas=document.getElementById('pdfCanvas');
     var ctx=canvas.getContext('2d');
-    canvas.width=_canvasW;
-    canvas.height=_canvasH;
-    ctx.drawImage(offscreen,0,0,_canvasW,_canvasH);
+    // Resize canvas to hi-res but keep CSS display size = logical size
+    var prevW=_canvasW,prevH=_canvasH;
+    canvas.width=vpHi.width;
+    canvas.height=vpHi.height;
+    canvas.style.width=prevW+'px';
+    canvas.style.height=prevH+'px';
+    ctx.drawImage(offscreen,0,0);
     renderPins();
-  }).catch(function(){});
+  }).catch(function(){_hiRenderTask=null;});
 }
 function applyTransform(){
   document.getElementById('pdfStage').style.transform='translate('+_offsetX+'px,'+_offsetY+'px) scale('+_scale+')';
