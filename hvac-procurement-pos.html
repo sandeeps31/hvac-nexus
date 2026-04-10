@@ -755,7 +755,7 @@ function renderList(){
     return `<tr onclick="openPOReadOnly('${p._secId}','${p._grpId}','${p.id}')">
       <td class="po-num-c">${p.id}</td>
       <td style="font-weight:500;color:var(--text)">${p.supplier||'—'}</td>
-      <td><span style="font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:20px;background:var(--surface3);border:1px solid var(--border);color:var(--text2)">${p._grpName}</span></td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:20px;background:var(--surface3);border:1px solid var(--border);color:var(--text2)">${p._grpName}</span>${p.svRef?'&nbsp;<span style="font-family:DM Mono,monospace;font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(255,184,48,.15);border:1px solid rgba(255,184,48,.4);color:var(--warn)">'+p.svRef+'</span>':''}</td>
       <td class="r" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">${fmtZ(sub)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.orderDate)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.delivery)}</td>
@@ -1118,6 +1118,9 @@ function savePO(){
   const poData={
     id:document.getElementById('po-page-num').textContent,
     supplier,
+    svRef:window._pendingSvRef?window._pendingSvRef.svNum:'',
+    svId:window._pendingSvRef?window._pendingSvRef.svId:'',
+    svLinkedVar:window._pendingSvRef?window._pendingSvRef.svLinkedVar:'',
     lineItems:JSON.parse(JSON.stringify(items)),
     actual:0,
     orderDate:document.getElementById('po-order-date').value,
@@ -1133,6 +1136,16 @@ function savePO(){
   grp.pos.push(poData);
   _isDirty=false;
   addSupplierToList(poData.supplier);
+  // If this PO was raised from a Subbie Variation, update the SV's poRef
+  if(window._pendingSvRef&&window._pendingSvRef.svId){
+    dbGetSubVariations(_poPNum).then(function(d){
+      var svs=(d&&Array.isArray(d.subVars))?d.subVars:[];
+      var sv=svs.find(function(x){return x.id===window._pendingSvRef.svId;});
+      if(sv){sv.poId=poData.id;sv.poRef=poData.id;}
+      dbSetSubVariations(_poPNum,{subVars:svs}).catch(function(e){console.error(e);});
+    }).catch(function(e){console.error(e);});
+    window._pendingSvRef=null;
+  }
   saveData();goList();
 }
 
@@ -1286,7 +1299,39 @@ window.addEventListener('DOMContentLoaded', async function(){
   if(saved?.sections){ sections = saved.sections; }
   var params = new URLSearchParams(window.location.search);
   var src = params.get('source')||'';
-  if(src==='subvar'){
+  if(src==='svnew'){
+    // New PO from approved Subbie Variation — pre-fill and open in edit mode
+    renderList();
+    var svLineItems=[];
+    try{svLineItems=JSON.parse(decodeURIComponent(params.get('svLineItems')||'[]'));}catch(e){
+      svLineItems=[{id:nid(),desc:decodeURIComponent(params.get('svDesc')||''),qty:'1',price:String(parseFloat(params.get('svValue')||0))}];
+    }
+    // Ensure line items have proper ids
+    svLineItems=svLineItems.map(function(li){return {id:li.id||nid(),desc:li.desc||'',qty:li.qty||'1',price:li.price||'0'};});
+    lineItems=svLineItems.length?svLineItems:[{id:nid(),desc:decodeURIComponent(params.get('svDesc')||''),qty:'1',price:String(parseFloat(params.get('svValue')||0))}];
+    editingPO=null;
+    _poReadOnly=false;
+    document.getElementById('po-page-num').textContent=genPONum();
+    document.getElementById('po-page-title').textContent='New PO — '+decodeURIComponent(params.get('svNum')||'SV');
+    document.getElementById('po-supplier').value=decodeURIComponent(params.get('svSubbie')||'');
+    document.getElementById('po-delivery').value='';
+    document.getElementById('po-notes').value='SV: '+decodeURIComponent(params.get('svNum')||'')+' — '+decodeURIComponent(params.get('svDesc')||'');
+    document.getElementById('po-file-lbl').textContent='Attach PDF (optional)';
+    document.getElementById('deletePOBtn').style.display='none';
+    document.getElementById('savePOBtn').style.display='';
+    document.getElementById('editPOBtn').style.display='none';
+    document.getElementById('emailPOBtn').style.display='none';
+    document.getElementById('exportPOBtn').style.display='none';
+    setFieldsReadOnly(false);
+    var _today2=new Date();
+    document.getElementById('po-order-date').value=_today2.getFullYear()+'-'+String(_today2.getMonth()+1).padStart(2,'0')+'-'+String(_today2.getDate()).padStart(2,'0');
+    // Store SV reference on window for savePO to pick up
+    window._pendingSvRef={svId:decodeURIComponent(params.get('svId')||''),svNum:decodeURIComponent(params.get('svNum')||''),svLinkedVar:decodeURIComponent(params.get('svLinkedVar')||'')};
+    populateCatDD('');
+    renderLI();
+    setPOView('New PO');
+    setTimeout(function(){document.getElementById('po-cat-input').focus();},100);
+  } else if(src==='subvar'){
     var svId=params.get('svId');
     if(!subVarPos.find(function(x){return x.svId===svId;})){
       subVarPos.push({id:'svpo_'+Date.now(),svId:svId,svNum:params.get('svNum')||'',poRef:params.get('poRef')||'',subbie:params.get('svSubbie')||'',desc:params.get('svDesc')||'',value:parseFloat(params.get('svValue')||0),lineItems:[{desc:params.get('svDesc')||'',qty:'1',price:params.get('svValue')||''}],delivery:'',notes:'',createdDate:new Date().toISOString().split('T')[0]});
