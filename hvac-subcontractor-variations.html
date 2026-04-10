@@ -336,6 +336,7 @@ input[type=number]{-moz-appearance:textfield}
       <button class="bp bsm btn" id="det-saveBtn" onclick="saveSV()" style="display:none">💾 Save</button>
       <button class="bg bsm btn" id="det-cancelBtn" onclick="cancelSVEdit()" style="display:none">Cancel</button>
       <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" id="det-deleteBtn" onclick="deleteSV()" style="display:none">🗑 Delete</button>
+      <button class="btn bsm" id="det-raisePOBtn" onclick="raisePOFromDetail()" style="display:none;background:var(--warn);color:#000;font-weight:600">📦 Raise PO</button>
       <button class="bg bsm btn" onclick="goList()">← Back</button>
     </div>
     <div class="sv-meta-grid">
@@ -764,6 +765,22 @@ function svRenderLI(){
   svUpdateTot();
 }
 
+function raisePOFromDetail(){
+  var sv=subVars.find(function(x){return x.id===editingId;});
+  if(!sv||sv.status!=='Approved'){alert('SV must be Approved to raise a PO.');return;}
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  var liJson=encodeURIComponent(JSON.stringify(sv.lineItems||[]));
+  var params='?source=svnew'
+    +'&svId='+encodeURIComponent(sv.id)
+    +'&svNum='+encodeURIComponent(sv.num||'')
+    +'&svDesc='+encodeURIComponent(sv.desc||'')
+    +'&svSubbie='+encodeURIComponent(sv.subbie||'')
+    +'&svValue='+encodeURIComponent(sv.value||0)
+    +'&svLinkedVar='+encodeURIComponent(sv.linkedVarId||'')
+    +'&svLineItems='+liJson;
+  window.location.href=b+'hvac-procurement-pos.html'+params;
+}
+
 // openAddModal/openEditModal replaced by openNewSV/openSVDetail
 
 function renderLinkedVarDisplay(){
@@ -817,7 +834,10 @@ function saveSV(){
   if(sv.linkedVarId){
     syncValueToVariation(sv.id, sv.num, sv.subbie, sv.value);
   }
-  save();renderList();
+  var _savedId=sv.id;
+  save();
+  openSVDetail(_savedId);
+  showView('detail');
 }
 
 function deleteSV(){
@@ -964,6 +984,8 @@ function openSVDetail(id, autoLink){
   document.getElementById('det-saveBtn').style.display='none';
   document.getElementById('det-cancelBtn').style.display='none';
   document.getElementById('det-deleteBtn').style.display='none';
+  var _rpBtn=document.getElementById('det-raisePOBtn');
+  if(_rpBtn)_rpBtn.style.display=(sv&&sv.status==='Approved'&&!sv.poId)?'':'none';
   document.getElementById('det-link-btns').style.display='none';
   document.getElementById('svAddLiBtn').style.display='none';
   renderLinkedVarDisplay();
@@ -981,6 +1003,7 @@ function enterSVEditMode(){
   document.getElementById('det-saveBtn').style.display='';
   document.getElementById('det-cancelBtn').style.display='';
   document.getElementById('det-deleteBtn').style.display='';
+  var _rpBtn2=document.getElementById('det-raisePOBtn');if(_rpBtn2)_rpBtn2.style.display='none';
   document.getElementById('det-link-btns').style.display='flex';
   document.getElementById('svAddLiBtn').style.display='';
   svRenderLI();
