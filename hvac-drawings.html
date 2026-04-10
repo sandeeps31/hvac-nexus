@@ -216,7 +216,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
 
 <!-- ADD DRAWING MODAL -->
 <div class="mo" id="addModal">
-  <div class="modal" style="width:560px;max-height:90vh;display:flex;flex-direction:column">
+  <div class="modal" style="width:680px;max-height:90vh;display:flex;flex-direction:column">
     <!-- Header with tabs -->
     <div style="padding:18px 22px 0;border-bottom:1px solid var(--border);flex-shrink:0">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -234,12 +234,12 @@ body.sb-sm{padding-left:var(--sb-sm)}
     <div style="overflow-y:auto;flex:1;padding:18px 22px">
       <!-- SINGLE TAB -->
       <div id="singleTab" style="overflow-y:auto;flex:1">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div><label class="ml">Drawing Number *</label><input class="mi" id="f-num" placeholder="e.g. M-HV-001"/></div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+          <div><label class="ml">Drawing Number *</label><input class="mi" id="f-num" placeholder="e.g. M-HV-001" style="font-size:15px"/></div>
           <div><label class="ml">Revision</label><input class="mi" id="f-rev" placeholder="e.g. A"/></div>
         </div>
         <label class="ml" style="margin-top:10px">Drawing Title *</label>
-        <input class="mi" id="f-name" placeholder="e.g. Level 2 HVAC Layout"/>
+        <input class="mi" id="f-name" placeholder="e.g. Level 2 HVAC Layout" style="font-size:15px"/>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
           <div><label class="ml">Discipline</label>
             <select class="ms" id="f-cat" onchange="updateSubcat()">
@@ -545,8 +545,8 @@ var SUBCATS={Mechanical:['General','Schematics','Schedules','Mechanical Services
 
 // Areas — UI preference, stays in localStorage
 var AREAS_KEY='hvacnexus_areas_'+_pNum;
-var DEFAULT_AREAS=['General','Basement','Ground Floor','Level 1','Level 2','Level 3','Level 4','Level 5','Roof','Plant Room','External'];
-function loadAreas(){try{var s=localStorage.getItem(AREAS_KEY);return s?JSON.parse(s):DEFAULT_AREAS.slice();}catch(e){return DEFAULT_AREAS.slice();}}
+var DEFAULT_AREAS=[];
+function loadAreas(){try{var s=localStorage.getItem(AREAS_KEY);if(s){var _pa=JSON.parse(s);return Array.isArray(_pa)?_pa:[];}return [];}catch(e){return [];}}
 function saveAreas(a){try{localStorage.setItem(AREAS_KEY,JSON.stringify(a));}catch(e){}}
 var AREAS=loadAreas();
 
@@ -604,7 +604,8 @@ async function saveDrawing(){
   var drwObj={id:newId,num:num,name:name,rev:rev,
     cat:document.getElementById('f-cat').value,
     subcat:(document.getElementById('f-subcat')||{value:'General'}).value,
-    area:(document.getElementById('f-area')||{value:'General'}).value||'General',
+    area:(function(){var _av=(document.getElementById('f-area')||{value:''}).value||'';if(_av&&AREAS.indexOf(_av)===-1){AREAS.push(_av);saveAreas(AREAS);}return _av;})(),
+    fileName:(_pendingPdfFile?_pendingPdfFile.name:''),
     status:status,approval:approval,subDate:subDate,apprDate:'',superseded:false,
     history:[{rev:rev,status:status,approval:approval,subDate:subDate,apprDate:'',recorded:today}],
     pins:[],pdfData:null,pdfUrl:null};
@@ -664,7 +665,7 @@ function buildDrawingRow(d){
     +'<td style="white-space:nowrap"><span class="drw-status '+(ST_CLS[d.status]||'st-p')+'">'+escH(d.status||'-')+'</span></td>'
     +'<td style="white-space:nowrap"><span class="drw-status '+apprCls+'" style="font-size:9.5px">'+escH(d.approval||'Pending')+'</span></td>'
     +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);white-space:nowrap">'+escH(d.subDate||'-')+'</td>'
-    
+    +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(d.fileName||'')+'">'+(d.pdfUrl||d.pdfData?(d.fileName?'<span style="color:var(--danger)">📄</span> '+escH(d.fileName):'📄'):'—')+'</td>'
     +'<td onclick="event.stopPropagation()">'
       +'<div class="drw-actions">'
         +'<button class="drw-act-btn" onclick="openEditModal(\''+d.id+'\')"><span class="tip">Edit</span>&#9998;</button>'
@@ -749,7 +750,7 @@ function renderList(){
       +'<thead><tr>'
       +'<th style="width:32px;text-align:center">PDF</th><th>Drawing No.</th><th>Drawing Name</th>'
       +'<th>Rev</th><th>Status</th>'
-      +'<th>Approval</th><th>Sub Date</th>'
+      +'<th>Approval</th><th>Submission Date</th><th style="min-width:140px">File Name</th>'
       +'<th style="text-align:right;padding-right:14px">Actions</th>'
       +'</tr></thead>';
     var tbody=document.createElement('tbody');
@@ -958,7 +959,8 @@ function saveBulkDrawings(){
     var num=(bf.num||'').trim();if(!num)return;
     var newId='d'+nid();
     var drw={id:newId,num:num,name:bf.name||num,rev:bf.rev||'A',cat:bf.cat||'Mechanical',subcat:bf.subcat||'General',
-      area:bf.area||'General',
+      area:(function(){var _ba=bf.area||'';if(_ba&&AREAS.indexOf(_ba)===-1){AREAS.push(_ba);saveAreas(AREAS);}return _ba||'';})(),
+      fileName:(bf.file?bf.file.name:''),
       status:bf.status||'IFR',approval:bf.approval||'Pending',subDate:bf.subDate||today,apprDate:'',superseded:false,
       history:[{rev:bf.rev||'A',status:bf.status||'IFR',approval:bf.approval||'Pending',subDate:bf.subDate||today,apprDate:'',recorded:today}],
       pins:[],pdfData:null,pdfUrl:null};
@@ -1122,7 +1124,7 @@ function renderAreaList(){
   ul.innerHTML=AREAS.map(function(a,i){
     return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
       +'<span style="flex:1;font-size:13px;color:var(--text)">'+escH(a)+'</span>'
-      +(DEFAULT_AREAS.indexOf(a)===-1?'<button onclick="removeArea('+i+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px" title="Remove">✕</button>':'<span style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace">DEFAULT</span>')
+      '<button onclick="removeArea('+i+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px" title="Remove">✕</button>'
       +'</div>';
   }).join('');
 }
