@@ -337,8 +337,8 @@ input[type=number]{-moz-appearance:textfield}
     <div class="sv-meta-grid" style="grid-template-columns:repeat(5,auto);align-items:start;gap:0;display:flex;flex-wrap:wrap;gap:0">
       <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">SV Number</span><div><input class="mi mono" id="f-num" style="display:none"/><span class="sv-mv mono" id="det-num-val">—</span></div></div>
       <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">Subcontractor</span><div><input class="mi" id="f-subbie" style="display:none"/><span class="sv-mv" id="det-subbie-val">—</span></div></div>
-      <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">Status</span><div><select class="ms" id="f-status" style="display:none"><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select><span class="sv-mv" id="det-status-val">—</span></div></div>
-      <div class="sv-mf" style="padding-right:32px"><span class="sv-ml" id="det-value-lbl">Value (ex GST)</span><div><input class="mi mono" id="f-approved-value" style="display:none;max-width:140px" placeholder="Enter approved value…" type="text" inputmode="numeric"/><span class="sv-mv mono" id="det-value-val" style="color:var(--accent)">—</span></div></div>
+      <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">Status</span><div><select class="ms" id="f-status" style="display:none" onchange="onStatusChange(this.value)"><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select><span class="sv-mv" id="det-status-val">—</span></div></div>
+      <div class="sv-mf" style="padding-right:32px"><span class="sv-ml" id="det-value-lbl">Value (ex GST)</span><div><input class="mi mono" id="f-approved-value" style="display:none;max-width:140px" placeholder="Enter approved value…" type="text" inputmode="numeric" onfocus="this.value=this.value.replace(/,/g,'')" onblur="var v=parseFloat(this.value.replace(/,/g,''));this.value=isNaN(v)?'':(v===0?'':Math.round(v).toLocaleString('en-AU'))"/><span class="sv-mv mono" id="det-value-val" style="color:var(--accent)">—</span></div></div>
       <div class="sv-mf"><span class="sv-ml">Purchase Order</span><span class="sv-mv" id="det-po-val">—</span></div>
     </div>
   </div>
@@ -864,6 +864,22 @@ function enterSVEditMode(){
   document.getElementById('svAddLiBtn').style.display='';
   svRenderLI();
 }
+function onStatusChange(status){
+  var _avInp=document.getElementById('f-approved-value');
+  var _vVal=document.getElementById('det-value-val');
+  var _lbl=document.getElementById('det-value-lbl');
+  var _isApproved=status==='Approved';
+  if(_lbl)_lbl.textContent=_isApproved?'Approved Value (ex GST)':'Value (ex GST)';
+  if(_avInp){
+    _avInp.style.display=_isApproved?'':'none';
+    if(_isApproved){
+      _avInp.value='';
+      setTimeout(function(){_avInp.focus();},50);
+    }
+  }
+  if(_vVal)_vVal.style.display=_isApproved?'none':'';
+}
+
 function cancelSVEdit(){var _av=document.getElementById('f-approved-value');if(_av)_av.style.display='none';if(editingId){openSVDetail(editingId);}else{goList();}}
 function setSVFieldVis(edit){
   ['f-num','f-subbie','f-desc','f-sow','f-status'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=edit?'':'none';});
