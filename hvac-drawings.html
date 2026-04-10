@@ -7,7 +7,7 @@
 <title>Drawings — HVAC NEXUS</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;--border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.10);--green:#00e5a0;--green-dim:rgba(0,229,160,.10);--warn:#ffb830;--warn-dim:rgba(255,184,48,.10);--danger:#ff4d6d;--danger-dim:rgba(255,77,109,.10);--purple:#a78bfa;--purple-dim:rgba(167,139,250,.10);--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a;--radius:10px;--sb:230px;--sb-sm:52px;--sb-w:230px}
+:root{--bg:#080c12;--surface:#0e1520;--surface2:#141e2e;--surface3:#1a2640;--border:#1e3050;--accent:#00c8ff;--accent-dim:rgba(0,200,255,.10);--green:#00e5a0;--green-dim:rgba(0,229,160,.10);--warn:#ffb830;--warn-dim:rgba(255,184,48,.10);--danger:#ff4d6d;--danger-dim:rgba(255,77,109,.10);--purple:#a78bfa;--purple-dim:rgba(167,139,250,.10);--text:#ddeeff;--text2:#7a9bbf;--muted:#3d5a7a;--radius:10px;--sb:230px;--sb-sm:52px}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;height:100vh;overflow:hidden}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
@@ -216,7 +216,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
 
 <!-- ADD DRAWING MODAL -->
 <div class="mo" id="addModal">
-  <div class="modal" style="width:680px;max-height:90vh;display:flex;flex-direction:column;padding:0">
+  <div class="modal" style="width:680px;max-height:90vh;display:flex;flex-direction:column">
     <!-- Header with tabs -->
     <div style="padding:18px 22px 0;border-bottom:1px solid var(--border);flex-shrink:0">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -466,7 +466,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
           <th style="padding:9px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Rev</th>
           <th style="padding:9px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
           <th style="padding:9px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Approval</th>
-          <th style="padding:9px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Sub Date</th>
+          <th style="padding:9px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Submission Date</th>
 
         </tr></thead>
         <tbody id="revModalBody"></tbody>
@@ -545,6 +545,7 @@ var SUBCATS={Mechanical:['General','Schematics','Schedules','Mechanical Services
 
 // Areas — UI preference, stays in localStorage
 var AREAS_KEY='hvacnexus_areas_'+_pNum;
+var DEFAULT_AREAS=[];
 function loadAreas(){try{var s=localStorage.getItem(AREAS_KEY);if(s){var _pa=JSON.parse(s);return Array.isArray(_pa)?_pa:[];}return [];}catch(e){return [];}}
 function saveAreas(a){try{localStorage.setItem(AREAS_KEY,JSON.stringify(a));}catch(e){}}
 var AREAS=loadAreas();
@@ -664,7 +665,7 @@ function buildDrawingRow(d){
     +'<td style="white-space:nowrap"><span class="drw-status '+(ST_CLS[d.status]||'st-p')+'">'+escH(d.status||'-')+'</span></td>'
     +'<td style="white-space:nowrap"><span class="drw-status '+apprCls+'" style="font-size:9.5px">'+escH(d.approval||'Pending')+'</span></td>'
     +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);white-space:nowrap">'+escH(d.subDate||'-')+'</td>'
-    +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(d.fileName||'')+'">'+(d.pdfUrl||d.pdfData?(d.fileName?'<span style="color:var(--danger)">📄</span> '+escH(d.fileName):'📄'):'—')+'</td>'
+    +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(d.fileName||'')+'">'+(d.pdfUrl||d.pdfData?(d.fileName?'<span style="color:var(--danger)">📄</span> '+escH(d.fileName):'📄'):'—')+'</td>'
     +'<td onclick="event.stopPropagation()">'
       +'<div class="drw-actions">'
         +'<button class="drw-act-btn" onclick="openEditModal(\''+d.id+'\')"><span class="tip">Edit</span>&#9998;</button>'
@@ -749,7 +750,7 @@ function renderList(){
       +'<thead><tr>'
       +'<th style="width:32px;text-align:center">PDF</th><th>Drawing No.</th><th>Drawing Name</th>'
       +'<th>Rev</th><th>Status</th>'
-      +'<th>Approval</th><th>Submission Date</th><th style="min-width:150px">File Name</th>'
+      +'<th>Approval</th><th>Submission Date</th>'
       +'<th style="text-align:right;padding-right:14px">Actions</th>'
       +'</tr></thead>';
     var tbody=document.createElement('tbody');
@@ -912,7 +913,7 @@ function handleBulkPdf(inp){
     +'<th '+th+'>Rev</th>'
     +'<th '+th+'>Status</th>'
     +'<th '+th+'>Approval</th>'
-    +'<th '+th+'>Sub Date</th>'
+    +'<th '+th+'>Submission Date</th>'
     +'<th '+th+'>Discipline</th>'
     +'<th '+th+'>Category</th>'
     +'<th '+th+'>Area</th>'
@@ -1380,7 +1381,7 @@ function buildRegisterPreview(){
   var thead=document.getElementById('regPreviewHead');
   tbody.innerHTML='';
   if(tabVal==='type1'){
-    thead.innerHTML='<th>Drawing No.</th><th>Drawing Name</th><th>Category</th><th style="width:48px">Rev</th><th style="width:75px">Status</th><th style="width:130px">Approval</th><th style="width:95px">Sub Date</th><th style="width:95px">Appr Date</th><th style="width:110px">Notes</th>';
+    thead.innerHTML='<th>Drawing No.</th><th>Drawing Name</th><th>Category</th><th style="width:48px">Rev</th><th style="width:75px">Status</th><th style="width:130px">Approval</th><th style="width:95px">Submission Date</th><th style="width:95px">Appr Date</th><th style="width:110px">Notes</th>';
     data.order.forEach(function(num){
       data.grouped[num].forEach(function(d,ri){
         var tr=document.createElement('tr');
@@ -1393,7 +1394,7 @@ function buildRegisterPreview(){
       });
     });
   } else {
-    thead.innerHTML='<th>Drawing No.</th><th>Drawing Name</th><th>Category</th><th style="width:48px">Rev</th><th style="width:75px">Status</th><th style="width:130px">Approval</th><th style="width:95px">Sub Date</th><th style="width:95px">Appr Date</th>';
+    thead.innerHTML='<th>Drawing No.</th><th>Drawing Name</th><th>Category</th><th style="width:48px">Rev</th><th style="width:75px">Status</th><th style="width:130px">Approval</th><th style="width:95px">Submission Date</th><th style="width:95px">Appr Date</th>';
     data.rows.forEach(function(d){
       var tr=document.createElement('tr');
       var isObs=d.status==='Obsolete';
