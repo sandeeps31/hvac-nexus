@@ -167,7 +167,7 @@ tr:hover .ra{opacity:1}
 .li-tbl{width:100%;border-collapse:collapse;table-layout:fixed}
 .li-tbl th{padding:8px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)}
 .li-tbl th.r{text-align:right}
-.li-tbl td{padding:8px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+.li-tbl td{padding:8px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
 .li-tbl tr:last-child td{border-bottom:none}
 .li-tbl tr:hover td{background:rgba(255,255,255,.02)}
 .li-desc-ta{background:var(--surface3);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%;resize:none;overflow:hidden;line-height:1.5;min-height:28px;word-wrap:break-word;white-space:pre-wrap;padding:5px 9px;border-radius:6px;transition:border-color .15s,background .15s}
@@ -323,9 +323,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
     <div class="page">
       <div class="tw"><table class="dt">
         <thead><tr>
-          <th style="width:150px">PO Number</th><th>Supplier</th><th>Budget Category</th>
-          <th class="r" style="min-width:120px">Order Cost (ex GST)</th>
-          <th style="width:120px">Order Date</th><th style="width:120px">Delivery</th><th style="width:20px"></th>
+          <th style="width:200px;cursor:pointer" onclick="sortList('id')">PO Number <span id="sort-ind-id"></span></th>
+          <th style="cursor:pointer" onclick="sortList('supplier')">Supplier <span id="sort-ind-supplier"></span></th>
+          <th style="cursor:pointer" onclick="sortList('cat')">Budget Category <span id="sort-ind-cat"></span></th>
+          <th class="r" style="min-width:120px;cursor:pointer" onclick="sortList('cost')">Order Cost (ex GST) <span id="sort-ind-cost"></span></th>
+          <th style="width:120px;cursor:pointer" onclick="sortList('orderDate')">Order Date <span id="sort-ind-orderDate"></span></th>
+          <th style="width:120px;cursor:pointer" onclick="sortList('delivery')">Delivery <span id="sort-ind-delivery"></span></th>
+          <th style="width:20px"></th>
         </tr></thead>
         <tbody id="poBody"></tbody>
       </table></div>
@@ -356,7 +360,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
             </div>
           </div>
           <div class="mf"><span class="ml">Supplier *</span>
-            <input class="mi" id="po-supplier" placeholder="Supplier name…"/>
+            <input class="mi" id="po-supplier" placeholder="Supplier name…" oninput="_isDirty=true;updateSupplierList(this.value)" list="supplierDatalist" autocomplete="off"/>
+              <datalist id="supplierDatalist"></datalist>
           </div>
           <div class="mf"><span class="ml">Order Date</span>
             <input class="mi" id="po-order-date" type="date"/>
@@ -609,6 +614,26 @@ var _budgetData=null;
 async function loadBudgetData(){try{var b=await dbGetBudget(_poPNum);_budgetData=b||null;}catch(e){_budgetData=null;}}
 async function loadSubVarPos(){try{var d=await dbGetSubVariations(_poPNum);subVarPos=(d&&Array.isArray(d.subVarPos))?d.subVarPos:[];}catch(e){subVarPos=[];}}
 function saveSubVarPos(){dbGetSubVariations(_poPNum).then(function(d){var data=d||{};data.subVarPos=subVarPos;dbSetSubVariations(_poPNum,data).catch(function(e){console.error(e);});}).catch(function(e){console.error(e);});}
+function getSavedSuppliers(){
+  try{return JSON.parse(localStorage.getItem('hvacnexus_suppliers_'+_poPNum)||'[]');}catch(e){return [];}
+}
+function addSupplierToList(name){
+  if(!name)return;
+  var list=getSavedSuppliers();
+  var n=name.trim();
+  if(n&&!list.find(function(s){return s.toLowerCase()===n.toLowerCase();})){
+    list.push(n);list.sort();
+    localStorage.setItem('hvacnexus_suppliers_'+_poPNum,JSON.stringify(list));
+  }
+}
+function updateSupplierList(q){
+  var dl=document.getElementById('supplierDatalist');if(!dl)return;
+  var list=getSavedSuppliers();
+  var filtered=q?list.filter(function(s){return s.toLowerCase().includes(q.toLowerCase());}):list;
+  dl.innerHTML=filtered.map(function(s){return '<option value="'+s.replace(/"/g,'&quot;')+'"></option>';}).join('');
+}
+function populateSupplierDatalist(){updateSupplierList('');}
+
 function saveData(){
   try{
     dbSetPurchaseOrders(_poPNum,{sections,margin:15,ts:Date.now()}).catch(e=>console.error(e));
@@ -631,10 +656,23 @@ function genPONum(){
     var m=p.id&&p.id.match(/-(\d+)$/);return m?parseInt(m[1]):0;
   });
   var next=(existing.length?Math.max.apply(null,existing):0)+1;
-  return proj+'-PO-'+String(next).padStart(2,'0');
+  return proj+'-PO-'+String(next).padStart(3,'0');
 }
 
 // ── DATA ──
+var _sortCol='id';
+var _sortDir=1; // 1=asc, -1=desc
+
+function sortList(col){
+  if(_sortCol===col){_sortDir*=-1;}else{_sortCol=col;_sortDir=col==='id'?1:1;}
+  // Update indicators
+  ['id','supplier','cat','cost','orderDate','delivery'].forEach(function(c){
+    var el=document.getElementById('sort-ind-'+c);
+    if(el)el.textContent=c===_sortCol?(_sortDir===1?' ▲':' ▼'):'';
+  });
+  renderList();
+}
+
 function getAllPOs(){
   const all=[];
   sections.forEach(sec=>sec.groups.forEach(g=>g.pos.forEach(po=>{
@@ -692,6 +730,20 @@ function renderList(){
     (!q||(p.id||'').toLowerCase().includes(q)||(p.supplier||'').toLowerCase().includes(q)||(p._grpName||'').toLowerCase().includes(q))
     &&(!cat||p._grpName===cat)
   );
+  // Sort
+  all.sort(function(a,b){
+    var va,vb;
+    if(_sortCol==='id'){va=a.id||'';vb=b.id||'';}
+    else if(_sortCol==='supplier'){va=(a.supplier||'').toLowerCase();vb=(b.supplier||'').toLowerCase();}
+    else if(_sortCol==='cat'){va=(a._grpName||'').toLowerCase();vb=(b._grpName||'').toLowerCase();}
+    else if(_sortCol==='cost'){va=liSub(a.lineItems||[]);vb=liSub(b.lineItems||[]);}
+    else if(_sortCol==='orderDate'){va=a.orderDate||'';vb=b.orderDate||'';}
+    else if(_sortCol==='delivery'){va=a.delivery||'';vb=b.delivery||'';}
+    else{va=a.id||'';vb=b.id||'';}
+    if(va<vb)return -1*_sortDir;
+    if(va>vb)return 1*_sortDir;
+    return 0;
+  });
   document.getElementById('poCount').textContent=all.length+' purchase orders';
   updateSummary();
   if(!all.length){
@@ -721,6 +773,7 @@ function setPOView(poId){
 }
 
 function openNewPO(preCatVal){
+  _isDirty=false;
   _poReadOnly=false;
   editingPO=null; lineItems=[{id:nid(),desc:'',qty:'',price:''}];
   document.getElementById('po-page-num').textContent=genPONum();
@@ -735,7 +788,8 @@ function openNewPO(preCatVal){
   document.getElementById('emailPOBtn').style.display='none';
   document.getElementById('exportPOBtn').style.display='none';
   setFieldsReadOnly(false);
-  document.getElementById('po-order-date').value=new Date().toISOString().split('T')[0];
+  var _today=new Date();var _dd=String(_today.getDate()).padStart(2,'0');var _mm=String(_today.getMonth()+1).padStart(2,'0');var _yyyy=_today.getFullYear();
+  document.getElementById('po-order-date').value=_yyyy+'-'+_mm+'-'+_dd;
   populateCatDD(preCatVal||'');
   renderLI();
   setPOView('New PO');
@@ -766,6 +820,15 @@ function openPO(sid,gid,pid){
 
 // ── VIEW-ONLY / EDIT MODE ──
 var _poReadOnly = false;
+var _isDirty = false;
+
+window.addEventListener('beforeunload', function(e){
+  if(_isDirty){
+    e.preventDefault();
+    e.returnValue='You have unsaved changes in this PO. Are you sure you want to leave?';
+    return e.returnValue;
+  }
+});
 
 function openPOReadOnly(sid,gid,pid){
   _poReadOnly = true;
@@ -809,7 +872,7 @@ var _catOptions = []; // [{value, label, group}]
 var _catComboIdx = -1;
 
 function populateCatDD(selectedVal){
-  var sv=(selectedVal||'').trim();
+  var sv=(typeof selectedVal==='string'?selectedVal:(selectedVal||'')).toString().trim();
   _catOptions=[];
   var budSecs=(_budgetData&&_budgetData.sections&&_budgetData.sections.length)?_budgetData.sections:null;
   if(budSecs){
@@ -954,6 +1017,7 @@ function updateRowTotal(i){
   if(el) el.textContent=tot;
   // Update summary totals
   const sub=liSub(lineItems),gst=liGST(lineItems),total=liTot(lineItems);
+  _isDirty=true;
   document.getElementById('tot-sub').textContent=fmt2(sub);
   document.getElementById('tot-gst').textContent=fmt2(gst);
   document.getElementById('tot-total').textContent=fmt2(total);
@@ -1067,6 +1131,8 @@ function savePO(){
     if(og){const old=og.pos.find(p=>p.id===editingPO.pid);if(old)poData.actual=old.actual||0;og.pos=og.pos.filter(p=>p.id!==editingPO.pid);}
   }
   grp.pos.push(poData);
+  _isDirty=false;
+  addSupplierToList(poData.supplier);
   saveData();goList();
 }
 
@@ -1257,6 +1323,7 @@ window.addEventListener('DOMContentLoaded', async function(){
     renderList();
   }
   populateFilters();
+  populateSupplierDatalist();
 });
 
 // Sidebar tooltip
@@ -1416,7 +1483,7 @@ function updateBudgetPanel(){
   if(bar){bar.style.width=pct+'%';bar.style.background=pct>=100?'var(--danger)':pct>=80?'var(--warn)':'var(--green)';}
   if(remaining<0){
     if(alert)alert.className='bp-alert visible danger';
-    if(alertMsg)alertMsg.innerHTML='\u26a0 Exceeds budget by '+fmtZ(Math.abs(remaining))+' excl GST';
+    if(alertMsg)alertMsg.innerHTML='\u26a0 Exceeds budget by '+fmtZ(Math.abs(remaining));
   } else if(pct>=80){
     if(alert)alert.className='bp-alert visible warn';
     if(alertMsg)alertMsg.innerHTML='\u26a0 Warning: '+Math.round(pct)+'% of budget consumed';
