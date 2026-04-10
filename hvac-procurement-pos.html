@@ -1152,13 +1152,15 @@ function savePO(){
   addSupplierToList(poData.supplier);
   // If this PO was raised from a Subbie Variation, update the SV's poRef
   if(window._pendingSvRef&&window._pendingSvRef.svId){
+    var _svRef=window._pendingSvRef; // capture before clearing
+    window._pendingSvRef=null;
+    var _poId=poData.id;
     dbGetSubVariations(_poPNum).then(function(d){
       var svs=(d&&Array.isArray(d.subVars))?d.subVars:[];
-      var sv=svs.find(function(x){return x.id===window._pendingSvRef.svId;});
-      if(sv){sv.poId=poData.id;sv.poRef=poData.id;}
+      var sv=svs.find(function(x){return x.id===_svRef.svId;});
+      if(sv){sv.poId=_poId;sv.poRef=_poId;}
       dbSetSubVariations(_poPNum,{subVars:svs}).catch(function(e){console.error(e);});
     }).catch(function(e){console.error(e);});
-    window._pendingSvRef=null;
   }
   saveData();goList();
 }
