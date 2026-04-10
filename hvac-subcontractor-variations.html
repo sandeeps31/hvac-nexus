@@ -672,10 +672,10 @@ function renderList(){
     if(sv.linkedVarId&&sv.linkedVarNum){
       linkCell='<span class="var-link-chip" onclick="event.stopPropagation();navTo(\'hvac-variations.html\')" title="Open in Variations">'+escH(sv.linkedVarNum)+' — '+escH(sv.linkedVarTitle||'')+'</span>';
     } else {
-      linkCell='<span class="unlinked-chip" data-svnum="'+escH(sv.num)+'" onclick="event.stopPropagation();openSVByNum(this.dataset.svnum,true)">＋ Link variation</span>';
+      linkCell='<span class="unlinked-chip" data-svnum="'+escH(sv.num)+'" onclick="event.stopPropagation();openSVByNum(this.dataset.svnum,true,\''+sv.id+'\')" >＋ Link variation</span>';
     }
     var hasPo=!!sv.poId;
-    rows+='<tr data-svnum="'+escH(sv.num)+'" data-svid="'+escH(sv.id)+'" onclick="openSVByNum(this.dataset.svnum,false,this.dataset.svid)">'
+    rows+='<tr data-svnum="'+escH(sv.num)+'" data-svid="'+escH(sv.id)+'">'
       +'<td class="sv-num">'+escH(sv.num||'—')+'</td>'
       +'<td style="font-weight:500;color:var(--text)">'+escH(sv.subbie||'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(sv.desc||'—')+'</td>'
@@ -691,6 +691,16 @@ function renderList(){
       +'</tr>';
   });
   document.getElementById('svBody').innerHTML=rows;
+  // Use event delegation - much more reliable than inline onclick
+  document.getElementById('svBody').onclick=function(e){
+    var tr=e.target.closest('tr');
+    if(!tr)return;
+    // Don't open if clicking a button or chip that stops propagation
+    if(e.target.closest('button')||e.target.closest('.var-link-chip'))return;
+    var svnum=tr.dataset.svnum;
+    var svid=tr.dataset.svid;
+    openSVByNum(svnum,false,svid);
+  };
 }
 
 // ADD MODAL
