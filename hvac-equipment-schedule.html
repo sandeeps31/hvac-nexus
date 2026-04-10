@@ -259,6 +259,16 @@ body.sb-sm{padding-left:var(--sb-sm)}
 .sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
+
+.scan-step{flex:1;padding:10px 16px;font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-right:1px solid var(--border);text-align:center}
+.scan-step.active{color:var(--accent);background:var(--accent-dim)}
+.scan-step:last-child{border-right:none}
+.scan-drw-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
+.scan-drw-row:hover{background:var(--surface2)}
+.scan-drw-row.selected{background:var(--accent-dim)}
+.scan-result-row{padding:12px 16px;border-bottom:1px solid var(--border)}
+.scan-conflict{background:rgba(255,184,48,.08);border:1px solid rgba(255,184,48,.3);border-radius:6px;padding:6px 10px;margin-top:4px;font-size:11px;color:var(--warn)}
+
 </style>
 <script src="db.js"></script>
 </head>
@@ -544,6 +554,8 @@ function allCols(t){return t.cc||defn(t.type).cols;}
 function renderStrip(){
   var has=tabs.length>0;
   ['tso','abar'].forEach(function(id){document.getElementById(id).style.display=has?(id==='tso'?'block':'flex'):'none';});document.getElementById('addbar').style.display='none';
+  // Clear table when no tabs
+  var _tw=document.querySelector('.twrap');if(_tw&&!tabs.length)_tw.innerHTML='';
   if(!has){
   var _es=document.getElementById('eqEmptyState');
   if(!_es){
@@ -847,7 +859,7 @@ function openAddModal(){
   document.getElementById('etgrid').innerHTML=EQ.map(function(t){
     var u=used.includes(t.key);
     return'<div class="etc'+(u?' used':'')+'" id="etc_'+t.key+'"'+(u?'':' onclick="pickT(\''+t.key+'\')"')+'>'
-      +'<div class="etc-ic">'+t.icon+'</div><div class="etc-nm">'+t.name+'</div>'+(u?'<div style="font-size:9px;color:var(--green)">✓</div>':'')+'</div>';
+      +'<div class="etc-nm">'+t.name+'</div>'+(u?'<div style="font-size:9px;color:var(--green)">✓</div>':'')+'</div>';
   }).join('');
   document.getElementById('addModal').classList.add('open');
 }
@@ -1357,7 +1369,7 @@ function renderRevSnapshot(idx){
   var tb='<tbody id="etbd">'+rows.map(function(row){
     return'<tr data-tid="'+tabId+'" data-rid="'+row.id+'">'
       +cols.map(function(c){return'<td style="color:var(--text2)">'+X(row[c.k]||'')+'</td>';}).join('')
-      +'</tr>';
+      +'</'+'tr>';
   }).join('')+'</tbody>';
   document.getElementById('main').innerHTML='<div class="twrap" id="body-scroll"><table class="etbl" id="etbl">'+th+tb+'</table></div>';
   applyDiffHighlights();
@@ -1496,9 +1508,9 @@ function exportRevPDF(){
       var cs=(!isAdded&&!isDel&&cf.indexOf(c.k)>=0)?'background:rgba(255,184,48,.28)':'';
       html+='<td style="'+cs+'">'+(r[c.k]||'')+'</td>';
     });
-    html+='</tr>';
+    html+='</'+'tr>';
   });
-  html+='</tbody></table></body></html>';
+  html+='</'+'tbody></'+'table></body></html>';
   var w=window.open('','_blank','width=1100,height=700');w.document.write(html);w.document.close();w.focus();
   setTimeout(function(){w.print();},600);closeM('exportRevModal');
 }
@@ -1567,6 +1579,271 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 </script>
 
 <script>
+
+// ═══════════════════════════════════════════
+// SCAN DRAWINGS ENGINE
+// ═══════════════════════════════════════════
+var _scanDrawings=[],_scanSelected=new Set(),_scanResults=[];
+
+function openScanModal(){
+  _scanSelected=new Set();_scanResults=[];
+  document.getElementById('scanModal').classList.add('open');
+  setScanStep(1);
+  renderScanStep1Loading();
+  dbGetDrawings(_eqPNum).then(function(d){
+    var all=(d&&Array.isArray(d.drawings)?d.drawings:[]);
+    _scanDrawings=all.filter(function(drw){
+      return (drw.cat||'').toLowerCase().indexOf('mechanical')>=0;
+    });
+    renderScanStep1();
+  }).catch(function(){_scanDrawings=[];renderScanStep1();});
+}
+
+function closeScanModal(){document.getElementById('scanModal').classList.remove('open');}
+
+function setScanStep(n){
+  [1,2,3].forEach(function(i){
+    var el=document.getElementById('scanStep'+i);
+    if(el)el.classList.toggle('active',i===n);
+  });
+}
+
+function renderScanStep1Loading(){
+  document.getElementById('scanBody').innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">Loading drawings…</div>';
+  document.getElementById('scanFooter').innerHTML='';
+}
+
+function renderScanStep1(){
+  var body=document.getElementById('scanBody');
+  if(!_scanDrawings.length){
+    body.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">📭</div><div>No mechanical drawings found.</div><div style="font-size:12px;margin-top:6px;color:var(--text2)">Upload drawings via the Drawings module first.</div></div>';
+    document.getElementById('scanFooter').innerHTML='<button class="btn bg bsm" onclick="closeScanModal()">Close</button>';
+    return;
+  }
+  var groups={};
+  _scanDrawings.forEach(function(drw){
+    var cat=drw.subcat||drw.cat||'General';
+    var area=drw.area||'';
+    var gk=cat+'|||'+area;
+    if(!groups[gk])groups[gk]={cat:cat,area:area,drawings:[]};
+    groups[gk].drawings.push(drw);
+  });
+  var html='<div style="padding:8px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--surface2)">'
+    +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" id="scanChkAll" onchange="scanToggleAll(this.checked)"/> Select all</label>'
+    +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);margin-left:auto" id="scanSelCount">0 selected</span></div>';
+  Object.values(groups).forEach(function(g){
+    html+='<div style="padding:6px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-family:DM Mono,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text2);display:flex;gap:8px;align-items:center">'
+      +'<span>'+escH(g.cat)+'</span>'+(g.area?'<span style="color:var(--accent);font-size:9px">▸ '+escH(g.area)+'</span>':'')
+      +'<span style="color:var(--muted);font-size:9px;margin-left:auto">'+g.drawings.length+' drawing'+(g.drawings.length!==1?'s':'')+'</span></div>';
+    g.drawings.forEach(function(drw){
+      var hasPdf=!!(drw.pdfUrl||drw.pdfData);
+      var sel=_scanSelected.has(drw.id);
+      html+='<div class="scan-drw-row'+(sel?' selected':'')+'" data-id="'+escH(drw.id)+'" onclick="scanToggleRow(this)">'
+        +'<input type="checkbox" class="scan-chk" data-id="'+escH(drw.id)+'" '+(sel?'checked':'')+' onclick="event.stopPropagation();scanToggleRow(this.closest(\'.scan-drw-row\'))" style="flex-shrink:0"/>'
+        +'<span style="font-size:16px">'+(hasPdf?'📄':'📋')+'</span>'
+        +'<div style="flex:1;min-width:0"><div style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(drw.num||'—')+'</div>'
+        +'<div style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(drw.name||'—')+'</div></div>'
+        +(hasPdf?'<span style="font-size:10px;font-family:DM Mono,monospace;color:var(--green);flex-shrink:0">PDF ✓</span>':'<span style="font-size:10px;font-family:DM Mono,monospace;color:var(--muted);flex-shrink:0">No PDF</span>')
+        +'</div>';
+    });
+  });
+  body.innerHTML=html;
+  updateScanSelCount();
+  document.getElementById('scanFooter').innerHTML=
+    '<button class="btn bg bsm" onclick="closeScanModal()">Cancel</button>'
+    +'<button class="btn bp bsm" id="scanStartBtn" onclick="startScan()" disabled>📄 Scan Selected</button>';
+}
+
+function scanToggleRow(row){
+  var id=row.dataset.id;
+  var chk=row.querySelector('.scan-chk');
+  if(_scanSelected.has(id)){_scanSelected.delete(id);row.classList.remove('selected');if(chk)chk.checked=false;}
+  else{_scanSelected.add(id);row.classList.add('selected');if(chk)chk.checked=true;}
+  updateScanSelCount();
+}
+function scanToggleAll(checked){
+  _scanDrawings.forEach(function(drw){checked?_scanSelected.add(drw.id):_scanSelected.delete(drw.id);});
+  document.querySelectorAll('.scan-drw-row').forEach(function(row){
+    row.classList.toggle('selected',checked);
+    var chk=row.querySelector('.scan-chk');if(chk)chk.checked=checked;
+  });
+  updateScanSelCount();
+}
+function updateScanSelCount(){
+  var n=_scanSelected.size;
+  var el=document.getElementById('scanSelCount');if(el)el.textContent=n+' selected';
+  var btn=document.getElementById('scanStartBtn');if(btn)btn.disabled=(n===0);
+}
+
+var HEADER_MAP={'tag':['tag','tag no','tag no.','equipment id','item','item no','id','ref','mark'],'desc':['description','desc','service','name','unit description'],'location':['location','loc','area','zone','room','level','floor'],'sublocation':['sublocation','sub location','sub loc','room name'],'qty':['qty','quantity','no','no.','count','units'],'manufacturer':['manufacturer','make','brand','mfr','mfg','vendor'],'model':['model','model no','model no.','part no','cat no'],'type':['type','unit type','equipment type'],'airflow':['airflow','supply l/s','cfm','l/s','total l/s','air volume','sa l/s'],'oa':['oa','oa l/s','outside air','fresh air'],'esp':['esp','esp pa','external static','static pa'],'cooling':['cooling','cooling kw','cooling capacity','cool kw','total cooling','tc kw'],'heating':['heating','heating kw','heating capacity','heat kw','total heating'],'flow':['flow','flow l/s','water flow','flow rate'],'head':['head','head kpa','pressure drop','pump head'],'power':['power','power kw','input kw','kw input'],'motor_kw':['motor kw','motor power kw'],'motor_volt':['voltage','volts','supply voltage'],'motor_fla':['fla','fla a','full load amps','amps'],'fan':['fan kw','fan power'],'weight':['weight','mass','kg','weight kg'],'size':['size','dimensions','overall size'],'noise':['noise','noise dba','sound level','dba'],'status':['status','install status']};
+var _hdrLookup={};
+Object.keys(HEADER_MAP).forEach(function(k){HEADER_MAP[k].forEach(function(a){_hdrLookup[a.toLowerCase().trim()]=k;});});
+
+var EQ_TYPE_HINTS=[{keys:['fcu','fan coil'],type:'fcu'},{keys:['ahu','air handling'],type:'ahu'},{keys:['chiller','chw'],type:'chillers'},{keys:['cooling tower','ct-'],type:'ct'},{keys:['pump','chwp','hwp'],type:'pumps'},{keys:['fan','exhaust fan','supply fan'],type:'fans'},{keys:['hepa'],type:'hepa'},{keys:['humidifier','hum'],type:'hum'},{keys:['crac','crah'],type:'crac'},{keys:['pac','vrf','vrv'],type:'pac'},{keys:['vav'],type:'vav'},{keys:['mssb','switchboard'],type:'mssb'},{keys:['damper'],type:'dampers'},{keys:['grille','diffuser'],type:'grilles'}];
+
+function detectEquipType(title,firstTag){
+  var s=((title||'')+' '+(firstTag||'')).toLowerCase();
+  for(var i=0;i<EQ_TYPE_HINTS.length;i++){var h=EQ_TYPE_HINTS[i];for(var j=0;j<h.keys.length;j++){if(s.indexOf(h.keys[j])>=0)return h.type;}}
+  return null;
+}
+function mapHeader(raw){
+  var clean=raw.toLowerCase().trim().replace(/[^a-z0-9\s\/\.]/g,' ').replace(/\s+/g,' ').trim();
+  return _hdrLookup[clean]||null;
+}
+
+function extractTablesFromPdf(pdfUrl,pdfData){
+  return new Promise(function(resolve,reject){
+    var src=pdfUrl?{url:pdfUrl}:{data:(function(){var b=atob(pdfData.split(',')[1]||pdfData);var a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;})()};
+    if(typeof pdfjsLib==='undefined'){resolve([]);return;}
+    pdfjsLib.getDocument(src).promise.then(function(pdf){
+      var pagePromises=[];
+      for(var pg=1;pg<=pdf.numPages;pg++){pagePromises.push(pdf.getPage(pg).then(function(page){return page.getTextContent().then(function(content){return{page:page.pageNumber,items:content.items};});}));}
+      Promise.all(pagePromises).then(function(pages){
+        var tables=[];
+        pages.forEach(function(pg){detectTablesInPage(pg.items,pg.page).forEach(function(t){tables.push(t);});});
+        resolve(tables);
+      });
+    }).catch(reject);
+  });
+}
+
+function detectTablesInPage(items,pageNum){
+  if(!items||!items.length)return[];
+  var rows={};
+  items.forEach(function(item){
+    var y=Math.round(item.transform[5]/2)*2;
+    var x=Math.round(item.transform[4]);
+    var txt=(item.str||'').trim();
+    if(!txt)return;
+    if(!rows[y])rows[y]=[];
+    rows[y].push({x:x,y:y,txt:txt});
+  });
+  var sortedYs=Object.keys(rows).map(Number).sort(function(a,b){return b-a;});
+  var rowArr=sortedYs.map(function(y){return{y:y,cells:rows[y].slice().sort(function(a,b){return a.x-b.x;})};});
+  var tables=[];
+  var i=0;
+  while(i<rowArr.length){
+    if(rowArr[i].cells.length>=3){
+      var block=[rowArr[i]];var j=i+1;
+      while(j<rowArr.length&&rowArr[j].cells.length>=2){block.push(rowArr[j]);j++;}
+      if(block.length>=3){var tbl=parseTableBlock(block,pageNum);if(tbl)tables.push(tbl);}
+      i=j;
+    } else {i++;}
+  }
+  return tables;
+}
+
+function parseTableBlock(block,pageNum){
+  var hdrRow=block[0];
+  var colXs=hdrRow.cells.map(function(c){return c.x;});
+  var headers=hdrRow.cells.map(function(c){return c.txt;});
+  var mappedCols=headers.map(function(h){return{raw:h,key:mapHeader(h)};});
+  if(mappedCols.filter(function(m){return m.key;}).length<2)return null;
+  var dataRows=[];
+  for(var i=1;i<block.length;i++){
+    var row=block[i];var obj={};
+    row.cells.forEach(function(cell){
+      var bestJ=0,bestDist=Infinity;
+      for(var j=0;j<colXs.length;j++){var d=Math.abs(cell.x-colXs[j]);if(d<bestDist){bestDist=d;bestJ=j;}}
+      if(bestDist<40&&mappedCols[bestJ]&&mappedCols[bestJ].key){var k=mappedCols[bestJ].key;obj[k]=(obj[k]?obj[k]+' ':'')+cell.txt;}
+    });
+    if(obj.tag&&String(obj.tag).trim())dataRows.push(obj);
+  }
+  if(!dataRows.length)return null;
+  return{page:pageNum,title:headers.join(' / '),headers:headers,mappedCols:mappedCols,rows:dataRows,eqType:detectEquipType(headers.join(' '),dataRows[0].tag||''),selected:true};
+}
+
+var _scanQueue=[],_scanQueueIdx=0;
+function startScan(){
+  if(!_scanSelected.size){alert('Select at least one drawing.');return;}
+  var withPdf=_scanDrawings.filter(function(d){return _scanSelected.has(d.id)&&(d.pdfUrl||d.pdfData);});
+  if(!withPdf.length){alert('None of the selected drawings have PDFs attached.');return;}
+  _scanQueue=withPdf;_scanQueueIdx=0;_scanResults=[];
+  setScanStep(2);
+  document.getElementById('scanBody').innerHTML='<div style="padding:28px 24px"><div style="font-size:13px;color:var(--text2);margin-bottom:20px">Scanning '+_scanQueue.length+' drawing'+(_scanQueue.length!==1?'s':'')+'…</div><div style="background:var(--surface2);border-radius:8px;overflow:hidden;height:8px;margin-bottom:16px"><div id="scanProgressBar" style="height:100%;background:var(--accent);width:0%;transition:width .3s;border-radius:8px"></div></div><div id="scanProgressLog" style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);max-height:300px;overflow-y:auto"></div></div>';
+  document.getElementById('scanFooter').innerHTML='<button class="btn bg bsm" onclick="closeScanModal()">Cancel</button>';
+  processNextScan();
+}
+function scanLog(msg,color){var el=document.getElementById('scanProgressLog');if(el){el.innerHTML+='<div style="padding:2px 0'+(color?';color:'+color:'')+'">'+(msg||'')+'</div>';el.scrollTop=el.scrollHeight;}}
+function processNextScan(){
+  if(_scanQueueIdx>=_scanQueue.length){var pb=document.getElementById('scanProgressBar');if(pb)pb.style.width='100%';setTimeout(renderScanStep3,400);return;}
+  var drw=_scanQueue[_scanQueueIdx];
+  var pb=document.getElementById('scanProgressBar');if(pb)pb.style.width=Math.round(_scanQueueIdx/_scanQueue.length*100)+'%';
+  scanLog('Scanning: '+escH(drw.num)+' — '+escH(drw.name||''));
+  extractTablesFromPdf(drw.pdfUrl||null,drw.pdfData||null).then(function(tables){
+    if(tables.length){scanLog('  ✓ Found '+tables.length+' table'+(tables.length!==1?'s':''),'#00e5a0');_scanResults.push({drawing:drw,tables:tables});}
+    else{scanLog('  — No equipment tables found','');}
+    _scanQueueIdx++;processNextScan();
+  }).catch(function(e){scanLog('  ✗ Error: '+(e.message||e),'#ff4d6d');_scanQueueIdx++;processNextScan();});
+}
+
+function renderScanStep3(){
+  setScanStep(3);
+  var body=document.getElementById('scanBody');
+  if(!_scanResults.length){
+    body.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">🔍</div><div style="font-weight:600">No equipment data found</div><div style="font-size:12px;margin-top:6px">Ensure PDFs are CAD-generated (not scanned).</div></div>';
+    document.getElementById('scanFooter').innerHTML='<button class="btn bg bsm" onclick="closeScanModal()">Close</button>';
+    return;
+  }
+  var totalRows=_scanResults.reduce(function(a,r){return a+r.tables.reduce(function(b,t){return b+t.rows.length;},0);},0);
+  var totalTables=_scanResults.reduce(function(a,r){return a+r.tables.length;},0);
+  var html='<div style="padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)">Found <strong style="color:var(--text)">'+totalTables+' table'+(totalTables!==1?'s':'')+'</strong> with <strong style="color:var(--text)">'+totalRows+' item'+(totalRows!==1?'s':'')+'</strong></div>';
+  _scanResults.forEach(function(result,ri){
+    result.tables.forEach(function(tbl,ti){
+      var eqMeta=EQ.find(function(e){return e.key===tbl.eqType;});
+      var conflicts=[];
+      if(tbl.eqType){var existTab=tabs.find(function(t){return t.type===tbl.eqType;});if(existTab){tbl.rows.forEach(function(row){if(row.tag&&existTab.rows.find(function(r){return r.tag===row.tag;}))conflicts.push(row.tag);});}}
+      html+='<div class="scan-result-row">'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+        +'<input type="checkbox" '+(tbl.selected?'checked':'')+' onchange="_scanResults['+ri+'].tables['+ti+'].selected=this.checked"/>'
+        +'<div style="flex:1"><div style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+escH(result.drawing.num)+'  ·  Page '+tbl.page+'</div>'
+        +'<div style="font-size:13px;font-weight:600;color:var(--text)">'+escH(tbl.title)+'</div></div>'
+        +'<select style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:2px 6px" onchange="scanSetType('+ri+','+ti+',this.value)">'
+        +EQ.map(function(e){return'<option value="'+e.key+'"'+(e.key===tbl.eqType?' selected':'')+'>'+e.name+'</option>';}).join('')
+        +'<option value=""'+(tbl.eqType?'':' selected')+'>— Skip —</option></select></div>'
+        +(conflicts.length?'<div class="scan-conflict">⚠ '+conflicts.length+' tag'+(conflicts.length!==1?'s':'')+' already exist and will be skipped: '+escH(conflicts.slice(0,5).join(', '))+'</div>':'')
+        +'<div style="margin-top:8px;overflow-x:auto;border:1px solid var(--border);border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:var(--surface2)">'
+        +tbl.mappedCols.filter(function(m){return m.key;}).map(function(m){return'<th style="padding:4px 8px;text-align:left;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">'+escH(m.raw)+'</th>';}).join('')
+        +'</tr></thead><tbody>'
+        +tbl.rows.slice(0,5).map(function(row){return'<tr style="border-bottom:1px solid var(--border)">'+tbl.mappedCols.filter(function(m){return m.key;}).map(function(m){return'<td style="padding:3px 8px;color:var(--text2);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+escH(row[m.key]||'—')+'</td>';}).join('')+'</'+'tr>';}).join('')
+        +(tbl.rows.length>5?'<tr><td colspan="20" style="padding:4px 8px;color:var(--muted);font-size:10px">… and '+(tbl.rows.length-5)+' more</td></tr>':'')
+        +'</'+'tbody></'+'table></div></div>';
+    });
+  });
+  body.innerHTML=html;
+  document.getElementById('scanFooter').innerHTML='<button class="btn bg bsm" onclick="closeScanModal()">Cancel</button><button class="btn bp bsm" onclick="doImportScanned()">⬇ Import Selected</button>';
+}
+
+function scanSetType(ri,ti,type){_scanResults[ri].tables[ti].eqType=type;}
+
+function doImportScanned(){
+  var imported=0,skipped=0,created=0;
+  _scanResults.forEach(function(result){
+    result.tables.forEach(function(tbl){
+      if(!tbl.selected||!tbl.eqType)return;
+      var tab=tabs.find(function(t){return t.type===tbl.eqType;});
+      if(!tab){
+        var eqMeta=EQ.find(function(e){return e.key===tbl.eqType;});if(!eqMeta)return;
+        tab={id:'eq_'+Date.now()+'_'+Math.random().toString(36).slice(2),type:tbl.eqType,rows:[],cc:null};
+        tabs.push(tab);created++;
+      }
+      var existingTags=new Set(tab.rows.map(function(r){return r.tag;}));
+      tbl.rows.forEach(function(row){
+        if(!row.tag){return;}
+        if(existingTags.has(row.tag)){skipped++;return;}
+        var newRow={id:'r_'+Date.now()+'_'+Math.random().toString(36).slice(2)};
+        Object.keys(row).forEach(function(k){newRow[k]=row[k];});
+        if(!newRow.status)newRow.status='Not Started';
+        tab.rows.push(newRow);existingTags.add(row.tag);imported++;
+      });
+    });
+  });
+  saveEquip();
+  if(created>0)activeId=tabs[tabs.length-1].id;
+  renderStrip();closeScanModal();
+  showToast('\u2713 Imported '+imported+' item'+(imported!==1?'s':'')+(skipped?' ('+skipped+' skipped)':'')+(created?' · '+created+' new tab'+(created!==1?'s':'')+' created':''));
+}
+
 // ── SIDEBAR JS ──
 var SBK='hvacnexus_sb_collapsed';
 function toggleSB(){var col=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,col?'1':'0');applySB(col);}
@@ -1579,5 +1856,25 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   try{if(typeof dbGetCurrentUser==='function'){var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}}catch(e){}
 })();
 </script>
+<!-- SCAN DRAWINGS MODAL -->
+<div class="mo" id="scanModal" onclick="if(event.target===this)closeScanModal()">
+  <div class="modal" style="width:740px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;padding:0">
+    <div style="padding:18px 24px 14px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--text)">&#128196; Scan Drawings for Equipment Data</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:3px">Extracts equipment schedules from mechanical drawings and imports into tabs</div>
+      </div>
+      <button class="btn bg bsm" onclick="closeScanModal()">&#10005;</button>
+    </div>
+    <div id="scanStepBar" style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div class="scan-step active" id="scanStep1">1 &middot; Select Drawings</div>
+      <div class="scan-step" id="scanStep2">2 &middot; Scanning</div>
+      <div class="scan-step" id="scanStep3">3 &middot; Review &amp; Import</div>
+    </div>
+    <div style="flex:1;overflow-y:auto" id="scanBody"></div>
+    <div style="padding:12px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0" id="scanFooter"></div>
+  </div>
+</div>
+
 </body>
 </html>
