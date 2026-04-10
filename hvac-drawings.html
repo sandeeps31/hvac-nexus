@@ -235,7 +235,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
       <!-- SINGLE TAB -->
       <div id="singleTab" style="overflow-y:auto;flex:1">
         <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
-          <div><label class="ml">Drawing Number *</label><input class="mi" id="f-num" placeholder="e.g. M-HV-001" style="font-size:15px"/></div>
+          <div><label class="ml">Drawing Number *</label><input class="mi" id="f-num" placeholder="e.g. M-HV-001" style="font-size:15px" oninput="if(this.value.length===1)expandModal()"/></div>
           <div><label class="ml">Revision</label><input class="mi" id="f-rev" placeholder="e.g. A"/></div>
         </div>
         <label class="ml" style="margin-top:10px">Drawing Title *</label>
@@ -590,11 +590,34 @@ function openAddModal(){
   document.getElementById('addModal').classList.add('open');
   setTimeout(function(){var el=document.getElementById('f-num');if(el)el.focus();},80);
 }
-function closeAddModal(){document.getElementById('addModal').classList.remove('open');}
+function closeAddModal(){
+  var mo=document.getElementById('addModal');
+  mo.classList.remove('open');
+  // Reset modal to default size
+  var m=mo.querySelector('.modal');
+  if(m){m.style.width='680px';m.style.maxWidth='96vw';m.style.height='';m.style.maxHeight='90vh';}
+  mo.style.padding='';
+  mo.style.alignItems='';
+}
+
+function expandModal(){
+  var mo=document.getElementById('addModal');
+  var m=mo.querySelector('.modal');
+  if(m){
+    m.style.width='95vw';
+    m.style.maxWidth='95vw';
+    m.style.height='95vh';
+    m.style.maxHeight='95vh';
+  }
+  // Override padding so modal covers full screen incl sidebar
+  mo.style.padding='2.5vh 2.5vw';
+  mo.style.alignItems='center';
+}
 function handleModalPdf(inp){
   var files=inp.files||inp.target&&inp.target.files;
   if(!files||!files[0]) return;
   var file=files[0];
+  expandModal();
   var lbl=document.getElementById('fileLabel');if(lbl)lbl.textContent=file.name+' (uploading...)';
   var dz=document.getElementById('addDropZone');if(dz)dz.classList.add('has-file');
   _pendingPdfData=null;_pendingPdfFile=file;
@@ -900,6 +923,21 @@ function setAddTab(tab){
   document.getElementById('tabBulk').style.color=tab==='bulk'?'#080c12':'var(--text2)';
 }
 
+function bulkDownloadPdf(idx){
+  var bf=_bulkFiles[idx];
+  if(!bf||!bf.file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var a=document.createElement('a');
+    a.href=e.target.result;
+    a.download=bf.file.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+  reader.readAsDataURL(bf.file);
+}
+
 function bulkAreaChange(inp){
   var val=(inp.value||'').trim();
   if(!val)return;
@@ -953,6 +991,7 @@ function handleBulkPdf(inp){
     +'<th '+th+'>Category</th>'
     +'<th '+th+'>Area</th>'
     +'</tr></thead><tbody id="bulkTableBody"></tbody></table></div>';
+  expandModal();
   list.innerHTML=tableHtml;
   var tbody=document.getElementById('bulkTableBody');
 
@@ -971,10 +1010,10 @@ function handleBulkPdf(inp){
     tr.style.borderBottom='1px solid var(--border)';
     tr.innerHTML=
       '<td style="padding:5px 8px;color:var(--muted);font-family:DM Mono,monospace;font-size:10px;white-space:nowrap;width:28px;text-align:center">'+(i+1)+'</td>'
-      +'<td style="padding:5px 6px;width:32px;text-align:center"><span style="font-size:18px;cursor:pointer;color:var(--danger)" title="'+escH(file.name)+'" onclick="var u=URL.createObjectURL(_bulkFiles['+i+'].file);var a=document.createElement(\'a\');a.href=u;a.download=\''+escH(file.name)+'\';a.click()">📄</span></td>'
+      +'<td style="padding:5px 6px;width:32px;text-align:center"><span style="font-size:18px;cursor:pointer;color:var(--danger)" title="'+escH(file.name)+'" data-bi="'+i+'" onclick="bulkDownloadPdf(this.dataset.bi*1)">📄</span></td>'
       +'<td style="padding:5px 6px;min-width:160px;font-family:DM Mono,monospace;font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" title="'+escH(file.name)+'">'+escH(file.name)+'</td>'
-      +'<td style="padding:5px 6px;min-width:200px"><input style="'+si+';font-size:13px;font-weight:600" value="'+escH(numGuess)+'" oninput="_bulkFiles['+i+'].num=this.value"></td>'
-      +'<td style="padding:5px 6px;min-width:220px"><input style="'+si+';font-size:13px" placeholder="Title…" oninput="_bulkFiles['+i+'].name=this.value"></td>'
+      +'<td style="padding:5px 6px;min-width:280px"><input style="'+si+';font-size:13px;font-weight:600" value="'+escH(numGuess)+'" oninput="_bulkFiles['+i+'].num=this.value"></td>'
+      +'<td style="padding:5px 6px;min-width:320px"><input style="'+si+';font-size:13px" placeholder="Title…" oninput="_bulkFiles['+i+'].name=this.value"></td>'
       +'<td style="padding:5px 6px;width:60px"><input style="'+si+';width:55px" placeholder="Rev" oninput="_bulkFiles['+i+'].rev=this.value"></td>'
       +'<td style="padding:5px 6px;width:80px"><select style="'+ss+';width:75px" onchange="_bulkFiles['+i+'].status=this.value">'+statusOpts+'</select></td>'
       +'<td style="padding:5px 6px;width:155px"><select style="'+ss+';width:150px" onchange="_bulkFiles['+i+'].approval=this.value">'+apprOpts+'</select></td>'
