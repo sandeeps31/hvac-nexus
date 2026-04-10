@@ -338,7 +338,7 @@ input[type=number]{-moz-appearance:textfield}
       <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">SV Number</span><div><input class="mi mono" id="f-num" style="display:none"/><span class="sv-mv mono" id="det-num-val">—</span></div></div>
       <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">Subcontractor</span><div><input class="mi" id="f-subbie" style="display:none"/><span class="sv-mv" id="det-subbie-val">—</span></div></div>
       <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">Status</span><div><select class="ms" id="f-status" style="display:none"><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select><span class="sv-mv" id="det-status-val">—</span></div></div>
-      <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">Value (ex GST)</span><span class="sv-mv mono" id="det-value-val" style="color:var(--accent)">—</span></div>
+      <div class="sv-mf" style="padding-right:32px"><span class="sv-ml" id="det-value-lbl">Value (ex GST)</span><div><input class="mi mono" id="f-approved-value" style="display:none;max-width:140px" placeholder="Enter approved value…" type="text" inputmode="numeric"/><span class="sv-mv mono" id="det-value-val" style="color:var(--accent)">—</span></div></div>
       <div class="sv-mf"><span class="sv-ml">Purchase Order</span><span class="sv-mv" id="det-po-val">—</span></div>
     </div>
   </div>
@@ -668,13 +668,13 @@ function renderList(){
       +'<td class="sv-num">'+escH(sv.num||'—')+'</td>'
       +'<td style="font-weight:500;color:var(--text)">'+escH(sv.subbie||'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(sv.desc||'—')+'</td>'
-      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">'+fmt(sv.value)+'</td>'
+      +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:'+(sv.status==='Approved'?'var(--green)':'var(--accent)')+'">'+fmt(sv.status==='Approved'&&sv.approvedValue?sv.approvedValue:sv.value)+'</td>'
       +'<td><span class="sb-badge '+(stMap[sv.status]||'st-pending')+'">'+escH(sv.status)+'</span></td>'
       +'<td>'+linkCell+'</td>'
       +'<td style="white-space:nowrap">'
       +(sv.status==='Approved'&&!hasPo
         ?'<button class="ia" data-svid="'+sv.id+'" onclick="event.stopPropagation();openSVDetail(this.dataset.svid)" style="font-size:11px;padding:4px 10px;background:var(--warn);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600">&#128196; Raise PO</button>'
-        :(hasPo?'<button data-poref="'+escH(sv.poRef||sv.poId||'')+'" onclick="event.stopPropagation();navToPO(this.dataset.poref)" style="background:none;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:2px 8px;cursor:pointer;font-family:DM Mono,monospace;font-size:10px;color:var(--accent)">&#128196; '+escH(sv.poRef||sv.poId||'')+'</button>':'')
+        :(hasPo?'<a data-poref="'+escH(sv.poRef||sv.poId||'')+'" onclick="event.stopPropagation();event.preventDefault();navToPO(this.dataset.poref)" href="#" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(0,200,255,.4);padding-bottom:1px;cursor:pointer" onmouseover="this.style.borderBottomColor=\'var(--accent)\'" onmouseout="this.style.borderBottomColor=\'rgba(0,200,255,.4)\'">'+escH(sv.poRef||sv.poId||'')+'</a>':'')
       )
       +'</td>'
       +'</tr>';
@@ -729,6 +729,7 @@ function saveSV(){
     lineItems:JSON.parse(JSON.stringify(_svLineItems)),
     docs:JSON.parse(JSON.stringify(_svDocs)),
     status:document.getElementById('f-status').value,
+    approvedValue:(document.getElementById('f-status').value==='Approved'&&document.getElementById('f-approved-value').value)?parseFloat(document.getElementById('f-approved-value').value.replace(/,/g,''))||null:null,
     linkedVarId:linkedVar?linkedVar.id:null,
     linkedVarNum:linkedVar?linkedVar.num:null,
     linkedVarTitle:linkedVar?linkedVar.title:null
@@ -783,6 +784,8 @@ function openNewSV(){
   document.getElementById('det-subbie-val').textContent='—';
   document.getElementById('det-status-val').textContent='Pending';
   document.getElementById('det-value-val').textContent='—';
+  var _avNew=document.getElementById('f-approved-value');if(_avNew){_avNew.style.display='none';_avNew.value='';}
+  var _lblNew=document.getElementById('det-value-lbl');if(_lblNew)_lblNew.textContent='Value (ex GST)';
   document.getElementById('det-po-val').textContent='—';
   renderLinkedVarDisplay();
   svRenderLI();
@@ -815,7 +818,11 @@ function openSVDetail(id, autoLink){
   document.getElementById('det-desc-val').textContent=sv.desc||'—';
   document.getElementById('det-sow-val').textContent=sv.sow||'—';
   document.getElementById('det-status-val').textContent=sv.status||'—';
-  document.getElementById('det-value-val').textContent=fmt(sv.value);
+  var _isApproved=sv.status==='Approved';
+  var _lbl=document.getElementById('det-value-lbl');
+  if(_lbl)_lbl.textContent=_isApproved?'Approved Value (ex GST)':'Value (ex GST)';
+  document.getElementById('det-value-val').textContent=fmt(_isApproved&&sv.approvedValue?sv.approvedValue:sv.value);
+  document.getElementById('det-value-val').style.color=_isApproved?'var(--green)':'var(--accent)';
   var _poEl=document.getElementById('det-po-val');
   if(_poEl){var _pr=sv.poRef||sv.poId||'';
     _poEl.innerHTML=_pr?'<a onclick="event.preventDefault();navToPO(\''+_pr+'\')" href="#" style="font-family:DM Mono,monospace;font-size:13px;color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(0,200,255,.4);padding-bottom:1px;cursor:pointer" onmouseover="this.style.borderBottomColor=\'var(--accent)\'" onmouseout="this.style.borderBottomColor=\'rgba(0,200,255,.4)\'">'+_pr+'</a>':'—';}
@@ -837,6 +844,17 @@ function openSVDetail(id, autoLink){
 
 function enterSVEditMode(){
   setSVFieldVis(true);
+  var sv=subVars.find(function(x){return x.id===editingId;});
+  var _isApproved=sv&&sv.status==='Approved';
+  var _avInp=document.getElementById('f-approved-value');
+  var _vVal=document.getElementById('det-value-val');
+  var _lbl=document.getElementById('det-value-lbl');
+  if(_lbl)_lbl.textContent=_isApproved?'Approved Value (ex GST)':'Value (ex GST)';
+  if(_avInp){
+    _avInp.style.display=_isApproved?'':'none';
+    _avInp.value=_isApproved&&sv.approvedValue?fmtComma(sv.approvedValue):'';
+  }
+  if(_vVal)_vVal.style.display=_isApproved?'none':'';
   document.getElementById('det-editBtn').style.display='none';
   document.getElementById('det-saveBtn').style.display='';
   document.getElementById('det-cancelBtn').style.display='';
@@ -846,7 +864,7 @@ function enterSVEditMode(){
   document.getElementById('svAddLiBtn').style.display='';
   svRenderLI();
 }
-function cancelSVEdit(){if(editingId){openSVDetail(editingId);}else{goList();}}
+function cancelSVEdit(){var _av=document.getElementById('f-approved-value');if(_av)_av.style.display='none';if(editingId){openSVDetail(editingId);}else{goList();}}
 function setSVFieldVis(edit){
   ['f-num','f-subbie','f-desc','f-sow','f-status'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=edit?'':'none';});
   ['det-num-val','det-subbie-val','det-desc-val','det-sow-val','det-status-val'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=edit?'none':'';});
@@ -859,6 +877,8 @@ function raisePOFromDetail(){
   var liJson=encodeURIComponent(JSON.stringify(sv.lineItems||[]));
   window.location.href=b+'hvac-procurement-pos.html?source=svnew&svId='+encodeURIComponent(sv.id)+'&svNum='+encodeURIComponent(sv.num||'')+'&svDesc='+encodeURIComponent(sv.desc||'')+'&svSubbie='+encodeURIComponent(sv.subbie||'')+'&svValue='+encodeURIComponent(sv.value||0)+'&svLinkedVar='+encodeURIComponent(sv.linkedVarId||'')+'&svLineItems='+liJson;
 }
+function fmtComma(n){var v=parseFloat(n)||0;return v===0?'':Math.round(v).toLocaleString('en-AU');}
+
 function navToPO(poRef){if(!poRef)return;var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+'hvac-procurement-pos.html?viewpo='+encodeURIComponent(poRef);}
 
 // ── COMPANY SUMMARY ──
