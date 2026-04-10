@@ -125,10 +125,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 .po-tbl{width:100%;border-collapse:collapse}
 .po-tbl th{padding:7px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)}
 .po-tbl th.r,.po-tbl td.r{text-align:right}
-.po-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:12.5px}
+.po-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:12.5px;white-space:nowrap}
 .po-tbl tr:last-child td{border-bottom:none}
 .po-tbl tr:hover td{background:var(--surface3)}
-.po-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);cursor:pointer}
+.po-num{font-family:'DM Mono',monospace;font-size:12px;color:var(--warn);font-weight:600;cursor:pointer;white-space:nowrap}
 .po-num:hover{text-decoration:underline}
 .po-empty{padding:24px;text-align:center;color:var(--muted);font-size:13px}
 .add-po-btn{display:flex;align-items:center;gap:7px;padding:9px 16px 10px 24px;color:var(--muted);font-size:12.5px;cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif;transition:color .13s}
@@ -298,12 +298,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
     <button class="bg bsm btn" onclick="navTo('hvac-procurement-pos.html')">📦 Procurement →</button>
     <button class="bg bsm btn" onclick="expandAll()">Expand All</button>
     <button class="bg bsm btn" onclick="collapseAll()">Collapse All</button>
-    <button class="bg bsm btn" id="editBudgetBtn" onclick="enterBudgetEdit()" style="display:none;color:var(--warn);border-color:rgba(255,184,48,.3)">✏️ Edit Budget</button>
+    <button class="bg bsm btn" id="editBudgetBtn" onclick="enterBudgetEdit()" style="color:var(--warn);border-color:rgba(255,184,48,.3)">✏️ Edit Budget</button>
     <button class="bp bsm btn" id="saveBudgetBtn" onclick="saveBudgetEdit()" style="display:none">💾 Save Budget</button>
     <button class="bg bsm btn" id="cancelBudgetBtn" onclick="cancelBudgetEdit()" style="display:none">✕ Cancel</button>
-    <button class="bg bsm btn" onclick="openUploadTemplate()" style="color:var(--accent);border-color:rgba(0,200,255,.3)">📂 Upload Template</button>
+    <button class="bg bsm btn" id="uploadTplBtn" onclick="openUploadTemplate()" style="display:none;color:var(--accent);border-color:rgba(0,200,255,.3)">📂 Upload Template</button>
     <input type="file" id="templateFileInput" accept=".xlsx" style="display:none" onchange="handleTemplateUpload(this)">
-    <button class="bp bsm btn" onclick="openAddSection()">＋ Add Category</button>
+    <button class="bp bsm btn" id="addCatBtn" onclick="openAddSection()" style="display:none">＋ Add Category</button>
   </div>
 </div>
 
@@ -714,8 +714,8 @@ function renderPOPanel(g,secId){
   var procUrl = 'hvac-procurement-pos.html';
   var newPoUrl = procUrl+'?newpo=1&sec='+encodeURIComponent(sec?sec.name:'')+'&grp='+encodeURIComponent(g.parent);
   if(!g.pos.length) return '<div class="po-empty">No POs -- <button onclick="navTo(\''+newPoUrl+'\')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-family:DM Sans,sans-serif">+ Create PO in Procurement</button></div>';
-  return '<table class="po-tbl"><thead><tr><th style="width:130px">PO No.</th><th>Supplier</th><th class="r" style="min-width:90px">Amount</th><th class="r" style="min-width:90px">Actual</th></tr></thead><tbody>'
-    +g.pos.map(function(po){var viewUrl=procUrl+'?viewpo='+encodeURIComponent(po.id)+'&sec='+encodeURIComponent(sec?sec.name:'')+'&grp='+encodeURIComponent(g.parent);return '<tr><td class="po-num" onclick="navTo(\''+viewUrl+'\')">'+po.id+'</td><td style="font-weight:500;color:var(--text)">'+(po.supplier||'--')+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">'+fmt(liSub(po.lineItems||[]))+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(po.actual)+'</td></tr>';}).join('')
+  return '<table class="po-tbl"><thead><tr><th style="width:130px">PO No.</th><th>Vendor</th><th class="r" style="min-width:90px">Amount</th><th class="r" style="min-width:90px">Actual</th></tr></thead><tbody>'
+    +g.pos.map(function(po){var viewUrl=procUrl+'?viewpo='+encodeURIComponent(po.id)+'&sec='+encodeURIComponent(sec?sec.name:'')+'&grp='+encodeURIComponent(g.parent);return '<tr><td class="po-num" onclick="navTo(\''+viewUrl+'\')">'+po.id+'</td><td style="font-weight:500;color:var(--text)">'+(po.supplier||'--')+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--warn)">'+fmt(liSub(po.lineItems||[]))+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(po.actual)+'</td></tr>';}).join('')
     +'</tbody></table><button class="add-po-btn" onclick="navTo(\''+newPoUrl+'\')">+ Create PO in Procurement</button>';
 }
 
@@ -1212,6 +1212,8 @@ function showTemplateToast(msg){
   if(banner)banner.style.display=_canEditBudget?'flex':'none';
   var editBtn=document.getElementById('editBudgetBtn');
   if(editBtn)editBtn.style.display=_canEditBudget?'':'none';
+  var _iac=document.getElementById('addCatBtn');if(_iac)_iac.style.display='none';
+  var _iut=document.getElementById('uploadTplBtn');if(_iut)_iut.style.display='none';
   var ac=document.getElementById('addCatBtn');if(ac)ac.style.display='none';
   var ut=document.getElementById('uploadTplBtn');if(ut)ut.style.display='none';
   var saved = await loadData();
