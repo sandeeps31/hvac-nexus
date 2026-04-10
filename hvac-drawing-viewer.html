@@ -429,20 +429,52 @@ function loadFromData(dataUrl){
   for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
   pdfjsLib.getDocument({data:arr}).promise.then(renderPdf).catch(function(e){showError('PDF error: '+e.message);});
 }
+var _pdfPage=null;
+
 function renderPdf(pdf){
   pdf.getPage(1).then(function(page){
-    var vp=page.getViewport({scale:1});
-    _canvasW=vp.width;_canvasH=vp.height;
+    _pdfPage=page;
+    // ── Step 1: Fast low-res render (scale:1) for immediate display ──
+    var vpLow=page.getViewport({scale:1});
+    _canvasW=vpLow.width;_canvasH=vpLow.height;
     var canvas=document.getElementById('pdfCanvas');
     canvas.width=_canvasW;canvas.height=_canvasH;
+    canvas.style.imageRendering='auto';
     var ctx=canvas.getContext('2d');
-    page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
+    page.render({canvasContext:ctx,viewport:vpLow}).promise.then(function(){
       document.getElementById('loading').style.display='none';
       fitToScreen();
       renderPins();
       renderPanel();
+      // ── Step 2: High-res render in background ──
+      renderHighRes(page);
     });
   });
+}
+
+function renderHighRes(page){
+  // Use devicePixelRatio * 3 capped at 6 for max sharpness
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  var hiScale=Math.max(3,dpr*3);
+  var vpHi=page.getViewport({scale:hiScale});
+  var hiCanvas=document.createElement('canvas');
+  hiCanvas.width=vpHi.width;
+  hiCanvas.height=vpHi.height;
+  var hiCtx=hiCanvas.getContext('2d');
+  // Render to offscreen canvas
+  var task=page.render({canvasContext:hiCtx,viewport:vpHi});
+  task.promise.then(function(){
+    // Swap: scale the hi-res canvas down to logical size via CSS
+    var mainCanvas=document.getElementById('pdfCanvas');
+    mainCanvas.width=vpHi.width;
+    mainCanvas.height=vpHi.height;
+    mainCanvas.style.width=_canvasW+'px';
+    mainCanvas.style.height=_canvasH+'px';
+    mainCanvas.style.imageRendering='crisp-edges';
+    var ctx=mainCanvas.getContext('2d');
+    ctx.drawImage(hiCanvas,0,0);
+    renderPins();
+  }).catch(function(){/* silently ignore if cancelled */});
 }
 function applyTransform(){
   document.getElementById('pdfStage').style.transform='translate('+_offsetX+'px,'+_offsetY+'px) scale('+_scale+')';
