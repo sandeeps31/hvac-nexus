@@ -759,7 +759,7 @@ function renderList(){
       <td class="r" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">${fmtZ(sub)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.orderDate)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.delivery)}</td>
-      <td onclick="event.stopPropagation()"><div class="ra"><button class="ia del" onclick="delPO('${p._secId}','${p._grpId}','${p.id}')">✕</button></div></td>
+      <td></td>
     </tr>`;
   }).join('');
 }
@@ -981,6 +981,16 @@ function catComboKey(e){
     e.preventDefault();
     var o=opts[_catComboIdx];
     if(o)catComboSelect(o.dataset.val,o.dataset.lbl);
+  } else if(e.key==='Tab'){
+    if(_catComboIdx>=0){
+      e.preventDefault();
+      var o=opts[_catComboIdx];
+      if(o)catComboSelect(o.dataset.val,o.dataset.lbl);
+    } else if(opts.length>0){
+      // Auto-select first match on Tab
+      e.preventDefault();
+      catComboSelect(opts[0].dataset.val,opts[0].dataset.lbl);
+    }
   } else if(e.key==='Escape'){
     list.style.display='none';
   }
@@ -1173,8 +1183,25 @@ function deleteCurrentPO(){
 }
 
 function delPO(sid,gid,pid){
+  // Check for claims or invoices against this PO
+  var g=getGrp(sid,gid);
+  if(g){
+    var po=g.pos.find(function(p){return p.id===pid;});
+    if(po){
+      var hasClaims=(po.claims&&po.claims.length>0);
+      var hasInvoices=(po.invoices&&po.invoices.length>0);
+      if(hasClaims||hasInvoices){
+        var msg='Cannot delete this PO — it has ';
+        if(hasClaims)msg+=po.claims.length+' claim'+(po.claims.length!==1?'s':'');
+        if(hasClaims&&hasInvoices)msg+=' and ';
+        if(hasInvoices)msg+=po.invoices.length+' invoice'+(po.invoices.length!==1?'s':'');
+        msg+=' against it. Remove these first.';
+        alert(msg);return;
+      }
+    }
+  }
   if(!confirm('Delete this PO? This will remove it from the budget too.'))return;
-  const g=getGrp(sid,gid);if(g)g.pos=g.pos.filter(p=>p.id!==pid);
+  if(g)g.pos=g.pos.filter(p=>p.id!==pid);
   saveData();renderList();
 }
 
@@ -1421,6 +1448,7 @@ document.querySelectorAll('.sb-item[data-tip]').forEach(function(el){
 // ── SIDEBAR ──
 var SBK='hvacnexus_sb_collapsed';
 function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function navToSV(){navTo('hvac-subcontractor-variations.html');}
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
 function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
 function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}

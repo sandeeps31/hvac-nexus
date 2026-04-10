@@ -334,11 +334,11 @@ input[type=number]{-moz-appearance:textfield}
       <button class="btn bsm" id="det-raisePOBtn" onclick="raisePOFromDetail()" style="display:none;background:var(--warn);color:#000;font-weight:600">📦 Raise PO</button>
       <button class="bg bsm btn" onclick="goList()">← Back</button>
     </div>
-    <div class="sv-meta-grid">
-      <div class="sv-mf"><span class="sv-ml">SV Number</span><div><input class="mi mono" id="f-num" style="display:none"/><span class="sv-mv mono" id="det-num-val">—</span></div></div>
-      <div class="sv-mf"><span class="sv-ml">Subcontractor</span><div><input class="mi" id="f-subbie" style="display:none"/><span class="sv-mv" id="det-subbie-val">—</span></div></div>
-      <div class="sv-mf"><span class="sv-ml">Status</span><div><select class="ms" id="f-status" style="display:none"><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select><span class="sv-mv" id="det-status-val">—</span></div></div>
-      <div class="sv-mf"><span class="sv-ml">Value (ex GST)</span><span class="sv-mv mono" id="det-value-val" style="color:var(--accent)">—</span></div>
+    <div class="sv-meta-grid" style="grid-template-columns:repeat(5,auto);align-items:start;gap:0;display:flex;flex-wrap:wrap;gap:0">
+      <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">SV Number</span><div><input class="mi mono" id="f-num" style="display:none"/><span class="sv-mv mono" id="det-num-val">—</span></div></div>
+      <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">Subcontractor</span><div><input class="mi" id="f-subbie" style="display:none"/><span class="sv-mv" id="det-subbie-val">—</span></div></div>
+      <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">Status</span><div><select class="ms" id="f-status" style="display:none"><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select><span class="sv-mv" id="det-status-val">—</span></div></div>
+      <div class="sv-mf" style="padding-right:32px"><span class="sv-ml">Value (ex GST)</span><span class="sv-mv mono" id="det-value-val" style="color:var(--accent)">—</span></div>
       <div class="sv-mf"><span class="sv-ml">Purchase Order</span><span class="sv-mv" id="det-po-val">—</span></div>
     </div>
   </div>
@@ -435,8 +435,8 @@ var _svProj=(typeof dbGetCurrentProject==='function'?dbGetCurrentProject():{})||
 var subVars=[];
 var editingId=null;
 var linkedVar=null; // {id, num, title} while modal is open
-var _uid=100;
-function nid(){return ++_uid;}
+var _uid=0;
+function nid(){return 'sv'+Date.now()+Math.floor(Math.random()*1000);}
 function num(v){return parseFloat(v)||0;}
 function fmt(n){var v=num(n);return v===0?'—':'$'+v.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtSm(n){var v=num(n);return v===0?'—':'$'+Math.round(v).toLocaleString('en-AU');}
@@ -534,7 +534,19 @@ function confirmRaisePO(){
 }
 
 function save(){dbSetSubVariations(_svPNum,{subVars:subVars}).catch(e=>console.error(e));}
-async function load(){try{var p=await dbGetSubVariations(_svPNum);subVars=p&&Array.isArray(p.subVars)?p.subVars:[];}catch(e){subVars=[];}}
+async function load(){
+  try{var p=await dbGetSubVariations(_svPNum);subVars=p&&Array.isArray(p.subVars)?p.subVars:[];}catch(e){subVars=[];}
+  // Fix duplicate IDs (one-time migration)
+  var seen={};var fixed=false;
+  subVars.forEach(function(sv){
+    if(seen[sv.id]){
+      sv.id='sv'+Date.now()+Math.floor(Math.random()*9999);
+      fixed=true;
+    }
+    seen[sv.id]=true;
+  });
+  if(fixed){dbSetSubVariations(_svPNum,{subVars:subVars}).catch(function(e){console.warn('dedup save failed',e);});}
+}
 load();
 
 // LOAD VARIATIONS from variations module
@@ -708,7 +720,7 @@ function saveSV(){
   var value=svLiSub();
   if(!subbie||!desc){alert('Subcontractor and description are required.');return;}
   var sv={
-    id:editingId||('sv'+nid()),
+    id:editingId||nid(),
     num:num_v,
     subbie:subbie,
     desc:desc,
@@ -781,7 +793,12 @@ function openNewSV(){
 // ── OPEN SV DETAIL ──
 function openSVDetail(id, autoLink){
   var sv=subVars.find(function(x){return x.id===id;});
-  if(!sv)return;
+  if(!sv){console.warn('openSVDetail: id not found:',id,'available:',subVars.map(function(x){return x.id+'/'+x.num;}));return;}
+  // Defensive defaults for SVs created before new schema
+  if(!sv.lineItems||!Array.isArray(sv.lineItems)){
+    sv.lineItems=sv.value?[{id:'li1',desc:sv.desc||'',qty:'1',price:String(sv.value||0)}]:[];
+  }
+  if(!sv.docs||!Array.isArray(sv.docs)){sv.docs=[];}
   editingId=id;
   linkedVar=sv.linkedVarId?{id:sv.linkedVarId,num:sv.linkedVarNum,title:sv.linkedVarTitle}:null;
   _svLineItems=(sv.lineItems&&sv.lineItems.length)?JSON.parse(JSON.stringify(sv.lineItems)):[{id:svNid(),desc:'',qty:'1',price:''}];
@@ -801,7 +818,7 @@ function openSVDetail(id, autoLink){
   document.getElementById('det-value-val').textContent=fmt(sv.value);
   var _poEl=document.getElementById('det-po-val');
   if(_poEl){var _pr=sv.poRef||sv.poId||'';
-    _poEl.innerHTML=_pr?'<button onclick="navToPO(\''+_pr+'\')" style="background:none;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:3px 10px;cursor:pointer;font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">&#128196; '+_pr+'</button>':'—';}
+    _poEl.innerHTML=_pr?'<a onclick="event.preventDefault();navToPO(\''+_pr+'\')" href="#" style="font-family:DM Mono,monospace;font-size:13px;color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(0,200,255,.4);padding-bottom:1px;cursor:pointer" onmouseover="this.style.borderBottomColor=\'var(--accent)\'" onmouseout="this.style.borderBottomColor=\'rgba(0,200,255,.4)\'">'+_pr+'</a>':'—';}
   setSVFieldVis(false);
   document.getElementById('det-editBtn').style.display='';
   document.getElementById('det-saveBtn').style.display='none';
