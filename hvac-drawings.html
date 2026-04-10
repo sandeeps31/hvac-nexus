@@ -900,6 +900,29 @@ function setAddTab(tab){
   document.getElementById('tabBulk').style.color=tab==='bulk'?'#080c12':'var(--text2)';
 }
 
+function bulkAreaChange(inp){
+  var val=(inp.value||'').trim();
+  if(!val)return;
+  if(AREAS.indexOf(val)===-1){
+    AREAS.push(val);
+    saveAreas(AREAS);
+    // Refresh all bulk area datalists
+    document.querySelectorAll('[id^="bulkAreaList"]').forEach(function(dl){
+      dl.innerHTML=AREAS.map(function(a){return'<option>'+escH(a)+'</option>';}).join('');
+    });
+    // Also refresh the main area filter dropdown
+    var af=document.getElementById('areaFilter');
+    if(af){
+      var cur=af.value;
+      af.innerHTML='<option value="">All Areas</option>';
+      AREAS.forEach(function(a){var o=document.createElement('option');o.value=a;o.textContent=a;if(a===cur)o.selected=true;af.appendChild(o);});
+    }
+    // Refresh single upload area dropdown
+    var fa=document.getElementById('f-area');
+    if(fa){var cv=fa.value;fa.innerHTML=AREAS.map(function(a){return'<option'+(a===cv?' selected':'')+'>'+escH(a)+'</option>';}).join('');}
+  }
+}
+
 function updateBulkSubcat(catSel, i){
   var cat=catSel.value;
   var subs=(SUBCATS[cat]||['General']);
@@ -958,7 +981,15 @@ function handleBulkPdf(inp){
       +'<td style="padding:5px 6px;width:125px"><input type="date" style="'+si+';width:120px" onchange="_bulkFiles['+i+'].subDate=this.value"></td>'
       +'<td style="padding:5px 6px;width:150px"><select style="'+ss+';width:145px" onchange="_bulkFiles['+i+'].cat=this.value;updateBulkSubcat(this,'+i+')">'+catOpts+'</select></td>'
       +'<td style="padding:5px 6px;width:140px"><select style="'+ss+';width:135px" id="bsc'+i+'" onchange="_bulkFiles['+i+'].subcat=this.value"><option value="">—</option></select></td>'
-      +'<td style="padding:5px 6px;width:130px"><select style="'+ss+';width:125px" onchange="_bulkFiles['+i+'].area=this.value">'+areaOpts+'</select></td>';
+      +'<td style="padding:5px 6px;min-width:150px">'
+      +'<div style="display:flex;gap:3px;align-items:center">'
+      +'<input list="bulkAreaList'+i+'" style="'+si+';flex:1;min-width:100px" placeholder="Area…" value="'+escH(_bulkFiles[i]?_bulkFiles[i].area||'':'')+'"'
+      +' data-bi="'+i+'"'
+      +' oninput="_bulkFiles[this.dataset.bi*1].area=this.value"'
+      +' onchange="bulkAreaChange(this)"/>'
+      +'<datalist id="bulkAreaList'+i+'">'+AREAS.map(function(a){return'<option>'+escH(a)+'</option>';}).join('')+'</datalist>'
+      +'</div>'
+      +'</td>';
     tbody.appendChild(tr);
     var reader=new FileReader();
     (function(idx){reader.onload=function(e){_bulkFiles[idx].data=e.target.result;};})(i);
