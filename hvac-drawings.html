@@ -233,49 +233,74 @@ body.sb-sm{padding-left:var(--sb-sm)}
     <!-- Body -->
     <div style="overflow-y:auto;flex:1;padding:18px 22px">
       <!-- SINGLE TAB -->
-      <div id="singleTab" style="overflow-y:auto;flex:1">
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
-          <div><label class="ml">Drawing Number *</label><input class="mi" id="f-num" placeholder="e.g. M-HV-001" style="font-size:15px" oninput="if(this.value.length===1)expandModal()"/></div>
-          <div><label class="ml">Revision</label><input class="mi" id="f-rev" placeholder="e.g. A"/></div>
+      <div id="singleTab" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px">
+        <!-- Line 1: Drawing Number full width -->
+        <div>
+          <label class="ml">Drawing Number *</label>
+          <input class="mi" id="f-num" placeholder="e.g. M-HV-001" style="font-size:15px;font-weight:600" oninput="if(this.value.length===1)expandModal()"/>
         </div>
-        <label class="ml" style="margin-top:10px">Drawing Title *</label>
-        <input class="mi" id="f-name" placeholder="e.g. Level 2 HVAC Layout" style="font-size:15px"/>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+        <!-- Line 2: Drawing Title full width -->
+        <div>
+          <label class="ml">Drawing Title *</label>
+          <input class="mi" id="f-name" placeholder="e.g. Level 2 HVAC Layout" style="font-size:14px"/>
+        </div>
+        <!-- Line 3: Rev / Status -->
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px">
+          <div><label class="ml">Revision</label><input class="mi" id="f-rev" placeholder="e.g. A"/></div>
+          <div><label class="ml">Status</label>
+            <select class="ms" id="f-status" onchange="toggleApprovalField('f-approval-wrap')">
+              <option value='IFR'>IFR — Issued for Review</option>
+              <option value='IFA'>IFA — Issued for Approval</option>
+              <option value='IFC'>IFC — Issued for Construction</option>
+              <option value='AB'>AB — As Built</option>
+            </select>
+          </div>
+        </div>
+        <!-- Line 4: Approval Status / Submission Date -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div id="f-approval-wrap"><label class="ml">Approval Status</label>
+            <select class="ms" id="f-approval">
+              <option value='Pending'>Pending</option>
+              <option value='Approved'>Approved</option>
+              <option value='Approved with Comments'>Approved with Comments</option>
+              <option value='Rejected'>Rejected</option>
+            </select>
+          </div>
+          <div><label class="ml">Submission Date</label><input class="mi" id="f-subdate" type="date"/></div>
+        </div>
+        <!-- Line 5: Discipline / Category -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div><label class="ml">Discipline</label>
             <select class="ms" id="f-cat" onchange="updateSubcat()">
-              <option value='Mechanical'>Mechanical</option><option value='Electrical'>Electrical</option>
-              <option value='Architectural'>Architectural</option><option value='Hydraulic'>Hydraulic</option>
+              <option value='Mechanical'>Mechanical</option>
+              <option value='Electrical'>Electrical</option>
+              <option value='Architectural'>Architectural</option>
+              <option value='Hydraulic'>Hydraulic</option>
               <option value='Base Build Mechanical'>Base Build Mechanical</option>
             </select>
           </div>
           <div><label class="ml">Category</label><select class="ms" id="f-subcat"></select></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
-          <div><label class="ml">Status</label>
-            <select class="ms" id="f-status" onchange="toggleApprovalField('f-approval-wrap')">
-              <option value='IFR'>IFR — Issued for Review</option><option value='IFA'>IFA — Issued for Approval</option>
-              <option value='IFC'>IFC — Issued for Construction</option><option value='AB'>AB — As Built</option>
-            </select>
-          </div>
-          <div id="f-approval-wrap"><label class="ml">Approval Status</label>
-            <select class="ms" id="f-approval">
-              <option value='Pending'>Pending</option><option value='Approved'>Approved</option>
-              <option value='Approved with Comments'>Approved with Comments</option>
-              <option value='Rejected'>Rejected</option>
-            </select>
+        <!-- Line 6: Area with add-new support -->
+        <div>
+          <label class="ml">Area</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input list="singleAreaList" class="mi" id="f-area-input" placeholder="Select or type new area…" style="flex:1"
+              oninput="document.getElementById('f-area-hidden').value=this.value"
+              onchange="singleAreaChange(this.value)"/>
+            <datalist id="singleAreaList"></datalist>
+            <input type="hidden" id="f-area"/>
           </div>
         </div>
-        <label class="ml" style="margin-top:10px">Submission Date</label>
-        <input class="mi" id="f-subdate" type="date"/>
-        <div style="margin-top:10px"><label class="ml">Area</label>
-          <select class="ms" id="f-area"></select>
-        </div>
-        <label class="ml" style="margin-top:10px">Upload PDF (optional)</label>
-        <div id="addDropZone" class="drop-zone" onclick="document.getElementById('addFileInput').click()" ondragover="dzOver(event,'addDropZone')" ondragleave="dzLeave('addDropZone')" ondrop="dzDrop(event,'addDropZone',handleModalPdf)">
-          <span style="font-size:28px">📎</span>
-          <div id="fileLabel" style="font-size:13px;color:var(--text2)">Click or drag & drop PDF here</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">PDF files only</div>
-          <input type="file" id="addFileInput" accept=".pdf" style="display:none" onchange="handleModalPdf(this)">
+        <!-- Line 7: PDF drag & drop -->
+        <div>
+          <label class="ml">Upload PDF (optional)</label>
+          <div id="addDropZone" class="drop-zone" onclick="document.getElementById('addFileInput').click()" ondragover="dzOver(event,'addDropZone')" ondragleave="dzLeave('addDropZone')" ondrop="dzDrop(event,'addDropZone',handleModalPdf)">
+            <span style="font-size:28px">📎</span>
+            <div id="fileLabel" style="font-size:13px;color:var(--text2)">Click or drag &amp; drop PDF here</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">PDF files only</div>
+            <input type="file" id="addFileInput" accept=".pdf" style="display:none" onchange="handleModalPdf(this)">
+          </div>
         </div>
       </div>
       <!-- BULK TAB -->
@@ -585,8 +610,11 @@ function openAddModal(){
   if(typeof populateSubcat==='function')populateSubcat('f-cat','f-subcat');
   if(typeof toggleApprovalField==='function')toggleApprovalField('f-approval-wrap');
   // Populate area dropdown
-  var fa=document.getElementById('f-area');
-  if(fa){fa.innerHTML=AREAS.map(function(a){return'<option>'+escH(a)+'</option>';}).join('');}
+  var fa=document.getElementById('f-area-input');
+  if(fa){fa.value='';}
+  document.getElementById('f-area').value='';
+  var dl=document.getElementById('singleAreaList');
+  if(dl)dl.innerHTML=AREAS.map(function(a){return'<option>'+escH(a)+'</option>';}).join('');
   document.getElementById('addModal').classList.add('open');
   setTimeout(function(){var el=document.getElementById('f-num');if(el)el.focus();},80);
 }
@@ -651,7 +679,7 @@ async function saveDrawing(){
   var drwObj={id:newId,num:num,name:name,rev:rev,
     cat:document.getElementById('f-cat').value,
     subcat:(document.getElementById('f-subcat')||{value:'General'}).value,
-    area:(function(){var _av=(document.getElementById('f-area')||{value:''}).value||'';if(_av&&AREAS.indexOf(_av)===-1){AREAS.push(_av);saveAreas(AREAS);}return _av;})(),
+    area:(function(){var _av=(document.getElementById('f-area-input')||document.getElementById('f-area')||{value:''}).value||'';if(_av&&AREAS.indexOf(_av)===-1){AREAS.push(_av);saveAreas(AREAS);}return _av;})(),
     fileName:(_pendingPdfFile?_pendingPdfFile.name:''),
     status:status,approval:approval,subDate:subDate,apprDate:'',superseded:false,
     history:[{rev:rev,status:status,approval:approval,subDate:subDate,apprDate:'',recorded:today}],
@@ -950,6 +978,22 @@ function bulkDownloadPdf(idx){
     document.body.removeChild(a);
   };
   reader.readAsDataURL(bf.file);
+}
+
+function singleAreaChange(val){
+  val=(val||'').trim();
+  document.getElementById('f-area').value=val;
+  if(val&&AREAS.indexOf(val)===-1){
+    AREAS.push(val);saveAreas(AREAS);
+    // Refresh datalist
+    var dl=document.getElementById('singleAreaList');
+    if(dl)dl.innerHTML=AREAS.map(function(a){return'<option>'+escH(a)+'</option>';}).join('');
+    // Refresh area filter
+    var af=document.getElementById('areaFilter');
+    if(af){var cur=af.value;af.innerHTML='<option value="">All Areas</option>';AREAS.forEach(function(a){var o=document.createElement('option');o.value=a;o.textContent=a;if(a===cur)o.selected=true;af.appendChild(o);});}
+    // Refresh bulk datalists
+    document.querySelectorAll('[id^="bulkAreaList"]').forEach(function(dl2){dl2.innerHTML=AREAS.map(function(a){return'<option>'+escH(a)+'</option>';}).join('');});
+  }
 }
 
 function bulkAreaChange(inp){
