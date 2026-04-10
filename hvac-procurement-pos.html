@@ -942,9 +942,13 @@ function catComboClose(){
   var inp=document.getElementById('po-cat-input');
   var hid=document.getElementById('po-cat');
   if(inp&&hid){
+    // Only clear if the input text doesn't match any option at all
+    var inpTxt=(inp.value||'').trim().toLowerCase();
     var val=hid.value;
-    var matched=_catOptions.find(function(o){return o.value===val;});
-    if(!matched){inp.value='';hid.value='';onCatChange('');}
+    var matchedByVal=_catOptions.find(function(o){return o.value===val;});
+    var matchedByTxt=_catOptions.find(function(o){return o.label.toLowerCase()===inpTxt;});
+    if(!matchedByVal&&!matchedByTxt&&inpTxt){inp.value='';hid.value='';onCatChange('');}
+    else if(!matchedByVal&&matchedByTxt){hid.value=matchedByTxt.value;}
   }
 }
 
@@ -1101,8 +1105,18 @@ function doUndo(){
 function savePO(){
   const supplier=document.getElementById('po-supplier').value.trim();
   if(!supplier){const el=document.getElementById('po-supplier');el.classList.add('err');el.focus();setTimeout(()=>el.classList.remove('err'),2000);return;}
+  // If hidden cat val is empty but input has text, try to match
+  var _catInpVal=document.getElementById('po-cat-input').value.trim();
+  if(!document.getElementById('po-cat').value&&_catInpVal){
+    var _m=_catOptions.find(function(o){return o.label.toLowerCase()===_catInpVal.toLowerCase()||o.value.split('||')[1].toLowerCase()===_catInpVal.toLowerCase();});
+    if(_m){document.getElementById('po-cat').value=_m.value;document.getElementById('po-cat-input').value=_m.label;}
+  }
   const catVal=document.getElementById('po-cat').value;
-  if(!catVal){document.getElementById('po-cat').focus();return;}
+  if(!catVal){
+    var _ci=document.getElementById('po-cat-input');
+    if(_ci){_ci.style.borderColor='var(--danger)';_ci.focus();setTimeout(function(){_ci.style.borderColor='';},2000);}
+    return;
+  }
   const [secName,grpName]=catVal.split('||');
   let sec=sections.find(s=>s.name===secName);
   if(!sec){
