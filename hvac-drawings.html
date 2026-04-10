@@ -593,15 +593,28 @@ function openAddModal(){
 function closeAddModal(){
   var mo=document.getElementById('addModal');
   mo.classList.remove('open');
+  // Move back to original parent if it was relocated
+  if(mo._origParent){
+    if(mo._origNextSibling){mo._origParent.insertBefore(mo,mo._origNextSibling);}
+    else{mo._origParent.appendChild(mo);}
+    mo._origParent=null;mo._origNextSibling=null;
+  }
   // Reset modal to default size
   var m=mo.querySelector('.modal');
   if(m){m.style.width='680px';m.style.maxWidth='96vw';m.style.height='';m.style.maxHeight='90vh';}
   mo.style.padding='';
   mo.style.alignItems='';
+  mo.style.zIndex='';
 }
 
 function expandModal(){
   var mo=document.getElementById('addModal');
+  // Move modal to document.body so it's not clipped by .main's left:230px
+  if(mo.parentElement!==document.body){
+    mo._origParent=mo.parentElement;
+    mo._origNextSibling=mo.nextSibling;
+    document.body.appendChild(mo);
+  }
   var m=mo.querySelector('.modal');
   if(m){
     m.style.width='96vw';
@@ -609,9 +622,7 @@ function expandModal(){
     m.style.height='96vh';
     m.style.maxHeight='96vh';
   }
-  // Remove all padding/offset so modal sits over everything incl sidebar
   mo.style.padding='2vh 2vw';
-  mo.style.paddingLeft='2vw';
   mo.style.alignItems='center';
   mo.style.justifyContent='center';
   mo.style.zIndex='99999';
