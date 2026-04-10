@@ -144,9 +144,9 @@ input[type=number]{-moz-appearance:textfield}
 .raise-po-opt:hover{border-color:var(--accent);background:var(--accent-dim)}
 .raise-po-opt.active{border-color:var(--accent);background:var(--accent-dim)}
 </style>
+<script src="db.js"></script>
 </head>
 <body>
-<script src="db.js"></script>
 
 <!-- SIDEBAR -->
 <div class="sb" id="sidebar"><div class="sb-resize-handle" id="sbResize"></div>
@@ -208,7 +208,7 @@ input[type=number]{-moz-appearance:textfield}
   </div>
   <div style="display:flex;gap:8px">
     <button class="bg bsm btn" onclick="navTo('hvac-variations.html')">My Variations →</button>
-    <button class="bp bsm btn" onclick="openAddModal()">＋ Add Subbie Var</button>
+    <button class="bp bsm btn" id="topAddBtn" onclick="openNewSV()">＋ Add Subbie Var</button>
   </div>
 </div>
 
@@ -238,21 +238,28 @@ input[type=number]{-moz-appearance:textfield}
   <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="svCount"></span>
 </div>
 
+<!-- VIEW: LIST -->
+<div class="view active" id="view-list">
+<div class="co-sum-wrap">
+  <div class="co-sum-hdr" onclick="toggleCoSum()">
+    <span class="co-sum-hdr-lbl">Summary by Subcontractor</span>
+    <span id="coSumChev" style="font-size:11px;color:var(--muted)">▾</span>
+  </div>
+  <div id="coSumBody" style="display:none;overflow:auto">
+    <table class="co-sum-tbl">
+      <thead><tr><th>Subcontractor</th><th class="r"># SVs</th><th class="r">Pending (ex GST)</th><th class="r">Approved (ex GST)</th><th class="r">Total (ex GST)</th></tr></thead>
+      <tbody id="coSumRows"></tbody>
+    </table>
+  </div>
+</div>
 <div class="page">
   <div class="tw">
     <table class="dt">
       <thead>
         <tr>
-          <th>SV No.</th>
-          <th>Subcontractor</th>
-          <th>Description</th>
-          <th class="r">Value (ex GST)</th>
-          <th class="r">GST</th>
-          <th class="r">Total (incl GST)</th>
-          <th>Status</th>
-          <th>Linked variation</th>
-          <th style="width:110px">PO</th>
-          <th style="width:36px"></th>
+          <th>SV No.</th><th>Subcontractor</th><th>Description</th>
+          <th class="r">Value (ex GST)</th><th>Status</th>
+          <th>Linked Variation</th><th style="width:130px">PO</th>
         </tr>
       </thead>
       <tbody id="svBody"></tbody>
@@ -261,52 +268,80 @@ input[type=number]{-moz-appearance:textfield}
 </div>
 </div>
 
-<!-- ADD / EDIT SUBBIE VAR MODAL -->
-<div class="mo" id="addModal" onclick="if(event.target===this)closeAddModal()">
-  <div class="modal">
-    <h3 id="modalTitle">Add Subbie Variation</h3>
-    <p class="msub">Record a variation raised by a subcontractor.</p>
-    <div class="mgrid">
-      <div><label class="ml">SV Number *</label><input class="mi mono" id="f-num" placeholder="e.g. SV-001"/></div>
-      <div><label class="ml">Subcontractor *</label><input class="mi" id="f-subbie" placeholder="e.g. Acme Duct Co."/></div>
+<!-- VIEW: DETAIL -->
+<div class="view" id="view-detail">
+  <div class="sv-detail-hdr">
+    <div class="sv-detail-title-row">
+      <div class="sv-detail-num" id="det-num">SV-001</div>
+      <div class="sv-detail-title" id="det-title">—</div>
+      <button class="bg bsm btn" id="det-editBtn" onclick="enterSVEditMode()" style="display:none">✏️ Edit</button>
+      <button class="bp bsm btn" id="det-saveBtn" onclick="saveSV()" style="display:none">💾 Save</button>
+      <button class="bg bsm btn" id="det-cancelBtn" onclick="cancelSVEdit()" style="display:none">Cancel</button>
+      <button class="bg bsm btn" id="det-deleteBtn" onclick="deleteSV()" style="display:none;color:var(--danger);border-color:rgba(255,77,109,.3)">🗑 Delete</button>
+      <button class="btn bsm" id="det-raisePOBtn" onclick="raisePOFromDetail()" style="display:none;background:var(--warn);color:#000;font-weight:600">📦 Raise PO</button>
+      <button class="bg bsm btn" onclick="goList()">← Back</button>
     </div>
-    <label class="ml">Description *</label>
-    <input class="mi" id="f-desc" placeholder="Brief description of the variation claim"/>
-    <label class="ml">Scope of works</label>
-    <textarea class="mta" id="f-sow" placeholder="Detailed scope of works for this subbie variation…"></textarea>
-    <div class="mgrid">
-      <div><label class="ml">Value (ex GST) *</label><input class="mi" id="f-value" type="number" placeholder="0.00"/></div>
-      <div><label class="ml">Status</label>
-        <select class="ms" id="f-status">
-          <option value="Pending">Pending</option>
-          <option value="Approved">Approved</option>
-          <option value="Rejected">Rejected</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- LINKED VARIATION SECTION -->
-    <div class="link-section" style="margin-top:14px">
-      <div class="link-section-hdr">
-        <span class="link-section-title">Linked variation</span>
-        <div style="display:flex;gap:6px">
-          <button class="bsm btn bg" onclick="openVarPicker()" id="linkVarBtn">＋ Link to variation</button>
-          <button class="bsm btn" style="background:var(--purple-dim);color:var(--purple);border:1px solid rgba(167,139,250,.3)" onclick="openQuickCreateVar()">✦ Create new variation</button>
-        </div>
-      </div>
-      <div id="linkedVarDisplay" style="padding:14px;color:var(--muted);font-size:12.5px;text-align:center">
-        Not linked — link or create a variation above
-      </div>
-    </div>
-
-    <div id="modalPoLink" style="display:none;margin-top:10px;padding:8px 0"></div>
-    <div class="mac">
-      <button class="bdanger bsm btn" id="deleteBtn" style="display:none;margin-right:auto" onclick="deleteSV()">Delete</button>
-      <button class="btn bsm" id="raisePOModalBtn" style="display:none;background:var(--warn);color:#000;font-weight:600;margin-right:auto" onclick="raisePOFromModal(this.dataset.svid)">📦 Raise PO</button>
-      <button class="bg bsm btn" onclick="closeAddModal()">Cancel</button>
-      <button class="bp bsm btn" onclick="saveSV()">Save</button>
+    <div class="sv-meta-grid">
+      <div class="sv-mf"><span class="sv-ml">SV Number</span><div><input class="mi mono" id="f-num" style="display:none"/><span class="sv-mv mono" id="det-num-val">—</span></div></div>
+      <div class="sv-mf"><span class="sv-ml">Subcontractor</span><div><input class="mi" id="f-subbie" style="display:none"/><span class="sv-mv" id="det-subbie-val">—</span></div></div>
+      <div class="sv-mf"><span class="sv-ml">Status</span><div><select class="ms" id="f-status" style="display:none"><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select><span class="sv-mv" id="det-status-val">—</span></div></div>
+      <div class="sv-mf"><span class="sv-ml">Value (ex GST)</span><span class="sv-mv mono" id="det-value-val" style="color:var(--accent)">—</span></div>
+      <div class="sv-mf"><span class="sv-ml">Purchase Order</span><span class="sv-mv" id="det-po-val">—</span></div>
     </div>
   </div>
+  <div class="sv-section" style="margin-top:20px">
+    <div class="sv-section-hdr">Description &amp; Scope</div>
+    <div class="sv-section-body">
+      <div style="margin-bottom:10px"><span class="sv-ml">Description</span>
+        <input class="mi" id="f-desc" style="display:none;margin-top:4px"/>
+        <div class="sv-mv" id="det-desc-val" style="margin-top:4px">—</div></div>
+      <div><span class="sv-ml">Scope of Works</span>
+        <textarea class="mta" id="f-sow" style="display:none;margin-top:4px"></textarea>
+        <div class="sv-mv" id="det-sow-val" style="margin-top:4px;white-space:pre-wrap;color:var(--text2);font-size:12.5px">—</div></div>
+    </div>
+  </div>
+  <div class="sv-section">
+    <div class="sv-section-hdr">Line Items (ex GST)</div>
+    <div>
+      <div class="sv-li-wrap" style="border-radius:0;border:none;border-bottom:1px solid var(--border)">
+        <table class="sv-li-tbl">
+          <thead><tr>
+            <th style="width:40%">Description</th>
+            <th class="r" style="width:15%">Qty</th>
+            <th class="r" style="width:22%">Price / Unit</th>
+            <th class="r" style="width:18%">Total</th>
+            <th style="width:5%"></th>
+          </tr></thead>
+          <tbody id="svLiBody"></tbody>
+        </table>
+        <button class="sv-add-li" id="svAddLiBtn" onclick="svAddLI()" style="display:none">＋ Add line item</button>
+      </div>
+      <div class="sv-tot-row"><span class="sv-tot-lbl">Subtotal (ex GST)</span><span class="sv-tot-val" id="svTotSub">$0.00</span></div>
+      <div class="sv-tot-row"><span class="sv-tot-lbl">GST (10%)</span><span class="sv-tot-val" id="svTotGst">$0.00</span></div>
+      <div class="sv-tot-row final"><span class="sv-tot-lbl">Total (incl GST)</span><span class="sv-tot-val" id="svTotIncl">$0.00</span></div>
+    </div>
+  </div>
+  <div class="sv-section">
+    <div class="sv-section-hdr" style="display:flex;align-items:center;gap:8px">
+      <span style="flex:1">Linked Variation</span>
+      <div id="det-link-btns" style="display:none;gap:6px;align-items:center">
+        <button class="bsm btn bg" onclick="openVarPicker()">＋ Link to variation</button>
+        <button class="bsm btn" style="background:var(--purple-dim);color:var(--purple);border:1px solid rgba(167,139,250,.3)" onclick="openQuickCreateVar()">✦ Create new variation</button>
+      </div>
+    </div>
+    <div class="sv-section-body" id="linkedVarDisplay">—</div>
+  </div>
+  <div class="sv-section">
+    <div class="sv-section-hdr">Documents &amp; Attachments</div>
+    <div class="sv-section-body">
+      <div class="doc-drop" id="docDrop" ondragover="docDragOver(event)" ondragleave="docDragLeave(event)" ondrop="docDrop(event)">
+        <input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.eml,.msg" onchange="docFileChange(event)"/>
+        <div class="doc-drop-lbl">📎 <strong>Click to attach</strong> or drag &amp; drop quotes, emails, PDFs</div>
+      </div>
+      <div id="docList"></div>
+    </div>
+  </div>
+</div>
 </div>
 
 <!-- VARIATION PICKER MODAL -->
@@ -341,7 +376,7 @@ input[type=number]{-moz-appearance:textfield}
 </div>
 
 <script>
-var _svProj=dbGetCurrentProject();var _svPNum=_svProj.num||_svProj.number||'GCT001';
+var _svProj=(typeof dbGetCurrentProject==='function'?dbGetCurrentProject():{})||{};var _svPNum=_svProj.num||_svProj.number||'GCT001';
 
 
 var subVars=[];
@@ -353,6 +388,12 @@ function num(v){return parseFloat(v)||0;}
 function fmt(n){var v=num(n);return v===0?'—':'$'+v.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtSm(n){var v=num(n);return v===0?'—':'$'+Math.round(v).toLocaleString('en-AU');}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+
+// SIDEBAR
+
+
+(function(){applySB(localStorage.getItem(SBK)==='1');})();
 
 
 // DATA
@@ -556,10 +597,10 @@ function renderList(){
     if(sv.linkedVarId&&sv.linkedVarNum){
       linkCell='<span class="var-link-chip" onclick="event.stopPropagation();navTo(\'hvac-variations.html\')" title="Open in Variations">'+escH(sv.linkedVarNum)+' — '+escH(sv.linkedVarTitle||'')+'</span>';
     } else {
-      linkCell='<span class="unlinked-chip" data-svid="'+sv.id+'" onclick="event.stopPropagation();openEditModal(this.dataset.svid);setTimeout(openVarPicker,200)">＋ Link variation</span>';
+      linkCell='<span class="unlinked-chip" onclick="event.stopPropagation();openEditModal(\''+sv.id+'\');setTimeout(openVarPicker,200)">＋ Link variation</span>';
     }
     var hasPo=!!sv.poId;
-    rows+='<tr data-svid="'+sv.id+'">'
+    rows+='<tr onclick="openEditModal(\''+sv.id+'\')">'
       +'<td class="sv-num">'+escH(sv.num||'—')+'</td>'
       +'<td style="font-weight:500;color:var(--text)">'+escH(sv.subbie||'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(sv.desc||'—')+'</td>'
@@ -568,30 +609,23 @@ function renderList(){
       +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:600">'+fmt(total)+'</td>'
       +'<td><span class="sb-badge '+(stMap[sv.status]||'st-pending')+'">'+escH(sv.status)+'</span></td>'
       +'<td>'+linkCell+'</td>'
-      +'<td><button data-svid="'+sv.id+'" onclick="event.stopPropagation();openEditModal(this.dataset.svid)" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 5px" onmouseover="this.style.color=\'var(--accent)\'" onmouseout="this.style.color=\'var(--muted)\'">✎</button></td>'
-      +'<td style="white-space:nowrap">'
+      +'<td onclick="event.stopPropagation()"><button onclick="openEditModal(\''+sv.id+'\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 5px" onmouseover="this.style.color=\'var(--accent)\'" onmouseout="this.style.color=\'var(--muted)\'">✎</button></td>'
+      +'<td onclick="event.stopPropagation()" style="white-space:nowrap">'
       +(sv.status==='Approved'&&!hasPo
-        ?'<button class="ia" data-svid="'+sv.id+'" onclick="event.stopPropagation();raisePO(this.dataset.svid)" title="Raise PO" style="font-size:11px;padding:4px 10px;background:var(--warn);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600">&#128196; Raise PO</button>'
-        :(hasPo?'<button data-poref="'+escH(sv.poRef||sv.poId||'')+'" onclick="event.stopPropagation();navToPO(this.dataset.poref)" style="background:none;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:2px 8px;cursor:pointer;font-family:DM Mono,monospace;font-size:10px;color:var(--accent)">&#128196; '+escH(sv.poRef||sv.poId||'')+'</button>':'')
+        ?'<button class="ia" onclick="raisePO(\''+sv.id+'\')" title="Raise PO" style="font-size:11px;padding:4px 10px;background:var(--accent);color:#000;border:none;border-radius:6px;cursor:pointer">&#128196; Raise PO</button>'
+        :(hasPo?'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--green)">&#10003; PO '+escH(sv.poRef||'')+'</span>':'')
       )
       +'</td>'
       +'</tr>';
   });
   document.getElementById('svBody').innerHTML=rows;
   document.getElementById('svBody').onclick=function(e){
-    if(e.target.closest('button')||e.target.closest('.var-link-chip')||e.target.closest('.unlinked-chip'))return;
+    if(e.target.closest('button'))return;
     var tr=e.target.closest('tr[data-svid]');
     if(!tr)return;
-    openEditModal(tr.dataset.svid);
+    openSVDetail(tr.dataset.svid);
   };
 }
-
-function navToPO(poRef){
-  if(!poRef)return;
-  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
-  window.location.href=b+'hvac-procurement-pos.html?viewpo='+encodeURIComponent(poRef);
-}
-
 
 // ADD MODAL
 function openAddModal(){
@@ -604,8 +638,6 @@ function openAddModal(){
   document.getElementById('f-value').value='';
   document.getElementById('f-status').value='Pending';
   document.getElementById('deleteBtn').style.display='none';
-  var _rpNew=document.getElementById('raisePOModalBtn');if(_rpNew)_rpNew.style.display='none';
-  var _poLNew=document.getElementById('modalPoLink');if(_poLNew)_poLNew.style.display='none';
   renderLinkedVarDisplay();
   document.getElementById('addModal').classList.add('open');
   setTimeout(function(){document.getElementById('f-subbie').focus();},80);
@@ -623,43 +655,9 @@ function openEditModal(id){
   document.getElementById('f-status').value=sv.status||'Pending';
   document.getElementById('deleteBtn').style.display='';
   renderLinkedVarDisplay();
-  // Show/hide Raise PO button
-  var _rpBtn=document.getElementById('raisePOModalBtn');
-  if(_rpBtn){
-    _rpBtn.style.display=(sv.status==='Approved'&&!sv.poId)?'':'none';
-    _rpBtn.dataset.svid=id;
-  }
-  // Show PO link if exists
-  var _poLinkEl=document.getElementById('modalPoLink');
-  if(_poLinkEl){
-    if(sv.poRef||sv.poId){
-      var _pr=sv.poRef||sv.poId;
-      _poLinkEl.innerHTML='<button onclick="navToPO(\''+_pr+'\')" style="background:none;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:3px 10px;cursor:pointer;font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">&#128196; '+_pr+'</button>';
-      _poLinkEl.style.display='';
-    } else {
-      _poLinkEl.style.display='none';
-    }
-  }
   document.getElementById('addModal').classList.add('open');
 }
 function closeAddModal(){document.getElementById('addModal').classList.remove('open');}
-
-function raisePOFromModal(svId){
-  var sv=subVars.find(function(x){return x.id===svId;});
-  if(!sv||sv.status!=='Approved'){alert('SV must be Approved to raise a PO.');return;}
-  closeAddModal();
-  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
-  var liJson=encodeURIComponent(JSON.stringify([{id:'li1',desc:sv.desc||'',qty:'1',price:String(sv.value||0)}]));
-  var params='?source=svnew'
-    +'&svId='+encodeURIComponent(sv.id)
-    +'&svNum='+encodeURIComponent(sv.num||'')
-    +'&svDesc='+encodeURIComponent(sv.desc||'')
-    +'&svSubbie='+encodeURIComponent(sv.subbie||'')
-    +'&svValue='+encodeURIComponent(sv.value||0)
-    +'&svLinkedVar='+encodeURIComponent(sv.linkedVarId||'')
-    +'&svLineItems='+liJson;
-  window.location.href=b+'hvac-procurement-pos.html'+params;
-}
 
 function renderLinkedVarDisplay(){
   var el=document.getElementById('linkedVarDisplay');
@@ -709,14 +707,163 @@ function saveSV(){
   if(sv.linkedVarId){
     syncValueToVariation(sv.id, sv.num, sv.subbie, sv.value);
   }
-  save();closeAddModal();renderList();
+  var _sid=sv.id;
+  save();
+  openSVDetail(_sid);
 }
 
 function deleteSV(){
   if(!editingId||!confirm('Delete this subbie variation?'))return;
   subVars=subVars.filter(function(x){return x.id!==editingId;});
-  save();closeAddModal();renderList();
+  save();goList();
 }
+
+
+// ── VIEW MANAGEMENT ──
+function showView(v){document.querySelectorAll('.view').forEach(function(el){el.classList.remove('active');});var el=document.getElementById('view-'+v);if(el)el.classList.add('active');}
+function goList(){showView('list');var btn=document.getElementById('topAddBtn');if(btn)btn.style.display='';renderList();}
+
+// ── OPEN NEW SV ──
+function openNewSV(){
+  editingId=null;linkedVar=null;
+  _svLineItems=[{id:svNid(),desc:'',qty:'1',price:''}];
+  _svDocs=[];
+  document.getElementById('f-num').value=genSVNum();
+  document.getElementById('f-subbie').value='';
+  document.getElementById('f-desc').value='';
+  document.getElementById('f-sow').value='';
+  document.getElementById('f-status').value='Pending';
+  setSVFieldVis(true);
+  document.getElementById('det-editBtn').style.display='none';
+  document.getElementById('det-saveBtn').style.display='';
+  document.getElementById('det-cancelBtn').style.display='none';
+  document.getElementById('det-deleteBtn').style.display='none';
+  document.getElementById('det-raisePOBtn').style.display='none';
+  document.getElementById('det-link-btns').style.display='flex';
+  document.getElementById('svAddLiBtn').style.display='';
+  document.getElementById('det-num').textContent='New SV';
+  document.getElementById('det-title').textContent='New Subbie Variation';
+  document.getElementById('det-num-val').textContent='—';
+  document.getElementById('det-subbie-val').textContent='—';
+  document.getElementById('det-status-val').textContent='Pending';
+  document.getElementById('det-value-val').textContent='—';
+  document.getElementById('det-po-val').textContent='—';
+  renderLinkedVarDisplay();
+  svRenderLI();
+  var btn=document.getElementById('topAddBtn');if(btn)btn.style.display='none';
+  showView('detail');
+}
+
+// ── OPEN SV DETAIL ──
+function openSVDetail(id, autoLink){
+  var sv=subVars.find(function(x){return x.id===id;});
+  if(!sv)return;
+  editingId=id;
+  linkedVar=sv.linkedVarId?{id:sv.linkedVarId,num:sv.linkedVarNum,title:sv.linkedVarTitle}:null;
+  _svLineItems=(sv.lineItems&&sv.lineItems.length)?JSON.parse(JSON.stringify(sv.lineItems)):[{id:svNid(),desc:'',qty:'1',price:''}];
+  _svDocs=sv.docs?JSON.parse(JSON.stringify(sv.docs)):[];
+  document.getElementById('f-num').value=sv.num||'';
+  document.getElementById('f-subbie').value=sv.subbie||'';
+  document.getElementById('f-desc').value=sv.desc||'';
+  document.getElementById('f-sow').value=sv.sow||'';
+  document.getElementById('f-status').value=sv.status||'Pending';
+  document.getElementById('det-num').textContent=sv.num||'—';
+  document.getElementById('det-num-val').textContent=sv.num||'—';
+  document.getElementById('det-title').textContent=sv.desc||'—';
+  document.getElementById('det-subbie-val').textContent=sv.subbie||'—';
+  document.getElementById('det-desc-val').textContent=sv.desc||'—';
+  document.getElementById('det-sow-val').textContent=sv.sow||'—';
+  document.getElementById('det-status-val').textContent=sv.status||'—';
+  document.getElementById('det-value-val').textContent=fmt(sv.value);
+  var _poEl=document.getElementById('det-po-val');
+  if(_poEl){var _pr=sv.poRef||sv.poId||'';
+    _poEl.innerHTML=_pr?'<button onclick="navToPO(\''+_pr+'\')" style="background:none;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:3px 10px;cursor:pointer;font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">&#128196; '+_pr+'</button>':'—';}
+  setSVFieldVis(false);
+  document.getElementById('det-editBtn').style.display='';
+  document.getElementById('det-saveBtn').style.display='none';
+  document.getElementById('det-cancelBtn').style.display='none';
+  document.getElementById('det-deleteBtn').style.display='none';
+  document.getElementById('det-raisePOBtn').style.display=(sv.status==='Approved'&&!sv.poId)?'':'none';
+  document.getElementById('det-link-btns').style.display='none';
+  document.getElementById('svAddLiBtn').style.display='none';
+  renderLinkedVarDisplay();
+  svRenderLI();
+  renderDocList();
+  var btn=document.getElementById('topAddBtn');if(btn)btn.style.display='none';
+  showView('detail');
+  if(autoLink)setTimeout(openVarPicker,200);
+}
+
+function enterSVEditMode(){
+  setSVFieldVis(true);
+  document.getElementById('det-editBtn').style.display='none';
+  document.getElementById('det-saveBtn').style.display='';
+  document.getElementById('det-cancelBtn').style.display='';
+  document.getElementById('det-deleteBtn').style.display='';
+  document.getElementById('det-raisePOBtn').style.display='none';
+  document.getElementById('det-link-btns').style.display='flex';
+  document.getElementById('svAddLiBtn').style.display='';
+  svRenderLI();
+}
+function cancelSVEdit(){if(editingId){openSVDetail(editingId);}else{goList();}}
+function setSVFieldVis(edit){
+  ['f-num','f-subbie','f-desc','f-sow','f-status'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=edit?'':'none';});
+  ['det-num-val','det-subbie-val','det-desc-val','det-sow-val','det-status-val'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=edit?'none':'';});
+}
+
+function raisePOFromDetail(){
+  var sv=subVars.find(function(x){return x.id===editingId;});
+  if(!sv||sv.status!=='Approved'){alert('SV must be Approved to raise a PO.');return;}
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  var liJson=encodeURIComponent(JSON.stringify(sv.lineItems||[]));
+  window.location.href=b+'hvac-procurement-pos.html?source=svnew&svId='+encodeURIComponent(sv.id)+'&svNum='+encodeURIComponent(sv.num||'')+'&svDesc='+encodeURIComponent(sv.desc||'')+'&svSubbie='+encodeURIComponent(sv.subbie||'')+'&svValue='+encodeURIComponent(sv.value||0)+'&svLinkedVar='+encodeURIComponent(sv.linkedVarId||'')+'&svLineItems='+liJson;
+}
+function navToPO(poRef){if(!poRef)return;var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+'hvac-procurement-pos.html?viewpo='+encodeURIComponent(poRef);}
+
+// ── COMPANY SUMMARY ──
+var _coSumOpen=false;
+function toggleCoSum(){_coSumOpen=!_coSumOpen;document.getElementById('coSumBody').style.display=_coSumOpen?'block':'none';document.getElementById('coSumChev').textContent=_coSumOpen?'▾':'▸';if(_coSumOpen)renderCoSum();}
+function renderCoSum(){
+  var map={};
+  subVars.forEach(function(sv){var k=sv.subbie||'Unknown';if(!map[k])map[k]={count:0,pending:0,approved:0};map[k].count++;if(sv.status==='Pending')map[k].pending+=parseFloat(sv.value)||0;else if(sv.status==='Approved')map[k].approved+=parseFloat(sv.value)||0;});
+  var html='';
+  Object.keys(map).sort().forEach(function(k){var d=map[k];html+='<tr data-sub="'+escH(k)+'" onclick="filterBySubbie(this.dataset.sub)"><td>'+escH(k)+'</td><td class="r">'+d.count+'</td><td class="r" style="color:var(--warn)">'+fmtSm(d.pending)+'</td><td class="r" style="color:var(--green)">'+fmtSm(d.approved)+'</td><td class="r">'+fmtSm(d.pending+d.approved)+'</td></tr>';});
+  document.getElementById('coSumRows').innerHTML=html||'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:14px">No data</td></tr>';
+}
+function filterBySubbie(name){document.getElementById('srch').value=name;renderList();}
+
+// ── SV LINE ITEMS ──
+var _svLineItems=[];var _svLiUid=1;
+function svNid(){return ++_svLiUid;}
+function svLiSub(){return _svLineItems.reduce(function(a,l){return a+(parseFloat(l.qty)||1)*(parseFloat(l.price)||0);},0);}
+function svRenderLI(){
+  var tbody=document.getElementById('svLiBody');if(!tbody)return;
+  var editing=document.getElementById('svAddLiBtn')&&document.getElementById('svAddLiBtn').style.display!=='none';
+  tbody.innerHTML=_svLineItems.map(function(li,i){
+    var tot=(parseFloat(li.qty)||1)*(parseFloat(li.price)||0);
+    var fv=function(n){return n.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});};
+    if(editing){return '<tr><td><input class="mi" style="width:100%" value="'+escH(li.desc||'')+'" oninput="_svLineItems['+i+'].desc=this.value;svUpdateTots()" placeholder="Description"/></td><td class="r"><input class="mi" style="width:80px;text-align:right" value="'+escH(String(li.qty||'1'))+'" oninput="_svLineItems['+i+'].qty=this.value;svUpdateTots()"/></td><td class="r"><input class="mi" style="width:110px;text-align:right" value="'+escH(String(li.price||''))+'" oninput="_svLineItems['+i+'].price=this.value;svUpdateTots()" placeholder="0.00"/></td><td class="r" style="font-family:DM Mono,monospace;font-size:12px">$'+fv(tot)+'</td><td><button onclick="_svLineItems.splice('+i+',1);svRenderLI()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✕</button></td></tr>';}
+    else{return '<tr><td>'+escH(li.desc||'—')+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+(li.qty||'1.00')+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+(li.price?parseFloat(li.price).toLocaleString('en-AU',{minimumFractionDigits:2}):'—')+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">$'+fv(tot)+'</td><td></td></tr>';}
+  }).join('');
+  svUpdateTots();
+}
+function svAddLI(){_svLineItems.push({id:svNid(),desc:'',qty:'1',price:''});svRenderLI();}
+function svUpdateTots(){
+  var sub=svLiSub();var gst=sub*0.1;var tot=sub+gst;
+  var fv=function(n){return '$'+n.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});};
+  var s=document.getElementById('svTotSub');var g=document.getElementById('svTotGst');var t=document.getElementById('svTotIncl');
+  if(s)s.textContent=fv(sub);if(g)g.textContent=fv(gst);if(t)t.textContent=fv(tot);
+}
+
+// ── DOCUMENT HANDLING ──
+var _svDocs=[];
+function docDragOver(e){e.preventDefault();document.getElementById('docDrop').classList.add('over');}
+function docDragLeave(){document.getElementById('docDrop').classList.remove('over');}
+function docDrop(e){e.preventDefault();document.getElementById('docDrop').classList.remove('over');handleDocFiles(e.dataTransfer.files);}
+function docFileChange(e){handleDocFiles(e.target.files);}
+function handleDocFiles(files){Array.from(files).forEach(function(f){var reader=new FileReader();reader.onload=function(ev){_svDocs.push({name:f.name,url:ev.target.result,type:f.type});renderDocList();};reader.readAsDataURL(f);});}
+function removeDoc(idx){_svDocs.splice(idx,1);renderDocList();}
+function renderDocList(){var el=document.getElementById('docList');if(!el)return;el.innerHTML=_svDocs.map(function(d,i){return '<div class="doc-item"><span style="font-size:16px">'+(d.type&&d.type.includes('pdf')?'📄':'📎')+'</span><span class="doc-item-name">'+escH(d.name)+'</span><a href="'+d.url+'" download="'+escH(d.name)+'" style="color:var(--accent);font-size:12px;text-decoration:none">⬇️</a><button class="doc-item-del" onclick="removeDoc('+i+')">✕</button></div>';}).join('');}
 
 // VARIATION PICKER
 function openVarPicker(){
