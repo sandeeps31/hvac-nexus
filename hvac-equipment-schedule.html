@@ -443,6 +443,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
 </div>
 <div class="ctxm" id="ctxm">
   <div class="ctxi" onclick="ctxCols()">✏️&nbsp; Edit Columns</div>
+  <div class="ctxi" onclick="ctxDuplicate()">📋&nbsp; Duplicate Tab</div>
   <div class="ctxdiv"></div>
   <div class="ctxi red" onclick="ctxDel()">🗑&nbsp; Delete Tab</div>
 </div>
@@ -880,6 +881,21 @@ function showCtx(e,id){
   ctxEl.style.display='block';
 }
 function ctxCols(){ctxEl.style.display='none';if(ctxId){activeId=ctxId;openColEditor();}}
+function ctxDuplicate(){
+  ctxEl.style.display='none';
+  var t=tabs.find(function(x){return x.id===ctxId;});if(!t)return;
+  var copy=JSON.parse(JSON.stringify(t));
+  copy.id='tab'+(++uidN);
+  copy.publishedToCompany=false;
+  // Give new IDs to all rows
+  copy.rows=(copy.rows||[]).map(function(r){var nr=JSON.parse(JSON.stringify(r));nr.id='r'+(++uidN);return nr;});
+  copy.name=(copy.name||t.type)+' (copy)';
+  tabs.push(copy);
+  activeId=copy.id;
+  ctxId=null;renderStrip();saveEquip();
+  showToast('Tab duplicated');
+}
+
 function ctxDel(){
   ctxEl.style.display='none';
   var t=tabs.find(function(x){return x.id===ctxId;});if(!t)return;
@@ -978,6 +994,8 @@ function confirmAdd(){
   tabs.push(newTab);activeId=tabId;_addSelTplId=null;
   closeM('addModal');renderStrip();saveEquip();
   setTimeout(openNewRow,120);
+}
+
 var eCols=[],dragI=null;
 function openColEditor(){
   var t=aTab();if(!t)return;
