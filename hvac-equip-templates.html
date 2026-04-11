@@ -189,6 +189,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn bg bsm" id="backToRegBtn" style="display:none" onclick="showRegister()">← Back to Templates</button>
       <button class="btn bg bsm" id="publishBtn" style="display:none" onclick="publishTemplate()">↑ Publish Revision</button>
+      <button class="btn bg bsm" id="inboxBtn" onclick="showInbox()" style="color:var(--purple);border-color:rgba(167,139,250,.3)">📥 Inbox <span id="inboxBadge" style="display:none;background:var(--purple);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:4px"></span></button>
       <button class="btn bp bsm" id="newTplBtn" onclick="openNewTplModal()">＋ New Template</button>
     </div>
   </div>
@@ -226,6 +227,29 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
           </tr>
         </thead>
         <tbody id="regBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- INBOX VIEW -->
+  <div class="view" id="view-inbox">
+    <div class="reg-toolbar">
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">Schedules submitted from projects for review</span>
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="inboxCount"></span>
+    </div>
+    <div class="reg-page">
+      <table class="reg-tbl">
+        <thead>
+          <tr>
+            <th>Equipment Type</th>
+            <th style="width:120px">Project</th>
+            <th style="width:80px">Layout</th>
+            <th style="width:90px">Submitted</th>
+            <th style="width:90px">Status</th>
+            <th style="width:140px;text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="inboxBody"></tbody>
       </table>
     </div>
   </div>
@@ -370,6 +394,7 @@ function showRegister(){
   document.getElementById('backToRegBtn').style.display='none';
   document.getElementById('publishBtn').style.display='none';
   document.getElementById('newTplBtn').style.display='';
+  document.getElementById('inboxBtn').style.display='';
   document.getElementById('bcCurr').textContent='Equipment Schedule Templates';
   activeTplId=null;
   renderRegister();showView('register');
@@ -756,6 +781,106 @@ function showToast(msg){
   setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},300);},2500);
 }
 
+// ── Inbox (project submissions) ──
+var _inboxItems=[];
+
+async function loadInbox(){
+  try{var d=await dbGetEqsSubmissions();_inboxItems=Array.isArray(d)?d:[];}catch(e){_inboxItems=[];}
+  // Update badge
+  var pending=_inboxItems.filter(function(s){return s.status==='pending';}).length;
+  var badge=document.getElementById('inboxBadge');
+  if(badge){badge.style.display=pending?'':'none';badge.textContent=pending;}
+}
+
+function showInbox(){
+  _inEditor=false;
+  document.getElementById('backToRegBtn').style.display='none';
+  document.getElementById('publishBtn').style.display='none';
+  document.getElementById('newTplBtn').style.display='none';
+  document.getElementById('inboxBtn').style.display='none';
+  // Add back button
+  var bb=document.getElementById('backToRegBtn');
+  bb.style.display='';bb.textContent='← Back to Templates';
+  document.getElementById('bcCurr').textContent='Project Submissions';
+  showView('inbox');renderInbox();
+}
+
+function renderInbox(){
+  var body=document.getElementById('inboxBody');
+  var cnt=document.getElementById('inboxCount');
+  var pending=_inboxItems.filter(function(s){return s.status==='pending';});
+  if(cnt)cnt.textContent=_inboxItems.length+' submission'+(_inboxItems.length!==1?'s':'')+' · '+pending.length+' pending';
+  if(!_inboxItems.length){
+    body.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📥</div><div class="empty-title">No submissions yet</div><div class="empty-sub">When project teams submit equipment schedules for review, they will appear here.</div></div></td></tr>';
+    return;
+  }
+  var rows='';
+  _inboxItems.slice().reverse().forEach(function(s,i){
+    var ri=_inboxItems.length-1-i;
+    var statusCls=s.status==='pending'?'sb-draft':s.status==='added'?'sb-current':'sb-superseded';
+    var statusLabel=s.status==='pending'?'Pending':s.status==='added'?'Added to Library':'Dismissed';
+    rows+='<tr>'
+      +'<td><span style="font-weight:600;color:var(--text)">'+escH(s.equipType||'—')+'</span>'
+      +(s.tplNo?'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted);margin-left:8px">'+escH(s.tplNo)+'</span>':'')
+      +(s.notes?'<div style="font-size:11px;color:var(--text2);margin-top:2px">'+escH(s.notes)+'</div>':'')+'</td>'
+      +'<td><span style="font-size:12px;font-family:DM Mono,monospace;color:var(--accent)">'+escH(s.fromProjectNum||'—')+'</span><div style="font-size:11px;color:var(--text2)">'+escH(s.fromProjectName||'')+'</div></td>'
+      +'<td style="font-size:12px;color:var(--muted)">'+(s.layout==='vertical'?'↕ Vertical':'↔ Horizontal')+'</td>'
+      +'<td style="font-size:12px;color:var(--muted)">'+fmtDate(s.submittedAt||'')+'</td>'
+      +'<td><span class="status-badge '+statusCls+'">'+statusLabel+'</span></td>'
+      +'<td><div class="act-btns">'
+      +(s.status==='pending'?'<button class="act-btn" onclick="inboxAddToLib('+ri+')" title="Add to Library"><span class="tip">Add to Library</span>＋</button>':'')
+      +(s.status==='pending'?'<button class="act-btn danger" onclick="inboxDismiss('+ri+')" title="Dismiss"><span class="tip">Dismiss</span>✕</button>':'')
+      +'<button class="act-btn danger" onclick="inboxDelete('+ri+')" title="Delete"><span class="tip">Delete</span>🗑</button>'
+      +'</div></td></tr>';
+  });
+  body.innerHTML=rows;
+}
+
+async function inboxAddToLib(idx){
+  var s=_inboxItems[idx];if(!s)return;
+  // Create a new template from this submission
+  var newTpl={
+    id:nid(),
+    tplNo:genTplNum(),
+    name:s.equipType,
+    group:'',
+    layout:s.layout||'horizontal',
+    revisions:[],
+    createdAt:todayStr(),
+    updatedAt:todayStr(),
+    sourceProject:s.fromProjectNum,
+    sourceProjectName:s.fromProjectName
+  };
+  // Start as published rev with the submitted sections
+  newTpl.revisions.push({
+    version:'1.0',status:'published',
+    sections:JSON.parse(JSON.stringify(s.sections||[])),
+    createdAt:todayStr(),publishedAt:todayStr(),
+    notes:'Imported from project '+s.fromProjectNum+' — '+s.fromProjectName
+  });
+  templates.push(newTpl);
+  _inboxItems[idx].status='added';
+  save();
+  await dbSetEqsSubmissions(_inboxItems);
+  await loadInbox();
+  renderInbox();
+  showToast('✓ Added "'+s.equipType+'" to template library as '+newTpl.tplNo);
+}
+
+async function inboxDismiss(idx){
+  if(!confirm('Dismiss this submission?'))return;
+  _inboxItems[idx].status='dismissed';
+  await dbSetEqsSubmissions(_inboxItems);
+  await loadInbox();renderInbox();
+}
+
+async function inboxDelete(idx){
+  if(!confirm('Delete this submission permanently?'))return;
+  _inboxItems.splice(idx,1);
+  await dbSetEqsSubmissions(_inboxItems);
+  await loadInbox();renderInbox();
+}
+
 // ── Sidebar ──
 var SBK='hvacnexus_sb_collapsed';
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
@@ -768,6 +893,7 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   try{var p=dbGetCurrentProject();if(p.name){var pn=document.getElementById('sb-proj-name');if(pn)pn.textContent=p.name;}if(p.num){var pu=document.getElementById('sb-proj-num');if(pu)pu.textContent=p.num;}}catch(e){}
   try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   await load();
+  await loadInbox();
   renderRegister();
 })();
 </script>

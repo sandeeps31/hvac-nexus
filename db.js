@@ -285,6 +285,14 @@ async function dbSetEqsTemplates(data) {
   return await dbSet('eqs_templates', data);
 }
 
+// ── Equipment Schedule Submissions (project → company) ──
+async function dbGetEqsSubmissions() {
+  return await dbGet('eqs_submissions') || [];
+}
+async function dbSetEqsSubmissions(data) {
+  return await dbSet('eqs_submissions', data);
+}
+
 // ── Transmittals ──
 async function dbGetTransmittals(projectNum) {
   return await dbGetProject('transmittals', projectNum) || [];
