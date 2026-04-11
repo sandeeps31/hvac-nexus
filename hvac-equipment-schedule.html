@@ -442,7 +442,8 @@ body.sb-sm{padding-left:var(--sb-sm)}
   <button class="addbar-btn" onclick="openNewRow()">＋ Add Row &nbsp;·&nbsp; Tab across &nbsp;·&nbsp; Enter to save</button>
 </div>
 <div class="ctxm" id="ctxm">
-  <div class="ctxi" onclick="ctxCols()">✏️&nbsp; Edit Columns</div>
+  <div class="ctxi" onclick="ctxRename()">✏️&nbsp; Rename</div>
+  <div class="ctxi" onclick="ctxCols()">⚙️&nbsp; Edit Columns</div>
   <div class="ctxi" onclick="ctxDuplicate()">📋&nbsp; Duplicate Tab</div>
   <div class="ctxdiv"></div>
   <div class="ctxi red" onclick="ctxDel()">🗑&nbsp; Delete Tab</div>
@@ -584,8 +585,23 @@ function nid(){return 'r'+(++uidN);}
 function X(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function defn(k){for(var i=0;i<EQ.length;i++)if(EQ[i].key===k)return EQ[i];}
 function aTab(){for(var i=0;i<tabs.length;i++)if(tabs[i].id===activeId)return tabs[i];}
-function getCols(t){return(t.cc||defn(t.type).cols).filter(function(c){return!c.hidden;});}
-function allCols(t){return t.cc||defn(t.type).cols;}
+// Build cols from template sections if no EQ definition
+function tplCols(t){
+  if(t.cc)return t.cc;
+  var eq=defn(t.type);
+  if(eq)return eq.cols;
+  // Company template — derive cols from sections
+  var cols=[{k:'tag',l:'Equipment ID',key:1}];
+  (t.sections||[]).forEach(function(sec){
+    (sec.fields||[]).forEach(function(f){
+      if(f.key&&f.key!=='tag')cols.push({k:f.key,l:f.label||f.key,num:f.type==='number',sel:f.type==='dropdown'});
+    });
+  });
+  if(!cols.find(function(c){return c.k==='status';}))cols.push({k:'status',l:'Status',sel:1});
+  return cols;
+}
+function getCols(t){return tplCols(t).filter(function(c){return!c.hidden;});}
+function allCols(t){return tplCols(t);}
 
 function renderStrip(){
   var has=tabs.length>0;
@@ -612,7 +628,7 @@ function renderStrip(){
 return;}
   var _es2=document.getElementById('eqEmptyState');if(_es2)_es2.remove();
    document.getElementById('tstrip').innerHTML=tabs.map(function(t){
-     var d=defn(t.type),a=t.id===activeId;
+     var d=defn(t.type)||{name:t.name||t.type},a=t.id===activeId;
      var label=t.name||(d?d.name:t.type)||t.type;
      var badge='';
      if(t.companyTemplateTplNo)badge+='<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);opacity:.7;margin-left:4px">'+X(t.companyTemplateTplNo)+'</span>';
@@ -622,7 +638,7 @@ return;}
        +'<button class="etab-menu" onclick="event.stopPropagation();showCtx(event,\''+t.id+'\')">⋮</button>'
        +'</div>';
   }).join('')+'<button class="add-etab" onclick="openAddModal()">＋ Add</button>';
-  updSum();renderTable();
+  updSum();renderTable();updateSubmitBtn();
 }
 
 function updSum(){
@@ -881,6 +897,16 @@ function showCtx(e,id){
   ctxEl.style.display='block';
 }
 function ctxCols(){ctxEl.style.display='none';if(ctxId){activeId=ctxId;openColEditor();}}
+function ctxRename(){
+  ctxEl.style.display='none';
+  var t=tabs.find(function(x){return x.id===ctxId;});if(!t)return;
+  var newName=prompt('Rename schedule:',t.name||t.type||'');
+  if(newName===null||!newName.trim())return;
+  t.name=newName.trim();
+  renderStrip();saveEquip();
+  updateSubmitBtn();
+}
+
 function ctxDuplicate(){
   ctxEl.style.display='none';
   var t=tabs.find(function(x){return x.id===ctxId;});if(!t)return;
@@ -899,7 +925,7 @@ function ctxDuplicate(){
 function ctxDel(){
   ctxEl.style.display='none';
   var t=tabs.find(function(x){return x.id===ctxId;});if(!t)return;
-  var nm=defn(t.type)?defn(t.type).name:t.type;
+  var nm=(defn(t.type)||{name:t.name||t.type}).name;
   if(!confirm('Delete "'+nm+'" tab and ALL its data?\n\nThis cannot be undone.'))return;
   tabs=tabs.filter(function(x){return x.id!==ctxId;});
   if(activeId===ctxId)activeId=tabs.length?tabs[0].id:null;
@@ -948,19 +974,15 @@ function renderAddModalList(){
       });
     });
   }
-  // Blank / built-in types
-  html+='<div style="padding:5px 16px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);margin-top:4px">Blank / Built-in</div>';
-  var eqList=EQ.filter(function(e){return !q||(e.name||'').toLowerCase().includes(q);});
-  var extras=[{key:'__custom__',name:'Custom (blank)',desc:'No predefined fields — build from scratch'}];
-  if(!q)eqList=extras.concat(eqList);
-  else if('custom'.includes(q))eqList=extras.concat(eqList);
-  eqList.forEach(function(e){
-    var sel=_addSelTplId===e.key;
-    html+='<div onclick="pickAddTpl(\''+e.key+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border);background:'+(sel?'var(--accent-dim)':'transparent')+'">'
-      +'<div style="flex:1"><div style="font-size:13px;font-weight:600;color:'+(sel?'var(--accent)':'var(--text)')+'">'+X(e.name)+'</div>'
-      +(e.desc?'<div style="font-size:11px;color:var(--muted);margin-top:1px">'+X(e.desc)+'</div>':'')+'</div>'
+  // Custom blank option always at bottom
+  if(!q||'custom'.includes(q)){
+    html+='<div style="padding:5px 16px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);margin-top:4px">Custom</div>';
+    var sel=_addSelTplId==='__custom__';
+    html+='<div onclick="pickAddTpl(\'__custom__\')" style="display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border);background:'+(sel?'var(--accent-dim)':'transparent')+'">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:600;color:'+(sel?'var(--accent)':'var(--text)')+'">Custom (blank)</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:1px">No predefined fields — build from scratch</div></div>'
       +(sel?'<span style="color:var(--accent)">✓</span>':'')+'</div>';
-  });
+  }
   list.innerHTML=html||'<div style="padding:40px;text-align:center;color:var(--muted)">No templates found</div>';
 }
 
@@ -999,7 +1021,7 @@ function confirmAdd(){
 var eCols=[],dragI=null;
 function openColEditor(){
   var t=aTab();if(!t)return;
-  var d=defn(t.type);
+  var d=defn(t.type)||{name:t.name||t.type,cols:[]};
   eCols=JSON.parse(JSON.stringify(allCols(t)));
   document.getElementById('ceSub').textContent=(d?d.name:'')+' — drag to reorder · toggle · rename · add custom columns';
   rCeList();document.getElementById('ceModal').classList.add('open');
@@ -1257,6 +1279,7 @@ document.getElementById('ceModal').addEventListener('click',function(e){if(e.tar
     var ok=await loadEquip();
     if(ok)await loadRevData();
   }catch(e){console.warn('equip load failed:',e);}
+  try{var d=await dbGetEqsTemplates();_addModalTemplates=Array.isArray(d)?d:[];}catch(e){_addModalTemplates=[];}
   renderStrip();
   setTimeout(function(){if(activeId&&typeof ensureRevInit==='function'){ensureRevInit(activeId);renderRevBar();}},0);
 })();
@@ -2118,6 +2141,19 @@ function doImportScanned(){
 }
 
 // ── PUBLISH TO COMPANY ──
+function updateSubmitBtn(){
+  var btn=document.getElementById('submitToCoBtn');if(!btn)return;
+  var t=aTab();if(!t){btn.style.display='none';return;}
+  var tabName=(t.name||t.type||'').toLowerCase().trim();
+  // Hide if derived from a company template (already exists)
+  if(t.companyTemplateId){btn.style.display='none';return;}
+  // Hide if name matches any company template name
+  var matchesTpl=_addModalTemplates.some(function(tpl){
+    return (tpl.name||'').toLowerCase().trim()===tabName;
+  });
+  btn.style.display=matchesTpl?'none':'';
+}
+
 function openPublishToCo(){
   var t=aTab();if(!t){showToast('No active tab');return;}
   document.getElementById('publishToCoNotes').value='';
