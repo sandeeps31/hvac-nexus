@@ -1414,71 +1414,79 @@ function selectEqType(type){
 function renderEqEditor(){
   var pane=document.getElementById('eqEditorPane');if(!pane)return;
   var t=_eqSelectedType;if(!t){pane.innerHTML='';return;}
-  var tmpl=_eqTemplates[t]||{layout:'vertical',groups:[{name:'General',fields:[]}]};
-
+  if(!_eqTemplates[t])_eqTemplates[t]={layout:'vertical',groups:[{name:'General',fields:[]}]};
+  var tmpl=_eqTemplates[t];
   var si='background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none';
-
-  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">'
-    +'<div><div style="font-family:\'Syne\',sans-serif;font-size:18px;font-weight:800;color:var(--text)">'+t+'</div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">Define fields for this equipment type template</div></div>'
-    +'<div style="display:flex;gap:8px;align-items:center">'
-    +'<div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px">'
-    +'<span style="font-size:11px;color:var(--text2)">Layout:</span>'
-    +'<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:'+(tmpl.layout==='vertical'?'var(--accent)':'var(--muted)')+'"><input type="radio" name="eqLayout" value="vertical" '+(tmpl.layout==='vertical'?'checked':'')+' onchange="eqSetLayout(\'vertical\')"/> Vertical</label>'
-    +'<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:'+(tmpl.layout==='horizontal'?'var(--accent)':'var(--muted)')+'"><input type="radio" name="eqLayout" value="horizontal" '+(tmpl.layout==='horizontal'?'checked':'')+' onchange="eqSetLayout(\'horizontal\')"/> Horizontal</label>'
-    +'</div>'
+  var isV=tmpl.layout==='vertical';
+  var html='';
+  // Header
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">'
+    +'<div><div style="font-family:\'Syne\',sans-serif;font-size:18px;font-weight:800;color:var(--text)">'+escHs(t)+'</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">Define fields and section headers for this equipment type</div></div>'
+    +'<div style="display:flex;gap:8px">'
     +'<button class="btn bg bsm" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="deleteEqTemplate()">Delete</button>'
     +'<button class="btn bp bsm" onclick="saveEqTemplate()">Save Template</button>'
     +'</div></div>';
-
+  // Layout toggle
+  html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px">'
+    +'<span style="font-size:12px;color:var(--text2);font-weight:500;flex-shrink:0">Schedule layout:</span>'
+    +'<div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden">'
+    +'<button onclick="eqSetLayout(\'vertical\')" style="padding:6px 16px;font-size:12px;border:none;cursor:pointer;background:'+(isV?'var(--accent)':'var(--surface)')+';color:'+(isV?'#000':'var(--text2)')+';font-weight:'+(isV?'600':'400')+'">↕ Vertical</button>'
+    +'<button onclick="eqSetLayout(\'horizontal\')" style="padding:6px 16px;font-size:12px;border:none;cursor:pointer;background:'+(!isV?'var(--accent)':'var(--surface)')+';color:'+(!isV?'#000':'var(--text2)')+';font-weight:'+(!isV?'600':'400')+'">↔ Horizontal</button>'
+    +'</div>'
+    +'<span style="font-size:11px;color:var(--muted)">'+(isV?'Equipment IDs are columns, fields are rows (e.g. FCU schedule)':'Equipment IDs are rows, fields are columns (e.g. dampers, VAVs)')+'</span>'
+    +'</div>';
+  // Hint
+  html+='<div style="font-size:11px;color:var(--muted);margin-bottom:16px;padding:8px 12px;background:var(--accent-dim);border:1px solid rgba(0,200,255,.15);border-radius:7px">'
+    +'<strong style="color:var(--accent)">Section headers</strong> group related fields together — e.g. add a section called <em>FAN MAKE</em> then add fields: Type, Model, Speed, kW underneath it.'
+    +'</div>';
   // Groups
   tmpl.groups.forEach(function(grp,gi){
-    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:16px;overflow:hidden">'
-      +'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border)">'
-      +'<input type="text" value="'+escHs(grp.name)+'" oninput="eqRenameGroup('+gi+',this.value)" style="'+si+';font-weight:600;flex:1" placeholder="Group name e.g. Fan Details"/>'
-      +(tmpl.groups.length>1?'<button onclick="eqDeleteGroup('+gi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px">×</button>':'')
-      +'</div>'
-      // Field table header
-      +'<div style="display:grid;grid-template-columns:1fr 90px 80px 80px 80px 32px;gap:8px;padding:6px 14px;background:var(--surface3);border-bottom:1px solid var(--border)">'
-      +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Field Label</span>'
-      +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Type</span>'
-      +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Unit</span>'
-      +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Default</span>'
-      +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Required</span>'
-      +'<span></span>'
+    html+='<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden">'
+      +'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface3);border-bottom:2px solid var(--border)">'
+      +'<span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;color:var(--muted);flex-shrink:0">SECTION</span>'
+      +'<input type="text" value="'+escHs(grp.name)+'" oninput="eqRenameGroup('+gi+',this.value)" style="'+si+';font-family:\'DM Mono\',monospace;font-weight:700;font-size:12px;flex:1;letter-spacing:1px;text-transform:uppercase" placeholder="e.g. FAN MAKE"/>'
+      +'<span style="font-size:10px;color:var(--muted)">'+grp.fields.length+' field'+(grp.fields.length!==1?'s':'')+'</span>'
+      +(tmpl.groups.length>1?'<button onclick="eqDeleteGroup('+gi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">×</button>':'')
       +'</div>';
-
-    // Fields
+    if(grp.fields.length){
+      html+='<div style="display:grid;grid-template-columns:1fr 90px 70px 90px 60px 28px;gap:6px;padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border)">'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Field Label</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Type</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Unit</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Default / Options</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:center">Req.</span>'
+        +'<span></span>'
+        +'</div>';
+    }
     grp.fields.forEach(function(f,fi){
-      html+='<div style="display:grid;grid-template-columns:1fr 90px 80px 80px 80px 32px;gap:8px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center">'
+      html+='<div style="display:grid;grid-template-columns:1fr 90px 70px 90px 60px 28px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center;background:var(--surface)">'
         +'<input type="text" value="'+escHs(f.label)+'" oninput="eqUpdateField('+gi+','+fi+',\'label\',this.value)" style="'+si+';width:100%" placeholder="e.g. Air Flow"/>'
         +'<select onchange="eqUpdateField('+gi+','+fi+',\'type\',this.value)" style="'+si+';width:100%">'
         +FIELD_TYPES.map(function(ft){return'<option value="'+ft.key+'"'+(f.type===ft.key?' selected':'')+'>'+ft.label+'</option>';}).join('')
         +'</select>'
         +'<input type="text" value="'+escHs(f.unit||'')+'" oninput="eqUpdateField('+gi+','+fi+',\'unit\',this.value)" style="'+si+';width:100%" placeholder="l/s"/>'
         +(f.type==='dropdown'
-          ?'<input type="text" value="'+escHs((f.options||[]).join(','))+'" oninput="eqUpdateField('+gi+','+fi+',\'options\',this.value.split(\',\'))" style="'+si+';width:100%" placeholder="A,B,C"/>'
+          ?'<input type="text" value="'+escHs((f.options||[]).join(','))+'" oninput="eqUpdateField('+gi+','+fi+',\'options\',this.value.split(\',\'))" style="'+si+';width:100%;font-size:11px" placeholder="A,B,C"/>'
           :'<input type="text" value="'+escHs(f.defaultVal||'')+'" oninput="eqUpdateField('+gi+','+fi+',\'defaultVal\',this.value)" style="'+si+';width:100%" placeholder="—"/>'
         )
         +'<div style="text-align:center"><input type="checkbox" '+(f.required?'checked':'')+' onchange="eqUpdateField('+gi+','+fi+',\'required\',this.checked)"/></div>'
-        +'<button onclick="eqDeleteField('+gi+','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px">×</button>'
+        +'<button onclick="eqDeleteField('+gi+','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1">×</button>'
         +'</div>';
     });
-
-    html+='<div style="padding:8px 14px">'
+    if(!grp.fields.length)html+='<div style="padding:10px 14px;font-size:12px;color:var(--muted);font-style:italic">No fields yet</div>';
+    html+='<div style="padding:8px 14px;background:var(--surface)">'
       +'<button class="btn bg bsm" onclick="eqAddField('+gi+')" style="color:var(--accent);border-color:rgba(0,200,255,.3)">+ Add Field</button>'
       +'</div></div>';
   });
-
-  html+='<button class="btn bg bsm" onclick="eqAddGroup()" style="color:var(--accent);border-color:rgba(0,200,255,.3)">+ Add Group</button>';
-
+  html+='<button class="btn bg bsm" onclick="eqAddGroup()" style="color:var(--accent);border-color:rgba(0,200,255,.3);margin-top:4px">+ Add Section Header</button>';
   pane.innerHTML=html;
 }
 
 function eqSetLayout(v){
   if(!_eqSelectedType)return;
   if(!_eqTemplates[_eqSelectedType])_eqTemplates[_eqSelectedType]={layout:v,groups:[{name:'General',fields:[]}]};
-  _eqTemplates[_eqSelectedType].layout=v;_eqDirty=true;
+  _eqTemplates[_eqSelectedType].layout=v;_eqDirty=true;renderEqEditor();
 }
 function eqRenameGroup(gi,val){
   var tmpl=_eqTemplates[_eqSelectedType];if(!tmpl)return;
