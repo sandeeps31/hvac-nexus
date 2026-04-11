@@ -56,6 +56,18 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
 .fsel:focus{border-color:var(--accent);color:var(--text)}.fsel option{background:var(--surface2)}
 
 /* SYNC BANNER */
+.summary-group{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.summary-group-hdr{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;user-select:none;background:var(--surface2);border-bottom:1px solid var(--border)}
+.summary-group-hdr:hover{background:var(--surface3)}
+.summary-group-hdr.collapsed{border-bottom:none}
+.summary-group-body{overflow:hidden}
+.summary-stat{display:flex;flex-direction:column;align-items:center;padding:10px 18px;border-right:1px solid var(--border);min-width:80px}
+.summary-stat:last-child{border-right:none}
+.summary-stat-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:var(--text)}
+.summary-stat-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.summary-row{display:flex;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);font-size:12px;gap:12px}
+.summary-row:last-child{border-bottom:none}
+.summary-row:hover{background:var(--surface2);cursor:pointer}
 .sync-banner{margin:16px 24px 0;padding:12px 16px;background:var(--warn-dim);border:1px solid rgba(255,184,48,.25);border-radius:8px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--warn)}
 .sync-banner-text{flex:1}
 .sync-btn{padding:5px 14px;border-radius:6px;border:1px solid rgba(255,184,48,.3);background:transparent;color:var(--warn);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all .13s}
@@ -239,7 +251,12 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
   </select>
   <select class="fsel" id="typeFilter" onchange="renderTable()"><option value="">All Equipment Types</option></select>
   <select class="fsel" id="locFilter" onchange="renderTable()"><option value="">All Locations</option></select>
-  <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="rowCount"></span>
+  <!-- View toggle -->
+  <div style="display:flex;align-items:center;gap:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;overflow:hidden;margin-left:auto;font-family:'DM Mono',monospace;font-size:11px">
+    <button id="viewBtnFull" onclick="setView('full')" style="padding:5px 12px;border:none;cursor:pointer;background:var(--accent);color:#080c12;font-family:inherit;font-size:11px;font-weight:700;transition:all .13s">☰ Full</button>
+    <button id="viewBtnSummary" onclick="setView('summary')" style="padding:5px 12px;border:none;cursor:pointer;background:transparent;color:var(--muted);font-family:inherit;font-size:11px;transition:all .13s">⊞ Summary</button>
+  </div>
+  <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="rowCount"></span>
 </div>
 
 <div id="syncBanner" style="display:none" class="sync-banner">
@@ -248,7 +265,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
   <button class="sync-btn" onclick="syncFromEquipment()">⟳ Sync Now</button>
 </div>
 
-<div style="padding:16px 24px 60px"><div style="overflow-x:auto;border-radius:var(--radius)"><table class="proc-tbl" id="procTable">
+<div id="summaryView" style="display:none;padding:16px 24px 60px"></div>
+<div id="fullView" style="padding:16px 24px 60px"><div style="overflow-x:auto;border-radius:var(--radius)"><table class="proc-tbl" id="procTable">
     <thead>
       <tr>
         <th style="width:40px">#</th>
@@ -269,7 +287,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
     <tbody id="procTbody"></tbody>
   </table>
 </div>
-</div>
+</div></div>
 
 <!-- ADD / EDIT MODAL -->
 <div class="mo" id="addModal" onclick="if(event.target===this)closeModal()">
@@ -545,6 +563,7 @@ function renderTable(){
   var filtered=getFilteredItems();
   updateSummary(filtered);
   document.getElementById('rowCount').textContent=filtered.length+' item'+(filtered.length!==1?'s':'');
+  if(_currentView==='summary'){renderSummary();return;}
   var tbody=document.getElementById('procTbody');
   tbody.innerHTML='';
   if(!filtered.length){
@@ -709,6 +728,109 @@ var SBK='hvacnexus_sb_collapsed';
 function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
 function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+// ── View toggle ──
+var _currentView='full';
+function setView(v){
+  _currentView=v;
+  document.getElementById('fullView').style.display=v==='full'?'':'none';
+  document.getElementById('summaryView').style.display=v==='summary'?'':'none';
+  document.getElementById('viewBtnFull').style.background=v==='full'?'var(--accent)':'transparent';
+  document.getElementById('viewBtnFull').style.color=v==='full'?'#080c12':'var(--muted)';
+  document.getElementById('viewBtnFull').style.fontWeight=v==='full'?'700':'400';
+  document.getElementById('viewBtnSummary').style.background=v==='summary'?'var(--accent)':'transparent';
+  document.getElementById('viewBtnSummary').style.color=v==='summary'?'#080c12':'var(--muted)';
+  document.getElementById('viewBtnSummary').style.fontWeight=v==='summary'?'700':'400';
+  if(v==='summary')renderSummary();
+}
+
+function renderSummary(){
+  var filtered=getFilteredItems();
+  var el=document.getElementById('summaryView');
+  if(!filtered.length){el.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)">No items match your filters.</div>';return;}
+
+  // Group by equipment type
+  var groups={};var gOrder=[];
+  filtered.forEach(function(item){
+    var k=item.equipType||'Unspecified';
+    if(!groups[k]){groups[k]=[];gOrder.push(k);}
+    groups[k].push(item);
+  });
+  gOrder.sort();
+
+  var td=today();
+  var STATUS_COLORS={'Delivered':'var(--green)','Ordered':'var(--accent)','Ready':'var(--purple)','Not ordered':'var(--danger)','Supplied by others':'var(--muted)'};
+
+  var html='';
+  gOrder.forEach(function(grpName,gi){
+    var grpItems=groups[grpName];
+    var total=grpItems.length;
+    var totalQty=grpItems.reduce(function(a,b){return a+(parseInt(b.qty)||1);},0);
+    var delivered=grpItems.filter(function(x){return x.status==='Delivered';}).length;
+    var ordered=grpItems.filter(function(x){return x.status==='Ordered'||x.status==='Ready';}).length;
+    var notOrdered=grpItems.filter(function(x){return x.status==='Not ordered';}).length;
+    var overdue=grpItems.filter(function(x){return x.eta&&x.eta<td&&x.status!=='Delivered';}).length;
+    // Earliest outstanding ETA
+    var etaDates=grpItems.filter(function(x){return x.eta&&x.status!=='Delivered';}).map(function(x){return x.eta;}).sort();
+    var nextEta=etaDates.length?fmtD(etaDates[0]):'—';
+    var pct=totalQty>0?Math.round((delivered/total)*100):0;
+
+    // Status summary text
+    var statusSummary='';
+    if(delivered===total)statusSummary='<span style="color:var(--green);font-weight:600">✓ All delivered</span>';
+    else if(notOrdered===total)statusSummary='<span style="color:var(--danger)">Not ordered</span>';
+    else statusSummary='<span style="color:var(--accent)">'+delivered+'/'+total+' delivered</span>'+(overdue?'<span style="color:var(--danger);margin-left:8px">⚠ '+overdue+' overdue</span>':'');
+
+    html+='<div class="summary-group" id="sg_'+gi+'">'
+      +'<div class="summary-group-hdr" onclick="toggleSummaryGroup('+gi+')">'
+        +'<span style="font-size:14px">▾</span>'
+        +'<span style="font-weight:700;font-size:13px;flex:1">'+escH(grpName)+'</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);margin-right:16px">'+total+' item'+(total!==1?'s':'')+'</span>'
+        +statusSummary
+        // Mini progress bar
+        +'<div style="width:80px;height:6px;background:var(--surface3);border-radius:3px;margin-left:16px;overflow:hidden">'
+          +'<div style="height:100%;width:'+pct+'%;background:var(--green);border-radius:3px;transition:width .3s"></div>'
+        +'</div>'
+      +'</div>'
+      +'<div class="summary-group-body" id="sgb_'+gi+'">'
+        // Stats row
+        +'<div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface)">'
+          +'<div class="summary-stat"><span class="summary-stat-val">'+total+'</span><span class="summary-stat-lbl">Total</span></div>'
+          +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--danger)">'+notOrdered+'</span><span class="summary-stat-lbl">Not ordered</span></div>'
+          +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--accent)">'+ordered+'</span><span class="summary-stat-lbl">Ordered</span></div>'
+          +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--green)">'+delivered+'</span><span class="summary-stat-lbl">Delivered</span></div>'
+          +(overdue?'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--danger)">'+overdue+'</span><span class="summary-stat-lbl">Overdue</span></div>':'')
+          +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--text2);font-size:14px">'+nextEta+'</span><span class="summary-stat-lbl">Next ETA</span></div>'
+        +'</div>'
+        // Item rows
+        +grpItems.map(function(item){
+          var etaD=item.eta?fmtD(item.eta):'—';
+          var etaColor=item.status==='Delivered'?'var(--green)':item.eta&&item.eta<td?'var(--danger)':item.eta?'var(--text2)':'var(--muted)';
+          var stColor=STATUS_COLORS[item.status]||'var(--text2)';
+          return '<div class="summary-row" onclick="openEdit(''+item.id+'')">'
+            +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);min-width:140px">'+escH(item.assetId||'—')+'</span>'
+            +'<span style="color:var(--text2);min-width:100px">'+escH(item.location||'—')+'</span>'
+            +'<span style="color:var(--muted);flex:1">'+escH(item.manufacturer||'—')+(item.model?' · '+escH(item.model):'')+'</span>'
+            +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+stColor+';min-width:120px">'+escH(item.status||'—')+'</span>'
+            +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+etaColor+';min-width:80px;text-align:right">'+etaD+'</span>'
+          +'</div>';
+        }).join('')
+      +'</div>'
+    +'</div>';
+  });
+
+  el.innerHTML=html;
+}
+
+var _sgCollapsed={};
+function toggleSummaryGroup(gi){
+  _sgCollapsed[gi]=!_sgCollapsed[gi];
+  var body=document.getElementById('sgb_'+gi);
+  var hdr=document.querySelector('#sg_'+gi+' .summary-group-hdr');
+  var chev=hdr?hdr.querySelector('span'):null;
+  if(body)body.style.display=_sgCollapsed[gi]?'none':'';
+  if(chev)chev.textContent=_sgCollapsed[gi]?'▸':'▾';
+}
+
 function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
