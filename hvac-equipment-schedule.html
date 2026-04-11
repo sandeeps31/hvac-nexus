@@ -1594,23 +1594,24 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 // SCAN DRAWINGS ENGINE
 // ═══════════════════════════════════════════
 var _scanDrawings=[],_scanSelected=new Set(),_scanResults=[];
+// _scanRawTables: [{drawing, headers:[], rows:[[...]]}]
+// _scanMapping: [{pdfHeader, mappedKey, isNew, newLabel}]
+var _scanRawTables=[],_scanMappings=[],_scanEqType=null,_scanEqTypeConfirmed=false;
 
 function openScanModal(){
-  _scanSelected=new Set();_scanResults=[];
+  _scanSelected=new Set();_scanResults=[];_scanRawTables=[];_scanMappings=[];_scanEqType=null;_scanEqTypeConfirmed=false;
   document.getElementById('scanModal').classList.add('open');
-  setScanStep(1);
-  renderScanStep1Loading();
+  setScanStep(1);renderScanStep1Loading();
   dbGetDrawings(_eqPNum).then(function(d){
     var all=(Array.isArray(d)?d:d&&Array.isArray(d.drawings)?d.drawings:[]);
     _scanDrawings=all.filter(function(drw){return drw.status!=='Obsolete';});
     renderScanStep1();
-  }).catch(function(e){console.error('[ScanModal] fetch error:',e);_scanDrawings=[];renderScanStep1();});
+  }).catch(function(e){console.error('[Scan]',e);_scanDrawings=[];renderScanStep1();});
 }
-
 function closeScanModal(){document.getElementById('scanModal').classList.remove('open');}
 
 function setScanStep(n){
-  [1,2,3].forEach(function(i){
+  [1,2,3,4].forEach(function(i){
     var el=document.getElementById('scanStep'+i);
     if(el)el.classList.toggle('active',i===n);
   });
@@ -1630,41 +1631,37 @@ function renderScanStep1(){
   }
   var groups={};
   _scanDrawings.forEach(function(drw){
-    var cat=drw.subcat||drw.cat||'General';
-    var area=drw.area||'';
-    var gk=cat+'|||'+area;
+    var cat=drw.cat||'Other';var area=drw.area||'General';
+    var gk=cat+'||'+area;
     if(!groups[gk])groups[gk]={cat:cat,area:area,drawings:[]};
     groups[gk].drawings.push(drw);
   });
-  var html='<div style="padding:8px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--surface2)">'
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)">'
     +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" id="scanChkAll" onchange="scanToggleAll(this.checked)"/> Select all</label>'
     +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);margin-left:auto" id="scanSelCount">0 selected</span></div>';
-  Object.values(groups).forEach(function(g){
-    html+='<div style="padding:6px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-family:DM Mono,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text2);display:flex;gap:8px;align-items:center">'
-      +'<span>'+escH(g.cat)+'</span>'+(g.area?'<span style="color:var(--accent);font-size:9px">▸ '+escH(g.area)+'</span>':'')
-      +'<span style="color:var(--muted);font-size:9px;margin-left:auto">'+g.drawings.length+' drawing'+(g.drawings.length!==1?'s':'')+'</span></div>';
+  Object.keys(groups).forEach(function(gk){
+    var g=groups[gk];
+    html+='<div style="padding:6px 16px;background:var(--surface2);font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">'
+      +'<span>'+escH(g.cat)+'</span>'+(g.area?'<span style="color:var(--accent);font-size:9px"> ▸ '+escH(g.area)+'</span>':'')+' <span style="color:var(--muted);font-size:9px;margin-left:auto">'+g.drawings.length+' drawing'+(g.drawings.length!==1?'s':'')+'</span></div>';
     g.drawings.forEach(function(drw){
-      var hasPdf=!!(drw.pdfUrl||drw.pdfData);
       var sel=_scanSelected.has(drw.id);
-      html+='<div class="scan-drw-row'+(sel?' selected':'')+'" data-id="'+escH(drw.id)+'" onclick="scanToggleRow(this)">'
+      var hasPdf=!!(drw.pdfUrl||drw.pdfData);
+      html+='<div class="scan-drw-row'+(sel?' selected':'')+(hasPdf?'':' dim')+'" data-id="'+escH(drw.id)+'" onclick="scanToggleRow(this)">'
         +'<input type="checkbox" class="scan-chk" data-id="'+escH(drw.id)+'" '+(sel?'checked':'')+' onclick="event.stopPropagation();scanToggleRow(this.closest(\'.scan-drw-row\'))" style="flex-shrink:0"/>'
-        +'<span style="font-size:16px">'+(hasPdf?'📄':'📋')+'</span>'
         +'<div style="flex:1;min-width:0"><div style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(drw.num||'—')+'</div>'
         +'<div style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(drw.name||'—')+'</div></div>'
-        +(hasPdf?'<span style="font-size:10px;font-family:DM Mono,monospace;color:var(--green);flex-shrink:0">PDF ✓</span>':'<span style="font-size:10px;font-family:DM Mono,monospace;color:var(--muted);flex-shrink:0">No PDF</span>')
+        +(hasPdf?'<span style="font-size:10px;color:var(--green)">PDF</span>':'<span style="font-size:10px;color:var(--muted)">No PDF</span>')
         +'</div>';
     });
   });
   body.innerHTML=html;
   updateScanSelCount();
-  document.getElementById('scanFooter').innerHTML=
-    '<button class="btn bg bsm" onclick="closeScanModal()">Cancel</button>'
-    +'<button class="btn bp bsm" id="scanStartBtn" onclick="startScan()" disabled>📄 Scan Selected</button>';
+  document.getElementById('scanFooter').innerHTML='<button class="btn bg bsm" onclick="closeScanModal()">Cancel</button>'
+    +'<button class="btn bp bsm" id="scanStartBtn" onclick="startScan()" disabled>Extract Data →</button>';
 }
 
 function scanToggleRow(row){
-  var id=row.dataset.id;
-  var chk=row.querySelector('.scan-chk');
+  var id=row.dataset.id;var chk=row.querySelector('.scan-chk');
   if(_scanSelected.has(id)){_scanSelected.delete(id);row.classList.remove('selected');if(chk)chk.checked=false;}
   else{_scanSelected.add(id);row.classList.add('selected');if(chk)chk.checked=true;}
   updateScanSelCount();
@@ -1672,184 +1669,324 @@ function scanToggleRow(row){
 function scanToggleAll(checked){
   _scanDrawings.forEach(function(drw){checked?_scanSelected.add(drw.id):_scanSelected.delete(drw.id);});
   document.querySelectorAll('.scan-drw-row').forEach(function(row){
-    row.classList.toggle('selected',checked);
-    var chk=row.querySelector('.scan-chk');if(chk)chk.checked=checked;
+    row.classList.toggle('selected',checked);var chk=row.querySelector('.scan-chk');if(chk)chk.checked=checked;
   });
   updateScanSelCount();
 }
 function updateScanSelCount(){
-  var n=_scanSelected.size;
-  var el=document.getElementById('scanSelCount');if(el)el.textContent=n+' selected';
-  var btn=document.getElementById('scanStartBtn');if(btn)btn.disabled=(n===0);
+  var el=document.getElementById('scanSelCount');if(el)el.textContent=_scanSelected.size+' selected';
+  var btn=document.getElementById('scanStartBtn');if(btn)btn.disabled=!_scanSelected.size;
 }
 
-var HEADER_MAP={'tag':['tag','tag no','tag no.','equipment id','item','item no','id','ref','mark'],'desc':['description','desc','service','name','unit description'],'location':['location','loc','area','zone','room','level','floor'],'sublocation':['sublocation','sub location','sub loc','room name'],'qty':['qty','quantity','no','no.','count','units'],'manufacturer':['manufacturer','make','brand','mfr','mfg','vendor'],'model':['model','model no','model no.','part no','cat no'],'type':['type','unit type','equipment type'],'airflow':['airflow','supply l/s','cfm','l/s','total l/s','air volume','sa l/s'],'oa':['oa','oa l/s','outside air','fresh air'],'esp':['esp','esp pa','external static','static pa'],'cooling':['cooling','cooling kw','cooling capacity','cool kw','total cooling','tc kw'],'heating':['heating','heating kw','heating capacity','heat kw','total heating'],'flow':['flow','flow l/s','water flow','flow rate'],'head':['head','head kpa','pressure drop','pump head'],'power':['power','power kw','input kw','kw input'],'motor_kw':['motor kw','motor power kw'],'motor_volt':['voltage','volts','supply voltage'],'motor_fla':['fla','fla a','full load amps','amps'],'fan':['fan kw','fan power'],'weight':['weight','mass','kg','weight kg'],'size':['size','dimensions','overall size'],'noise':['noise','noise dba','sound level','dba'],'status':['status','install status']};
-var _hdrLookup={};
-Object.keys(HEADER_MAP).forEach(function(k){HEADER_MAP[k].forEach(function(a){_hdrLookup[a.toLowerCase().trim()]=k;});});
-
-var EQ_TYPE_HINTS=[{keys:['fcu','fan coil'],type:'fcu'},{keys:['ahu','air handling'],type:'ahu'},{keys:['chiller','chw'],type:'chillers'},{keys:['cooling tower','ct-'],type:'ct'},{keys:['pump','chwp','hwp'],type:'pumps'},{keys:['fan','exhaust fan','supply fan'],type:'fans'},{keys:['hepa'],type:'hepa'},{keys:['humidifier','hum'],type:'hum'},{keys:['crac','crah'],type:'crac'},{keys:['pac','vrf','vrv'],type:'pac'},{keys:['vav'],type:'vav'},{keys:['mssb','switchboard'],type:'mssb'},{keys:['damper'],type:'dampers'},{keys:['grille','diffuser'],type:'grilles'}];
-
-function detectEquipType(title,firstTag){
-  var s=((title||'')+' '+(firstTag||'')).toLowerCase();
-  for(var i=0;i<EQ_TYPE_HINTS.length;i++){var h=EQ_TYPE_HINTS[i];for(var j=0;j<h.keys.length;j++){if(s.indexOf(h.keys[j])>=0)return h.type;}}
-  return null;
+// ── STEP 2: Extract raw tables from PDFs ──
+var _scanQueue=[],_scanQueueIdx=0;
+function startScan(){
+  if(!_scanSelected.size){alert('Select at least one drawing.');return;}
+  var withPdf=_scanDrawings.filter(function(d){return _scanSelected.has(d.id)&&(d.pdfUrl||d.pdfData);});
+  if(!withPdf.length){alert('None of the selected drawings have PDFs attached.');return;}
+  _scanQueue=withPdf;_scanQueueIdx=0;_scanRawTables=[];
+  setScanStep(2);
+  document.getElementById('scanBody').innerHTML='<div style="padding:28px 24px"><div style="font-size:13px;color:var(--text2);margin-bottom:20px">Extracting data from '+_scanQueue.length+' drawing'+(_scanQueue.length!==1?'s':'')+'…</div>'
+    +'<div style="background:var(--surface2);border-radius:8px;overflow:hidden;height:8px;margin-bottom:16px"><div id="scanProgressBar" style="height:100%;background:var(--accent);width:0%;transition:width .3s;border-radius:8px"></div></div>'
+    +'<div id="scanProgressLog" style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);max-height:300px;overflow-y:auto"></div></div>';
+  document.getElementById('scanFooter').innerHTML='<button class="btn bg bsm" onclick="closeScanModal()">Cancel</button>';
+  processNextScan();
 }
-function mapHeader(raw){
-  var clean=raw.toLowerCase().trim().replace(/[^a-z0-9\s\/\.]/g,' ').replace(/\s+/g,' ').trim();
-  return _hdrLookup[clean]||null;
+function scanLog(msg,color){var el=document.getElementById('scanProgressLog');if(el){el.innerHTML+='<div style="padding:2px 0'+(color?';color:'+color:'')+'">'+(msg||'')+'</div>';el.scrollTop=el.scrollHeight;}}
+function processNextScan(){
+  if(_scanQueueIdx>=_scanQueue.length){
+    var pb=document.getElementById('scanProgressBar');if(pb)pb.style.width='100%';
+    setTimeout(renderScanStep3,400);return;
+  }
+  var drw=_scanQueue[_scanQueueIdx];
+  var pb=document.getElementById('scanProgressBar');if(pb)pb.style.width=Math.round(_scanQueueIdx/_scanQueue.length*100)+'%';
+  scanLog('Extracting: '+escH(drw.num)+' — '+escH(drw.name||''));
+  extractRawTables(drw.pdfUrl||null,drw.pdfData||null).then(function(tables){
+    if(tables.length){
+      scanLog('  ✓ Found '+tables.length+' table'+(tables.length!==1?'s':''),'#00e5a0');
+      tables.forEach(function(t){_scanRawTables.push({drawing:drw,headers:t.headers,rows:t.rows,page:t.page});});
+    } else {scanLog('  — No tables found');}
+    _scanQueueIdx++;processNextScan();
+  }).catch(function(e){scanLog('  ✗ Error: '+(e.message||e),'#ff4d6d');_scanQueueIdx++;processNextScan();});
 }
 
-function extractTablesFromPdf(pdfUrl,pdfData){
+// Raw extraction — just grab headers and rows, no mapping
+function extractRawTables(pdfUrl,pdfData){
   return new Promise(function(resolve,reject){
-    var src=pdfUrl?{url:pdfUrl}:{data:(function(){var b=atob(pdfData.split(',')[1]||pdfData);var a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;})()};
     if(typeof pdfjsLib==='undefined'){resolve([]);return;}
+    var src=pdfUrl?{url:pdfUrl}:{data:(function(){var b=atob(pdfData.split(',')[1]||pdfData);var a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;})()};
     pdfjsLib.getDocument(src).promise.then(function(pdf){
       var pagePromises=[];
-      for(var pg=1;pg<=pdf.numPages;pg++){pagePromises.push(pdf.getPage(pg).then(function(page){return page.getTextContent().then(function(content){return{page:page.pageNumber,items:content.items};});}));}
+      for(var pg=1;pg<=pdf.numPages;pg++){
+        pagePromises.push(pdf.getPage(pg).then(function(page){
+          return page.getTextContent().then(function(content){return{page:page.pageNumber,items:content.items};});
+        }));
+      }
       Promise.all(pagePromises).then(function(pages){
         var tables=[];
-        pages.forEach(function(pg){detectTablesInPage(pg.items,pg.page).forEach(function(t){tables.push(t);});});
+        pages.forEach(function(pg){
+          extractRawTablesFromPage(pg.items,pg.page).forEach(function(t){tables.push(t);});
+        });
         resolve(tables);
       });
     }).catch(reject);
   });
 }
 
-function detectTablesInPage(items,pageNum){
+function extractRawTablesFromPage(items,pageNum){
   if(!items||!items.length)return[];
   var rows={};
   items.forEach(function(item){
-    var y=Math.round(item.transform[5]/2)*2;
+    var y=Math.round(item.transform[5]/3)*3;
     var x=Math.round(item.transform[4]);
     var txt=(item.str||'').trim();
     if(!txt)return;
     if(!rows[y])rows[y]=[];
-    rows[y].push({x:x,y:y,txt:txt});
+    rows[y].push({x:x,txt:txt});
   });
   var sortedYs=Object.keys(rows).map(Number).sort(function(a,b){return b-a;});
   var rowArr=sortedYs.map(function(y){return{y:y,cells:rows[y].slice().sort(function(a,b){return a.x-b.x;})};});
-  var tables=[];
-  var i=0;
+  var tables=[];var i=0;
   while(i<rowArr.length){
-    if(rowArr[i].cells.length>=3){
+    if(rowArr[i].cells.length>=2){
       var block=[rowArr[i]];var j=i+1;
       while(j<rowArr.length&&rowArr[j].cells.length>=2){block.push(rowArr[j]);j++;}
-      if(block.length>=3){var tbl=parseTableBlock(block,pageNum);if(tbl)tables.push(tbl);}
+      if(block.length>=3){
+        var hdr=block[0].cells.map(function(c){return c.txt;});
+        var colXs=block[0].cells.map(function(c){return c.x;});
+        var dataRows=[];
+        for(var r=1;r<block.length;r++){
+          var rowObj={};
+          block[r].cells.forEach(function(cell){
+            var bestJ=0,bestDist=Infinity;
+            for(var jj=0;jj<colXs.length;jj++){var d=Math.abs(cell.x-colXs[jj]);if(d<bestDist){bestDist=d;bestJ=jj;}}
+            if(bestDist<60){var k='col'+bestJ;rowObj[k]=(rowObj[k]?rowObj[k]+' ':'')+cell.txt;}
+          });
+          if(Object.keys(rowObj).length>=2)dataRows.push(rowObj);
+        }
+        if(dataRows.length>=1)tables.push({page:pageNum,headers:hdr,rows:dataRows});
+      }
       i=j;
     } else {i++;}
   }
   return tables;
 }
 
-function parseTableBlock(block,pageNum){
-  var hdrRow=block[0];
-  var colXs=hdrRow.cells.map(function(c){return c.x;});
-  var headers=hdrRow.cells.map(function(c){return c.txt;});
-  var mappedCols=headers.map(function(h){return{raw:h,key:mapHeader(h)};});
-  if(mappedCols.filter(function(m){return m.key;}).length<2)return null;
-  var dataRows=[];
-  for(var i=1;i<block.length;i++){
-    var row=block[i];var obj={};
-    row.cells.forEach(function(cell){
-      var bestJ=0,bestDist=Infinity;
-      for(var j=0;j<colXs.length;j++){var d=Math.abs(cell.x-colXs[j]);if(d<bestDist){bestDist=d;bestJ=j;}}
-      if(bestDist<40&&mappedCols[bestJ]&&mappedCols[bestJ].key){var k=mappedCols[bestJ].key;obj[k]=(obj[k]?obj[k]+' ':'')+cell.txt;}
-    });
-    if(obj.tag&&String(obj.tag).trim())dataRows.push(obj);
+// ── STEP 3: Detect equipment type ──
+function detectEqTypeFromRaw(headers,rows){
+  var combined=(headers.join(' ')+'  '+(rows.length?Object.values(rows[0]).join(' '):'')).toLowerCase();
+  var hints=[
+    {keys:['fan coil','fcu'],type:'fcu'},
+    {keys:['air handling','ahu'],type:'ahu'},
+    {keys:['chiller','chw'],type:'chillers'},
+    {keys:['cooling tower'],type:'ct'},
+    {keys:['pump','chwp','hwp'],type:'pumps'},
+    {keys:['exhaust fan','supply fan','inline fan'],type:'fans'},
+    {keys:['vav'],type:'vav'},
+    {keys:['damper','rad ','sad ','mvcd','mvd','return air damper','supply air damper','fire damper'],type:'dampers'},
+    {keys:['grille','diffuser','spigot'],type:'grilles'},
+    {keys:['hepa'],type:'hepa'},
+    {keys:['pac','vrf','vrv','split'],type:'pac'},
+  ];
+  for(var i=0;i<hints.length;i++){
+    for(var j=0;j<hints[i].keys.length;j++){
+      if(combined.indexOf(hints[i].keys[j])>=0)return hints[i].type;
+    }
   }
-  if(!dataRows.length)return null;
-  return{page:pageNum,title:headers.join(' / '),headers:headers,mappedCols:mappedCols,rows:dataRows,eqType:detectEquipType(headers.join(' '),dataRows[0].tag||''),selected:true};
-}
-
-var _scanQueue=[],_scanQueueIdx=0;
-function startScan(){
-  if(!_scanSelected.size){alert('Select at least one drawing.');return;}
-  var withPdf=_scanDrawings.filter(function(d){return _scanSelected.has(d.id)&&(d.pdfUrl||d.pdfData);});
-  if(!withPdf.length){alert('None of the selected drawings have PDFs attached.');return;}
-  _scanQueue=withPdf;_scanQueueIdx=0;_scanResults=[];
-  setScanStep(2);
-  document.getElementById('scanBody').innerHTML='<div style="padding:28px 24px"><div style="font-size:13px;color:var(--text2);margin-bottom:20px">Scanning '+_scanQueue.length+' drawing'+(_scanQueue.length!==1?'s':'')+'…</div><div style="background:var(--surface2);border-radius:8px;overflow:hidden;height:8px;margin-bottom:16px"><div id="scanProgressBar" style="height:100%;background:var(--accent);width:0%;transition:width .3s;border-radius:8px"></div></div><div id="scanProgressLog" style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);max-height:300px;overflow-y:auto"></div></div>';
-  document.getElementById('scanFooter').innerHTML='<button class="btn bg bsm" onclick="closeScanModal()">Cancel</button>';
-  processNextScan();
-}
-function scanLog(msg,color){var el=document.getElementById('scanProgressLog');if(el){el.innerHTML+='<div style="padding:2px 0'+(color?';color:'+color:'')+'">'+(msg||'')+'</div>';el.scrollTop=el.scrollHeight;}}
-function processNextScan(){
-  if(_scanQueueIdx>=_scanQueue.length){var pb=document.getElementById('scanProgressBar');if(pb)pb.style.width='100%';setTimeout(renderScanStep3,400);return;}
-  var drw=_scanQueue[_scanQueueIdx];
-  var pb=document.getElementById('scanProgressBar');if(pb)pb.style.width=Math.round(_scanQueueIdx/_scanQueue.length*100)+'%';
-  scanLog('Scanning: '+escH(drw.num)+' — '+escH(drw.name||''));
-  extractTablesFromPdf(drw.pdfUrl||null,drw.pdfData||null).then(function(tables){
-    if(tables.length){scanLog('  ✓ Found '+tables.length+' table'+(tables.length!==1?'s':''),'#00e5a0');_scanResults.push({drawing:drw,tables:tables});}
-    else{scanLog('  — No equipment tables found','');}
-    _scanQueueIdx++;processNextScan();
-  }).catch(function(e){scanLog('  ✗ Error: '+(e.message||e),'#ff4d6d');_scanQueueIdx++;processNextScan();});
+  return null;
 }
 
 function renderScanStep3(){
   setScanStep(3);
   var body=document.getElementById('scanBody');
-  if(!_scanResults.length){
-    body.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">🔍</div><div style="font-weight:600">No equipment data found</div><div style="font-size:12px;margin-top:6px">Ensure PDFs are CAD-generated (not scanned).</div></div>';
+  if(!_scanRawTables.length){
+    body.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">🔍</div><div style="font-weight:600">No tables found</div><div style="font-size:12px;margin-top:6px">Ensure PDFs contain selectable text (not scanned images).</div></div>';
     document.getElementById('scanFooter').innerHTML='<button class="btn bg bsm" onclick="closeScanModal()">Close</button>';
     return;
   }
-  var totalRows=_scanResults.reduce(function(a,r){return a+r.tables.reduce(function(b,t){return b+t.rows.length;},0);},0);
-  var totalTables=_scanResults.reduce(function(a,r){return a+r.tables.length;},0);
-  var html='<div style="padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)">Found <strong style="color:var(--text)">'+totalTables+' table'+(totalTables!==1?'s':'')+'</strong> with <strong style="color:var(--text)">'+totalRows+' item'+(totalRows!==1?'s':'')+'</strong></div>';
-  _scanResults.forEach(function(result,ri){
-    result.tables.forEach(function(tbl,ti){
-      var eqMeta=EQ.find(function(e){return e.key===tbl.eqType;});
-      var conflicts=[];
-      if(tbl.eqType){var existTab=tabs.find(function(t){return t.type===tbl.eqType;});if(existTab){tbl.rows.forEach(function(row){if(row.tag&&existTab.rows.find(function(r){return r.tag===row.tag;}))conflicts.push(row.tag);});}}
-      html+='<div class="scan-result-row">'
-        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
-        +'<input type="checkbox" '+(tbl.selected?'checked':'')+' onchange="_scanResults['+ri+'].tables['+ti+'].selected=this.checked"/>'
-        +'<div style="flex:1"><div style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+escH(result.drawing.num)+'  ·  Page '+tbl.page+'</div>'
-        +'<div style="font-size:13px;font-weight:600;color:var(--text)">'+escH(tbl.title)+'</div></div>'
-        +'<select style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:2px 6px" onchange="scanSetType('+ri+','+ti+',this.value)">'
-        +EQ.map(function(e){return'<option value="'+e.key+'"'+(e.key===tbl.eqType?' selected':'')+'>'+e.name+'</option>';}).join('')
-        +'<option value=""'+(tbl.eqType?'':' selected')+'>— Skip —</option></select></div>'
-        +(conflicts.length?'<div class="scan-conflict">⚠ '+conflicts.length+' tag'+(conflicts.length!==1?'s':'')+' already exist and will be skipped: '+escH(conflicts.slice(0,5).join(', '))+'</div>':'')
-        +'<div style="margin-top:8px;overflow-x:auto;border:1px solid var(--border);border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:var(--surface2)">'
-        +tbl.mappedCols.filter(function(m){return m.key;}).map(function(m){return'<th style="padding:4px 8px;text-align:left;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">'+escH(m.raw)+'</th>';}).join('')
-        +'</tr></thead><tbody>'
-        +tbl.rows.slice(0,5).map(function(row){return'<tr style="border-bottom:1px solid var(--border)">'+tbl.mappedCols.filter(function(m){return m.key;}).map(function(m){return'<td style="padding:3px 8px;color:var(--text2);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+escH(row[m.key]||'—')+'</td>';}).join('')+'</'+'tr>';}).join('')
-        +(tbl.rows.length>5?'<tr><td colspan="20" style="padding:4px 8px;color:var(--muted);font-size:10px">… and '+(tbl.rows.length-5)+' more</td></tr>':'')
-        +'</'+'tbody></'+'table></div></div>';
-    });
-  });
+  // Detect eq type from all tables combined
+  var allHeaders=[];var allRows=[];
+  _scanRawTables.forEach(function(t){allHeaders=allHeaders.concat(t.headers);if(t.rows.length)allRows.push(t.rows[0]);});
+  _scanEqType=detectEqTypeFromRaw(allHeaders,allRows);
+  var eqMeta=_scanEqType?EQ.find(function(e){return e.key===_scanEqType;}):null;
+
+  var html='<div style="padding:20px 20px 0">';
+  html+='<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Step 1 of 2 — Equipment Type</div>';
+  html+='<div style="font-size:12px;color:var(--text2);margin-bottom:14px">We found <strong style="color:var(--text)">'+_scanRawTables.length+'</strong> table'
+    +(_scanRawTables.length!==1?'s':'')+' across your drawings. What type of equipment is this schedule for?</div>';
+
+  if(eqMeta){
+    html+='<div style="background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text2)">'
+      +'<span style="color:var(--accent)">✦ Suggested:</span> <strong style="color:var(--text)">'+escH(eqMeta.name)+'</strong> — based on your PDF content</div>';
+  }
+
+  html+='<div style="margin-bottom:6px;font-size:11px;color:var(--muted);font-family:DM Mono,monospace;text-transform:uppercase;letter-spacing:1px">Equipment type</div>'
+    +'<select id="scanEqTypeSelect" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 12px;outline:none">'
+    +'<option value="">— Select type —</option>'
+    +EQ.map(function(e){return'<option value="'+e.key+'"'+(e.key===_scanEqType?' selected':'')+'>'+escH(e.name)+'</option>';}).join('')
+    +'</select>';
+
+  // Preview of extracted headers
+  html+='<div style="margin-top:18px;margin-bottom:6px;font-size:11px;color:var(--muted);font-family:DM Mono,monospace;text-transform:uppercase;letter-spacing:1px">Headers found in PDF</div>';
+  var uniqueHdrs=[]; _scanRawTables.forEach(function(t){t.headers.forEach(function(h){if(h&&uniqueHdrs.indexOf(h)<0)uniqueHdrs.push(h);});});
+  html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">'
+    +uniqueHdrs.map(function(h){return'<span style="font-family:DM Mono,monospace;font-size:10px;padding:3px 8px;border-radius:20px;background:var(--surface3);border:1px solid var(--border);color:var(--text2)">'+escH(h)+'</span>';}).join('')
+    +'</div>';
+  html+='</div>';
   body.innerHTML=html;
-  document.getElementById('scanFooter').innerHTML='<button class="btn bg bsm" onclick="closeScanModal()">Cancel</button><button class="btn bp bsm" onclick="doImportScanned()">⬇ Import Selected</button>';
+  document.getElementById('scanFooter').innerHTML=
+    '<button class="btn bg bsm" onclick="closeScanModal()">Cancel</button>'
+    +'<button class="btn bp bsm" onclick="goToColumnMapping()">Map Columns →</button>';
 }
 
-function scanSetType(ri,ti,type){_scanResults[ri].tables[ti].eqType=type;}
+// ── STEP 4: Column mapping ──
+function suggestMapping(pdfHeader,eqCols){
+  var h=pdfHeader.toLowerCase().trim();
+  // Direct matches
+  var directMap={
+    'damper tag':'tag','unit tag':'tag','fcu tag':'tag','ahu tag':'tag','pump tag':'tag','fan tag':'tag','equipment tag':'tag','equip tag':'tag','tag no':'tag','tag no.':'tag',
+    'number':'qty','number off':'qty','no off':'qty','no.':'qty','no':'qty','count':'qty',
+    'system':'desc','service':'desc','unit description':'desc',
+    'overal air way size wxh mm':'size','overall size wxh mm':'size','size wxh mm':'size','airway size':'size','duct size':'size','damper size':'size',
+    'construction phase':'phase_col','phase':'phase_col',
+    'level':'location','zone':'location','floor':'location','area':'location',
+  };
+  if(directMap[h]){
+    var k=directMap[h];var col=eqCols.find(function(c){return c.k===k;});
+    return col?k:null;
+  }
+  // Check against each col's label and key
+  for(var i=0;i<eqCols.length;i++){
+    var col=eqCols[i];
+    if(h===col.k||h===col.l.toLowerCase())return col.k;
+    if(h.indexOf(col.k)>=0||col.k.indexOf(h)>=0)return col.k;
+    if(h.indexOf(col.l.toLowerCase())>=0||col.l.toLowerCase().indexOf(h)>=0)return col.k;
+  }
+  return null;
+}
 
+function goToColumnMapping(){
+  var sel=document.getElementById('scanEqTypeSelect');
+  _scanEqType=sel?sel.value:'';
+  if(!_scanEqType){alert('Please select an equipment type.');return;}
+  var eqMeta=EQ.find(function(e){return e.key===_scanEqType;});
+  if(!eqMeta){alert('Invalid equipment type.');return;}
+  var eqCols=eqMeta.cols;
+
+  // Build unique headers across all tables
+  var uniqueHdrs=[];
+  _scanRawTables.forEach(function(t){
+    t.headers.forEach(function(h){if(h&&uniqueHdrs.indexOf(h)<0)uniqueHdrs.push(h);});
+  });
+
+  // Build mapping suggestions
+  _scanMappings=uniqueHdrs.map(function(h,i){
+    var suggested=suggestMapping(h,eqCols);
+    return{pdfHeader:h,colIdx:i,mappedKey:suggested,isNew:false,newLabel:''};
+  });
+
+  setScanStep(4);
+  renderColumnMapping(eqCols);
+}
+
+function renderColumnMapping(eqCols){
+  var body=document.getElementById('scanBody');
+  var si='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;outline:none';
+  var html='<div style="padding:16px 20px 8px">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Step 2 of 2 — Map Columns</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Match each PDF column to your equipment schedule fields. Suggestions are pre-filled — adjust as needed.</div>'
+    +'</div>'
+    +'<div style="border-top:1px solid var(--border)">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;padding:6px 20px;background:var(--surface2);border-bottom:1px solid var(--border)">'
+    +'<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">PDF Column</div>'
+    +'<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Map to</div>'
+    +'</div>';
+
+  _scanMappings.forEach(function(m,i){
+    var isSuggested=!!m.mappedKey;
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:10px 20px;border-bottom:1px solid var(--border);align-items:center">'
+      +'<div>'
+      +'<div style="font-size:13px;color:var(--text)">'+escH(m.pdfHeader)+'</div>'
+      +(isSuggested?'<div style="font-size:10px;color:var(--accent);margin-top:2px">✦ suggested</div>':'<div style="font-size:10px;color:var(--muted);margin-top:2px">no match found</div>')
+      +'</div>'
+      +'<div>'
+      +'<select id="scanMap_'+i+'" style="'+si+'" onchange="scanMapChange('+i+',this.value)">'
+      +'<option value="">— Skip —</option>'
+      +eqCols.map(function(c){return'<option value="'+c.k+'"'+(c.k===m.mappedKey?' selected':'')+'>'+escH(c.l)+'</option>';}).join('')
+      +'<option value="__new__"'+(m.isNew?' selected':'')+'>+ Add as new column</option>'
+      +'</select>'
+      +(m.isNew?'<input id="scanNewLabel_'+i+'" type="text" placeholder="New column name…" value="'+escH(m.newLabel)+'" oninput="scanNewLabelChange('+i+',this.value)" style="'+si+';margin-top:6px"/>':'')
+      +'</div>'
+      +'</div>';
+  });
+  html+='</div>';
+  body.innerHTML=html;
+  document.getElementById('scanFooter').innerHTML=
+    '<button class="btn bg bsm" onclick="renderScanStep3()">← Back</button>'
+    +'<button class="btn bp bsm" onclick="doImportScanned()">⬇ Import</button>';
+}
+
+function scanMapChange(i,val){
+  _scanMappings[i].mappedKey=val==='__new__'?null:val;
+  _scanMappings[i].isNew=(val==='__new__');
+  var eqMeta=EQ.find(function(e){return e.key===_scanEqType;});
+  if(eqMeta)renderColumnMapping(eqMeta.cols);
+}
+function scanNewLabelChange(i,val){_scanMappings[i].newLabel=val;}
+
+// ── Import ──
 function doImportScanned(){
-  var imported=0,skipped=0,created=0;
-  _scanResults.forEach(function(result){
-    result.tables.forEach(function(tbl){
-      if(!tbl.selected||!tbl.eqType)return;
-      var tab=tabs.find(function(t){return t.type===tbl.eqType;});
-      if(!tab){
-        var eqMeta=EQ.find(function(e){return e.key===tbl.eqType;});if(!eqMeta)return;
-        tab={id:'eq_'+Date.now()+'_'+Math.random().toString(36).slice(2),type:tbl.eqType,rows:[],cc:null};
-        tabs.push(tab);created++;
+  // Validate: at least one column mapped
+  var hasMapped=_scanMappings.some(function(m){return m.mappedKey||(m.isNew&&m.newLabel.trim());});
+  if(!hasMapped){alert('Map at least one column before importing.');return;}
+
+  var eqMeta=EQ.find(function(e){return e.key===_scanEqType;});if(!eqMeta)return;
+
+  // Add any new columns to the equipment type definition
+  _scanMappings.forEach(function(m){
+    if(m.isNew&&m.newLabel.trim()){
+      var newKey='custom_'+m.newLabel.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+      if(!eqMeta.cols.find(function(c){return c.k===newKey;})){
+        eqMeta.cols.splice(eqMeta.cols.length-1,0,{k:newKey,l:m.newLabel.trim()});
       }
-      var existingTags=new Set(tab.rows.map(function(r){return r.tag;}));
-      tbl.rows.forEach(function(row){
-        if(!row.tag){return;}
-        if(existingTags.has(row.tag)){skipped++;return;}
-        var newRow={id:'r_'+Date.now()+'_'+Math.random().toString(36).slice(2)};
-        Object.keys(row).forEach(function(k){newRow[k]=row[k];});
-        if(!newRow.status)newRow.status='Not Started';
-        tab.rows.push(newRow);existingTags.add(row.tag);imported++;
+      m.mappedKey=newKey;
+    }
+  });
+
+  // Find or create tab
+  var tab=tabs.find(function(t){return t.type===_scanEqType;});
+  var created=0;
+  if(!tab){tab={id:'eq_'+Date.now()+'_'+Math.random().toString(36).slice(2),type:_scanEqType,rows:[],cc:null};tabs.push(tab);created=1;}
+
+  var existingTags=new Set(tab.rows.map(function(r){return(r.tag||'').toLowerCase();}));
+  var imported=0,skipped=0;
+
+  _scanRawTables.forEach(function(t){
+    // Build a per-table col index mapping (which colX index maps to which pdf header)
+    var hdrIdxMap={};
+    t.headers.forEach(function(h,hi){hdrIdxMap['col'+hi]=h;});
+
+    t.rows.forEach(function(rawRow){
+      var newRow={id:'r_'+Date.now()+'_'+Math.random().toString(36).slice(2)};
+      // Map col0, col1, ... to field keys
+      Object.keys(rawRow).forEach(function(colKey){
+        var pdfHeader=hdrIdxMap[colKey];
+        if(!pdfHeader)return;
+        var mapping=_scanMappings.find(function(m){return m.pdfHeader===pdfHeader;});
+        if(mapping&&mapping.mappedKey)newRow[mapping.mappedKey]=rawRow[colKey];
       });
+      if(!newRow.tag||!String(newRow.tag).trim())return;
+      var tagLc=String(newRow.tag).trim().toLowerCase();
+      if(existingTags.has(tagLc)){skipped++;return;}
+      if(!newRow.status)newRow.status='Not Started';
+      tab.rows.push(newRow);existingTags.add(tagLc);imported++;
     });
   });
+
   saveEquip();
   if(created>0)activeId=tabs[tabs.length-1].id;
   renderStrip();closeScanModal();
-  showToast('\u2713 Imported '+imported+' item'+(imported!==1?'s':'')+(skipped?' ('+skipped+' skipped)':'')+(created?' · '+created+' new tab'+(created!==1?'s':'')+' created':''));
+  showToast('✓ Imported '+imported+' item'+(imported!==1?'s':'')+(skipped?' ('+skipped+' skipped)':'')+(created?' · New tab created':''));
 }
 
 // ── SIDEBAR JS ──
@@ -1875,9 +2012,10 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
       <button class="btn bg bsm" onclick="closeScanModal()">&#10005;</button>
     </div>
     <div id="scanStepBar" style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div class="scan-step active" id="scanStep1">1 &middot; Select Drawings</div>
-      <div class="scan-step" id="scanStep2">2 &middot; Scanning</div>
-      <div class="scan-step" id="scanStep3">3 &middot; Review &amp; Import</div>
+      <div class="scan-step active" id="scanStep1">1 · Select</div>
+      <div class="scan-step" id="scanStep2">2 · Extracting</div>
+      <div class="scan-step" id="scanStep3">3 · Eq Type</div>
+      <div class="scan-step" id="scanStep4">4 · Map Columns</div>
     </div>
     <div style="flex:1;overflow-y:auto" id="scanBody"></div>
     <div style="padding:12px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0" id="scanFooter"></div>
