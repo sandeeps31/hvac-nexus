@@ -591,13 +591,17 @@ function tplCols(t){
   var eq=defn(t.type);
   if(eq)return eq.cols;
   // Company template — derive cols from sections
-  var cols=[{k:'tag',l:'Equipment ID',key:1}];
+  // Always start with tag (Equipment ID) once only
+  var cols=[{k:'tag',l:'Equipment ID',key:1,sectionName:null}];
+  var usedKeys=new Set(['tag']);
   (t.sections||[]).forEach(function(sec){
     (sec.fields||[]).forEach(function(f){
-      if(f.key&&f.key!=='tag')cols.push({k:f.key,l:f.label||f.key,num:f.type==='number',sel:f.type==='dropdown'});
+      if(!f.key||usedKeys.has(f.key))return;
+      usedKeys.add(f.key);
+      cols.push({k:f.key,l:f.label||f.key,num:f.type==='number',sel:f.type==='dropdown',sectionName:(sec.name&&sec.name!=='__none__')?sec.name:null});
     });
   });
-  if(!cols.find(function(c){return c.k==='status';}))cols.push({k:'status',l:'Status',sel:1});
+  if(!usedKeys.has('status'))cols.push({k:'status',l:'Status',sel:1,sectionName:null});
   return cols;
 }
 function getCols(t){return tplCols(t).filter(function(c){return!c.hidden;});}
@@ -631,7 +635,7 @@ return;}
      var d=defn(t.type)||{name:t.name||t.type},a=t.id===activeId;
      var label=t.name||(d?d.name:t.type)||t.type;
      var badge='';
-     if(t.companyTemplateTplNo)badge+='<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);opacity:.7;margin-left:4px">'+X(t.companyTemplateTplNo)+'</span>';
+     // form number badge removed from tab strip
      if(t.publishedToCompany)badge+='<span style="font-size:9px;color:var(--purple);margin-left:4px">↑</span>';
      return '<div class="etab'+(a?' active':'')+'" onclick="swTab(\''+t.id+'\')" oncontextmenu="showCtx(event,\''+t.id+'\')">'
        +'<span>'+X(label)+badge+'</span>'
@@ -701,7 +705,24 @@ function renderTable(){
 
   // ── FLAT TABLE VIEW ──
   var cols=getCols(t);
-  var th='<thead><tr>'+cols.map(function(c){
+  // Build header — show section grouping row if template has sections
+  var hasSections=cols.some(function(c){return c.sectionName;});
+  var th='<thead>';
+  if(hasSections){
+    // Group header row
+    var groups=[];var cur=null;
+    cols.forEach(function(c){
+      var sn=c.sectionName||'';
+      if(!cur||cur.name!==sn){cur={name:sn,count:0};groups.push(cur);}
+      cur.count++;
+    });
+    th+='<tr>';
+    groups.forEach(function(g){
+      th+='<th colspan="'+g.count+'" style="text-align:center;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:'+(g.name?'var(--text)':'var(--muted)')+';background:'+(g.name?'var(--surface3)':'var(--surface2)')+';border-bottom:1px solid var(--border);padding:4px 8px">'+X(g.name||'')+'</th>';
+    });
+    th+='<th style="background:var(--surface2);width:28px"></th></tr>';
+  }
+  th+='<tr>'+cols.map(function(c){
     var style=c.key?'style="min-width:160px"':c.k==='desc'?'style="min-width:140px"':'';
     return'<th '+style+' onclick="srtBy(\'' +c.k+ '\')">'+X(c.l)+(sortK===c.k?(sortD>0?' ↑':' ↓'):'')+' </th>';
   }).join('')+'<th style="width:28px"></th></tr></thead>';
@@ -1225,46 +1246,61 @@ function rowDrop(e){
 
 
 function downloadTemplate(){
-  var t=aTab(); if(!t) return;
-  var d=defn(t.type); if(!d) return;
-  var cols=allCols(t).filter(function(c){return !c.hidden;});
-
-  // Load SheetJS if needed
+  var t=aTab();if(!t)return;
+  var cols=allCols(t).filter(function(c){return!c.hidden;});
   if(typeof XLSX==='undefined'){
     var s=document.createElement('script');
     s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    s.onload=function(){buildAndDownloadTemplate(t,d,cols);};
+    s.onload=function(){buildAndDownloadTemplate(t,cols);};
     document.head.appendChild(s);
-  } else {
-    buildAndDownloadTemplate(t,d,cols);
-  }
+  } else {buildAndDownloadTemplate(t,cols);}
 }
 
-function buildAndDownloadTemplate(t, d, cols){
+function buildAndDownloadTemplate(t,cols){
   var wb=XLSX.utils.book_new();
-  var headers=cols.map(function(c){return c.l;});
-  // Example row
+  var tabName=(t.name||t.type||'Schedule').substring(0,31);
+  var hasSections=cols.some(function(c){return c.sectionName;});
+  var rows=[];
+  // Row 1: section group headers (if any)
+  if(hasSections){
+    var groupRow=cols.map(function(c){return c.sectionName||'';});
+    rows.push(groupRow);
+  }
+  // Row 2: column headers
+  rows.push(cols.map(function(c){return c.l;}));
+  // Row 3: example data
   var example=cols.map(function(col){
-    if(col.key)  return d.name.toUpperCase().replace(/\s/g,'-')+'-01';
-    if(col.sel)  return 'Not Started';
-    if(col.num)  return 1;
-    if(col.k==='location')    return 'Level 1';
-    if(col.k==='sublocation') return 'Zone A';
-    if(col.k==='desc')        return 'Example '+d.name;
-    if(col.k==='make'||col.k==='manufacturer') return 'Brand Name';
-    if(col.k==='model')       return 'Model No.';
+    if(col.key)return (t.name||'EQ').toUpperCase().replace(/\s/g,'-')+'-001';
+    if(col.sel)return 'Not Started';
+    if(col.num)return '';
+    if(col.k==='location')return 'Level 1';
+    if(col.k==='sublocation')return 'Zone A';
+    if(col.k==='desc'||col.k==='service')return t.name||'';
+    if(col.k==='manufacturer'||col.k==='make')return '';
+    if(col.k==='model')return '';
     return '';
   });
-  var ws=XLSX.utils.aoa_to_sheet([headers, example]);
-  ws['!cols']=headers.map(function(h){return{wch:Math.max(h.length+4,14)};});
-  for(var col=0;col<headers.length;col++){
-    var hRef=XLSX.utils.encode_cell({r:0,c:col});
-    if(ws[hRef]) ws[hRef].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0E1520'}},alignment:{horizontal:'center',vertical:'center'}};
-    var eRef=XLSX.utils.encode_cell({r:1,c:col});
-    if(ws[eRef]) ws[eRef].s={font:{name:'Arial',sz:10,color:{rgb:'4472C4'},italic:true},alignment:{horizontal:'center'}};
+  rows.push(example);
+  // Add existing data rows if any
+  t.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
+    rows.push(cols.map(function(c){return row[c.k]||'';}));
+  });
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,14)};});
+  // Style header row
+  var hdrRow=hasSections?1:0;
+  for(var ci=0;ci<cols.length;ci++){
+    if(hasSections){
+      var gRef=XLSX.utils.encode_cell({r:0,c:ci});
+      if(ws[gRef]&&ws[gRef].v)ws[gRef].s={font:{bold:true,name:'Arial',sz:9},fill:{fgColor:{rgb:'1A2640'}},alignment:{horizontal:'center'}};
+    }
+    var hRef=XLSX.utils.encode_cell({r:hdrRow,c:ci});
+    if(ws[hRef])ws[hRef].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0E1520'}},alignment:{horizontal:'center',vertical:'center'}};
+    var eRef=XLSX.utils.encode_cell({r:hdrRow+1,c:ci});
+    if(ws[eRef])ws[eRef].s={font:{name:'Arial',sz:10,color:{rgb:'4472C4'},italic:true}};
   }
-  XLSX.utils.book_append_sheet(wb,ws,d.name.substring(0,31));
-  XLSX.writeFile(wb,'HVAC_NEXUS_'+d.name.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx');
+  XLSX.utils.book_append_sheet(wb,ws,tabName);
+  XLSX.writeFile(wb,'HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx');
 }
 
 
@@ -1453,7 +1489,7 @@ function renderRevBar(){
     addBtn('\u270f Start Draft','bg',startDraft);
   } else if(isLockedByMe(tabId)){
     addBtn('&#128203; History','bg',openRevHistory);
-    addBtn('\uD83D\uDD13 Release Lock','bg',function(){releaseLock(tabId);});
+    addBtn('🔓 Release Lock','bg',function(){releaseLock(tabId);},null,'Release your edit lock so others can edit this tab');
     addBtn('\u2191 Publish','bp',openPublishModal);
   } else if(isLockedByOther(tabId)){
     addBtn('&#128203; History','bg',openRevHistory);
