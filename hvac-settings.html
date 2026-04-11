@@ -1427,18 +1427,92 @@ function renderEqEditor(){
     +'<button class="btn bg bsm" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="deleteEqTemplate()">Delete</button>'
     +'<button class="btn bp bsm" onclick="saveEqTemplate()">Save Template</button>'
     +'</div></div>';
-  // Layout toggle
-  html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px">'
-    +'<span style="font-size:12px;color:var(--text2);font-weight:500;flex-shrink:0">Schedule layout:</span>'
+  // Layout toggle + live preview
+  // Build sample fields from first 2 groups, up to 3 fields each
+  var previewGroups=[];
+  tmpl.groups.forEach(function(g){if(previewGroups.length>=2&&g.fields.length)return;if(g.fields.length)previewGroups.push({name:g.name,fields:g.fields.slice(0,3)});});
+  if(!previewGroups.length)previewGroups=[{name:'GENERAL',fields:[{label:'Tag',unit:''},{label:'Location',unit:''},{label:'Airflow',unit:'l/s'}]}];
+
+  html+='<div style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+  // Toggle bar
+  html+='<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border)">'
+    +'<span style="font-size:12px;color:var(--text2);font-weight:500">Layout:</span>'
     +'<div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden">'
-    +'<button onclick="eqSetLayout(\'vertical\')" style="padding:6px 16px;font-size:12px;border:none;cursor:pointer;background:'+(isV?'var(--accent)':'var(--surface)')+';color:'+(isV?'#000':'var(--text2)')+';font-weight:'+(isV?'600':'400')+'">↕ Vertical</button>'
-    +'<button onclick="eqSetLayout(\'horizontal\')" style="padding:6px 16px;font-size:12px;border:none;cursor:pointer;background:'+(!isV?'var(--accent)':'var(--surface)')+';color:'+(!isV?'#000':'var(--text2)')+';font-weight:'+(!isV?'600':'400')+'">↔ Horizontal</button>'
+    +'<button onclick="eqSetLayout(\'vertical\')" style="padding:5px 14px;font-size:12px;border:none;cursor:pointer;background:'+(isV?'var(--accent)':'var(--surface3)')+';color:'+(isV?'#000':'var(--text2)')+';font-weight:'+(isV?'600':'400')+'">↕ Vertical</button>'
+    +'<button onclick="eqSetLayout(\'horizontal\')" style="padding:5px 14px;font-size:12px;border:none;cursor:pointer;background:'+(!isV?'var(--accent)':'var(--surface3)')+';color:'+(!isV?'#000':'var(--text2)')+';font-weight:'+(!isV?'600':'400')+'">↔ Horizontal</button>'
     +'</div>'
-    +'<span style="font-size:11px;color:var(--muted)">'+(isV?'Equipment IDs are columns, fields are rows (e.g. FCU schedule)':'Equipment IDs are rows, fields are columns (e.g. dampers, VAVs)')+'</span>'
+    +'<span style="font-size:11px;color:var(--muted)">'+(isV?'Fields are rows — equipment IDs are column headers (FCU, AHU style)':'Fields are column headers — each equipment item is a row (Damper, VAV style)')+'</span>'
     +'</div>';
+
+  // Live preview
+  html+='<div style="padding:12px 14px;background:var(--surface);overflow-x:auto">';
+  html+='<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Preview</div>';
+
+  var previewStyle='font-size:11px;border-collapse:collapse;width:100%;font-family:DM Sans,sans-serif';
+  var thStyle='padding:5px 10px;background:var(--surface2);border:1px solid var(--border);font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);white-space:nowrap';
+  var sectionStyle='padding:5px 10px;background:var(--surface3);border:1px solid var(--border);font-family:DM Mono,monospace;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text)';
+  var labelStyle='padding:5px 10px;border:1px solid var(--border);font-size:11px;color:var(--text2);white-space:nowrap';
+  var cellStyle='padding:5px 10px;border:1px solid var(--border);font-size:11px;color:var(--muted);font-style:italic';
+
+  if(isV){
+    // VERTICAL: rows = fields, columns = equipment IDs
+    html+='<table style="'+previewStyle+'">';
+    // Header row: field label col + sample equipment IDs
+    html+='<thead><tr>'
+      +'<th style="'+thStyle+';min-width:140px">Field</th>'
+      +'<th style="'+thStyle+'">EQ-001</th>'
+      +'<th style="'+thStyle+'">EQ-002</th>'
+      +'<th style="'+thStyle+'">EQ-003</th>'
+      +'</tr></thead><tbody>';
+    previewGroups.forEach(function(g){
+      // Section header row spanning all cols
+      html+='<tr><td colspan="4" style="'+sectionStyle+'">'+g.name+'</td></tr>';
+      g.fields.forEach(function(f){
+        html+='<tr>'
+          +'<td style="'+labelStyle+'">'+f.label+(f.unit?' <span style="color:var(--muted);font-size:10px">('+f.unit+')</span>':'')+'</td>'
+          +'<td style="'+cellStyle+'">—</td>'
+          +'<td style="'+cellStyle+'">—</td>'
+          +'<td style="'+cellStyle+'">—</td>'
+          +'</tr>';
+      });
+    });
+    html+='</tbody></table>';
+  } else {
+    // HORIZONTAL: columns = fields, rows = equipment items
+    html+='<table style="'+previewStyle+'">';
+    // Build flat column list from all groups
+    html+='<thead>';
+    // Group header row
+    html+='<tr><th style="'+thStyle+'">Tag</th>';
+    previewGroups.forEach(function(g){
+      html+='<th colspan="'+g.fields.length+'" style="'+sectionStyle+';text-align:center">'+g.name+'</th>';
+    });
+    html+='</tr>';
+    // Field label row
+    html+='<tr><th style="'+thStyle+'">ID</th>';
+    previewGroups.forEach(function(g){
+      g.fields.forEach(function(f){
+        html+='<th style="'+thStyle+'">'+f.label+(f.unit?' ('+f.unit+')':'')+'</th>';
+      });
+    });
+    html+='</tr></thead>';
+    // Sample rows
+    html+='<tbody>';
+    ['EQ-001','EQ-002','EQ-003'].forEach(function(id){
+      html+='<tr><td style="'+labelStyle+';color:var(--accent);font-family:DM Mono,monospace">'+id+'</td>';
+      previewGroups.forEach(function(g){
+        g.fields.forEach(function(){html+='<td style="'+cellStyle+'">—</td>';});
+      });
+      html+='</tr>';
+    });
+    html+='</tbody>';
+    html+='</table>';
+  }
+
+  html+='</div></div>';
   // Hint
   html+='<div style="font-size:11px;color:var(--muted);margin-bottom:16px;padding:8px 12px;background:var(--accent-dim);border:1px solid rgba(0,200,255,.15);border-radius:7px">'
-    +'<strong style="color:var(--accent)">Section headers</strong> group related fields together — e.g. add a section called <em>FAN MAKE</em> then add fields: Type, Model, Speed, kW underneath it.'
+    +'<strong style="color:var(--accent)">Section headers</strong> group related fields — e.g. add a section called <em>FAN MAKE</em> then add fields: Type, Model, Speed, kW underneath it.'
     +'</div>';
   // Groups
   tmpl.groups.forEach(function(grp,gi){
