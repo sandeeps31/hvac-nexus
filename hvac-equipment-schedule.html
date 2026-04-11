@@ -1494,19 +1494,18 @@ function renderRevBar(){
     addBtn('&#8595; Export','bg',openExportModal);
     addBtn('\u2190 Live View','bg',function(){viewRevision(null);});
   } else if(!hasDraft){
-    addBtn('&#128203; History','bg',openRevHistory);
-    addBtn('\u270f Start Draft','bg',startDraft);
+    addBtn('📋 History','bg',openRevHistory);
+    addBtn('✏️ Edit','bp',function(){startDraftAndEdit(tabId);});
   } else if(isLockedByMe(tabId)){
-    addBtn('&#128203; History','bg',openRevHistory);
-    addBtn('💾 Save & Release','bp',function(){saveEquip();releaseLock(tabId);showToast('Saved and lock released');});
-    addBtn('↑ Publish Version','bp',openPublishModal);
+    addBtn('📋 History','bg',openRevHistory);
+    addBtn('💾 Save & Release','bp',function(){saveAndRelease(tabId);});
+    addBtn('↑ Publish','bg',openPublishModal);
   } else if(isLockedByOther(tabId)){
-    addBtn('&#128203; History','bg',openRevHistory);
-    addBtn('\u270E Take Lock','bg',function(){openForceUnlock(lk);});
+    addBtn('📋 History','bg',openRevHistory);
+    addBtn('⚠️ Take Lock','bg',function(){openForceUnlock(lk);});
   } else {
-    addBtn('&#128203; History','bg',openRevHistory);
-    addBtn('✏️ Edit','bp',function(){takeLock(tabId);});
-    addBtn('↑ Publish Version','bp',openPublishModal);
+    addBtn('📋 History','bg',openRevHistory);
+    addBtn('✏️ Edit','bp',function(){startDraftAndEdit(tabId);});
   }
 
   // Banners
@@ -1527,7 +1526,7 @@ function renderRevBar(){
     bannerBtn.style.display='none';
   } else if(!hasDraft){
     banner.style.display='flex';bannerIcon.textContent='\uD83D\uDC41\uFE0F';
-    bannerText.textContent='View-only. Click \u201c\u270f Start Draft\u201d to begin editing.';
+    bannerText.textContent='View-only. Click \u201c\u270f Edit\u201d to begin editing.';
     bannerBtn.style.display='none';
   } else {
     banner.style.display='none';
@@ -1571,6 +1570,26 @@ function startDraft(){
   showToast('Draft started \u2014 table is now editable');
 }
 function takeLock(tabId){var me=getCurrentUser();setLock(tabId,me);renderRevBar();renderTable();showToast('Edit lock acquired');}
+function startDraftAndEdit(tabId){
+  var me=getCurrentUser();
+  var tr=getTabRev(tabId);
+  // Start draft if none exists
+  if(!tr.draft){
+    tr.draft={startedBy:me,startedAt:new Date().toISOString(),baseRevIdx:tr.revisions.length-1};
+    saveRevData();
+  }
+  // Take lock
+  setLock(tabId,me);
+  viewingRevIdx=null;
+  renderRevBar();renderTable();
+  showToast('✏️ Editing — click Save & Release when done');
+}
+function saveAndRelease(tabId){
+  saveEquip();
+  clearLock(tabId);
+  renderRevBar();renderTable();
+  showToast('💾 Saved');
+}
 function releaseLock(tabId){saveEquip();clearLock(tabId);renderRevBar();renderTable();showToast('Saved and released');}
 
 function openForceUnlock(lk){
