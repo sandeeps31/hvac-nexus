@@ -623,8 +623,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 </div>
 
 <script>
-var SK = 'hvacnexus_techsubs_GCT001';
-
+var _tsProj=dbGetCurrentProject();
+var _tsPNum=_tsProj.num||_tsProj.number||'GCT001';
 
 var submissions = [];
 var activeId = null; // currently open submission id
@@ -660,8 +660,8 @@ function today(){return new Date().toISOString().split('T')[0];}
 
 /* DATA */
 function save(){dbSetTechSubmissions(_tsPNum,submissions).catch(function(e){console.error(e);});}
-function load(){try{var s=localStorage.getItem(SK);if(s){var p=JSON.parse(s);submissions=Array.isArray(p)?p:[];}}catch(e){submissions=[];}}
-load();
+async function load(){try{var s=await dbGetTechSubmissions(_tsPNum);submissions=Array.isArray(s)?s:[];}catch(e){submissions=[];}}
+load().then(function(){renderList();});
 
 /* GEN SUBMISSION NUMBER */
 function genSubNum(){
@@ -1290,8 +1290,6 @@ function unlinkEquip(){
   rev.linkedEquip=null;
   save();renderDetail();
 }
-
-renderList();
 </script>
 <script>
 (function(){try{var cp=localStorage.getItem('hvacnexus_current_project');if(cp){var p=JSON.parse(cp);document.querySelectorAll('.bc-proj-name').forEach(function(el){el.textContent=p.name||el.textContent;});}}catch(e){}})();

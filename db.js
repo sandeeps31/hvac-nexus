@@ -285,6 +285,22 @@ async function dbSetEqsTemplates(data) {
   return await dbSet('eqs_templates', data);
 }
 
+// ── Transmittals ──
+async function dbGetTransmittals(projectNum) {
+  return await dbGetProject('transmittals', projectNum) || [];
+}
+async function dbSetTransmittals(projectNum, data) {
+  return await dbSetProject('transmittals', projectNum, data);
+}
+
+// ── Commissioning MSSB ──
+async function dbGetCommissioningMssb(projectNum) {
+  return await dbGetProject('commissioning_mssb', projectNum) || {};
+}
+async function dbSetCommissioningMssb(projectNum, data) {
+  return await dbSetProject('commissioning_mssb', projectNum, data);
+}
+
 // ── Pre-Cx Template ──
 async function dbGetPrecxTemplate() {
   return await dbGet('precx_template') || {};

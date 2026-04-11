@@ -478,6 +478,7 @@ var drawings=[];
 async function loadAll(){
   try{var s=await dbGetItpStructure(pKey);structure=(s&&s.buildings)?s:{buildings:[]};}catch(e){structure={buildings:[]};}
   try{var d=await dbGetDrawings(pKey);drawings=Array.isArray(d)?d:[];}catch(e){drawings=[];}
+  try{window._cachedItpResponses=await dbGetItpResponses(pKey)||{};}catch(e){window._cachedItpResponses={};}
 }
 function saveStructure(){
   dbSetItpStructure(pKey,structure).catch(function(e){console.error('saveStructure error:',e);});
@@ -533,7 +534,7 @@ function applyRoleUI(){
 function getItpCounts(itype){
   // Count pins from linked drawings that belong to this ITP type
   var total=0,ns=0,ip=0,act=0,cl=0;
-  var resp={};try{resp=JSON.parse(localStorage.getItem('hvacnexus_itp_responses_'+pKey)||'{}');}catch(e){}
+  var resp=window._cachedItpResponses||{};
   (itype.drawings||[]).forEach(function(ld){
     var drw=drawings.find(function(d){return d.id===ld.id;});
     if(!drw||!drw.pins)return;
@@ -913,9 +914,8 @@ function getItpTypeList(){
     if(window._cachedProjectTemplates&&window._cachedProjectTemplates.length){
       window._cachedProjectTemplates.forEach(function(t){if(t.itpType)result.push({name:t.itpType,itpNo:t.itpNo||''}); });
     } else {
-      // Fallback to localStorage during transition
-      var tmpl=JSON.parse(localStorage.getItem('hvacnexus_itp_templates_'+pKey)||'[]');
-      tmpl.forEach(function(t){if(t.itpType)result.push({name:t.itpType,itpNo:t.itpNo||''}); });
+      // No templates found in cache
+      console.warn('No cached project templates found');
     }
   }catch(e){}
   if(!result.length)result=ITP_MASTER.map(function(n){return{name:n,itpNo:''};});

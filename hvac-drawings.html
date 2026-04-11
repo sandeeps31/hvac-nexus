@@ -1017,11 +1017,10 @@ function generateTransmittal(){
   var proj=dbGetCurrentProject();
   var projName=proj.name||document.getElementById('sb-proj-name').textContent||'Project';
   // Save transmittal record
-  var txKey='hvacnexus_transmittals_'+_pNum;
-  var txList=[];try{txList=JSON.parse(localStorage.getItem(txKey)||'[]');}catch(e){}
+  var txList=[];try{var txRaw=await dbGetTransmittals(_pNum);txList=Array.isArray(txRaw)?txRaw:[];}catch(e){}
   var txNum='T-'+String(txList.length+1).padStart(3,'0');
   txList.push({num:txNum,date:today,to:to,desc:desc,drawings:_transmittalDrawings.map(function(d){return{num:d.num,name:d.name,rev:d.rev,status:d.status};})});
-  try{localStorage.setItem(txKey,JSON.stringify(txList));}catch(e){}
+  dbSetTransmittals(_pNum,txList).catch(function(e){console.error(e);});
   // Build mailto
   var subject='Drawing Transmittal '+txNum+' — '+projName+' — '+today;
   var body='DRAWING TRANSMITTAL\n\nTransmittal No: '+txNum+'\nProject: '+projName+'\nDate: '+today+'\n'+(desc?'Description of Changes: '+desc+'\n':'')+'\nDrawings Issued:\n\n';
