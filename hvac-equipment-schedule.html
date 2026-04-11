@@ -594,11 +594,17 @@ function tplCols(t){
   // Always start with tag (Equipment ID) once only
   var cols=[{k:'tag',l:'Equipment ID',key:1,sectionName:null}];
   var usedKeys=new Set(['tag']);
+  var usedLabels=new Set(['equipment id']);
   (t.sections||[]).forEach(function(sec){
     (sec.fields||[]).forEach(function(f){
       if(!f.key||usedKeys.has(f.key))return;
+      var fLabel=(f.label||'').toLowerCase().trim();
+      if(usedLabels.has(fLabel))return;
       usedKeys.add(f.key);
-      cols.push({k:f.key,l:f.label||f.key,num:f.type==='number',sel:f.type==='dropdown',sectionName:(sec.name&&sec.name!=='__none__')?sec.name:null});
+      usedLabels.add(fLabel);
+      // Remap equipment_id → tag so it aligns with the frozen first column
+      var fKey=fLabel==='equipment id'?'tag':f.key;
+      cols.push({k:fKey,l:f.label||f.key,num:f.type==='number',sel:f.type==='dropdown',sectionName:(sec.name&&sec.name!=='__none__')?sec.name:null});
     });
   });
   if(!usedKeys.has('status'))cols.push({k:'status',l:'Status',sel:1,sectionName:null});
@@ -723,16 +729,19 @@ function renderTable(){
     th+='<th style="background:var(--surface2);width:28px"></th></tr>';
   }
   th+='<tr>'+cols.map(function(c){
-    var style=c.key?'style="min-width:160px"':c.k==='desc'?'style="min-width:140px"':'';
+    var style=c.key?'style="min-width:180px"':c.k==='desc'||c.k==='service'?'style="min-width:200px"':'style="min-width:140px"';
     return'<th '+style+' onclick="srtBy(\'' +c.k+ '\')">'+X(c.l)+(sortK===c.k?(sortD>0?' ↑':' ↓'):'')+' </th>';
   }).join('')+'<th style="width:28px"></th></tr></thead>';
   var tb='<tbody id="etbd">'+rows.map(function(row){
     var cells=cols.map(function(c){
-      if(c.sel)return'<td><select class="csel" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+STATUSES.map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
-      if(c.num)return'<td><input class="ci num" type="number" value="'+X(row[c.k]||'')+'" placeholder="1" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"/></td>';
-      return'<td><input class="ci'+(c.key?' tag':'')+'" value="'+X(row[c.k]||'')+'" placeholder="'+X(c.l)+'…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"/></td>';
+      var ro2=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
+      if(c.sel)return'<td><select class="csel" '+(ro2?'disabled style="opacity:.65;cursor:default"':'')+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+STATUSES.map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+      var ro=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
+      if(c.num)return'<td><input class="ci num" type="number" value="'+X(row[c.k]||'')+'" placeholder="" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
+      return'<td><input class="ci'+(c.key?' tag':'')+'" value="'+X(row[c.k]||'')+'" placeholder="'+X(c.l)+'…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
     }).join('');
-    return'<tr data-tid="'+t.id+'" data-rid="'+row.id+'">'+cells+'<td><button class="delr" onclick="delR(\''+t.id+'\',\''+row.id+'\')">✕</button></td></tr>';
+    var canDel=(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
+    return'<tr data-tid="'+t.id+'" data-rid="'+row.id+'">'+cells+'<td>'+(canDel?'<button class="delr" onclick="delR(\''+t.id+'\',\''+row.id+'\')">✕</button>':'')+'</td></tr>';
   }).join('')+'</tbody>';
   document.getElementById('main').innerHTML='<div class="twrap" id="body-scroll"><table class="etbl" id="etbl">'+th+tb+'</table>'
     +'<div onclick="openNewRow()" style="display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;color:var(--muted);font-size:13px;font-family:DM Sans,sans-serif;border-top:1px solid var(--border);transition:all .15s;margin:0 14px" onmouseover="this.style.color=\'var(--accent)\';this.style.background=\'var(--accent-dim)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.background=\'transparent\'"><span style="font-size:16px;font-weight:300">＋</span><span>Add Row</span><span style="font-size:11px;opacity:.5;margin-left:4px">· Tab across · Enter to save</span></div>'
@@ -1489,15 +1498,15 @@ function renderRevBar(){
     addBtn('\u270f Start Draft','bg',startDraft);
   } else if(isLockedByMe(tabId)){
     addBtn('&#128203; History','bg',openRevHistory);
-    addBtn('🔓 Release Lock','bg',function(){releaseLock(tabId);},null,'Release your edit lock so others can edit this tab');
-    addBtn('\u2191 Publish','bp',openPublishModal);
+    addBtn('💾 Save & Release','bp',function(){saveEquip();releaseLock(tabId);showToast('Saved and lock released');});
+    addBtn('↑ Publish Version','bp',openPublishModal);
   } else if(isLockedByOther(tabId)){
     addBtn('&#128203; History','bg',openRevHistory);
     addBtn('\u270E Take Lock','bg',function(){openForceUnlock(lk);});
   } else {
     addBtn('&#128203; History','bg',openRevHistory);
-    addBtn('\u270E Take Edit Lock','bg',function(){takeLock(tabId);});
-    addBtn('\u2191 Publish','bp',openPublishModal);
+    addBtn('✏️ Edit','bp',function(){takeLock(tabId);});
+    addBtn('↑ Publish Version','bp',openPublishModal);
   }
 
   // Banners
@@ -1562,7 +1571,7 @@ function startDraft(){
   showToast('Draft started \u2014 table is now editable');
 }
 function takeLock(tabId){var me=getCurrentUser();setLock(tabId,me);renderRevBar();renderTable();showToast('Edit lock acquired');}
-function releaseLock(tabId){clearLock(tabId);renderRevBar();renderTable();showToast('Lock released');}
+function releaseLock(tabId){saveEquip();clearLock(tabId);renderRevBar();renderTable();showToast('Saved and released');}
 
 function openForceUnlock(lk){
   document.getElementById('forceUnlockMsg').textContent=lk.user+' holds the edit lock. Force-unlocking allows you to edit but may cause conflicts.';
