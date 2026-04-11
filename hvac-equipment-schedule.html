@@ -710,6 +710,12 @@ function renderTable(){
     return;
   }
 
+  // ── VERTICAL LAYOUT (fields=rows, equipment=columns, like FCU Excel) ──
+  if(t.layout==='vertical'){
+    renderVerticalTable(t,rows);
+    return;
+  }
+
   // ── FLAT TABLE VIEW ──
   var cols=getCols(t);
   // Build header — show section grouping row if template has sections
@@ -751,6 +757,62 @@ function renderTable(){
   if(typeof applyDiffHighlights==='function'){setTimeout(function(){applyDiffHighlights();updateEditability();renderRevBar();},0);}
 }
 
+
+function renderVerticalTable(t,rows){
+  var cols=getCols(t);
+  var canEdit=(_editingTabId===t.id);
+  var ro=!canEdit;
+  var roStyle=ro?' readonly style="opacity:.65;cursor:default"':'';
+  var roSel=ro?'disabled style="opacity:.65;cursor:default"':'';
+
+  // Build vertical table: rows=fields, cols=equipment items
+  var html='<div class="twrap" id="body-scroll"><table class="etbl" id="etbl" style="border-collapse:collapse">';
+
+  // Header row: empty label cell + one col per equipment item
+  html+='<thead><tr><th style="min-width:200px;background:var(--surface2);border-right:2px solid var(--border);position:sticky;left:0;z-index:3">Field</th>';
+  rows.forEach(function(row){
+    if(canEdit){
+      html+='<th style="min-width:160px;background:var(--surface2);text-align:center"><input class="ci tag" style="text-align:center;width:100%;background:transparent;border:none" value="'+X(row.tag||'')+'" placeholder="EQ-001…" onchange="updR(''+t.id+'',''+row.id+'','tag',this.value)" onblur="saveEquip()"/></th>';
+    } else {
+      html+='<th style="min-width:160px;background:var(--surface2);text-align:center;font-family:DM Mono,monospace;color:var(--accent)">'+X(row.tag||'—')+'</th>';
+    }
+  });
+  if(canEdit)html+='<th style="min-width:160px;background:var(--accent-dim);text-align:center;color:var(--accent);cursor:pointer" onclick="openNewRow()">＋ Add</th>';
+  html+='</tr></thead><tbody>';
+
+  // One row per field/col, grouped by section
+  var lastSection=null;
+  cols.forEach(function(c){
+    if(c.k==='tag')return; // tag is the column header, skip as a row
+    // Section header row
+    if(c.sectionName!==lastSection){
+      lastSection=c.sectionName;
+      if(c.sectionName){
+        var span=rows.length+(canEdit?1:0)+1;
+        html+='<tr><td colspan="'+span+'" style="padding:6px 14px;font-family:DM Mono,monospace;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text);background:var(--surface3);border-top:2px solid var(--border)">'+X(c.sectionName)+'</td></tr>';
+      }
+    }
+    // Field row
+    html+='<tr><td style="padding:8px 14px;font-size:12px;color:var(--text2);background:var(--surface2);border-right:2px solid var(--border);position:sticky;left:0;z-index:2;white-space:nowrap">'+X(c.l)+(c.unit?' <span style="color:var(--muted);font-size:10px">('+X(c.unit)+')</span>':'')+'</td>';
+    rows.forEach(function(row){
+      if(c.sel){
+        html+='<td style="padding:4px 8px"><select class="csel" '+roSel+' onchange="updR(''+t.id+'',''+row.id+'',''+c.k+'',this.value)">'+STATUSES.map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+      } else {
+        html+='<td style="padding:4px 8px"><input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="'+X(c.l)+'…" onchange="updR(''+t.id+'',''+row.id+'',''+c.k+'',this.value)"'+roStyle+'></td>';
+      }
+    });
+    if(canEdit)html+='<td style="padding:4px 8px;background:var(--surface);opacity:.3"></td>';
+    html+='</tr>';
+  });
+
+  html+='</tbody></table>';
+  if(canEdit){
+    html+='<div onclick="openNewRow()" style="padding:10px 16px;cursor:pointer;color:var(--muted);font-size:13px;font-family:DM Sans,sans-serif;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px"><span style="font-size:16px;font-weight:300">＋</span><span>Add Equipment Item</span></div>';
+  }
+  html+='</div>';
+  document.getElementById('main').innerHTML=html;
+  if(typeof applyDiffHighlights==='function'){setTimeout(function(){updateEditability();renderRevBar();},0);}
+}
 
 function toggleBoard(el){
   el.classList.toggle('collapsed-hdr');
@@ -889,8 +951,19 @@ function delR(tid,rid){
 
 function openNewRow(){
   var t=aTab();if(!t)return;
-  // Auto-start edit mode if not already editing
   if(_editingTabId!==t.id){startDraftAndEdit(t.id);}
+  if(t.layout==='vertical'){
+    // In vertical mode, add a blank column (new equipment item)
+    var row={id:nid(),tag:'',status:'Not Started'};
+    t.rows.push(row);
+    renderTable();saveEquip();
+    // Focus the tag cell of the new column
+    setTimeout(function(){
+      var inputs=document.querySelectorAll('#etbl thead th input');
+      if(inputs.length)inputs[inputs.length-1].focus();
+    },50);
+    return;
+  }
   if(nrVis){var f=document.querySelector('.ni');if(f)f.focus();return;}
   nrVis=true;appNR();
 }
@@ -902,15 +975,34 @@ function appNR(){
   var tr=document.createElement('tr');tr.id='nrtr';tr.className='nrow';
   var cells=cols.map(function(c,i){
     var ti=' tabindex="'+(i+1)+'"';
+    var last=i===cols.length-1;
     if(c.sel)return'<td><select class="nisel" id="ni_'+c.k+'"'+ti+'><option value="">Status…</option>'+STATUSES.map(function(s){return'<option>'+s+'</option>';}).join('')+'</select></td>';
-    if(c.num)return'<td><input class="ni num" id="ni_'+c.k+'" type="number" placeholder="1"'+ti+' onkeydown="nk(event)"/></td>';
-    return'<td><input class="ni'+(c.key?' tag':'')+'" id="ni_'+c.k+'" placeholder="'+X(c.l)+'…"'+ti+' onkeydown="nk(event)"/></td>';
+    if(c.num)return'<td><input class="ni num" id="ni_'+c.k+'" type="number" placeholder=""'+ti+' onkeydown="nk(event,'+last+')" onblur="nrBlur()"/></td>';
+    return'<td><input class="ni'+(c.key?' tag':'')+'" id="ni_'+c.k+'" placeholder="'+X(c.l)+'…"'+ti+' onkeydown="nk(event,'+last+')" onblur="nrBlur()"/></td>';
   }).join('');
   tr.innerHTML=cells+'<td style="white-space:nowrap"><button class="savr" onclick="comR()" tabindex="'+(cols.length+1)+'">↵</button> <button class="canr" onclick="canR()" tabindex="'+(cols.length+2)+'">✕</button></td>';
   tb.appendChild(tr);
   setTimeout(function(){var f=document.getElementById('ni_tag');if(f)f.focus();},30);
 }
-function nk(e){if(e.key==='Enter'){e.preventDefault();comR();}if(e.key==='Escape'){e.preventDefault();canR();}}
+function nrBlur(){
+  // Delay to allow focus to move to another cell in the same row first
+  setTimeout(function(){
+    var nrtr=document.getElementById('nrtr');
+    if(!nrtr)return;
+    // Check if focus is still inside the new row
+    var active=document.activeElement;
+    if(nrtr.contains(active))return;
+    // Check if any field has a value
+    var hasVal=false;
+    nrtr.querySelectorAll('input,select').forEach(function(el){if(el.value&&el.value.trim())hasVal=true;});
+    if(hasVal)comR();
+  },150);
+}
+function nk(e,isLast){
+  if(e.key==='Enter'){e.preventDefault();comR();return;}
+  if(e.key==='Escape'){e.preventDefault();canR();return;}
+  if(e.key==='Tab'&&isLast&&!e.shiftKey){e.preventDefault();comR();return;}
+}
 function comR(){
   var t=aTab();if(!t)return;
   if(_editingTabId!==t.id){startDraftAndEdit(t.id);}
