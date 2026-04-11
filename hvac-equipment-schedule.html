@@ -562,6 +562,7 @@ var EQ=[
   {key:'dcp',name:'DCP',cols:[{k:'tag',l:'DCP ID',key:1},{k:'type',l:'Type'},{k:'location',l:'Location'},{k:'sublocation',l:'Sub Location'},{k:'equip',l:'Equipment ID'},{k:'circuits',l:'No. of Circuits',num:1},{k:'voltage',l:'Voltage'},{k:'fla',l:'FLA (amps)',num:1},{k:'mcb',l:'MCB Rating'},{k:'rcd',l:'RCD'},{k:'status',l:'Status',sel:1}]},
 ];
 var tabs=[],activeId=null,selType=null,nrVis=false,sortK=null,sortD=1,uidN=0;
+var _editingTabId=null; // tracks which tab is currently in edit mode
 
 
 
@@ -877,7 +878,7 @@ function srtBy(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=1;}var t=aTab();if(!
 function updR(tid,rid,f,v){var t=tabs.find(function(x){return x.id===tid;});if(!t)return;if(typeof isEditingDraft==='function'&&!isEditingDraft(tid))return;var r=t.rows.find(function(x){return x.id===rid;});if(r)r[f]=v;updSum();saveEquip();if(typeof applyDiffHighlights==='function')setTimeout(applyDiffHighlights,0);}
 function delR(tid,rid){
   var t=tabs.find(function(x){return x.id===tid;});if(!t)return;
-  if(typeof isEditingDraft==='function'&&!isEditingDraft(tid)){if(typeof showToast==='function')showToast('Take edit lock to make changes.');return;}
+  if(typeof isEditingDraft==='function'&&!isEditingDraft(tid)){if(typeof showToast==='function')showToast('Click ✏️ Edit to make changes.');return;}
   var row=t.rows.find(function(x){return x.id===rid;});if(!row)return;
   var tr2=typeof getTabRev==='function'?getTabRev(tid):null;
   var baseSnap=tr2&&tr2.revisions.length?tr2.revisions[tr2.revisions.length-1].snapshot:[];
@@ -906,7 +907,7 @@ function appNR(){
 function nk(e){if(e.key==='Enter'){e.preventDefault();comR();}if(e.key==='Escape'){e.preventDefault();canR();}}
 function comR(){
   var t=aTab();if(!t)return;
-  if(typeof isEditingDraft==='function'&&!isEditingDraft(t.id)){if(typeof showToast==='function')showToast('Take edit lock to make changes.');return;}
+  if(typeof isEditingDraft==='function'&&!isEditingDraft(t.id)){if(typeof showToast==='function')showToast('Click ✏️ Edit to make changes.');return;}
   var cols=getCols(t);
   var row={id:nid(),status:'Not Started'};
   cols.forEach(function(c){var el=document.getElementById('ni_'+c.k);row[c.k]=el?el.value:'';});
@@ -915,7 +916,7 @@ function comR(){
 }
 function canR(){nrVis=false;var el=document.getElementById('nrtr');if(el)el.remove();}
 
-function swTab(id){activeId=id;sortK=null;sortD=1;nrVis=false;if(typeof viewingRevIdx!=='undefined')viewingRevIdx=null;renderStrip();}
+function swTab(id){if(_editingTabId&&_editingTabId!==id){if(!confirm('You have unsaved changes. Switch tabs anyway?'))return;_editingTabId=null;}activeId=id;sortK=null;sortD=1;nrVis=false;if(typeof viewingRevIdx!=='undefined')viewingRevIdx=null;renderStrip();}
 
 var ctxId=null,ctxEl=document.getElementById('ctxm');
 document.addEventListener('click',function(){ctxEl.style.display='none';});
@@ -1372,7 +1373,7 @@ function setLock(tabId,user){try{localStorage.setItem(LOCK_SK,JSON.stringify({ta
 function clearLock(tabId){var lk=getLock();if(lk&&lk.tabId===tabId)try{localStorage.removeItem(LOCK_SK);}catch(e){}}
 function isLockedByMe(tabId){var lk=getLock();var me=getCurrentUser();return !!(lk&&lk.tabId===tabId&&lk.user===me);}
 function isLockedByOther(tabId){var lk=getLock();var me=getCurrentUser();return !!(lk&&lk.tabId===tabId&&lk.user!==me);}
-function isEditingDraft(tabId){var tr=getTabRev(tabId);return !!(tr.draft&&isLockedByMe(tabId)&&viewingRevIdx===null);}
+function isEditingDraft(tabId){var tr=getTabRev(tabId);return !!(tr.draft&&_editingTabId===tabId&&viewingRevIdx===null);}
 
 // Diff engine
 function rowKey(r){return r.tag||r.id||'';}
@@ -1436,7 +1437,7 @@ function applyDiffHighlights(){
 
 function updateEditability(){
   var tabId=activeId;if(!tabId)return;
-  var canEdit=isEditingDraft(tabId);
+  var canEdit=(_editingTabId===tabId&&viewingRevIdx===null);
   var main=document.getElementById('main');if(!main)return;
   main.querySelectorAll('.ci,.csel').forEach(function(el){
     if(el.tagName==='SELECT')el.disabled=!canEdit;
@@ -1478,10 +1479,10 @@ function renderRevBar(){
 
   // Lock badge
   var lw=document.getElementById('lockBadgeWrap');lw.innerHTML='';
-  if(lk&&lk.tabId===tabId){
+  if(_editingTabId===tabId){
     var badge=document.createElement('div');
-    badge.className='lock-badge'+(lk.user===me?' mine':'');
-    badge.textContent=(lk.user===me?'\uD83D\uDD12 You are editing':'\uD83D\uDD12 Locked by '+lk.user);
+    badge.className='lock-badge mine';
+    badge.textContent='✏️ Editing';
     lw.appendChild(badge);
   }
 
@@ -1496,13 +1497,10 @@ function renderRevBar(){
   } else if(!hasDraft){
     addBtn('📋 History','bg',openRevHistory);
     addBtn('✏️ Edit','bp',function(){startDraftAndEdit(tabId);});
-  } else if(isLockedByMe(tabId)){
+  } else if(_editingTabId===tabId){
     addBtn('📋 History','bg',openRevHistory);
     addBtn('💾 Save & Release','bp',function(){saveAndRelease(tabId);});
     addBtn('↑ Publish','bg',openPublishModal);
-  } else if(isLockedByOther(tabId)){
-    addBtn('📋 History','bg',openRevHistory);
-    addBtn('⚠️ Take Lock','bg',function(){openForceUnlock(lk);});
   } else {
     addBtn('📋 History','bg',openRevHistory);
     addBtn('✏️ Edit','bp',function(){startDraftAndEdit(tabId);});
@@ -1526,7 +1524,7 @@ function renderRevBar(){
     bannerBtn.style.display='none';
   } else if(!hasDraft){
     banner.style.display='flex';bannerIcon.textContent='\uD83D\uDC41\uFE0F';
-    bannerText.textContent='View-only. Click \u201c\u270f Edit\u201d to begin editing.';
+    bannerText.textContent='View-only — click Edit to make changes.';
     bannerBtn.style.display='none';
   } else {
     banner.style.display='none';
@@ -1573,12 +1571,10 @@ function takeLock(tabId){var me=getCurrentUser();setLock(tabId,me);renderRevBar(
 function startDraftAndEdit(tabId){
   var me=getCurrentUser();
   var tr=getTabRev(tabId);
-  // Start draft if none exists
   if(!tr.draft){
     tr.draft={startedBy:me,startedAt:new Date().toISOString(),baseRevIdx:tr.revisions.length-1};
     saveRevData();
   }
-  // Take lock
   setLock(tabId,me);
   viewingRevIdx=null;
   renderRevBar();renderTable();
