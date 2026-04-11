@@ -146,11 +146,6 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 .bt-add-item:hover{color:var(--text);background:var(--surface2)}
 .bt-card-footer{padding:6px 10px;border-top:1px dashed var(--border);display:flex;gap:6px}
 .stab-inner{padding:8px 16px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent;transition:all .15s;font-family:'DM Sans',sans-serif;white-space:nowrap}
-.eq-group-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);user-select:none;background:var(--surface2)}
-.eq-group-hdr:hover{background:var(--surface3)}
-.eq-type-item{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 20px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);transition:background .12s}
-.eq-type-item:hover{background:var(--surface2);color:var(--text)}
-.eq-type-item.active{background:var(--accent-dim);color:var(--accent)}
 .stab-inner:hover{color:var(--text)}
 .stab-inner.active{color:var(--accent);border-bottom-color:var(--accent)}
 .stab-inner-bar{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;gap:0;background:var(--surface2);border-radius:8px 8px 0 0;overflow:hidden}
@@ -198,13 +193,12 @@ function switchTab(tab){
   if(tab==='templates')setTimeout(function(){if(typeof initBudgetTemplateBuilder==='function')initBudgetTemplateBuilder();},100);
 }
 function switchInnerTab(tab){
-  ['budget','itp','precx','equip'].forEach(function(t){
+  ['budget','itp','precx'].forEach(function(t){
     var el=document.getElementById('itab-content-'+t);
     var btn=document.getElementById('itab-'+t);
     if(el)el.style.display=t===tab?'':'none';
     if(btn)btn.classList.toggle('active',t===tab);
   });
-  if(tab==='equip')initEquipTemplates();
 }
 function toggleSB(){
   var c=!document.getElementById('sidebar').classList.contains('sm');
@@ -464,7 +458,6 @@ function budgetTplAddRow(type){
         <button class="stab-inner active" id="itab-budget" onclick="switchInnerTab('budget')">📊 Budget</button>
         <button class="stab-inner" id="itab-itp" onclick="switchInnerTab('itp')">📋 ITP</button>
         <button class="stab-inner" id="itab-precx" onclick="switchInnerTab('precx')">✅ Pre-Commissioning</button>
-        <button class="stab-inner" id="itab-equip" onclick="switchInnerTab('equip')">🗂️ Equipment Schedules</button>
       </div>
 
       <!-- INNER TAB: BUDGET -->
@@ -541,21 +534,7 @@ function budgetTplAddRow(type){
         </div>
       </div>
 
-      <!-- INNER TAB: EQUIPMENT SCHEDULES -->
-      <div id="itab-content-equip" style="display:none">
-        <div class="settings-card">
-          <div class="card-hdr">
-            <div class="card-hdr-title">Equipment Schedule Templates</div>
-            <div class="card-hdr-sub">Define field templates for each equipment type — FCUs, AHUs, dampers, pumps and more</div>
-          </div>
-          <div class="card-body" style="display:flex;align-items:center;justify-content:space-between">
-            <div style="font-size:13px;color:var(--text2)">Create versioned templates with custom fields, section headers and layout settings. Templates are pulled into project equipment schedules.</div>
-            <button class="btn bp bsm" onclick="navTo('hvac-equip-templates.html')" style="flex-shrink:0;margin-left:16px">Open Equipment Template Builder →</button>
-          </div>
-        </div>
-      </div>
-
-          </div><!-- /tab-templates -->
+    </div><!-- /tab-templates -->
 
 
     <!-- ── CONTACTS TAB ── -->
@@ -999,6 +978,8 @@ async function initBudgetTemplateBuilder(){
       _btRows=s.budgetTemplate.rows;
     }
   }catch(e){_btRows=[];}
+  // Also load uploaded template status
+  try{var tmpl=await dbGetBudget('__template__');if(tmpl)renderTemplateStatus(typeof tmpl==='string'?JSON.parse(tmpl):tmpl);}catch(e){}
   renderBudgetTplList();
   _btRowsBackup=JSON.parse(JSON.stringify(_btRows));
   lockBTView();
@@ -1309,324 +1290,6 @@ function renderUsers(){
   }catch(e){}
 }
 function deleteUser(i){if(confirm('Delete this user?')){try{var u=dbGetUsers()||[];u.splice(i,1);dbSetUsers(u);renderUsers();}catch(e){}}}
-
-// ═══════════════════════════════════════════════════
-// EQUIPMENT SCHEDULE TEMPLATES
-// ═══════════════════════════════════════════════════
-
-var EQ_GROUPS=[
-  {key:'air_handling',name:'Air Handling',icon:'🌬️',types:['AHUs','ERVs','FCU - Water cooled','Chilled beams','Ducted DX unit','CRAC units']},
-  {key:'air_conditioning',name:'Air Conditioning',icon:'❄️',types:['Chillers','Cooling Towers','Boilers','PAC unit - Air cooled','PAC unit - Water cooled','Single head split system','Multi head split system','VRF system']},
-  {key:'airflow',name:'Airflow Equipment',icon:'💨',types:['Barometric fire damper','Grilles','HEPA filters','Filters','Pressure relief damper','Security grilles','VAVs','Attenuators']},
-  {key:'fans',name:'Fans & Extraction',icon:'🔄',types:['Fans','Fume Cupboard Fans','Dust extractors','Welding extractor']},
-  {key:'air_quality',name:'Air Quality',icon:'🌿',types:['ESP','Humidifiers']},
-  {key:'heating',name:'Heating',icon:'🔥',types:['Radiators','Electric duct heater','Reheat coils']},
-  {key:'hydronic',name:'Hydronic & Refrigerant',icon:'💧',types:['Automatic refill units','Expansion tank','Pumps','Refrigerant recovery','Heat exchanger - Air','Heat exchanger - Water']},
-  {key:'actuators',name:'Actuators & Controls',icon:'⚙️',types:['Damper actuators','Valve actuators']},
-  {key:'electrical',name:'Electrical',icon:'⚡',types:['MSSB','MSSB loads','VSDs','DCP','Harmonic filters']},
-];
-
-var FIELD_TYPES=[
-  {key:'text',label:'Text'},
-  {key:'number',label:'Number'},
-  {key:'yesno',label:'Yes / No'},
-  {key:'dropdown',label:'Dropdown'},
-  {key:'date',label:'Date'},
-];
-
-var _eqTemplates={};  // { typeName: { layout:'horizontal'|'vertical', groups:[{name,fields:[{key,label,type,unit,required,defaultVal,options}]}] } }
-var _eqSelectedType=null;
-var _eqDirty=false;
-
-async function initEquipTemplates(){
-  try{var d=await dbGetCompanySettings();if(d&&d.eqTemplates)_eqTemplates=d.eqTemplates;}catch(e){}
-  renderEqTypeList();
-}
-
-function renderEqTypeList(){
-  var el=document.getElementById('eqTypeList');if(!el)return;
-  var html='';
-  EQ_GROUPS.forEach(function(g){
-    var hasCustom=Object.keys(_eqTemplates).some(function(k){return !EQ_GROUPS.some(function(gg){return gg.types.indexOf(k)>=0;})});
-    html+='<div class="eq-group-hdr" onclick="toggleEqGroup(\''+g.key+'\')" id="eqghdr-'+g.key+'">'
-      +'<span style="font-size:13px">'+g.icon+'</span>'
-      +'<span style="flex:1;font-size:11px;font-weight:600;color:var(--text)">'+g.name+'</span>'
-      +'<span id="eqgchev-'+g.key+'" style="color:var(--muted);font-size:10px">▾</span>'
-      +'</div>'
-      +'<div id="eqgitems-'+g.key+'">';
-    g.types.forEach(function(t){
-      var hasTemplate=!!_eqTemplates[t];
-      var active=_eqSelectedType===t;
-      html+='<div class="eq-type-item'+(active?' active':'')+'" onclick="selectEqType(\''+escHs(t)+'\')">'
-        +'<span style="flex:1;font-size:12px">'+t+'</span>'
-        +(hasTemplate?'<span style="width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0"></span>':'')
-        +'</div>';
-    });
-    html+='</div>';
-  });
-  // Custom types
-  var customTypes=Object.keys(_eqTemplates).filter(function(k){return!EQ_GROUPS.some(function(g){return g.types.indexOf(k)>=0;});});
-  if(customTypes.length){
-    html+='<div class="eq-group-hdr" onclick="toggleEqGroup(\'custom\')" id="eqghdr-custom">'
-      +'<span style="font-size:13px">📁</span>'
-      +'<span style="flex:1;font-size:11px;font-weight:600;color:var(--text)">Custom</span>'
-      +'<span id="eqgchev-custom" style="color:var(--muted);font-size:10px">▾</span>'
-      +'</div><div id="eqgitems-custom">';
-    customTypes.forEach(function(t){
-      html+='<div class="eq-type-item'+(_eqSelectedType===t?' active':'')+'" onclick="selectEqType(\''+escHs(t)+'\')">'
-        +'<span style="flex:1;font-size:12px">'+t+'</span>'
-        +'<span style="width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0"></span>'
-        +'</div>';
-    });
-    html+='</div>';
-  }
-  el.innerHTML=html;
-}
-
-function toggleEqGroup(key){
-  var items=document.getElementById('eqgitems-'+key);
-  var chev=document.getElementById('eqgchev-'+key);
-  if(!items)return;
-  var open=items.style.display!=='none';
-  items.style.display=open?'none':'block';
-  if(chev)chev.textContent=open?'▸':'▾';
-}
-
-function selectEqType(type){
-  if(_eqDirty&&!confirm('You have unsaved changes. Discard?'))return;
-  _eqSelectedType=type;_eqDirty=false;
-  renderEqTypeList();
-  renderEqEditor();
-}
-
-function renderEqEditor(){
-  var pane=document.getElementById('eqEditorPane');if(!pane)return;
-  var t=_eqSelectedType;if(!t){pane.innerHTML='';return;}
-  if(!_eqTemplates[t])_eqTemplates[t]={layout:'vertical',groups:[{name:'__none__',fields:[]}]};
-  var tmpl=_eqTemplates[t];
-  var si='background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none';
-  var isV=tmpl.layout==='vertical';
-  var html='';
-  // Header
-  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">'
-    +'<div><div style="font-family:\'Syne\',sans-serif;font-size:18px;font-weight:800;color:var(--text)">'+escHs(t)+'</div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">Define fields and section headers for this equipment type</div></div>'
-    +'<div style="display:flex;gap:8px">'
-    +'<button class="btn bg bsm" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="deleteEqTemplate()">Delete</button>'
-    +'<button class="btn bp bsm" onclick="saveEqTemplate()">Save Template</button>'
-    +'</div></div>';
-  // Layout toggle + live preview
-  // Build sample fields from first 2 groups, up to 3 fields each
-  var previewGroups=[];
-  tmpl.groups.forEach(function(g){if(previewGroups.length>=2&&g.fields.length)return;if(g.fields.length)previewGroups.push({name:g.name,fields:g.fields.slice(0,3)});});
-  if(!previewGroups.length)previewGroups=[{name:'GENERAL',fields:[{label:'Tag',unit:''},{label:'Location',unit:''},{label:'Airflow',unit:'l/s'}]}];
-
-  html+='<div style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-  // Toggle bar
-  html+='<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border)">'
-    +'<span style="font-size:12px;color:var(--text2);font-weight:500">Layout:</span>'
-    +'<div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden">'
-    +'<button onclick="eqSetLayout(\'vertical\')" style="padding:5px 14px;font-size:12px;border:none;cursor:pointer;background:'+(isV?'var(--accent)':'var(--surface3)')+';color:'+(isV?'#000':'var(--text2)')+';font-weight:'+(isV?'600':'400')+'">↕ Vertical</button>'
-    +'<button onclick="eqSetLayout(\'horizontal\')" style="padding:5px 14px;font-size:12px;border:none;cursor:pointer;background:'+(!isV?'var(--accent)':'var(--surface3)')+';color:'+(!isV?'#000':'var(--text2)')+';font-weight:'+(!isV?'600':'400')+'">↔ Horizontal</button>'
-    +'</div>'
-    +'<span style="font-size:11px;color:var(--muted)">'+(isV?'Fields are rows — equipment IDs are column headers (FCU, AHU style)':'Fields are column headers — each equipment item is a row (Damper, VAV style)')+'</span>'
-    +'</div>';
-
-  // Live preview
-  html+='<div style="padding:12px 14px;background:var(--surface);overflow-x:auto">';
-  html+='<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Preview</div>';
-
-  var previewStyle='font-size:11px;border-collapse:collapse;width:100%;font-family:DM Sans,sans-serif';
-  var thStyle='padding:5px 10px;background:var(--surface2);border:1px solid var(--border);font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);white-space:nowrap';
-  var sectionStyle='padding:5px 10px;background:var(--surface3);border:1px solid var(--border);font-family:DM Mono,monospace;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text)';
-  var labelStyle='padding:5px 10px;border:1px solid var(--border);font-size:11px;color:var(--text2);white-space:nowrap';
-  var cellStyle='padding:5px 10px;border:1px solid var(--border);font-size:11px;color:var(--muted);font-style:italic';
-
-  if(isV){
-    // VERTICAL: rows = fields, columns = equipment IDs
-    html+='<table style="'+previewStyle+'">';
-    // Header row: field label col + sample equipment IDs
-    html+='<thead><tr>'
-      +'<th style="'+thStyle+';min-width:140px">Field</th>'
-      +'<th style="'+thStyle+'">EQ-001</th>'
-      +'<th style="'+thStyle+'">EQ-002</th>'
-      +'<th style="'+thStyle+'">EQ-003</th>'
-      +'</tr></thead><tbody>';
-    previewGroups.forEach(function(g){
-      // Section header row spanning all cols — skip if no header
-      if(g.name&&g.name!=='__none__')html+='<tr><td colspan="4" style="'+sectionStyle+'">'+g.name+'</td></tr>';
-      g.fields.forEach(function(f){
-        html+='<tr>'
-          +'<td style="'+labelStyle+'">'+f.label+(f.unit?' <span style="color:var(--muted);font-size:10px">('+f.unit+')</span>':'')+'</td>'
-          +'<td style="'+cellStyle+'">—</td>'
-          +'<td style="'+cellStyle+'">—</td>'
-          +'<td style="'+cellStyle+'">—</td>'
-          +'</tr>';
-      });
-    });
-    html+='</tbody></table>';
-  } else {
-    // HORIZONTAL: columns = fields, rows = equipment items
-    html+='<table style="'+previewStyle+'">';
-    // Build flat column list from all groups
-    html+='<thead>';
-    // Group header row
-    html+='<tr><th style="'+thStyle+'">Tag</th>';
-    previewGroups.forEach(function(g){
-      var gLabel=(g.name&&g.name!=='__none__')?g.name:'';
-      html+='<th colspan="'+g.fields.length+'" style="'+sectionStyle+';text-align:center">'+gLabel+'</th>';
-    });
-    html+='</tr>';
-    // Field label row
-    html+='<tr><th style="'+thStyle+'">ID</th>';
-    previewGroups.forEach(function(g){
-      g.fields.forEach(function(f){
-        html+='<th style="'+thStyle+'">'+f.label+(f.unit?' ('+f.unit+')':'')+'</th>';
-      });
-    });
-    html+='</tr></thead>';
-    // Sample rows
-    html+='<tbody>';
-    ['EQ-001','EQ-002','EQ-003'].forEach(function(id){
-      html+='<tr><td style="'+labelStyle+';color:var(--accent);font-family:DM Mono,monospace">'+id+'</td>';
-      previewGroups.forEach(function(g){
-        g.fields.forEach(function(){html+='<td style="'+cellStyle+'">—</td>';});
-      });
-      html+='</tr>';
-    });
-    html+='</tbody>';
-    html+='</table>';
-  }
-
-  html+='</div></div>';
-  // Hint
-  html+='<div style="font-size:11px;color:var(--muted);margin-bottom:16px;padding:8px 12px;background:var(--accent-dim);border:1px solid rgba(0,200,255,.15);border-radius:7px">'
-    +'<strong style="color:var(--accent)">Section headers</strong> group related fields — e.g. add a section called <em>FAN MAKE</em> then add fields: Type, Model, Speed, kW underneath it.'
-    +'</div>';
-  // Groups
-  tmpl.groups.forEach(function(grp,gi){
-    var noHeader=(!grp.name||grp.name==='__none__');
-    html+='<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden">'
-      +'<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:'+(noHeader?'var(--surface2)':'var(--surface3)')+';border-bottom:'+(noHeader?'1px':'2px')+' solid var(--border)">'
-      +(noHeader
-        ?'<span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;color:var(--muted);flex-shrink:0">NO HEADER</span>'
-        +'<span style="font-size:11px;color:var(--muted);flex:1;font-style:italic">Fields shown without a section header</span>'
-        :'<span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;color:var(--muted);flex-shrink:0">SECTION</span>'
-        +'<input type="text" value="'+escHs(grp.name)+'" oninput="eqRenameGroup('+gi+',this.value)" style="'+si+';font-family:\'DM Mono\',monospace;font-weight:700;font-size:12px;flex:1;letter-spacing:1px;text-transform:uppercase" placeholder="e.g. FAN MAKE"/>'
-      )
-      +'<span style="font-size:10px;color:var(--muted)">'+grp.fields.length+' field'+(grp.fields.length!==1?'s':'')+'</span>'
-      +(tmpl.groups.length>1?'<button onclick="eqDeleteGroup('+gi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">×</button>':'')
-      +'<button onclick="eqToggleHeader('+gi+')" title="Toggle section header" style="background:none;border:1px solid var(--border);border-radius:5px;color:'+(noHeader?'var(--muted)':'var(--accent)')+';cursor:pointer;font-size:10px;padding:2px 7px;white-space:nowrap">'+(noHeader?'+ Header':'× No header')+'</button>'
-      +'</div>';
-    if(grp.fields.length){
-      html+='<div style="display:grid;grid-template-columns:1fr 90px 70px 90px 60px 28px;gap:6px;padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border)">'
-        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Field Label</span>'
-        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Type</span>'
-        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Unit</span>'
-        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Default / Options</span>'
-        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:center">Req.</span>'
-        +'<span></span>'
-        +'</div>';
-    }
-    grp.fields.forEach(function(f,fi){
-      html+='<div style="display:grid;grid-template-columns:1fr 90px 70px 90px 60px 28px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center;background:var(--surface)">'
-        +'<input type="text" value="'+escHs(f.label)+'" oninput="eqUpdateField('+gi+','+fi+',\'label\',this.value)" style="'+si+';width:100%" placeholder="e.g. Air Flow"/>'
-        +'<select onchange="eqUpdateField('+gi+','+fi+',\'type\',this.value)" style="'+si+';width:100%">'
-        +FIELD_TYPES.map(function(ft){return'<option value="'+ft.key+'"'+(f.type===ft.key?' selected':'')+'>'+ft.label+'</option>';}).join('')
-        +'</select>'
-        +'<input type="text" value="'+escHs(f.unit||'')+'" oninput="eqUpdateField('+gi+','+fi+',\'unit\',this.value)" style="'+si+';width:100%" placeholder="l/s"/>'
-        +(f.type==='dropdown'
-          ?'<input type="text" value="'+escHs((f.options||[]).join(','))+'" oninput="eqUpdateField('+gi+','+fi+',\'options\',this.value.split(\',\'))" style="'+si+';width:100%;font-size:11px" placeholder="A,B,C"/>'
-          :'<input type="text" value="'+escHs(f.defaultVal||'')+'" oninput="eqUpdateField('+gi+','+fi+',\'defaultVal\',this.value)" style="'+si+';width:100%" placeholder="—"/>'
-        )
-        +'<div style="text-align:center"><input type="checkbox" '+(f.required?'checked':'')+' onchange="eqUpdateField('+gi+','+fi+',\'required\',this.checked)"/></div>'
-        +'<button onclick="eqDeleteField('+gi+','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1">×</button>'
-        +'</div>';
-    });
-    if(!grp.fields.length)html+='<div style="padding:10px 14px;font-size:12px;color:var(--muted);font-style:italic">No fields yet</div>';
-    html+='<div style="padding:8px 14px;background:var(--surface)">'
-      +'<button class="btn bg bsm" onclick="eqAddField('+gi+')" style="color:var(--accent);border-color:rgba(0,200,255,.3)">+ Add Field</button>'
-      +'</div></div>';
-  });
-  html+='<div style="display:flex;gap:8px;margin-top:4px">'
-    +'<button class="btn bg bsm" onclick="eqAddGroup(false)" style="color:var(--accent);border-color:rgba(0,200,255,.3)">+ Add Section Header</button>'
-    +'<button class="btn bg bsm" onclick="eqAddGroup(true)" style="color:var(--muted);border-color:var(--border)">+ Add Fields (no header)</button>'
-    +'</div>';
-  pane.innerHTML=html;
-}
-
-function eqSetLayout(v){
-  if(!_eqSelectedType)return;
-  if(!_eqTemplates[_eqSelectedType])_eqTemplates[_eqSelectedType]={layout:v,groups:[{name:'__none__',fields:[]}]};
-  _eqTemplates[_eqSelectedType].layout=v;_eqDirty=true;renderEqEditor();
-}
-function eqRenameGroup(gi,val){
-  var tmpl=_eqTemplates[_eqSelectedType];if(!tmpl)return;
-  tmpl.groups[gi].name=val;_eqDirty=true;
-}
-function eqToggleHeader(gi){
-  var tmpl=_eqTemplates[_eqSelectedType];if(!tmpl)return;
-  var grp=tmpl.groups[gi];
-  grp.name=(grp.name==='__none__'||!grp.name)?'NEW SECTION':('__none__');
-  _eqDirty=true;renderEqEditor();
-}
-function eqDeleteGroup(gi){
-  var tmpl=_eqTemplates[_eqSelectedType];if(!tmpl||tmpl.groups.length<=1)return;
-  if(!confirm('Delete this group and all its fields?'))return;
-  tmpl.groups.splice(gi,1);_eqDirty=true;renderEqEditor();
-}
-function eqAddGroup(noHeader){
-  if(!_eqSelectedType)return;
-  if(!_eqTemplates[_eqSelectedType])_eqTemplates[_eqSelectedType]={layout:'vertical',groups:[]};
-  _eqTemplates[_eqSelectedType].groups.push({name:noHeader?'__none__':'NEW SECTION',fields:[]});
-  _eqDirty=true;renderEqEditor();
-}
-function eqAddField(gi){
-  if(!_eqSelectedType)return;
-  if(!_eqTemplates[_eqSelectedType])_eqTemplates[_eqSelectedType]={layout:'vertical',groups:[{name:'__none__',fields:[]}]};
-  _eqTemplates[_eqSelectedType].groups[gi].fields.push({key:'',label:'',type:'text',unit:'',required:false,defaultVal:''});
-  _eqDirty=true;renderEqEditor();
-}
-function eqDeleteField(gi,fi){
-  var tmpl=_eqTemplates[_eqSelectedType];if(!tmpl)return;
-  tmpl.groups[gi].fields.splice(fi,1);_eqDirty=true;renderEqEditor();
-}
-function eqUpdateField(gi,fi,prop,val){
-  var tmpl=_eqTemplates[_eqSelectedType];if(!tmpl)return;
-  tmpl.groups[gi].fields[fi][prop]=val;
-  // Auto-generate key from label
-  if(prop==='label')tmpl.groups[gi].fields[fi].key=val.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
-  _eqDirty=true;
-}
-function deleteEqTemplate(){
-  if(!_eqSelectedType||!confirm('Delete template for '+_eqSelectedType+'?'))return;
-  delete _eqTemplates[_eqSelectedType];
-  _eqSelectedType=null;_eqDirty=false;
-  saveEqTemplatesToDb();renderEqTypeList();
-  document.getElementById('eqEditorPane').innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">🗂️</div><div style="font-size:13px">Select an equipment type to edit its template</div></div>';
-}
-function saveEqTemplate(){
-  if(!_eqSelectedType)return;
-  if(!_eqTemplates[_eqSelectedType])_eqTemplates[_eqSelectedType]={layout:'vertical',groups:[{name:'__none__',fields:[]}]};
-  saveEqTemplatesToDb();_eqDirty=false;renderEqTypeList();showToast('✓ Template saved');
-}
-async function saveEqTemplatesToDb(){
-  try{
-    var cs=await dbGetCompanySettings()||{};
-    cs.eqTemplates=_eqTemplates;
-    await dbSetCompanySettings(cs);
-  }catch(e){console.error('saveEqTemplates error:',e);}
-}
-function addNewEqType(){
-  var name=prompt('New equipment type name:');
-  if(!name||!name.trim())return;
-  name=name.trim();
-  if(_eqTemplates[name]){alert('Already exists.');return;}
-  _eqTemplates[name]={layout:'vertical',groups:[{name:'__none__',fields:[]}]};
-  _eqDirty=false;_eqSelectedType=name;
-  saveEqTemplatesToDb();renderEqTypeList();renderEqEditor();
-}
-function escHs(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 </script>
 
 </body>
