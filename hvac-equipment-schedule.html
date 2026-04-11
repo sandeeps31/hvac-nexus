@@ -45,12 +45,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .twrap{overflow-x:auto;overflow-y:auto;flex:1;min-height:0;padding:0 14px 0}
 .etbl{width:100%;border-collapse:collapse;margin-top:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;table-layout:auto}
 .etbl thead tr{background:var(--surface2)}.etbl thead{position:sticky;top:0;z-index:4;box-shadow:0 1px 0 var(--border)}
-.etbl th{padding:8px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+.etbl th{padding:8px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 .etbl th:hover{color:var(--text2)}
 .etbl tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
 .etbl tbody tr:last-child{border-bottom:none}
 .etbl tbody tr:hover{background:var(--surface2)}
-.etbl td{padding:5px 6px;vertical-align:middle;text-align:center;white-space:nowrap}
+.etbl td{padding:5px 6px;vertical-align:middle;text-align:center;white-space:nowrap;border-right:1px solid var(--border)}
 .ci{background:transparent;border:1px solid transparent;border-radius:5px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;outline:none;width:100%;padding:4px 7px;transition:border-color .2s,background .2s;min-width:0;text-align:center}
 .ci:hover{border-color:var(--border)}.ci:focus{border-color:var(--accent);background:var(--surface2)}
 .ci.tag{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:600;text-align:center;background:transparent;border:1px solid transparent;border-radius:5px;padding:4px 7px}
@@ -818,9 +818,9 @@ function renderVerticalTable(t,rows){
 
     rows.forEach(function(row){
       if(c.sel){
-        html+='<td style="padding:3px 6px"><select class="csel" '+roSel+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+STATUSES.map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+        html+='<td style="padding:3px 6px;border-right:1px solid var(--border)"><select class="csel" '+roSel+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+STATUSES.map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
       } else {
-        html+='<td style="padding:3px 6px"><input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+roStyle+'></td>';
+        html+='<td style="padding:3px 6px;border-right:1px solid var(--border)"><input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+roStyle+'></td>';
       }
     });
     if(canEdit)html+='<td></td>';
@@ -1168,7 +1168,8 @@ function confirmAdd(){
   }
   tabs.push(newTab);activeId=tabId;_addSelTplId=null;
   closeM('addModal');renderStrip();saveEquip();
-  setTimeout(openNewRow,120);
+  // Auto-start draft so user can immediately fill data
+  setTimeout(function(){startDraftAndEdit(tabId);},100);
 }
 
 var eCols=[],dragI=null;
@@ -1575,26 +1576,27 @@ function updateEditability(){
 function renderRevBar(){
   var tabId=activeId;
   var revBarEl=document.getElementById('revBar');
-  if(!tabId||!revBarEl){if(revBarEl)revBarEl.style.display='none';return;}
+  if(!tabId||!tabs.length||!revBarEl){if(revBarEl)revBarEl.style.display='none';return;}
   ensureRevInit(tabId);
   var tr=getTabRev(tabId);
   var me=getCurrentUser();var lk=getLock();var hasDraft=!!tr.draft;
   revBarEl.style.display='flex';
 
-  // Pills
+  // Pills — only show latest revision + draft (not full history, use History modal for that)
   var pillStrip=document.getElementById('revPillStrip');pillStrip.innerHTML='';
-  tr.revisions.forEach(function(rv,idx){
+  if(tr.revisions.length){
+    var latestRv=tr.revisions[tr.revisions.length-1];
+    var latestIdx=tr.revisions.length-1;
     var pill=document.createElement('div');
-    pill.className='rpill'+(viewingRevIdx===idx?' current':'');
-    var archived=idx<tr.revisions.length-1;
-    pill.innerHTML='<span>'+rv.rev+'</span><span style="color:var(--muted);font-size:9px;margin-left:3px">'+fmtD(rv.date)+'</span>'+(archived?'<span class="rp-sup" style="margin-left:3px">ARCHIVED</span>':'');
-    pill.onclick=(function(i){return function(){viewRevision(i);};})(idx);
+    pill.className='rpill'+(viewingRevIdx===latestIdx?' current':'');
+    pill.innerHTML='<span>'+latestRv.rev+'</span><span style="color:var(--muted);font-size:9px;margin-left:4px">'+fmtD(latestRv.date)+'</span>';
+    pill.onclick=(function(i){return function(){viewRevision(i);};})(latestIdx);
     pillStrip.appendChild(pill);
-  });
+  }
   if(hasDraft){
     var dp=document.createElement('div');
     dp.className='rpill draft-pill'+(viewingRevIdx===null?' current':'');
-    dp.innerHTML='<span>\u270f DRAFT</span><span style="font-size:9px;opacity:.7;margin-left:3px">'+tr.draft.startedBy+'</span>';
+    dp.innerHTML='<span>✏ DRAFT</span><span style="font-size:9px;opacity:.7;margin-left:3px">'+tr.draft.startedBy+'</span>';
     dp.onclick=function(){viewRevision(null);};
     pillStrip.appendChild(dp);
   }
@@ -1617,14 +1619,14 @@ function renderRevBar(){
     addBtn('&#8595; Export','bg',openExportModal);
     addBtn('\u2190 Live View','bg',function(){viewRevision(null);});
   } else if(!hasDraft){
-    addBtn('📋 History','bg',openRevHistory);
+    addBtn('📋 Revision History','bg',openRevHistory);
     addBtn('✏️ Edit','bp',function(){startDraftAndEdit(tabId);});
   } else if(_editingTabId===tabId){
-    addBtn('📋 History','bg',openRevHistory);
+    addBtn('📋 Revision History','bg',openRevHistory);
     addBtn('💾 Save & Release','bp',function(){saveAndRelease(tabId);});
     addBtn('↑ Publish','bg',openPublishModal);
   } else {
-    addBtn('📋 History','bg',openRevHistory);
+    addBtn('📋 Revision History','bg',openRevHistory);
     addBtn('✏️ Edit','bp',function(){startDraftAndEdit(tabId);});
   }
 
