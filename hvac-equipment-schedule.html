@@ -875,7 +875,7 @@ function renderBoardGroups(t, rows){
   main.innerHTML=''; main.appendChild(wrap);
 }
 function srtBy(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=1;}var t=aTab();if(!t)return;t.rows.sort(function(a,b){return String(a[k]||'').localeCompare(String(b[k]||''),undefined,{numeric:true})*sortD;});renderTable();}
-function updR(tid,rid,f,v){var t=tabs.find(function(x){return x.id===tid;});if(!t)return;if(typeof isEditingDraft==='function'&&!isEditingDraft(tid))return;var r=t.rows.find(function(x){return x.id===rid;});if(r)r[f]=v;updSum();saveEquip();if(typeof applyDiffHighlights==='function')setTimeout(applyDiffHighlights,0);}
+function updR(tid,rid,f,v){var t=tabs.find(function(x){return x.id===tid;});if(!t)return;if(_editingTabId!==tid){startDraftAndEdit(tid);}var r=t.rows.find(function(x){return x.id===rid;});if(r)r[f]=v;updSum();saveEquip();if(typeof applyDiffHighlights==='function')setTimeout(applyDiffHighlights,0);}
 function delR(tid,rid){
   var t=tabs.find(function(x){return x.id===tid;});if(!t)return;
   if(typeof isEditingDraft==='function'&&!isEditingDraft(tid)){if(typeof showToast==='function')showToast('Click ✏️ Edit to make changes.');return;}
@@ -887,7 +887,13 @@ function delR(tid,rid){
   renderTable();updSum();saveEquip();
 }
 
-function openNewRow(){if(nrVis){var f=document.querySelector('.ni');if(f)f.focus();return;}nrVis=true;appNR();}
+function openNewRow(){
+  var t=aTab();if(!t)return;
+  // Auto-start edit mode if not already editing
+  if(_editingTabId!==t.id){startDraftAndEdit(t.id);}
+  if(nrVis){var f=document.querySelector('.ni');if(f)f.focus();return;}
+  nrVis=true;appNR();
+}
 function appNR(){
   var t=aTab();if(!t)return;
   var cols=getCols(t);
@@ -907,10 +913,11 @@ function appNR(){
 function nk(e){if(e.key==='Enter'){e.preventDefault();comR();}if(e.key==='Escape'){e.preventDefault();canR();}}
 function comR(){
   var t=aTab();if(!t)return;
-  if(typeof isEditingDraft==='function'&&!isEditingDraft(t.id)){if(typeof showToast==='function')showToast('Click ✏️ Edit to make changes.');return;}
+  if(_editingTabId!==t.id){startDraftAndEdit(t.id);}
   var cols=getCols(t);
   var row={id:nid(),status:'Not Started'};
   cols.forEach(function(c){var el=document.getElementById('ni_'+c.k);row[c.k]=el?el.value:'';});
+  if(!row.tag&&!row.equipment_id){showToast('Enter an Equipment ID first');return;}
   t.rows.push(row);nrVis=false;updSum();renderTable();saveEquip();
   setTimeout(function(){nrVis=true;appNR();},30);
 }
