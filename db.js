@@ -269,6 +269,14 @@ async function dbSetVendorInvoices(projectNum, data) {
   return await dbSetProject('procurement', projectNum+'_vi', data);
 }
 
+// ── Subcontractor Agreements ──
+async function dbGetSubAgreements(projectNum) {
+  return await dbGetProject('procurement', projectNum+'_sa') || [];
+}
+async function dbSetSubAgreements(projectNum, data) {
+  return await dbSetProject('procurement', projectNum+'_sa', data);
+}
+
 // ── Pre-Cx Template ──
 async function dbGetPrecxTemplate() {
   return await dbGet('precx_template') || {};
