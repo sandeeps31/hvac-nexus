@@ -1631,9 +1631,11 @@ function renderScanStep1(){
   }
   var groups={};
   _scanDrawings.forEach(function(drw){
-    var cat=drw.cat||'Other';var area=drw.area||'General';
-    var gk=cat+'||'+area;
-    if(!groups[gk])groups[gk]={cat:cat,area:area,drawings:[]};
+    var disc=drw.cat||'Other';
+    var subcat=drw.subcat||'General';
+    var area=drw.area||'';
+    var gk=disc+'||'+subcat+'||'+area;
+    if(!groups[gk])groups[gk]={disc:disc,subcat:subcat,area:area,drawings:[]};
     groups[gk].drawings.push(drw);
   });
   var html='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)">'
@@ -1641,12 +1643,14 @@ function renderScanStep1(){
     +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);margin-left:auto" id="scanSelCount">0 selected</span></div>';
   Object.keys(groups).forEach(function(gk){
     var g=groups[gk];
-    html+='<div style="padding:6px 16px;background:var(--surface2);font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">'
-      +'<span>'+escH(g.cat)+'</span>'+(g.area?'<span style="color:var(--accent);font-size:9px"> ▸ '+escH(g.area)+'</span>':'')+' <span style="color:var(--muted);font-size:9px;margin-left:auto">'+g.drawings.length+' drawing'+(g.drawings.length!==1?'s':'')+'</span></div>';
+    var label=escH(g.disc)+' › '+escH(g.subcat)+(g.area?' › '+escH(g.area):'');
+    html+='<div style="padding:6px 16px;background:var(--surface2);font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);display:flex;justify-content:space-between">'
+      +'<span>'+label+'</span>'
+      +'<span>'+g.drawings.length+' drawing'+(g.drawings.length!==1?'s':'')+'</span></div>';
     g.drawings.forEach(function(drw){
       var sel=_scanSelected.has(drw.id);
       var hasPdf=!!(drw.pdfUrl||drw.pdfData);
-      html+='<div class="scan-drw-row'+(sel?' selected':'')+(hasPdf?'':' dim')+'" data-id="'+escH(drw.id)+'" onclick="scanToggleRow(this)">'
+      html+='<div class="scan-drw-row'+(sel?' selected':'')+'" data-id="'+escH(drw.id)+'" onclick="scanToggleRow(this)">'
         +'<input type="checkbox" class="scan-chk" data-id="'+escH(drw.id)+'" '+(sel?'checked':'')+' onclick="event.stopPropagation();scanToggleRow(this.closest(\'.scan-drw-row\'))" style="flex-shrink:0"/>'
         +'<div style="flex:1;min-width:0"><div style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(drw.num||'—')+'</div>'
         +'<div style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(drw.name||'—')+'</div></div>'
@@ -1686,11 +1690,25 @@ function startScan(){
   if(!withPdf.length){alert('None of the selected drawings have PDFs attached.');return;}
   _scanQueue=withPdf;_scanQueueIdx=0;_scanRawTables=[];
   setScanStep(2);
-  document.getElementById('scanBody').innerHTML='<div style="padding:28px 24px"><div style="font-size:13px;color:var(--text2);margin-bottom:20px">Extracting data from '+_scanQueue.length+' drawing'+(_scanQueue.length!==1?'s':'')+'…</div>'
+  document.getElementById('scanBody').innerHTML='<div style="padding:28px 24px"><div style="font-size:13px;color:var(--text2);margin-bottom:20px">Loading PDF engine…</div>'
     +'<div style="background:var(--surface2);border-radius:8px;overflow:hidden;height:8px;margin-bottom:16px"><div id="scanProgressBar" style="height:100%;background:var(--accent);width:0%;transition:width .3s;border-radius:8px"></div></div>'
     +'<div id="scanProgressLog" style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);max-height:300px;overflow-y:auto"></div></div>';
   document.getElementById('scanFooter').innerHTML='<button class="btn bg bsm" onclick="closeScanModal()">Cancel</button>';
-  processNextScan();
+  loadPdfjsThen(function(){
+    scanLog('Extracting data from '+_scanQueue.length+' drawing'+(_scanQueue.length!==1?'s':'')+'…');
+    processNextScan();
+  });
+}
+function loadPdfjsThen(cb){
+  if(typeof pdfjsLib!=='undefined'){cb();return;}
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
+  s.onload=function(){
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    cb();
+  };
+  s.onerror=function(){scanLog('✗ Failed to load PDF engine','#ff4d6d');};
+  document.head.appendChild(s);
 }
 function scanLog(msg,color){var el=document.getElementById('scanProgressLog');if(el){el.innerHTML+='<div style="padding:2px 0'+(color?';color:'+color:'')+'">'+(msg||'')+'</div>';el.scrollTop=el.scrollHeight;}}
 function processNextScan(){
