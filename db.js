@@ -277,6 +277,14 @@ async function dbSetSubAgreements(projectNum, data) {
   return await dbSetProject('procurement', projectNum+'_sa', data);
 }
 
+// ── Equipment Schedule Templates (company-level) ──
+async function dbGetEqsTemplates() {
+  return await dbGet('eqs_templates') || [];
+}
+async function dbSetEqsTemplates(data) {
+  return await dbSet('eqs_templates', data);
+}
+
 // ── Pre-Cx Template ──
 async function dbGetPrecxTemplate() {
   return await dbGet('precx_template') || {};
