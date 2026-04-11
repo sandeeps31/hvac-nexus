@@ -113,8 +113,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .eq-section-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:2px solid var(--border)}
 .eq-section-hdr.no-header-style{background:var(--surface2);border-bottom:1px solid var(--border)}
 .eq-section-hdr.has-header-style{background:var(--surface3)}
-.eq-field-cols{display:grid;grid-template-columns:1fr 90px 70px 90px 60px 28px;gap:6px;padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border)}
-.eq-field-row{display:grid;grid-template-columns:1fr 90px 70px 90px 60px 28px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center;background:var(--surface)}
+.eq-field-cols{display:grid;grid-template-columns:22px 1fr 90px 70px 1fr 90px 60px 28px;gap:6px;padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.eq-field-row{display:grid;grid-template-columns:22px 1fr 90px 70px 1fr 90px 60px 28px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center;background:var(--surface);transition:background .12s}
+.eq-field-row.dragging{opacity:.4;background:var(--surface3)}
+.eq-field-row.drag-over{border-top:2px solid var(--accent)}
+.drag-handle{color:var(--muted);cursor:grab;font-size:14px;display:flex;align-items:center;justify-content:center;user-select:none}
+.drag-handle:active{cursor:grabbing}
+.opt-tag{display:inline-flex;align-items:center;gap:4px;background:var(--surface3);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:11px;color:var(--text2);cursor:default}
+.opt-tag .opt-x{cursor:pointer;color:var(--muted);font-size:12px;line-height:1}
+.opt-tag .opt-x:hover{color:var(--danger)}
+.opt-wrap{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:text;min-height:32px}
+.opt-wrap input{border:none;background:transparent;outline:none;color:var(--text);font-size:11px;font-family:DM Sans,sans-serif;min-width:60px;flex:1}
 .si{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;width:100%}
 .si:focus{border-color:var(--accent)}
 </style>
@@ -530,10 +539,11 @@ function renderEditorBody(tpl,rev,canEdit){
   var html='';
   sections.forEach(function(sec,si){
     var noHdr=!sec.name||sec.name==='__none__';
-    html+='<div class="eq-section">';
+    html+='<div class="eq-section" draggable="true" data-si="'+si+'" ondragstart="secDragStart(event,'+si+')" ondragover="secDragOver(event)" ondrop="secDrop(event,'+si+')" ondragleave="secDragLeave(event)" ondragend="secDragEnd(event)">';
     // Section header
     html+='<div class="eq-section-hdr '+(noHdr?'no-header-style':'has-header-style')+'">';
     if(canEdit){
+      html+='<div class="drag-handle" style="cursor:grab;color:var(--muted);padding:0 6px 0 0">⠿</div>';
       html+=(noHdr
         ?'<span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;color:var(--muted)">NO HEADER</span>'
         +'<span style="flex:1;font-style:italic;font-size:11px;color:var(--muted)">Fields shown without a section header</span>'
@@ -550,35 +560,44 @@ function renderEditorBody(tpl,rev,canEdit){
     // Fields
     if(sec.fields.length&&canEdit){
       html+='<div class="eq-field-cols">'
+        +'<span></span>'
         +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Field Label</span>'
         +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Type</span>'
         +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Unit</span>'
-        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Default / Options</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Options / Example</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Example Value</span>'
         +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:center">Req.</span>'
         +'<span></span>'
         +'</div>';
     }
     sec.fields.forEach(function(f,fi){
       if(canEdit){
-        html+='<div class="eq-field-row">'
+        html+='<div class="eq-field-row" draggable="true" data-si="'+si+'" data-fi="'+fi+'" ondragstart="fldDragStart(event,'+si+','+fi+')" ondragover="fldDragOver(event)" ondrop="fldDrop(event,'+si+','+fi+')" ondragleave="fldDragLeave(event)" ondragend="fldDragEnd(event)">'
+          +'<div class="drag-handle">⠿</div>'
           +'<input class="si" value="'+escHs(f.label)+'" oninput="fieldUpdate('+si+','+fi+',\'label\',this.value)" placeholder="e.g. Air Flow"/>'
           +'<select class="si" onchange="fieldUpdate('+si+','+fi+',\'type\',this.value)">'
           +FIELD_TYPES.map(function(ft){return'<option value="'+ft.key+'"'+(ft.key===(f.type||'text')?' selected':'')+'>'+ft.label+'</option>';}).join('')
           +'</select>'
           +'<input class="si" value="'+escHs(f.unit||'')+'" oninput="fieldUpdate('+si+','+fi+',\'unit\',this.value)" placeholder="l/s"/>'
           +(f.type==='dropdown'
-            ?'<input class="si" value="'+escHs((f.options||[]).join(','))+'" oninput="fieldUpdate('+si+','+fi+',\'options\',this.value.split(\',\'))" placeholder="A,B,C" style="font-size:11px"/>'
-            :'<input class="si" value="'+escHs(f.defaultVal||'')+'" oninput="fieldUpdate('+si+','+fi+',\'defaultVal\',this.value)" placeholder="—"/>'
+            ?'<div class="opt-wrap" onclick="this.querySelector(\'input\').focus()">'
+             +(f.options||[]).map(function(o,oi){return'<span class="opt-tag">'+escH(o)+'<span class="opt-x" onclick="fieldRemoveOpt('+si+','+fi+','+oi+')">×</span></span>';}).join('')
+             +'<input type="text" placeholder="Add option…" onkeydown="if(event.key===\'Enter\'||event.key===\',\'){event.preventDefault();fieldAddOpt('+si+','+fi+',this.value);this.value=\'\';}"/>'
+             +'</div>'
+            :'<input class="si" value="'+escHs(f.defaultVal||'')+'" oninput="fieldUpdate('+si+','+fi+',\'defaultVal\',this.value)" placeholder="e.g. 1200 l/s"/>'
           )
+          +'<input class="si" value="'+escHs(f.exampleVal||'')+'" oninput="fieldUpdate('+si+','+fi+',\'exampleVal\',this.value)" placeholder="e.g. TB1-ATT-01"/>'
           +'<div style="text-align:center"><input type="checkbox" '+(f.required?'checked':'')+' onchange="fieldUpdate('+si+','+fi+',\'required\',this.checked)"/></div>'
           +'<button onclick="fieldDelete('+si+','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1">×</button>'
           +'</div>';
       } else {
-        html+='<div style="display:grid;grid-template-columns:1fr 90px 70px 90px 60px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center">'
+        html+='<div style="display:grid;grid-template-columns:22px 1fr 90px 70px 1fr 90px 60px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center">'
+          +'<span></span>'
           +'<span style="font-size:12px;color:var(--text)">'+escH(f.label)+(f.required?'<span style="color:var(--danger);margin-left:3px">*</span>':'')+'</span>'
           +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">'+escH((FIELD_TYPES.find(function(x){return x.key===(f.type||'text');})||{label:'Text'}).label)+'</span>'
           +'<span style="font-size:11px;color:var(--muted)">'+escH(f.unit||'—')+'</span>'
-          +'<span style="font-size:11px;color:var(--muted)">'+(f.type==='dropdown'?(f.options||[]).join(', '):escH(f.defaultVal||'—'))+'</span>'
+          +'<span style="font-size:11px;color:var(--muted)">'+(f.type==='dropdown'?(f.options||[]).map(function(o){return'<span style="display:inline-block;background:var(--surface3);border-radius:3px;padding:1px 5px;font-size:10px;margin:1px">'+escH(o)+'</span>';}).join(''):(f.defaultVal?escH(f.defaultVal):'—'))+'</span>'
+          +'<span style="font-size:11px;color:var(--accent)">'+escH(f.exampleVal||'—')+'</span>'
           +'<span style="text-align:center;font-size:11px;color:var(--muted)">'+(f.required?'✓':'')+'</span>'
           +'</div>';
       }
@@ -648,18 +667,96 @@ function addSectionHeader(){
 }
 function fieldAdd(si){
   var s=getDraftSections();if(!s)return;
-  s[si].fields.push({key:'',label:'',type:'text',unit:'',required:false,defaultVal:''});
+  s[si].fields.push({key:'',label:'',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'',options:[]});
   markDirty();renderEditor();
 }
 function fieldDelete(si,fi){
   var s=getDraftSections();if(!s)return;
   s[si].fields.splice(fi,1);markDirty();renderEditor();
 }
+var DROPDOWN_PRESETS={
+  'airflow type':['Supply Air','Return Air','Exhaust Air','Transfer Air','Outside Air','Mixed Air'],
+  'service type':['Supply Air','Return Air','Exhaust Air','Transfer Air','Outside Air'],
+  'air type':['Supply Air','Return Air','Exhaust Air','Transfer Air','Outside Air'],
+  'status':['Not Started','Procurement','Installed','Commissioned','Complete'],
+  'yes no':['Yes','No'],
+  'yes/no':['Yes','No'],
+  'motor type':['Direct Drive','Belt Drive'],
+  'connection type':['CHWS/CHWR','HWS/HWR','CWS/CWR'],
+};
+
 function fieldUpdate(si,fi,prop,val){
   var s=getDraftSections();if(!s)return;
   s[si].fields[fi][prop]=val;
   if(prop==='label')s[si].fields[fi].key=val.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+  // Auto-populate dropdown options based on label
+  if(prop==='type'&&val==='dropdown'){
+    var lbl=(s[si].fields[fi].label||'').toLowerCase().trim();
+    var preset=DROPDOWN_PRESETS[lbl];
+    if(preset&&(!s[si].fields[fi].options||!s[si].fields[fi].options.length)){
+      s[si].fields[fi].options=preset.slice();
+    }
+  }
   markDirty();
+  if(prop==='type')renderEditor(); // re-render to show/hide options input
+}
+function fieldAddOpt(si,fi,val){
+  val=(val||'').trim();if(!val)return;
+  var s=getDraftSections();if(!s)return;
+  if(!s[si].fields[fi].options)s[si].fields[fi].options=[];
+  if(!s[si].fields[fi].options.includes(val))s[si].fields[fi].options.push(val);
+  markDirty();renderEditor();
+}
+function fieldRemoveOpt(si,fi,oi){
+  var s=getDraftSections();if(!s)return;
+  s[si].fields[fi].options.splice(oi,1);
+  markDirty();renderEditor();
+}
+
+// ── Section drag-and-drop ──
+var _secDragSi=null;
+function secDragStart(e,si){_secDragSi=si;setTimeout(function(){e.target.style.opacity='.4';},0);}
+function secDragOver(e){e.preventDefault();e.currentTarget.style.borderTop='2px solid var(--accent)';}
+function secDragLeave(e){e.currentTarget.style.borderTop='';}
+function secDragEnd(e){e.target.style.opacity='';document.querySelectorAll('.eq-section').forEach(function(r){r.style.borderTop='';});}
+function secDrop(e,toSi){
+  e.preventDefault();e.currentTarget.style.borderTop='';
+  if(_secDragSi===null||_secDragSi===toSi)return;
+  var s=getDraftSections();if(!s)return;
+  var moved=s.splice(_secDragSi,1)[0];
+  s.splice(toSi,0,moved);
+  _secDragSi=null;markDirty();renderEditor();
+}
+
+// ── Field drag-and-drop ──
+var _fldDragSi=null,_fldDragFi=null;
+function fldDragStart(e,si,fi){
+  _fldDragSi=si;_fldDragFi=fi;
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(function(){e.target.classList.add('dragging');},0);
+}
+function fldDragOver(e){
+  e.preventDefault();e.dataTransfer.dropEffect='move';
+  var row=e.currentTarget;
+  row.classList.add('drag-over');
+}
+function fldDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function fldDragEnd(e){
+  e.target.classList.remove('dragging');
+  document.querySelectorAll('.eq-field-row').forEach(function(r){r.classList.remove('drag-over','dragging');});
+}
+function fldDrop(e,toSi,toFi){
+  e.preventDefault();e.currentTarget.classList.remove('drag-over');
+  if(_fldDragSi===null)return;
+  var s=getDraftSections();if(!s)return;
+  // Only support drag within same section for now
+  if(_fldDragSi!==toSi){_fldDragSi=null;return;}
+  var fields=s[toSi].fields;
+  var moved=fields.splice(_fldDragFi,1)[0];
+  var insertAt=toFi>_fldDragFi?toFi-1:toFi;
+  fields.splice(insertAt,0,moved);
+  _fldDragSi=null;_fldDragFi=null;
+  markDirty();renderEditor();
 }
 
 function doStartDraft(){
