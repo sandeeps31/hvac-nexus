@@ -503,7 +503,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
     <div class="ceadd">
       <input class="cename-in" id="newColName" placeholder="New column name…" onkeydown="if(event.key==='Enter')addCol()">
       <select class="fsel" id="newColType" style="font-size:12px">
-        <option value="text">Text</option><option value="num">Number</option><option value="sel">Status</option>
+        <option value="text">Text</option><option value="num">Number</option><option value="dropdown">Dropdown</option><option value="date">Date</option>
       </select>
       <button class="btn bp bsm" onclick="addCol()">＋ Add</button>
     </div>
@@ -573,6 +573,7 @@ var EQ=[
   {key:'dcp',name:'DCP',cols:[{k:'tag',l:'DCP ID',key:1},{k:'type',l:'Type'},{k:'location',l:'Location'},{k:'sublocation',l:'Sub Location'},{k:'equip',l:'Equipment ID'},{k:'circuits',l:'No. of Circuits',num:1},{k:'voltage',l:'Voltage'},{k:'fla',l:'FLA (amps)',num:1},{k:'mcb',l:'MCB Rating'},{k:'rcd',l:'RCD'},{k:'status',l:'Status',sel:1}]},
 ];
 var tabs=[],activeId=null,selType=null,nrVis=false,sortK=null,sortD=1,uidN=0;
+var colFilters={};
 var _editingTabId=null; // tracks which tab is currently in edit mode
 
 
@@ -747,8 +748,15 @@ function renderTable(){
   var sf=(document.getElementById('stfil')||{}).value||'';
   var lf=(document.getElementById('locfil')||{}).value||'';
   var rows=t.rows.filter(function(r){
-    return(!q||(r.tag||'').toLowerCase().includes(q.toLowerCase())||(r.desc||'').toLowerCase().includes(q.toLowerCase())||(r.location||'').toLowerCase().includes(q.toLowerCase())||(r.equip||'').toLowerCase().includes(q.toLowerCase()))
-      &&(!sf||r.status===sf)&&(!lf||r.location===lf);
+    var qOk=!q||(r.tag||'').toLowerCase().includes(q.toLowerCase())||(r.desc||'').toLowerCase().includes(q.toLowerCase())||(r.location||'').toLowerCase().includes(q.toLowerCase())||(r.equip||'').toLowerCase().includes(q.toLowerCase());
+    var sfOk=!sf||r.status===sf;
+    var lfOk=!lf||r.location===lf;
+    // Per-column filters
+    var cfOk=Object.keys(colFilters).every(function(k){
+      var fv=colFilters[k];if(!fv)return true;
+      return String(r[k]||'').toLowerCase().includes(fv.toLowerCase());
+    });
+    return qOk&&sfOk&&lfOk&&cfOk;
   });
 
   // ── GROUP BY BOARD VIEW (MSSB only) ──
@@ -783,9 +791,21 @@ function renderTable(){
     th+='<th style="background:var(--surface2);width:28px"></th></tr>';
   }
   th+='<tr>'+cols.map(function(c){
-    var style=c.key?'style="min-width:180px"':c.k==='desc'||c.k==='service'?'style="min-width:200px"':'style="min-width:140px"';
-    return'<th '+style+' onclick="srtBy(\'' +c.k+ '\')">'+X(c.l)+(sortK===c.k?(sortD>0?' ↑':' ↓'):'')+' </th>';
-  }).join('')+'<th style="width:28px"></th></tr></thead>';
+    var style=c.key?'style="min-width:180px;cursor:pointer"':c.k==='desc'||c.k==='service'?'style="min-width:200px;cursor:pointer"':'style="min-width:140px;cursor:pointer"';
+    var sortInd=sortK===c.k?(sortD>0?' ▲':' ▼'):' ⇅';
+    var sortCol=sortK===c.k?'var(--accent)':'rgba(255,255,255,.2)';
+    return'<th '+style+' onclick="srtBy(\''+c.k+'\')" title="Sort by '+X(c.l)+'"><div style="display:flex;align-items:center;justify-content:space-between;gap:4px;user-select:none"><span>'+X(c.l)+'</span><span style="font-size:9px;color:'+sortCol+'">'+sortInd+'</span></div></th>';
+  }).join('')+'<th style="width:28px"></th></tr>';
+  // Filter row under headers
+  th+='<tr style="background:var(--surface3)">'+cols.map(function(c){
+    var opts=c.sel?colOptions(c,t):null;
+    var fv=colFilters[c.k]||'';
+    var active=fv!=='';
+    var borderCol=active?'var(--accent)':'var(--border)';
+    if(opts)return'<th style="padding:2px 4px"><select style="width:100%;background:var(--surface2);border:1px solid '+borderCol+';border-radius:4px;color:var(--text);font-size:10px;padding:2px 3px;outline:none" onchange="setColFilter(\''+c.k+'\',this.value)"><option value="">All</option>'+opts.map(function(o){return'<option value="'+X(o)+'"'+(fv===o?' selected':'')+'>'+X(o)+'</option>';}).join('')+'</select></th>';
+    return'<th style="padding:2px 4px"><input type="text" value="'+X(fv)+'" placeholder="🔍" style="width:100%;background:var(--surface2);border:1px solid '+borderCol+';border-radius:4px;color:var(--text);font-size:10px;padding:2px 5px;outline:none;box-sizing:border-box" oninput="setColFilter(\''+c.k+'\',this.value)"/></th>';
+  }).join('')+'<th style="padding:2px 4px;text-align:center">'+(Object.keys(colFilters).some(function(k){return colFilters[k]!='';})? '<button onclick="clearColFilters()" style="background:none;border:none;color:var(--warn);cursor:pointer;font-size:11px" title="Clear filters">✕</button>':'')+'</th></tr></thead>';
+  var tb='<tbody id="etbd">'+rows.map(function(row){
   var tb='<tbody id="etbd">'+rows.map(function(row){
     var cells=cols.map(function(c){
       var ro2=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
@@ -1009,11 +1029,15 @@ function renderBoardGroups(t, rows){
   main.innerHTML=''; main.appendChild(wrap);
 }
 function srtBy(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=1;}var t=aTab();if(!t)return;t.rows.sort(function(a,b){return String(a[k]||'').localeCompare(String(b[k]||''),undefined,{numeric:true})*sortD;});renderTable();}
+function setColFilter(k,v){colFilters[k]=v;renderTable();}
+function clearColFilters(){colFilters={};renderTable();}
 function updR(tid,rid,f,v){var t=tabs.find(function(x){return x.id===tid;});if(!t)return;if(_editingTabId!==tid){startDraftAndEdit(tid);}var r=t.rows.find(function(x){return x.id===rid;});if(r)r[f]=v;updSum();saveEquip();if(typeof applyDiffHighlights==='function')setTimeout(applyDiffHighlights,0);}
 function delR(tid,rid){
   var t=tabs.find(function(x){return x.id===tid;});if(!t)return;
   if(typeof isEditingDraft==='function'&&!isEditingDraft(tid)){if(typeof showToast==='function')showToast('Click ✏️ Edit to make changes.');return;}
   var row=t.rows.find(function(x){return x.id===rid;});if(!row)return;
+  var rowLabel=row.tag||row.equipment_id||'this row';
+  if(!confirm('Delete '+rowLabel+'?\nThe row will be marked for deletion and removed on publish.'))return;
   var tr2=typeof getTabRev==='function'?getTabRev(tid):null;
   var baseSnap=tr2&&tr2.revisions.length?tr2.revisions[tr2.revisions.length-1].snapshot:[];
   var inBase=baseSnap.some(function(r){return (r.tag||r.id)===(row.tag||row.id);});
@@ -1103,7 +1127,7 @@ function comR(){
 }
 function canR(){nrVis=false;var el=document.getElementById('nrtr');if(el)el.remove();}
 
-function swTab(id){if(_editingTabId&&_editingTabId!==id){if(!confirm('You have unsaved changes. Switch tabs anyway?'))return;_editingTabId=null;}activeId=id;sortK=null;sortD=1;nrVis=false;if(typeof viewingRevIdx!=='undefined')viewingRevIdx=null;renderStrip();}
+function swTab(id){if(_editingTabId&&_editingTabId!==id){if(!confirm('You have unsaved changes. Switch tabs anyway?'))return;_editingTabId=null;}activeId=id;sortK=null;sortD=1;colFilters={};nrVis=false;if(typeof viewingRevIdx!=='undefined')viewingRevIdx=null;renderStrip();}
 
 var ctxId=null,ctxEl=document.getElementById('ctxm');
 document.addEventListener('click',function(){ctxEl.style.display='none';});
@@ -1263,12 +1287,12 @@ function rCeList(){
       +'<input type="checkbox" class="cevis"'+(c.hidden?'':' checked')+' onchange="eCols['+i+'].hidden=!this.checked">'
       +'<input class="cein" value="'+X(c.l)+'" onchange="eCols['+i+'].l=this.value"'+(c.key?' readonly style="color:var(--accent)"':'')+'/>'
       +(c.key?'<span class="cekey">Key</span>':'')
-      +(!c.key?'<select class="cetyp" onchange="ceTy('+i+',this.value)"><option value="text"'+(!c.sel&&!c.num?' selected':'')+'>Text</option><option value="num"'+(c.num?' selected':'')+'>Num</option><option value="sel"'+(c.sel?' selected':'')+'>Status</option></select>':'')
+      +(!c.key?'<select class="cetyp" onchange="ceTy('+i+',this.value)"><option value="text"'+(!c.sel&&!c.num&&!c.date?' selected':'')+'>Text</option><option value="num"'+(c.num?' selected':'')+'>Number</option><option value="dropdown"'+(c.sel?' selected':'')+'>Dropdown</option><option value="date"'+(c.date?' selected':'')+'>Date</option></select>':'')
       +(!c.key?'<button class="cedel" onclick="ceD('+i+')">✕</button>':'')
       +'</div>';
   }).join('');
 }
-function ceTy(i,v){eCols[i].sel=v==='sel';eCols[i].num=v==='num';}
+function ceTy(i,v){eCols[i].sel=v==='dropdown';eCols[i].num=v==='num';eCols[i].date=v==='date';}
 function ceD(i){if(eCols[i].key){alert("Tag column can't be removed.");return;}eCols.splice(i,1);rCeList();}
 function cdS(i){dragI=i;var el=document.getElementById('cer_'+i);if(el)el.classList.add('dragging');}
 function cdE(){document.querySelectorAll('.cerow').forEach(function(r){r.classList.remove('dragging','dragover');});}
@@ -1625,7 +1649,7 @@ function buildAndDownloadTemplate(t,cols){
 
       // Try JSZip approach for real dropdown injection
       try{
-        var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+        var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
         injectDataValidation(wbout,dvEntries,tabName,t.name);
         return; // injectDataValidation handles the download
       }catch(err){
