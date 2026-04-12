@@ -1350,6 +1350,14 @@ function confirmAdd(){
       newTab.sections=pubRev?JSON.parse(JSON.stringify(pubRev.sections||[])):[{name:'__none__',fields:[]}];
     }
   }
+  // Handle duplicate names - add (2), (3) suffix
+  var baseName=newTab.name;
+  var existingNames=tabs.map(function(t){return t.name;});
+  if(existingNames.indexOf(baseName)>=0){
+    var n=2;
+    while(existingNames.indexOf(baseName+' ('+n+')')>=0)n++;
+    newTab.name=baseName+' ('+n+')';
+  }
   tabs.push(newTab);activeId=tabId;_addSelTplId=null;
   closeM('addModal');renderStrip();saveEquip();
   // Auto-start draft so user can immediately fill data
@@ -1878,12 +1886,9 @@ function fmtD(d){if(!d)return '';var p=d.split('-');return p.length===3?p[2]+'/'
 function ensureRevInit(tabId){
   if(!tabId)return;
   var tr=getTabRev(tabId);
-  if(tr.revisions.length)return;
-  var tab=tabs.find(function(t){return t.id===tabId;});
-  if(!tab)return; // tab not ready yet — will be called again via setTimeout
-  tr.revisions.push({rev:'Rev 01',date:todayStr(),note:'Initial revision',
-    snapshot:JSON.parse(JSON.stringify(tab.rows.filter(function(r){return !r._deleted;}))),
-    changeSummary:{added:0,deleted:0,changed:0}});
+  if(tr.revisions.length||tr.draft)return;
+  // New tab: start as a draft (no revision number until first publish)
+  tr.draft={note:'',startedAt:todayStr()};
   saveRevData();
 }
 
@@ -2158,8 +2163,8 @@ function forceUnlock(){
 function openPublishModal(){
   var tabId=activeId;var tr=getTabRev(tabId);
   if(!tr.draft){alert('No active draft to publish.');return;}
-  var lastRev=tr.revisions[tr.revisions.length-1].rev||'Rev 01';
-  var m=lastRev.match(/(\d+)/);var nextN=m?parseInt(m[1])+1:2;
+  var lastRev=tr.revisions.length?tr.revisions[tr.revisions.length-1].rev:'Rev 00';
+  var m=lastRev.match(/(\d+)/);var nextN=m?parseInt(m[1])+1:1;
   document.getElementById('pub-rev').value='Rev '+String(nextN).padStart(2,'0');
   document.getElementById('pub-date').value=todayStr();
   document.getElementById('pub-note').value='';
@@ -2170,7 +2175,7 @@ function confirmPublish(){
   if(!revNum){alert('Please enter a revision number.');return;}
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});if(!tab)return;
   var tr=getTabRev(tabId);
-  var baseSnap=tr.revisions[tr.revisions.length-1].snapshot||[];
+  var baseSnap=tr.revisions.length?tr.revisions[tr.revisions.length-1].snapshot||[]:[];
   var liveRows=tab.rows.filter(function(r){return !r._deleted;});
   tab.rows=liveRows;
   var diff=computeDiff(baseSnap,liveRows);
@@ -2261,7 +2266,7 @@ function exportRevPDF(){
   var projNum=proj?proj.num:'';
   var tabName=tab?tab.name||tab.type:'Equipment';
   var hasDiff=baseRows.length>0;
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'    +'<title>'+tabName+' — '+revLabel+'</title>'    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:9px;color:#1a1a1a;background:#fff}'    +'@page{size:A3 landscape;margin:12mm}'    +'.co-hdr{background:#f4f4f4;border:1px solid #ddd;border-bottom:none;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}'    +'.co-name{font-size:13px;font-weight:bold}.co-logo{width:110px;height:34px;border:1px dashed #bbb;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:7.5px;border-radius:2px}'    +'.proj-block{display:grid;grid-template-columns:1fr 1fr 1fr 150px;border:1px solid #ddd;margin-bottom:10px}'    +'.pb{padding:7px 12px;border-right:1px solid #ddd}.pb:last-child{border-right:none}'    +'.pb-lbl{font-size:7px;text-transform:uppercase;letter-spacing:.8px;color:#999;margin-bottom:2px}'    +'.pb-val{font-size:10px;font-weight:bold}'    +'.legend{display:flex;gap:14px;margin-bottom:7px;padding:4px 0;border-bottom:1px solid #eee;font-size:8px;color:#555}'    +'.ls{display:flex;align-items:center;gap:4px}.lsw{width:10px;height:10px;border-radius:2px;border:1px solid}'    +'table{width:100%;border-collapse:collapse}'    +'th{background:#0e1520;color:#fff;padding:5px 7px;text-align:left;font-size:7.5px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-right:1px solid #1e3050}'    +'td{padding:4px 7px;border-bottom:1px solid #ebebeb;border-right:1px solid #f4f4f4;vertical-align:middle}'    +'tr.r-added td{background:#e8faf3}tr.r-deleted td{background:#fef0f2;text-decoration:line-through;color:#cc3344;opacity:.8}td.c-chg{background:#fff8e0}'    +'tr:nth-child(even) td{filter:brightness(.975)}</style></head><body>';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'    +'<title>'+tabName+' — '+revLabel+'</title>'    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:9px;color:#1a1a1a;background:#fff}'    +'@page{size:A3 landscape;margin:12mm}'    +'.co-hdr{background:#f4f4f4;border:1px solid #ddd;border-bottom:none;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}'    +'.co-name{font-size:13px;font-weight:bold}.co-logo{width:110px;height:34px;border:1px dashed #bbb;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:7.5px;border-radius:2px}'    +'.proj-block{display:grid;grid-template-columns:1fr 1fr 1fr 150px;border:1px solid #ddd;margin-bottom:10px}'    +'.pb{padding:7px 12px;border-right:1px solid #ddd}.pb:last-child{border-right:none}'    +'.pb-lbl{font-size:7px;text-transform:uppercase;letter-spacing:.8px;color:#999;margin-bottom:2px}'    +'.pb-val{font-size:10px;font-weight:bold}'    +'.legend{display:flex;gap:14px;margin-bottom:7px;padding:4px 0;border-bottom:1px solid #eee;font-size:8px;color:#555}'    +'.ls{display:flex;align-items:center;gap:4px}.lsw{width:10px;height:10px;border-radius:2px;border:1px solid}'    +'table{width:100%;border-collapse:collapse}'    +'th{background:#0e1520;color:#fff;padding:5px 7px;text-align:left;font-size:7.5px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-right:1px solid #1e3050}'    +'td{padding:4px 7px;border-bottom:1px solid #ebebeb;border-right:1px solid #f4f4f4;vertical-align:middle}'    +'tr.r-added td{background:#c8f7c5!important}tr.r-deleted td{background:#ffcccc!important;text-decoration:line-through;color:#cc0000!important}td.c-chg{background:#fff176!important}'    +'tr:nth-child(even):not(.r-added):not(.r-deleted) td{filter:brightness(.975)}</style></head><body>';
   html+='<div class="co-hdr"><div><div class="co-name">[Company Name]</div><div style="font-size:8px;color:#888;margin-top:2px">[Address · Phone · Email]</div></div><div class="co-logo">COMPANY LOGO</div></div>';
   html+='<div class="proj-block">'    +'<div class="pb"><div class="pb-lbl">Project</div><div class="pb-val">'+projName+'</div></div>'    +'<div class="pb"><div class="pb-lbl">Project No.</div><div class="pb-val">'+projNum+'</div></div>'    +'<div class="pb"><div class="pb-lbl">Schedule</div><div class="pb-val">'+tabName+' Equipment Schedule</div></div>'    +'<div class="pb" style="background:#f9f9f9"><div class="pb-lbl">Revision</div><div class="pb-val" style="font-size:13px;color:#0e1520">'+revLabel+'</div>'    +'<div style="font-size:7px;color:#999;margin-top:2px">'+revDate+(hasDiff&&prevRevLabel!=='—'?' · Prev: '+prevRevLabel:'')+'</div></div></div>';
   if(hasDiff)html+='<div class="legend">'    +'<div class="ls"><div class="lsw" style="background:#e8faf3;border-color:#00c48c"></div>Added ('+diff.added.length+')</div>'    +'<div class="ls"><div class="lsw" style="background:#fef0f2;border-color:#ff4d6d"></div>Deleted ('+diff.deleted.length+')</div>'    +'<div class="ls"><div class="lsw" style="background:#fff8e0;border-color:#f0b429"></div>Changed ('+Object.keys(diff.changedIds).length+' rows)</div>'    +'<div class="ls" style="margin-left:auto;color:#aaa">'+prevRevLabel+' → '+revLabel+'</div></div>';
