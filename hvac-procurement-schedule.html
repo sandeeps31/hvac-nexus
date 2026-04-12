@@ -379,8 +379,6 @@ function isPast(ds){if(!ds)return false;return ds<today();}
 // DATA
 function save(){dbSetProcurement(_psPNum,items).catch(e=>console.error(e));}
 async function load(){try{var p=await dbGetProcurement(_psPNum);items=Array.isArray(p)?p:[];}catch(e){items=[];}}
-load();
-
 // ETA RECALC
 function calcETA(orderDate,leadWeeks){return addWeeks(orderDate,leadWeeks);}
 function recalcETA(){
@@ -407,6 +405,15 @@ async function syncFromEquipment(){
   raw.tabs.forEach(function(tab){
     if(!Array.isArray(tab.rows)) return;
     var typeLabel=getTypeLabel(tab);
+    // Fix existing items that have stale raw type keys (tpl_EQS-001 etc)
+    tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
+      var id=(row.tag||row.equipment_id||'').trim();
+      if(!id)return;
+      var ex=items.find(function(i){return i.assetId===id;});
+      if(ex&&ex.equipType&&(ex.equipType.startsWith('tpl_')||ex.equipType===tab.type)){
+        ex.equipType=typeLabel;
+      }
+    });
     tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
       var id=(row.tag||row.equipment_id||'').trim();
       if(!id||existing.has(id)) return;
@@ -750,8 +757,11 @@ function exportCSV(){
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='procurement-schedule-GCT001.csv';a.click();
 }
 
-checkSyncNeeded();
-renderTable();
+(async function(){
+  await load();
+  renderTable();
+  checkSyncNeeded();
+})();
 </script>
 <script>
 (function(){try{var cp=localStorage.getItem('hvacnexus_current_project');if(cp){var p=JSON.parse(cp);document.querySelectorAll('.bc-proj-name').forEach(function(el){el.textContent=p.name||el.textContent;});}}catch(e){}})();
