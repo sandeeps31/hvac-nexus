@@ -623,7 +623,21 @@ function tplCols(t){
   return cols;
 }
 function getCols(t){return tplCols(t).filter(function(c){return!c.hidden;});}
-function colOptions(c){return c.options&&c.options.length?c.options:STATUSES;}
+function colOptions(c,t){
+  if(c.options&&c.options.length)return c.options;
+  // Try to find options from tab sections
+  if(t){
+    var opts=null;
+    (t.sections||[]).forEach(function(sec){
+      (sec.fields||[]).forEach(function(f){
+        var fKey=f.key==='equipment_id'?'tag':f.key;
+        if(fKey===c.k&&f.type==='dropdown'&&f.options&&f.options.length)opts=f.options;
+      });
+    });
+    if(opts)return opts;
+  }
+  return STATUSES;
+}
 function allCols(t){return tplCols(t);}
 
 function renderStrip(){
@@ -775,7 +789,7 @@ function renderTable(){
   var tb='<tbody id="etbd">'+rows.map(function(row){
     var cells=cols.map(function(c){
       var ro2=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
-      if(c.sel)return'<td><select class="csel" '+(ro2?'disabled style="opacity:.65;cursor:default"':'')+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+      if(c.sel)return'<td><select class="csel" '+(ro2?'disabled style="opacity:.65;cursor:default"':'')+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
       var ro=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
       if(c.num)return'<td><input class="ci num" type="number" value="'+X(row[c.k]||'')+'" placeholder="" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
       return'<td><input class="ci'+(c.key?' tag':'')+'" value="'+X(row[c.k]||'')+'" placeholder="'+X(c.l)+'…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
@@ -852,7 +866,7 @@ function renderVerticalTable(t,rows){
 
     rows.forEach(function(row){
       if(c.sel){
-        html+='<td style="padding:3px 6px;border-right:1px solid var(--border)"><select class="csel" '+roSel+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+        html+='<td style="padding:3px 6px;border-right:1px solid var(--border)"><select class="csel" '+roSel+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
       } else {
         html+='<td style="padding:3px 6px;border-right:1px solid var(--border)"><input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+roStyle+'></td>';
       }
@@ -1033,7 +1047,7 @@ function appNR(){
   var cells=cols.map(function(c,i){
     var ti=' tabindex="'+(i+1)+'"';
     var last=i===cols.length-1;
-    if(c.sel)return'<td><select class="nisel" id="ni_'+c.k+'"'+ti+'><option value="">Select…</option>'+colOptions(c).map(function(s){return'<option>'+s+'</option>';}).join('')+'</select></td>';
+    if(c.sel)return'<td><select class="nisel" id="ni_'+c.k+'"'+ti+'><option value="">Select…</option>'+colOptions(c,t).map(function(s){return'<option>'+s+'</option>';}).join('')+'</select></td>';
     if(c.num)return'<td><input class="ni num" id="ni_'+c.k+'" type="number" placeholder=""'+ti+' onkeydown="nk(event,'+last+')" onblur="nrBlur()"/></td>';
     return'<td><input class="ni'+(c.key?' tag':'')+'" id="ni_'+c.k+'" placeholder="'+X(c.l)+'…"'+ti+' onkeydown="nk(event,'+last+')" onblur="nrBlur()"/></td>';
   }).join('');
@@ -1368,19 +1382,24 @@ function doXlsxImport(file,t){
         // Find the header row by looking for the column label match
         var cols=getCols(t);
         var hdrRowIdx=0;
-        for(var ri=0;ri<Math.min(4,rawRows.length);ri++){
-          var rowVals=rawRows[ri].map(function(v){return String(v||'').trim().toLowerCase();});
-          // Header row contains column labels
-          var matchCount=cols.filter(function(c){return rowVals.indexOf(c.l.toLowerCase().trim())>=0;}).length;
+        for(var ri=0;ri<Math.min(5,rawRows.length);ri++){
+          var rowVals=rawRows[ri].map(function(v){return String(v||'').trim();});
+          // Skip example row (starts with "Ex:")
+          if(rowVals[0]&&String(rowVals[0]).trim().toLowerCase().startsWith('ex:'))continue;
+          // Header row contains column labels matching our cols
+          var rowValsLow=rowVals.map(function(v){return v.toLowerCase();});
+          var matchCount=cols.filter(function(c){return rowValsLow.indexOf(c.l.toLowerCase().trim())>=0;}).length;
           if(matchCount>=Math.min(2,cols.length)){hdrRowIdx=ri;break;}
         }
         var hdrs=rawRows[hdrRowIdx].map(function(h){return String(h||'').trim();});
         // Build column index map: Excel header label → tab column key
         var colMap={};
         hdrs.forEach(function(h,i){
-          var hl=h.toLowerCase().replace(/[\s\/()]/g,'_');
+          if(!h||!h.trim())return;
+          var hl=h.toLowerCase().replace(/[\s\/().-]/g,'_').replace(/_+/g,'_');
           var col=cols.find(function(c){
-            return c.k===hl||c.l.toLowerCase().trim()===h.toLowerCase().trim()||c.l.toLowerCase().replace(/[\s\/()]/g,'_')===hl;
+            var cl=c.l.toLowerCase().replace(/[\s\/().-]/g,'_').replace(/_+/g,'_');
+            return c.k===hl||cl===hl||c.l.toLowerCase().trim()===h.toLowerCase().trim();
           });
           if(col)colMap[i]=col.k;
         });
@@ -1509,13 +1528,17 @@ function buildAndDownloadTemplate(t,cols){
   // Example values map
   var exMap={};
   (t.sections||[]).forEach(function(sec){(sec.fields||[]).forEach(function(f){if(f.exampleVal)exMap[f.key]=f.exampleVal;});});
-  var example=cols.map(function(col){
-    if(col.key)return (t.name||'EQ').toUpperCase().replace(/[^A-Z0-9]/g,'-')+'-001';
-    if(exMap[col.k])return exMap[col.k];
-    if(dropdownMap[col.k])return dropdownMap[col.k][0]||'';
-    if(col.k==='location')return 'Level 1';
-    if(col.k==='sublocation')return 'Zone A';
-    return '';
+  var example=cols.map(function(col,ci){
+    var val;
+    if(col.key)val='Ex: '+(t.name||'EQ').toUpperCase().replace(/[^A-Z0-9]/g,'-')+'-001';
+    else if(exMap[col.k])val=exMap[col.k];
+    else if(dropdownMap[col.k])val=dropdownMap[col.k][0]||'';
+    else if(col.k==='location')val='Level 1';
+    else if(col.k==='sublocation')val='Zone A';
+    else val='';
+    // Prefix first cell with Ex: if not already
+    if(ci===0&&val&&!val.startsWith('Ex:'))val='Ex: '+val;
+    return val;
   });
 
   // Row order: example row (italics, above header) | section headers | column headers | data
@@ -1540,9 +1563,11 @@ function buildAndDownloadTemplate(t,cols){
   // Row 0 = example (italic, light grey background)
   var hdrRow=hasSections?2:1; // header row index (0-based)
   for(var ci=0;ci<cols.length;ci++){
-    // Example row (row 0) - italic grey
+    // Example row (row 0) - grey italic (SheetJS free supports font but not fill)
     var exRef=XLSX.utils.encode_cell({r:0,c:ci});
-    if(ws[exRef])ws[exRef].s={font:{name:'Arial',sz:9,italic:true,color:{rgb:'888888'}},fill:{fgColor:{rgb:'F5F5F5'}},alignment:{horizontal:'center'}};
+    if(ws[exRef]&&ws[exRef].v!==undefined&&ws[exRef].v!==''){
+      ws[exRef].s={font:{name:'Arial',sz:9,italic:true,color:{rgb:'999999'}},alignment:{horizontal:'left'}};
+    }
     // Section row (row 1 if hasSections)
     if(hasSections){
       var gRef=XLSX.utils.encode_cell({r:1,c:ci});
