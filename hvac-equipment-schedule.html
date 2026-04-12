@@ -833,7 +833,7 @@ function renderTable(){
     return'<tr data-tid="'+t.id+'" data-rid="'+row.id+'" class="'+importCls+deletedCls+'">'+cells+'<td>'+(canDel?(row._deleted?'<button class="delr" style="opacity:1;color:var(--warn)" title="Restore" onclick="restoreR(\''+t.id+'\',\''+row.id+'\')" >↩</button>':'<button class="delr" onclick="delR(\''+t.id+'\',\''+row.id+'\')">✕</button>'):'')+'</td></tr>';
   }).join('')+'</tbody>';
   document.getElementById('main').innerHTML='<div class="twrap" id="body-scroll"><table class="etbl" id="etbl">'+th+tb+'</table>'
-    +(isEditingDraft(t.id)?'<div onclick="openNewRow()" style="display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;color:var(--muted);font-size:13px;font-family:DM Sans,sans-serif;border-top:1px solid var(--border);transition:all .15s;margin:0 14px" onmouseover="this.style.color=\'var(--accent)\';this.style.background=\'var(--accent-dim)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.background=\'transparent\'"><span style="font-size:16px;font-weight:300">＋</span><span>Add Row</span><span style="font-size:11px;opacity:.5;margin-left:4px">· Tab across · Enter to save</span></div>':'')
+    +''
     +'</div>';
   if(nrVis)appNR();
   if(typeof applyDiffHighlights==='function'){setTimeout(function(){applyDiffHighlights();updateEditability();renderRevBar();},0);}
@@ -1838,7 +1838,7 @@ function setLock(tabId,user){try{localStorage.setItem(LOCK_SK,JSON.stringify({ta
 function clearLock(tabId){var lk=getLock();if(lk&&lk.tabId===tabId)try{localStorage.removeItem(LOCK_SK);}catch(e){}}
 function isLockedByMe(tabId){var lk=getLock();var me=getCurrentUser();return !!(lk&&lk.tabId===tabId&&lk.user===me);}
 function isLockedByOther(tabId){var lk=getLock();var me=getCurrentUser();return !!(lk&&lk.tabId===tabId&&lk.user!==me);}
-function isEditingDraft(tabId){var tr=getTabRev(tabId);return !!(tr.draft&&_editingTabId===tabId&&viewingRevIdx===null);}
+function isEditingDraft(tabId){var tr=getTabRev(tabId);return !!(tr&&tr.draft&&_editingTabId===tabId&&viewingRevIdx===null);}
 
 // Diff engine
 function rowKey(r){return r.tag||r.id||'';}
@@ -1870,7 +1870,7 @@ function applyDiffHighlights(){
     baseRows=tr.revisions[viewingRevIdx-1].snapshot||[];
     viewRows=tr.revisions[viewingRevIdx].snapshot||[];
     diff=computeDiff(baseRows,viewRows);
-  } else if(tr.draft){
+  } else if(tr.draft&&_editingTabId===tabId){
     // Only show highlights if there's a previous published revision to compare against
     var prevRevisions=tr.revisions.filter(function(r){return r.snapshot&&r.snapshot.length>0;});
     if(!prevRevisions.length){
@@ -2124,7 +2124,7 @@ function confirmPublish(){
     snapshot:JSON.parse(JSON.stringify(liveRows)),
     changeSummary:{added:diff.added.length,deleted:diff.deleted.length,changed:Object.keys(diff.changedIds).length}
   });
-  tr.draft=null;clearLock(tabId);saveRevData();saveEquip();
+  tr.draft=null;_editingTabId=null;clearLock(tabId);saveRevData();saveEquip();
   closeM('publishModal');viewingRevIdx=null;renderRevBar();renderTable();
   showToast('\u2713 '+revNum+' published');
 }
