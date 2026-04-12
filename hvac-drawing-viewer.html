@@ -435,14 +435,27 @@ var _hiRenderTask=null;
 function renderPdf(pdf){
   pdf.getPage(1).then(function(page){
     _pdfPage=page;
-    renderAtScale(page,1.5,function(){
-      // Low-res is visible — now upgrade in background
+    // Render directly at high resolution — single pass, no swap
+    var dpr=window.devicePixelRatio||1;
+    var hiScale=Math.max(4,dpr*4);
+    var vp=page.getViewport({scale:hiScale});
+    var canvas=document.getElementById('pdfCanvas');
+    // Canvas pixel size = hi-res
+    canvas.width=vp.width;
+    canvas.height=vp.height;
+    // CSS display size = 1x equivalent (so transform math stays simple)
+    var vp1=page.getViewport({scale:1});
+    canvas.style.width=vp1.width+'px';
+    canvas.style.height=vp1.height+'px';
+    _canvasW=vp1.width;
+    _canvasH=vp1.height;
+    var ctx=canvas.getContext('2d');
+    page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
       document.getElementById('loading').style.display='none';
       fitToScreen();
       renderPins();
       renderPanel();
-      setTimeout(function(){renderHighRes(page);},100);
-    });
+    }).catch(function(){});
   });
 }
 
@@ -456,38 +469,7 @@ function renderAtScale(page,scale,cb){
 }
 
 function renderHighRes(page){
-  if(_hiRenderTask){try{_hiRenderTask.cancel();}catch(e){}}
-  var dpr=window.devicePixelRatio||1;
-  var hiScale=Math.max(6,dpr*5);
-  var vpHi=page.getViewport({scale:hiScale});
-  var offscreen=document.createElement('canvas');
-  offscreen.width=vpHi.width;
-  offscreen.height=vpHi.height;
-  var offCtx=offscreen.getContext('2d');
-  _hiRenderTask=page.render({canvasContext:offCtx,viewport:vpHi});
-  _hiRenderTask.promise.then(function(){
-    _hiRenderTask=null;
-    var canvas=document.getElementById('pdfCanvas');
-    var ctx=canvas.getContext('2d');
-    // Preserve current pan/zoom state
-    var prevScale=_scale,prevOX=_offsetX,prevOY=_offsetY;
-    var prevW=_canvasW,prevH=_canvasH;
-    // Set canvas to hi-res pixel dimensions
-    canvas.width=vpHi.width;
-    canvas.height=vpHi.height;
-    // Scale the CSS display size to match previous logical size exactly
-    // so the visual size on screen doesn't change at all
-    canvas.style.width=prevW+'px';
-    canvas.style.height=prevH+'px';
-    ctx.drawImage(offscreen,0,0);
-    // Keep _canvasW/_canvasH at the CSS display size for transform calcs
-    _canvasW=prevW;
-    _canvasH=prevH;
-    // Restore pan/zoom — no visual jump
-    _scale=prevScale;_offsetX=prevOX;_offsetY=prevOY;
-    applyTransform();
-    renderPins();
-  }).catch(function(){_hiRenderTask=null;});
+  // No-op — rendering is now done in single high-res pass in renderPdf
 }
 function applyTransform(){
   document.getElementById('pdfStage').style.transform='translate('+_offsetX+'px,'+_offsetY+'px) scale('+_scale+')';
