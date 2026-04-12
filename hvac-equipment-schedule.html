@@ -613,13 +613,14 @@ function tplCols(t){
       usedLabels.add(fLabel);
       // Remap equipment_id → tag so it aligns with the frozen first column
       var fKey=fLabel==='equipment id'?'tag':f.key;
-      cols.push({k:fKey,l:f.label||f.key,num:f.type==='number',sel:f.type==='dropdown',sectionName:(sec.name&&sec.name!=='__none__')?sec.name:null});
+      cols.push({k:fKey,l:f.label||f.key,num:f.type==='number',sel:f.type==='dropdown',options:(f.type==='dropdown'&&f.options&&f.options.length)?f.options:null,sectionName:(sec.name&&sec.name!=='__none__')?sec.name:null});
     });
   });
   if(!usedKeys.has('status'))cols.push({k:'status',l:'Status',sel:1,sectionName:null});
   return cols;
 }
 function getCols(t){return tplCols(t).filter(function(c){return!c.hidden;});}
+function colOptions(c){return c.options&&c.options.length?c.options:STATUSES;}
 function allCols(t){return tplCols(t);}
 
 function renderStrip(){
@@ -771,7 +772,7 @@ function renderTable(){
   var tb='<tbody id="etbd">'+rows.map(function(row){
     var cells=cols.map(function(c){
       var ro2=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
-      if(c.sel)return'<td><select class="csel" '+(ro2?'disabled style="opacity:.65;cursor:default"':'')+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+STATUSES.map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+      if(c.sel)return'<td><select class="csel" '+(ro2?'disabled style="opacity:.65;cursor:default"':'')+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
       var ro=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
       if(c.num)return'<td><input class="ci num" type="number" value="'+X(row[c.k]||'')+'" placeholder="" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
       return'<td><input class="ci'+(c.key?' tag':'')+'" value="'+X(row[c.k]||'')+'" placeholder="'+X(c.l)+'…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
@@ -847,7 +848,7 @@ function renderVerticalTable(t,rows){
 
     rows.forEach(function(row){
       if(c.sel){
-        html+='<td style="padding:3px 6px;border-right:1px solid var(--border)"><select class="csel" '+roSel+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+STATUSES.map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+        html+='<td style="padding:3px 6px;border-right:1px solid var(--border)"><select class="csel" '+roSel+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
       } else {
         html+='<td style="padding:3px 6px;border-right:1px solid var(--border)"><input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+roStyle+'></td>';
       }
@@ -1028,7 +1029,7 @@ function appNR(){
   var cells=cols.map(function(c,i){
     var ti=' tabindex="'+(i+1)+'"';
     var last=i===cols.length-1;
-    if(c.sel)return'<td><select class="nisel" id="ni_'+c.k+'"'+ti+'><option value="">Status…</option>'+STATUSES.map(function(s){return'<option>'+s+'</option>';}).join('')+'</select></td>';
+    if(c.sel)return'<td><select class="nisel" id="ni_'+c.k+'"'+ti+'><option value="">Select…</option>'+colOptions(c).map(function(s){return'<option>'+s+'</option>';}).join('')+'</select></td>';
     if(c.num)return'<td><input class="ni num" id="ni_'+c.k+'" type="number" placeholder=""'+ti+' onkeydown="nk(event,'+last+')" onblur="nrBlur()"/></td>';
     return'<td><input class="ni'+(c.key?' tag':'')+'" id="ni_'+c.k+'" placeholder="'+X(c.l)+'…"'+ti+' onkeydown="nk(event,'+last+')" onblur="nrBlur()"/></td>';
   }).join('');
@@ -1507,7 +1508,7 @@ function buildAndDownloadTemplate(t,cols){
       var colLetter=ci<26?String.fromCharCode(65+ci):(String.fromCharCode(64+Math.floor(ci/26))+String.fromCharCode(65+(ci%26)));
       var sqref=colLetter+dataStartRow+':'+colLetter+'1000';
       // Options as quoted comma-separated list, max 255 chars for formula1
-      var formula1='"'+opts.slice(0,20).map(function(o){return o.replace(/"/g,'');}).join(',').substring(0,250)+'"';
+      var formula1='&quot;'+opts.slice(0,20).map(function(o){return o.replace(/[&<>"]/g,'');}).join(',').substring(0,250)+'&quot;';
       dvEntries.push(
         '<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'">'+
         '<formula1>'+formula1+'</formula1>'+
@@ -1563,8 +1564,11 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName){
       if(!sheetKey){fallback();return;}
       zip.file(sheetKey).async('string').then(function(sheetXml){
         var dvXml='<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>';
-        if(sheetXml.indexOf('<dataValidations')>=0){
-          sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,dvXml);
+        // Remove existing dataValidations if present
+        sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
+        // Insert after </sheetData> — Excel requires this order
+        if(sheetXml.indexOf('</sheetData>')>=0){
+          sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
         } else {
           sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
         }
