@@ -469,18 +469,23 @@ function renderHighRes(page){
     _hiRenderTask=null;
     var canvas=document.getElementById('pdfCanvas');
     var ctx=canvas.getContext('2d');
+    // Preserve current pan/zoom state
+    var prevScale=_scale,prevOX=_offsetX,prevOY=_offsetY;
+    var prevW=_canvasW,prevH=_canvasH;
     // Set canvas to hi-res pixel dimensions
     canvas.width=vpHi.width;
     canvas.height=vpHi.height;
-    // CRITICAL: update logical dimensions so scale transform uses hi-res coords
-    _canvasW=vpHi.width;
-    _canvasH=vpHi.height;
-    // Remove any CSS size override — let canvas natural size drive layout
-    canvas.style.width='';
-    canvas.style.height='';
+    // Scale the CSS display size to match previous logical size exactly
+    // so the visual size on screen doesn't change at all
+    canvas.style.width=prevW+'px';
+    canvas.style.height=prevH+'px';
     ctx.drawImage(offscreen,0,0);
-    // Re-fit so the scale transform accounts for new canvas size
-    fitToScreen();
+    // Keep _canvasW/_canvasH at the CSS display size for transform calcs
+    _canvasW=prevW;
+    _canvasH=prevH;
+    // Restore pan/zoom — no visual jump
+    _scale=prevScale;_offsetX=prevOX;_offsetY=prevOY;
+    applyTransform();
     renderPins();
   }).catch(function(){_hiRenderTask=null;});
 }
