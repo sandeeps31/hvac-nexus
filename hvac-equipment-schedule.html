@@ -804,12 +804,16 @@ function renderTable(){
   }
   th+='<tr>'+cols.map(function(c,ci){
     var style=c.key?'min-width:180px':c.k==='desc'||c.k==='service'?'min-width:200px':'min-width:140px';
-    var sortInd=sortK===c.k?(sortD>0?' ▲':' ▼'):'';
+    var sortActive=sortK===c.k;
+    var sortIcon=sortActive?(sortD>0?'↑':'↓'):'↕';
+    var sortColor=sortActive?'var(--accent)':'rgba(255,255,255,.25)';
     var hasFilter=colFilters[c.k]&&colFilters[c.k].size>0;
+    var filterColor=hasFilter?'var(--accent)':'rgba(255,255,255,.25)';
     var canEditTab=(_editingTabId===t.id);
-    return'<th style="'+style+';cursor:pointer;padding:0" ><div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px 7px 12px">'
-      +'<span onclick="srtBy(\''+c.k+'\')" style="flex:1;user-select:none">'+X(c.l)+(sortInd?'<span style="font-size:9px;color:var(--accent);margin-left:4px">'+sortInd+'</span>':'')+'</span>'
-      +(canEditTab?'<span onclick="openColFilter(event,\''+c.k+'\')" style="font-size:11px;color:'+(hasFilter?'var(--accent)':'rgba(255,255,255,.3)')+';cursor:pointer;padding:2px 4px;border-radius:3px;transition:color .12s" title="Filter">▼</span>':'')
+    return'<th style="'+style+';cursor:pointer;padding:0"><div style="display:flex;align-items:center;gap:2px;padding:6px 8px 6px 12px">'
+      +'<span onclick="srtBy(\''+c.k+'\')" style="flex:1;user-select:none;font-size:9px;letter-spacing:.8px;text-transform:uppercase">'+X(c.l)+'</span>'
+      +'<span onclick="srtBy(\''+c.k+'\')" title="Sort" style="font-size:11px;color:'+sortColor+';cursor:pointer;padding:1px 3px;border-radius:3px;flex-shrink:0;line-height:1;transition:color .12s">'+sortIcon+'</span>'
+      +(canEditTab?'<span onclick="openColFilter(event,\''+c.k+'\')" title="Filter" style="font-size:10px;color:'+filterColor+';cursor:pointer;padding:1px 3px;border-radius:3px;flex-shrink:0;line-height:1;transition:color .12s">'+(hasFilter?'⊠':'⊟')+'</span>':'')
       +'</div></th>';
   }).join('')+'<th style="width:28px"></th></tr></thead>';
   var tb='<tbody id="etbd">'+rows.map(function(row){
@@ -2198,7 +2202,6 @@ function exportRevPDF(){
   html+='<\/body><\/html>';
   var w=window.open('','_blank','width=1200,height=800');w.document.write(html);w.document.close();w.focus();
   setTimeout(function(){w.print();},800);closeM('exportRevModal');
-}
 }
 function exportRevXLSX(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
