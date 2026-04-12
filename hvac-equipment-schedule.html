@@ -1556,33 +1556,27 @@ function buildAndDownloadTemplate(t,cols){
 function injectDataValidation(wbout,dvEntries,tabName,sheetName){
   // Load JSZip dynamically if needed
   function doInject(JSZip){
-    var zip=new JSZip(wbout);
-    // Find the sheet XML file (xl/worksheets/sheet1.xml)
-    var sheetKey=null;
-    zip.forEach(function(path){
-      if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;
-    });
-    if(!sheetKey){XLSX.writeFile(XLSX.read(new Uint8Array(wbout),{type:'array'}),'HVAC_NEXUS_'+tabName+'_Template.xlsx');return;}
-
-    var sheetXml=zip.file(sheetKey).asText();
-    var dvXml='<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>';
-
-    // Insert before </worksheet>
-    if(sheetXml.indexOf('<dataValidations')>=0){
-      // Replace existing
-      sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,dvXml);
-    } else {
-      sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
-    }
-
-    zip.file(sheetKey,sheetXml);
-    var out=zip.generate({type:'arraybuffer'});
-    var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    var a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';a.click();URL.revokeObjectURL(a.href);}
+    new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
+      var sheetKey=null;
+      zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
+      if(!sheetKey){fallback();return;}
+      zip.file(sheetKey).async('string').then(function(sheetXml){
+        var dvXml='<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>';
+        if(sheetXml.indexOf('<dataValidations')>=0){
+          sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,dvXml);
+        } else {
+          sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
+        }
+        zip.file(sheetKey,sheetXml);
+        zip.generateAsync({type:'arraybuffer'}).then(function(out){
+          var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+          var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+          a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';
+          a.click();URL.revokeObjectURL(a.href);
+        });
+      });
+    }).catch(function(){fallback();});
   }
 
   if(typeof JSZip!=='undefined'){
@@ -1592,11 +1586,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName){
     s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
     s.onload=function(){doInject(JSZip);};
     s.onerror=function(){
-      // JSZip failed — fall back to plain xlsx without dropdowns
-      var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-      var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-      a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';
-      a.click();URL.revokeObjectURL(a.href);
+      fallbackDownload();
     };
     document.head.appendChild(s);
   }
