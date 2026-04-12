@@ -220,6 +220,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
     <span class="bcl" onclick="window.location.href='index.html'">My Projects</span><span class="bcs">›</span>
     <span class="bcl" onclick="navTo('hvac-login.html')" style="cursor:pointer" onclick="window.location.href='project-dashboard.html'">Greenfield Commercial Tower</span class would be here><span class="bcs">›</span>
     <span class="bcc">Procurement Schedule</span>
+    <span id="equipTypePill" style="display:none;margin-left:10px;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.25);border-radius:20px;font-family:'DM Mono',monospace;font-size:11px;padding:3px 10px;font-weight:600"></span>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button class="bg bsm btn" onclick="syncFromEquipment()">⟳ Sync from Equipment Schedule</button>
@@ -270,6 +271,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
     <thead>
       <tr>
         <th style="width:40px">#</th>
+        <th style="width:46px"></th>
         <th>Asset ID</th>
         <th>Location</th>
         <th>Sub area</th>
@@ -390,7 +392,7 @@ function recalcETA(){
 
 // SYNC FROM EQUIPMENT SCHEDULE
 var TYPE_LABELS={'fcu':'FCU','mssb':'MSSB','dcp':'DCP','ahu':'AHU','chillers':'Chillers','ct':'Cooling Tower','fans':'Fans','pumps':'Pumps','vav':'VAV','pac':'PAC Units','pu':'Package Units','grilles':'Grilles','dampers':'Dampers','vsds':'VSDs','crac':'CRAC','hex':'Heat Ex','hum':'HUM','hepa':'HEPA','reheat':'Reheat Coils','acu':'ACU','edh':'EDH','harmonic':'Harmonic Filters'};
-function getTypeLabel(tab){return TYPE_LABELS[tab.type]||tab.type||tab.name||'Equipment';}
+function getTypeLabel(tab){return tab.name||TYPE_LABELS[tab.type]||tab.type||'Equipment';}
 
 
 
@@ -565,6 +567,34 @@ function renderTable(){
   var filtered=getFilteredItems();
   updateSummary(filtered);
   document.getElementById('rowCount').textContent=filtered.length+' item'+(filtered.length!==1?'s':'');
+  // Update equipment type pill
+  var pill=document.getElementById('equipTypePill');
+  if(pill){
+    var tf=document.getElementById('typeFilter');
+    var filterType=tf?tf.value:'';
+    if(filterType){
+      pill.textContent='Equipment Type — '+filterType;
+      pill.style.display='';
+      pill.style.background='var(--accent-dim)';
+      pill.style.color='var(--accent)';
+    } else {
+      // Get unique types
+      var types=[...new Set(filtered.map(function(i){return i.equipType;}).filter(Boolean))];
+      if(types.length===1){
+        pill.textContent='Equipment Type — '+types[0];
+        pill.style.display='';
+        pill.style.background='var(--accent-dim)';
+        pill.style.color='var(--accent)';
+      } else if(types.length>1){
+        pill.textContent='All Types ('+types.length+')';
+        pill.style.display='';
+        pill.style.background='var(--surface3)';
+        pill.style.color='var(--text2)';
+      } else {
+        pill.style.display='none';
+      }
+    }
+  }
   if(_currentView==='summary'){renderSummary();return;}
   var tbody=document.getElementById('procTbody');
   tbody.innerHTML='';
@@ -612,8 +642,9 @@ function renderTable(){
       +'</div>';
     tr.style.cursor='default';
     tr.setAttribute('data-item-id',item.id);
-    tr.innerHTML='<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">'+(idx+1)+'</td>'
-      +'<td class="asset-id">'+escH(item.assetId||'—')+'</td>'
+
+    var editBtn='<button onclick="openEditModal(\''+item.id+'\')" title="Edit" style="background:none;border:1px solid var(--border);border-radius:5px;color:var(--muted);cursor:pointer;font-size:11px;padding:3px 8px;font-family:DM Mono,monospace;transition:all .13s" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--muted)\'">✏️</button>';
+    tr.innerHTML='<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">'+(idx+1)+'</td>'      +'<td>'+editBtn+'</td>'      +'<td class="asset-id">'+escH(item.assetId||'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(item.location||'—')+'</td>'
       +'<td style="color:var(--muted);font-size:12px">'+escH(item.subarea||'—')+'</td>'
       +'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>'
@@ -675,7 +706,7 @@ function openEditModal(id){
 function closeModal(){document.getElementById('addModal').classList.remove('open');}
 function saveItem(){
   var assetId=document.getElementById('f-assetid').value.trim();
-  if(!assetId){alert('Asset ID is required.');return;}
+  if(!assetId){showToast('Asset ID is required.');return;}
   var od=document.getElementById('f-orderdate').value;
   var lw=document.getElementById('f-leadtime').value;
   var eta=od&&lw?calcETA(od,lw):'';
@@ -807,7 +838,7 @@ function renderSummary(){
           var etaD=item.eta?fmtD(item.eta):'—';
           var etaColor=item.status==='Delivered'?'var(--green)':item.eta&&item.eta<td?'var(--danger)':item.eta?'var(--text2)':'var(--muted)';
           var stColor=STATUS_COLORS[item.status]||'var(--text2)';
-          return '<div class="summary-row" onclick="openEdit(\''+item.id+'\')">'
+          return '<div class="summary-row" onclick="openEditModal(\''+item.id+'\')">'
             +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);min-width:140px">'+escH(item.assetId||'—')+'</span>'
             +'<span style="color:var(--text2);min-width:100px">'+escH(item.location||'—')+'</span>'
             +'<span style="color:var(--muted);flex:1">'+escH(item.manufacturer||'—')+(item.model?' · '+escH(item.model):'')+'</span>'
