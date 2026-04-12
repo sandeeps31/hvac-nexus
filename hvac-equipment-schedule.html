@@ -1035,7 +1035,7 @@ function appNR(){
   }).join('');
   tr.innerHTML=cells+'<td style="white-space:nowrap"><button class="savr" onclick="comR()" tabindex="'+(cols.length+1)+'">↵</button> <button class="canr" onclick="canR()" tabindex="'+(cols.length+2)+'">✕</button></td>';
   tb.appendChild(tr);
-  setTimeout(function(){var f=document.getElementById('ni_tag');if(f)f.focus();},30);
+  setTimeout(function(){var inputs=document.querySelectorAll('#nrtr .ni');if(inputs.length)inputs[0].focus();},30);
 }
 function nrBlur(){
   // Delay to allow focus to move to another cell in the same row first
@@ -1048,13 +1048,20 @@ function nrBlur(){
     // Check if any field has a value
     var hasVal=false;
     nrtr.querySelectorAll('input,select').forEach(function(el){if(el.value&&el.value.trim())hasVal=true;});
-    if(hasVal)comR();
+    if(hasVal){
+      comR();
+      // After blur commit, keep new row open for continued entry
+      // comR already does this via setTimeout(appNR, 30)
+    }
   },150);
 }
 function nk(e,isLast){
   if(e.key==='Enter'){e.preventDefault();comR();return;}
   if(e.key==='Escape'){e.preventDefault();canR();return;}
+  // Tab on last column always commits
   if(e.key==='Tab'&&isLast&&!e.shiftKey){e.preventDefault();comR();return;}
+  // Tab on any field that has a value — let tab move naturally but schedule a blur check
+  // nrBlur handles the actual commit when focus leaves the row
 }
 function comR(){
   var t=aTab();if(!t)return;
@@ -1062,9 +1069,12 @@ function comR(){
   var cols=getCols(t);
   var row={id:nid(),status:'Not Started'};
   cols.forEach(function(c){var el=document.getElementById('ni_'+c.k);row[c.k]=el?el.value:'';});
-  if(!row.tag&&!row.equipment_id){showToast('Enter an Equipment ID first');return;}
+  // Require at least one field to have a value
+  var hasAnyVal=Object.keys(row).some(function(k){return k!=='id'&&k!=='status'&&row[k]&&String(row[k]).trim();});
+  if(!hasAnyVal){showToast('Enter at least one value first');return;}
   t.rows.push(row);nrVis=false;updSum();renderTable();saveEquip();
-  setTimeout(function(){nrVis=true;appNR();},30);
+  // Immediately open new row for continued data entry
+  setTimeout(function(){nrVis=true;appNR();},20);
 }
 function canR(){nrVis=false;var el=document.getElementById('nrtr');if(el)el.remove();}
 
