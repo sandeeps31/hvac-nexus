@@ -49,6 +49,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .etbl tr.import-changed td{background:rgba(255,184,48,.08)!important;border-left:3px solid var(--warn)}
 .etbl tr.import-deleted td{background:rgba(255,77,109,.08)!important;border-left:3px solid var(--danger);opacity:.6;text-decoration:line-through}
 .etbl tr.import-deleted td input,.etbl tr.import-deleted td span,.etbl tr.import-deleted td select{text-decoration:line-through!important}
+.etbl td input[style*='line-through']{text-decoration:line-through!important}
 .etbl tr.tr-deleted td input,.etbl tr.tr-deleted td span,.etbl tr.tr-deleted td select{text-decoration:line-through!important}
 .etbl tr.tr-deleted td{background:rgba(255,77,109,.13)!important;text-decoration:line-through;color:rgba(255,100,100,.9)!important}
 .etbl tr.tr-deleted td:first-child{border-left:3px solid var(--danger)!important}.etbl thead{position:sticky;top:0;z-index:4;box-shadow:0 1px 0 var(--border)}
@@ -917,7 +918,7 @@ function renderVerticalTable(t,rows){
         if(ro)html+='<td style="'+tdStyle+'"><span style="font-size:12px;'+delStyle+'">'+X(row[c.k]||'—')+'</span></td>';
         else html+='<td style="'+tdStyle+'"><select class="csel" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
       } else {
-        html+='<td style="'+tdStyle+'"><input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+roStyle+' style="'+delStyle+'">'+'</td>';
+        html+='<td style="'+tdStyle+'"><input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly':'')+' style="'+(ro?'opacity:.65;cursor:default;':'')+delStyle+'"\x3e\x3c/td>';
       }
     });
     if(canEdit)html+='<td></td>';
@@ -2238,14 +2239,23 @@ function exportRevPDF(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
   var tr=getTabRev(tabId);
   var rv=exportingRevIdx!==null?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
-  var tab_rows=tab?tab.rows:[];
-  var rows=exportingRevIdx!==null?(function(){var rv=tr.revisions[exportingRevIdx];return rv?rv.snapshot:[];})():tab_rows;
   var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';var revDate=rv?fmtD(rv.date):todayStr();
   var prevRevIdx=exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2;
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
   var prevRevLabel=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].rev:'—';
-  var diff=computeDiff(baseRows,rows);
+  // Current rows: snapshot for specific rev, or live rows for draft
+  var snapRows=exportingRevIdx!==null?(tr.revisions[exportingRevIdx]?tr.revisions[exportingRevIdx].snapshot||[]:[]):(tab?tab.rows.filter(function(r){return!r._deleted;}):[]); 
+  var diff=computeDiff(baseRows,snapRows);
+  // Build full export rows: current snapshot + deleted rows (from base but not in current)
+  var rows=snapRows.slice();
+  baseRows.forEach(function(br){
+    var bk=rowKey(br);
+    if(diff.deleted.indexOf(bk)>=0){
+      // Add deleted row with flag
+      rows.push(Object.assign({},br,{_exportDeleted:true}));
+    }
+  });
   var proj=dbGetCurrentProject();
   var projName=proj?proj.name:'[Project Name]';
   var projNum=proj?proj.num:'';
@@ -2259,10 +2269,14 @@ function exportRevPDF(){
   rows.forEach(function(r,ri){
     var key=rowKey(r);
     var isAdded=hasDiff&&diff.added.indexOf(key)>=0;
-    var isDel=r._deleted;
-    var cf=hasDiff?(diff.changedIds[key]||[]):[];
-    html+='<tr class="'+(isAdded?'r-added':isDel?'r-deleted':'')+'"><td style="color:#aaa;text-align:center;font-size:8px">'+(ri+1)+'</td>';
-    cols.forEach(function(c){html+='<td class="'+(!isAdded&&!isDel&&cf.indexOf(c.k)>=0?'c-chg':'')+'">'+(r[c.k]||'')+'</td>';});
+    var isDel=r._exportDeleted||r._deleted||(hasDiff&&diff.deleted.indexOf(key)>=0);
+    var cf=hasDiff&&!isAdded&&!isDel?(diff.changedIds[key]||[]):[];
+    var trCls=isAdded?'r-added':isDel?'r-deleted':'';
+    html+='<tr class="'+trCls+'"><td style="color:#aaa;text-align:center;font-size:8px">'+(ri+1)+'</td>';
+    cols.forEach(function(c){
+      var isCellChg=!isAdded&&!isDel&&cf.indexOf(c.k)>=0;
+      html+='<td class="'+(isCellChg?'c-chg':'')+'" style="'+(isDel?'text-decoration:line-through;':'')+'">'+(r[c.k]||'')+'</td>';
+    });
     html+='</tr>';
   });
   html+='</tbody></table>';
@@ -2286,13 +2300,17 @@ function exportRevXLSX(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
   var tr=getTabRev(tabId);
   var rv=exportingRevIdx!==null?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
-  var rows=getExportRows();var cols=tab?getCols(tab):[];
+  var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';
   var tabName=tab?tab.name||tab.type:'Equip';
   var prevRevIdx=exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2;
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
-  var diff=computeDiff(baseRows,rows);
+  var snapRows=exportingRevIdx!==null?(tr.revisions[exportingRevIdx]?tr.revisions[exportingRevIdx].snapshot||[]:[]):(tab?tab.rows.filter(function(r){return!r._deleted&&!r._importDeleted;}):[]); 
+  var diff=computeDiff(baseRows,snapRows);
   var hasDiff=baseRows.length>0;
+  // Include deleted rows (from base but not in current snapshot)
+  var rows=snapRows.slice();
+  if(hasDiff){baseRows.forEach(function(br){if(diff.deleted.indexOf(rowKey(br))>=0)rows.push(Object.assign({},br,{_exportDeleted:true}));});}
   function doXlsx(){
     var wb=XLSX.utils.book_new();
     // Header row + data
@@ -2315,8 +2333,8 @@ function exportRevXLSX(){
       rows.forEach(function(r,ri){
         var key=rowKey(r);
         var isAdded=diff.added.indexOf(key)>=0;
-        var isDel=r._deleted;
-        var cf=diff.changedIds[key]||[];
+        var isDel=r._exportDeleted||r._deleted||(diff.deleted.indexOf(key)>=0);
+        var cf=(!isAdded&&!isDel)?(diff.changedIds[key]||[]):[];
         cols.forEach(function(c,ci){
           var ref=XLSX.utils.encode_cell({r:ri+1,c:ci});
           if(!ws[ref])return;
