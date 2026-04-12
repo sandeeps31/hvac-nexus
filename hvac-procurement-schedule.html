@@ -224,7 +224,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
   <div style="display:flex;gap:8px;align-items:center">
     <button class="bg bsm btn" onclick="syncFromEquipment()">⟳ Sync from Equipment Schedule</button>
     <button class="bg bsm btn" onclick="exportCSV()">⬇ Export CSV</button>
-    <button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="resetAndResync()">↺ Reset &amp; Resync</button>
+
     <button class="bp bsm btn" onclick="openAddModal()">＋ Add Item</button>
   </div>
 </div>
@@ -345,6 +345,12 @@ var _currentView='full';
 var items=[];
 var editingId=null;
 var _uid=100;
+function showToast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.4);white-space:nowrap';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(function(){t.remove();},300);},2500);
+}
 function nid(){return ++_uid;}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
@@ -386,16 +392,11 @@ function recalcETA(){
 var TYPE_LABELS={'fcu':'FCU','mssb':'MSSB','dcp':'DCP','ahu':'AHU','chillers':'Chillers','ct':'Cooling Tower','fans':'Fans','pumps':'Pumps','vav':'VAV','pac':'PAC Units','pu':'Package Units','grilles':'Grilles','dampers':'Dampers','vsds':'VSDs','crac':'CRAC','hex':'Heat Ex','hum':'HUM','hepa':'HEPA','reheat':'Reheat Coils','acu':'ACU','edh':'EDH','harmonic':'Harmonic Filters'};
 function getTypeLabel(tab){return TYPE_LABELS[tab.type]||tab.type||tab.name||'Equipment';}
 
-function resetAndResync(){
-  if(!confirm('Clear all procurement schedule data and re-sync from Equipment Schedule?\nThis will keep your order dates, lead times and statuses if you cancel — only do this to fix labels.')) return;
-  items=[];
-  save();
-  syncFromEquipment();
-}
 
-function syncFromEquipment(){
+
+async function syncFromEquipment(){
   var raw=null;
-  try{raw=null/*equip loaded separately*/;if(raw)raw=JSON.parse(raw);}catch(e){}
+  try{raw=await dbGetEquipment(_psPNum);}catch(e){}
   if(!raw||!raw.tabs||!raw.tabs.length){
     alert('No equipment schedule data found. Open the Equipment Schedule and add equipment first.');return;
   }
@@ -404,8 +405,8 @@ function syncFromEquipment(){
   raw.tabs.forEach(function(tab){
     if(!Array.isArray(tab.rows)) return;
     var typeLabel=getTypeLabel(tab);
-    tab.rows.forEach(function(row){
-      var id=(row.tag||'').trim();
+    tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
+      var id=(row.tag||row.equipment_id||'').trim();
       if(!id||existing.has(id)) return;
       items.push({
         id:'ps'+nid(),
@@ -430,26 +431,26 @@ function syncFromEquipment(){
   });
   if(added===0){
     document.getElementById('syncBanner').style.display='none';
-    alert('All equipment IDs are already in the procurement schedule.');
+    showToast('All equipment IDs are already in the procurement schedule.');
     return;
   }
   save();
   document.getElementById('syncBanner').style.display='none';
   renderTable();
-  alert(added+' item'+(added!==1?'s':'')+' synced from Equipment Schedule.');
+  showToast(added+' item'+(added!==1?'s':'')+' synced from Equipment Schedule.');
 }
 
 // CHECK for new equipment not in schedule
-function checkSyncNeeded(){
+async function checkSyncNeeded(){
   var raw=null;
-  try{raw=null/*equip loaded separately*/;if(raw)raw=JSON.parse(raw);}catch(e){}
+  try{raw=await dbGetEquipment(_psPNum);}catch(e){}
   if(!raw||!raw.tabs)return;
   var existing=new Set(items.map(function(i){return i.assetId;}));
   var newCount=0;
   raw.tabs.forEach(function(tab){
     if(!Array.isArray(tab.rows)) return;
-    tab.rows.forEach(function(row){
-      var id=(row.tag||'').trim();
+    tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
+      var id=(row.tag||row.equipment_id||'').trim();
       if(id&&!existing.has(id)) newCount++;
     });
   });
