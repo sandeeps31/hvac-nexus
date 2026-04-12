@@ -425,7 +425,11 @@ body.sb-sm{padding-left:var(--sb-sm)}
   </select>
   <select class="fsel" id="locfil" onchange="renderTable()"><option value="">All Locations</option></select>
   <div class="abtns">
-    <button class="cedbtn" onclick="openColEditor()">⚙ Columns</button>
+    <div style="display:flex;align-items:center;gap:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;overflow:hidden;font-family:'DM Mono',monospace;font-size:11px" id="layoutToggle">
+      <button id="btnHoriz" onclick="setTabLayout('horizontal')" style="padding:5px 10px;border:none;cursor:pointer;font-family:inherit;font-size:11px;transition:all .13s">↔ H</button>
+      <button id="btnVert" onclick="setTabLayout('vertical')" style="padding:5px 10px;border:none;cursor:pointer;font-family:inherit;font-size:11px;transition:all .13s">↕ V</button>
+    </div>
+    <button class="cedbtn" id="colSettingsBtn" onclick="openColEditor()">⚙ Columns</button>
     <div id="groupByBtn" style="display:none;align-items:center;gap:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;overflow:hidden;font-family:'DM Mono',monospace;font-size:11px">
       <button id="gbFlat" onclick="setGroupBy(false)" style="padding:4px 11px;border:none;cursor:pointer;background:var(--accent);color:#080c12;font-family:inherit;font-size:11px;font-weight:700;transition:all .13s">☰ Flat</button>
       <button id="gbGroup" onclick="setGroupBy(true)" style="padding:4px 11px;border:none;cursor:pointer;background:transparent;color:var(--muted);font-family:inherit;font-size:11px;transition:all .13s">⊞ By Board</button>
@@ -443,7 +447,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
 </div>
 <div class="ctxm" id="ctxm">
   <div class="ctxi" onclick="ctxRename()">✏️&nbsp; Rename</div>
-  <div class="ctxi" onclick="ctxCols()">⚙️&nbsp; Edit Columns</div>
+  <div class="ctxi" id="ctxColsItem" onclick="ctxCols()">⚙️&nbsp; Column Settings</div>
   <div class="ctxi" onclick="ctxDuplicate()">📋&nbsp; Duplicate Tab</div>
   <div class="ctxdiv"></div>
   <div class="ctxi red" onclick="ctxDel()">🗑&nbsp; Delete Tab</div>
@@ -486,8 +490,8 @@ body.sb-sm{padding-left:var(--sb-sm)}
 </div>
 <div class="mo" id="ceModal">
   <div class="modal" style="width:520px">
-    <div class="mh3">Edit Columns</div>
-    <div class="msub" id="ceSub">Drag to reorder · Toggle to show/hide · Rename · Add custom columns</div>
+    <div class="mh3" id="ceTitle">Column Settings</div>
+    <div class="msub" id="ceSub">Drag to reorder · Toggle to show/hide · Rename · Add custom</div>
     <div class="celist" id="celist"></div>
     <div class="ceadd">
       <input class="cename-in" id="newColName" placeholder="New column name…" onkeydown="if(event.key==='Enter')addCol()">
@@ -650,6 +654,11 @@ return;}
        +'</div>';
   }).join('')+'<button class="add-etab" onclick="openAddModal()">＋ Add</button>';
   updSum();renderTable();updateSubmitBtn();
+  // Update layout toggle and column settings button
+  var t=aTab();
+  var cbtn=document.getElementById('colSettingsBtn');
+  if(cbtn&&t)cbtn.textContent='⚙ '+(t.layout==='vertical'?'Row Settings':'Column Settings');
+  updateLayoutToggle();
 }
 
 function updSum(){
@@ -1044,6 +1053,10 @@ var ctxId=null,ctxEl=document.getElementById('ctxm');
 document.addEventListener('click',function(){ctxEl.style.display='none';});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')ctxEl.style.display='none';});
 function showCtx(e,id){
+  // Update context menu label based on layout
+  var t=tabs.find(function(x){return x.id===id;});
+  var ctxItem=document.getElementById('ctxColsItem');
+  if(ctxItem&&t)ctxItem.innerHTML='⚙️&nbsp; '+(t.layout==='vertical'?'Row Settings':'Column Settings');
   e.preventDefault();e.stopPropagation();ctxId=id;
   ctxEl.style.left=Math.min(e.clientX,window.innerWidth-180)+'px';
   ctxEl.style.top=Math.min(e.clientY,window.innerHeight-110)+'px';
@@ -1177,7 +1190,14 @@ function openColEditor(){
   var t=aTab();if(!t)return;
   var d=defn(t.type)||{name:t.name||t.type,cols:[]};
   eCols=JSON.parse(JSON.stringify(allCols(t)));
-  document.getElementById('ceSub').textContent=(d?d.name:'')+' — drag to reorder · toggle · rename · add custom columns';
+  var isVert=t.layout==='vertical';
+  var titleEl=document.getElementById('ceTitle');
+  var subEl=document.getElementById('ceSub');
+  if(titleEl)titleEl.textContent=isVert?'Row Settings':'Column Settings';
+  if(subEl)subEl.textContent=(t.name||d.name||'')+(isVert?' — drag to reorder rows · toggle · rename':' — drag to reorder · toggle · rename · add custom');
+  // For vertical layout the "add column" section label changes
+  var newColName=document.getElementById('newColName');
+  if(newColName)newColName.placeholder=isVert?'New row name…':'New column name…';
   rCeList();document.getElementById('ceModal').classList.add('open');
 }
 function rCeList(){
@@ -1393,34 +1413,52 @@ function buildAndDownloadTemplate(t,cols){
   var wb=XLSX.utils.book_new();
   var tabName=(t.name||t.type||'Schedule').substring(0,31);
   var hasSections=cols.some(function(c){return c.sectionName;});
+
+  // Build dropdown options map from template sections: {colKey: [options]}
+  var dropdownMap={};
+  (t.sections||[]).forEach(function(sec){
+    (sec.fields||[]).forEach(function(f){
+      if(f.type==='dropdown'&&f.options&&f.options.length){
+        var fKey=f.key==='equipment_id'?'tag':f.key;
+        dropdownMap[fKey]=f.options.slice();
+      }
+    });
+  });
+  // Also check t.cc for custom dropdown cols
+  (t.cc||[]).forEach(function(c){
+    if(c.sel&&c.options&&c.options.length)dropdownMap[c.k]=c.options.slice();
+  });
+  // STATUSES for status/sel columns
+  cols.forEach(function(c){if(c.sel&&!dropdownMap[c.k])dropdownMap[c.k]=STATUSES.slice();});
+
   var rows=[];
-  // Row 1: section group headers (if any)
   if(hasSections){
-    var groupRow=cols.map(function(c){return c.sectionName||'';});
-    rows.push(groupRow);
+    rows.push(cols.map(function(c){return c.sectionName||'';}));
   }
-  // Row 2: column headers
   rows.push(cols.map(function(c){return c.l;}));
-  // Row 3: example data
+
+  // Example row
+  var exMap={};
+  (t.sections||[]).forEach(function(sec){(sec.fields||[]).forEach(function(f){if(f.exampleVal)exMap[f.key]=f.exampleVal;});});
   var example=cols.map(function(col){
-    if(col.key)return (t.name||'EQ').toUpperCase().replace(/\s/g,'-')+'-001';
-    if(col.sel)return 'Not Started';
-    if(col.num)return '';
+    if(col.key)return (t.name||'EQ').toUpperCase().replace(/[^A-Z0-9]/g,'-')+'-001';
+    if(exMap[col.k])return exMap[col.k];
+    if(dropdownMap[col.k])return dropdownMap[col.k][0]||'';
     if(col.k==='location')return 'Level 1';
     if(col.k==='sublocation')return 'Zone A';
-    if(col.k==='desc'||col.k==='service')return t.name||'';
-    if(col.k==='manufacturer'||col.k==='make')return '';
-    if(col.k==='model')return '';
     return '';
   });
   rows.push(example);
-  // Add existing data rows if any
+
+  // Existing data rows
   t.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
     rows.push(cols.map(function(c){return row[c.k]||'';}));
   });
+
   var ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,14)};});
-  // Style header row
+  ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,16)};});
+
+  // Style headers
   var hdrRow=hasSections?1:0;
   for(var ci=0;ci<cols.length;ci++){
     if(hasSections){
@@ -1432,8 +1470,116 @@ function buildAndDownloadTemplate(t,cols){
     var eRef=XLSX.utils.encode_cell({r:hdrRow+1,c:ci});
     if(ws[eRef])ws[eRef].s={font:{name:'Arial',sz:10,color:{rgb:'4472C4'},italic:true}};
   }
+
   XLSX.utils.book_append_sheet(wb,ws,tabName);
+
+  // ── Inject data validation XML for dropdown columns ──
+  // xlsx is a zip — we intercept writeFile and inject the dataValidations node
+  var hasDV=Object.keys(dropdownMap).length>0;
+  if(hasDV){
+    // Data rows start at hdrRow+2 (1-indexed), apply down 500 rows
+    var dataStartRow=hdrRow+3; // 1-indexed
+    var dvEntries=[];
+    cols.forEach(function(col,ci){
+      var opts=dropdownMap[col.k];
+      if(!opts||!opts.length)return;
+      // Excel column letter
+      var colLetter=ci<26?String.fromCharCode(65+ci):(String.fromCharCode(64+Math.floor(ci/26))+String.fromCharCode(65+(ci%26)));
+      var sqref=colLetter+dataStartRow+':'+colLetter+'1000';
+      // Options as quoted comma-separated list, max 255 chars for formula1
+      var formula1='"'+opts.slice(0,20).map(function(o){return o.replace(/"/g,'');}).join(',').substring(0,250)+'"';
+      dvEntries.push(
+        '<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'">'+
+        '<formula1>'+formula1+'</formula1>'+
+        '</dataValidation>'
+      );
+    });
+
+    if(dvEntries.length){
+      // Hook into SheetJS write process via sheet XML manipulation
+      if(!ws['!dataValidations'])ws['!dataValidations']=[];
+      // SheetJS free doesn't natively support dataValidations,
+      // so we patch the worksheet XML after generation
+      var origWrite=XLSX.write;
+      XLSX.write=function(wb2,opts2){
+        var result=origWrite.call(XLSX,wb2,opts2);
+        XLSX.write=origWrite; // restore
+        return result;
+      };
+
+      // Use writeFile with bookType xlsx then patch via JSZip if available
+      // Fallback: write normally but add note in header cells
+      cols.forEach(function(col,ci){
+        var opts=dropdownMap[col.k];
+        if(!opts||!opts.length)return;
+        var hRef=XLSX.utils.encode_cell({r:hdrRow,c:ci});
+        if(ws[hRef]){
+          // Append options hint to header cell comment-style via cell note
+          ws[hRef].c=[{a:'HVACNex',t:'Options: '+opts.join(', ')}];
+        }
+      });
+
+      // Try JSZip approach for real dropdown injection
+      try{
+        var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+        injectDataValidation(wbout,dvEntries,tabName,t.name);
+        return; // injectDataValidation handles the download
+      }catch(err){
+        console.warn('DV injection failed, falling back:',err);
+      }
+    }
+  }
+
   XLSX.writeFile(wb,'HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx');
+}
+
+function injectDataValidation(wbout,dvEntries,tabName,sheetName){
+  // Load JSZip dynamically if needed
+  function doInject(JSZip){
+    var zip=new JSZip(wbout);
+    // Find the sheet XML file (xl/worksheets/sheet1.xml)
+    var sheetKey=null;
+    zip.forEach(function(path){
+      if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;
+    });
+    if(!sheetKey){XLSX.writeFile(XLSX.read(new Uint8Array(wbout),{type:'array'}),'HVAC_NEXUS_'+tabName+'_Template.xlsx');return;}
+
+    var sheetXml=zip.file(sheetKey).asText();
+    var dvXml='<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>';
+
+    // Insert before </worksheet>
+    if(sheetXml.indexOf('<dataValidations')>=0){
+      // Replace existing
+      sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,dvXml);
+    } else {
+      sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
+    }
+
+    zip.file(sheetKey,sheetXml);
+    var out=zip.generate({type:'arraybuffer'});
+    var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  if(typeof JSZip!=='undefined'){
+    doInject(JSZip);
+  } else {
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload=function(){doInject(JSZip);};
+    s.onerror=function(){
+      // JSZip failed — fall back to plain xlsx without dropdowns
+      var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';
+      a.click();URL.revokeObjectURL(a.href);
+    };
+    document.head.appendChild(s);
+  }
 }
 
 
@@ -1694,6 +1840,31 @@ function startDraft(){
   showToast('Draft started \u2014 table is now editable');
 }
 function takeLock(tabId){var me=getCurrentUser();setLock(tabId,me);renderRevBar();renderTable();showToast('Edit lock acquired');}
+function setTabLayout(layout){
+  var t=aTab();if(!t)return;
+  t.layout=layout;
+  saveEquip();
+  updateLayoutToggle();
+  renderTable();
+  // Update column settings button label
+  var cbtn=document.getElementById('colSettingsBtn');
+  if(cbtn)cbtn.textContent='⚙ '+(layout==='vertical'?'Row Settings':'Column Settings');
+}
+
+function updateLayoutToggle(){
+  var t=aTab();
+  var isVert=t&&t.layout==='vertical';
+  var bh=document.getElementById('btnHoriz');
+  var bv=document.getElementById('btnVert');
+  if(!bh||!bv)return;
+  bh.style.background=isVert?'transparent':'var(--accent)';
+  bh.style.color=isVert?'var(--muted)':'#080c12';
+  bh.style.fontWeight=isVert?'400':'700';
+  bv.style.background=isVert?'var(--accent)':'transparent';
+  bv.style.color=isVert?'#080c12':'var(--muted)';
+  bv.style.fontWeight=isVert?'700':'400';
+}
+
 function startDraftAndEdit(tabId){
   var me=getCurrentUser();
   var tr=getTabRev(tabId);
