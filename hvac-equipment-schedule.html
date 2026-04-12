@@ -796,10 +796,11 @@ function renderTable(){
     }).join('');
     var canDel=(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
     var importCls=row._importNew?' import-new':row._importDeleted?' import-deleted':row._importChanged?' import-changed':'';
-    return'<tr data-tid="'+t.id+'" data-rid="'+row.id+'" class="'+importCls+'">'+cells+'<td>'+(canDel?'<button class="delr" onclick="delR(\''+t.id+'\',\''+row.id+'\')">✕</button>':'')+'</td></tr>';
+    var deletedCls=row._deleted?' tr-deleted':'';
+    return'<tr data-tid="'+t.id+'" data-rid="'+row.id+'" class="'+importCls+deletedCls+'">'+cells+'<td>'+(canDel?(row._deleted?'<button class="delr" style="opacity:1;color:var(--warn)" title="Restore" onclick="restoreR(\''+t.id+'\',\''+row.id+'\')" >↩</button>':'<button class="delr" onclick="delR(\''+t.id+'\',\''+row.id+'\')">✕</button>'):'')+'</td></tr>';
   }).join('')+'</tbody>';
   document.getElementById('main').innerHTML='<div class="twrap" id="body-scroll"><table class="etbl" id="etbl">'+th+tb+'</table>'
-    +'<div onclick="openNewRow()" style="display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;color:var(--muted);font-size:13px;font-family:DM Sans,sans-serif;border-top:1px solid var(--border);transition:all .15s;margin:0 14px" onmouseover="this.style.color=\'var(--accent)\';this.style.background=\'var(--accent-dim)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.background=\'transparent\'"><span style="font-size:16px;font-weight:300">＋</span><span>Add Row</span><span style="font-size:11px;opacity:.5;margin-left:4px">· Tab across · Enter to save</span></div>'
+    +(isEditingDraft(t.id)?'<div onclick="openNewRow()" style="display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;color:var(--muted);font-size:13px;font-family:DM Sans,sans-serif;border-top:1px solid var(--border);transition:all .15s;margin:0 14px" onmouseover="this.style.color=\'var(--accent)\';this.style.background=\'var(--accent-dim)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.background=\'transparent\'"><span style="font-size:16px;font-weight:300">＋</span><span>Add Row</span><span style="font-size:11px;opacity:.5;margin-left:4px">· Tab across · Enter to save</span></div>':'')
     +'</div>';
   if(nrVis)appNR();
   if(typeof applyDiffHighlights==='function'){setTimeout(function(){applyDiffHighlights();updateEditability();renderRevBar();},0);}
@@ -1020,6 +1021,12 @@ function delR(tid,rid){
   renderTable();updSum();saveEquip();
 }
 
+function restoreR(tid,rid){
+  var t=tabs.find(function(x){return x.id===tid;});if(!t)return;
+  var row=t.rows.find(function(x){return x.id===rid;});if(!row)return;
+  delete row._deleted;
+  renderTable();updSum();saveEquip();
+}
 function openNewRow(){
   var t=aTab();if(!t)return;
   if(_editingTabId!==t.id){startDraftAndEdit(t.id);}
