@@ -817,19 +817,22 @@ function renderTable(){
       +'</div></th>';
   }).join('')+'<th style="width:28px"></th></tr></thead>';
   var tb='<tbody id="etbd">'+rows.map(function(row){
+    var ro2=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
+    var changedCols=row._importChangedCols||[];
     var cells=cols.map(function(c){
-      var ro2=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
+      var cellChanged=row._importChanged&&changedCols.indexOf(c.k)>=0;
+      var cellStyle=cellChanged?'style="background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)"':'';
       if(c.sel){
-        if(ro2)return'<td><span style="font-size:12px">'+X(row[c.k]||'—')+'</span></td>';
-        return'<td><select class="csel" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+        if(ro2)return'<td '+cellStyle+'><span style="font-size:12px">'+X(row[c.k]||'—')+'</span></td>';
+        return'<td '+cellStyle+'><select class="csel" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
       }
-      var ro=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
-      if(c.num)return'<td><input class="ci num" type="number" value="'+X(row[c.k]||'')+'" placeholder="" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
-      return'<td><input class="ci'+(c.key?' tag':'')+'" value="'+X(row[c.k]||'')+'" placeholder="'+X(c.l)+'…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
+      var ro=ro2;
+      if(c.num)return'<td '+cellStyle+'><input class="ci num" type="number" value="'+X(row[c.k]||'')+'" placeholder="" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
+      return'<td '+cellStyle+'><input class="ci'+(c.key?' tag':'')+'" value="'+X(row[c.k]||'')+'" placeholder="'+X(c.l)+'…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
     }).join('');
     var canDel=(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
-    var importCls=row._importNew?' import-new':row._importDeleted?' import-deleted':row._importChanged?' import-changed':'';
-    // import-changed gets yellow; individual changed cols handled separately
+    var importCls=row._importNew?' import-new':row._importDeleted?' import-deleted':'';
+    // changed rows: no row-level class - highlighted at cell level via cellChanged above
     var deletedCls=row._deleted?' tr-deleted':'';
     return'<tr data-tid="'+t.id+'" data-rid="'+row.id+'" class="'+importCls+deletedCls+'">'+cells+'<td>'+(canDel?(row._deleted?'<button class="delr" style="opacity:1;color:var(--warn)" title="Restore" onclick="restoreR(\''+t.id+'\',\''+row.id+'\')" >↩</button>':'<button class="delr" onclick="delR(\''+t.id+'\',\''+row.id+'\')">✕</button>'):'')+'</td></tr>';
   }).join('')+'</tbody>';
@@ -1536,7 +1539,13 @@ function doXlsxImport(file,t){
           var k=r.tag||r.equipment_id||'';
           if(k)existingMap[k]=r;
         });
-        // Also keep current row IDs so we can preserve them
+        // Also include any unpublished rows (e.g. from previous import) in baseline
+        // so they can be detected as deleted if removed from the new import
+        t.rows.forEach(function(r){
+          var k=r.tag||r.equipment_id||'';
+          if(k&&!existingMap[k]&&!r._importDeleted)existingMap[k]=r;
+        });
+        // Keep current row IDs so we can preserve them
         var currentIdMap={};
         t.rows.forEach(function(r){var k=r.tag||r.equipment_id||'';if(k)currentIdMap[k]=r.id;});
 
