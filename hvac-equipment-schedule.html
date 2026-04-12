@@ -76,6 +76,16 @@ tr:hover .delr{opacity:1}.delr:hover{color:var(--danger)}
 .canr{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 4px}
 .canr:hover{color:var(--danger)}
 .addbar{background:var(--surface);border-top:1px solid var(--border);padding:8px 14px;}
+#colFilterPopover{position:fixed;z-index:9999;background:var(--surface2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:200px;max-width:280px;display:none;flex-direction:column;max-height:340px}
+#colFilterPopover .cfp-hdr{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#colFilterPopover .cfp-hdr span{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+#colFilterPopover .cfp-list{overflow-y:auto;flex:1;padding:4px 0}
+#colFilterPopover .cfp-item{display:flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;transition:background .1s}
+#colFilterPopover .cfp-item:hover{background:var(--surface3)}
+#colFilterPopover .cfp-item input{cursor:pointer;accent-color:var(--accent);width:14px;height:14px;flex-shrink:0}
+#colFilterPopover .cfp-item label{font-size:12px;color:var(--text);cursor:pointer;flex:1}
+#colFilterPopover .cfp-foot{padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:6px;flex-shrink:0}
+#colFilterPopover .cfp-foot button{flex:1;padding:5px;border-radius:5px;border:1px solid var(--border);font-size:11px;cursor:pointer;font-family:'DM Mono',monospace}
 .addbar-btn{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:13px;cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif;transition:color .13s;padding:3px 0;width:100%}
 .addbar-btn:hover{color:var(--accent)}
 .emptyp{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:90px 20px;text-align:center}
@@ -751,10 +761,10 @@ function renderTable(){
     var qOk=!q||(r.tag||'').toLowerCase().includes(q.toLowerCase())||(r.desc||'').toLowerCase().includes(q.toLowerCase())||(r.location||'').toLowerCase().includes(q.toLowerCase())||(r.equip||'').toLowerCase().includes(q.toLowerCase());
     var sfOk=!sf||r.status===sf;
     var lfOk=!lf||r.location===lf;
-    // Per-column filters
+    // Per-column filters (Set-based like Excel)
     var cfOk=Object.keys(colFilters).every(function(k){
-      var fv=colFilters[k];if(!fv)return true;
-      return String(r[k]||'').toLowerCase().includes(fv.toLowerCase());
+      var fset=colFilters[k];if(!fset||fset.size===0)return true;
+      return fset.has(String(r[k]||'').trim());
     });
     return qOk&&sfOk&&lfOk&&cfOk;
   });
@@ -790,21 +800,15 @@ function renderTable(){
     });
     th+='<th style="background:var(--surface2);width:28px"></th></tr>';
   }
-  th+='<tr>'+cols.map(function(c){
-    var style=c.key?'style="min-width:180px;cursor:pointer"':c.k==='desc'||c.k==='service'?'style="min-width:200px;cursor:pointer"':'style="min-width:140px;cursor:pointer"';
-    var sortInd=sortK===c.k?(sortD>0?' ▲':' ▼'):' ⇅';
-    var sortCol=sortK===c.k?'var(--accent)':'rgba(255,255,255,.2)';
-    return'<th '+style+' onclick="srtBy(\''+c.k+'\')" title="Sort by '+X(c.l)+'"><div style="display:flex;align-items:center;justify-content:space-between;gap:4px;user-select:none"><span>'+X(c.l)+'</span><span style="font-size:9px;color:'+sortCol+'">'+sortInd+'</span></div></th>';
-  }).join('')+'<th style="width:28px"></th></tr>';
-  // Filter row under headers
-  th+='<tr style="background:var(--surface3)">'+cols.map(function(c){
-    var opts=c.sel?colOptions(c,t):null;
-    var fv=colFilters[c.k]||'';
-    var active=fv!=='';
-    var borderCol=active?'var(--accent)':'var(--border)';
-    if(opts)return'<th style="padding:2px 4px"><select style="width:100%;background:var(--surface2);border:1px solid '+borderCol+';border-radius:4px;color:var(--text);font-size:10px;padding:2px 3px;outline:none" onchange="setColFilter(\''+c.k+'\',this.value)"><option value="">All</option>'+opts.map(function(o){return'<option value="'+X(o)+'"'+(fv===o?' selected':'')+'>'+X(o)+'</option>';}).join('')+'</select></th>';
-    return'<th style="padding:2px 4px"><input type="text" value="'+X(fv)+'" placeholder="🔍" style="width:100%;background:var(--surface2);border:1px solid '+borderCol+';border-radius:4px;color:var(--text);font-size:10px;padding:2px 5px;outline:none;box-sizing:border-box" oninput="setColFilter(\''+c.k+'\',this.value)"/></th>';
-  }).join('')+'<th style="padding:2px 4px;text-align:center">'+(Object.keys(colFilters).some(function(k){return colFilters[k]!='';})? '<button onclick="clearColFilters()" style="background:none;border:none;color:var(--warn);cursor:pointer;font-size:11px" title="Clear filters">✕</button>':'')+'</th></tr></thead>';
+  th+='<tr>'+cols.map(function(c,ci){
+    var style=c.key?'min-width:180px':c.k==='desc'||c.k==='service'?'min-width:200px':'min-width:140px';
+    var sortInd=sortK===c.k?(sortD>0?' ▲':' ▼'):'';
+    var hasFilter=colFilters[c.k]&&colFilters[c.k].size>0;
+    return'<th style="'+style+';cursor:pointer;padding:0" ><div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px 7px 12px">'
+      +'<span onclick="srtBy(\''+c.k+'\')" style="flex:1;user-select:none">'+X(c.l)+(sortInd?'<span style="font-size:9px;color:var(--accent);margin-left:4px">'+sortInd+'</span>':'')+'</span>'
+      +'<span onclick="openColFilter(event,\''+c.k+'\')" style="font-size:11px;color:'+(hasFilter?'var(--accent)':'rgba(255,255,255,.3)')+';cursor:pointer;padding:2px 4px;border-radius:3px;transition:color .12s" title="Filter">▼</span>'
+      +'</div></th>';
+  }).join('')+'<th style="width:28px"></th></tr></thead>';
   var tb='<tbody id="etbd">'+rows.map(function(row){
     var cells=cols.map(function(c){
       var ro2=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
@@ -1030,6 +1034,68 @@ function renderBoardGroups(t, rows){
 function srtBy(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=1;}var t=aTab();if(!t)return;t.rows.sort(function(a,b){return String(a[k]||'').localeCompare(String(b[k]||''),undefined,{numeric:true})*sortD;});renderTable();}
 function setColFilter(k,v){colFilters[k]=v;renderTable();}
 function clearColFilters(){colFilters={};renderTable();}
+
+// colFilters: {colKey: Set of selected values} — empty Set or missing = show all
+var _cfpKey=null,_cfpPending=null;
+function openColFilter(e,k){
+  e.stopPropagation();
+  var t=aTab();if(!t)return;
+  _cfpKey=k;
+  var col=getCols(t).find(function(c){return c.k===k;});
+  // Gather unique values from current rows
+  var vals=[];
+  t.rows.filter(function(r){return!r._deleted;}).forEach(function(r){
+    var v=String(r[k]||'').trim();
+    if(v&&vals.indexOf(v)<0)vals.push(v);
+  });
+  // For dropdown cols also add option values not yet in data
+  if(col&&col.sel){colOptions(col,t).forEach(function(o){if(vals.indexOf(o)<0)vals.push(o);});}
+  vals.sort(function(a,b){return a.localeCompare(b,undefined,{numeric:true});});
+
+  var current=colFilters[k]||null; // null = all selected
+  _cfpPending=current?new Set(current):null;
+
+  document.getElementById('cfpTitle').textContent=col?col.l:k;
+  var list=document.getElementById('cfpList');
+  list.innerHTML=vals.map(function(v){
+    var checked=!_cfpPending||_cfpPending.has(v);
+    return'<div class="cfp-item"><input type="checkbox" id="cfp_'+escH(v)+'" '+(checked?'checked':'')+' onchange="cfpToggle(\''+escH(v)+'\',this.checked)"/><label for="cfp_'+escH(v)+'">'+escH(v||'(blank)')+'</label></div>';
+  }).join('');
+
+  var pop=document.getElementById('colFilterPopover');
+  pop.style.display='flex';
+  // Position near the clicked element
+  var rect=e.target.getBoundingClientRect();
+  var pw=220,ph=340;
+  var left=Math.min(rect.left,window.innerWidth-pw-8);
+  var top=rect.bottom+4;
+  if(top+ph>window.innerHeight)top=rect.top-ph-4;
+  pop.style.left=left+'px';pop.style.top=top+'px';
+}
+function cfpToggle(v,checked){
+  if(!_cfpPending)_cfpPending=new Set();
+  var t=aTab();if(!t)return;
+  var col=getCols(t).find(function(c){return c.k===_cfpKey;});
+  // Build full value set if starting from "all"
+  if(_cfpPending.size===0&&checked===false){
+    // Starting selection — add all then remove this one
+    t.rows.filter(function(r){return!r._deleted;}).forEach(function(r){var v2=String(r[_cfpKey]||'').trim();if(v2)_cfpPending.add(v2);});
+    if(col&&col.sel)colOptions(col,t).forEach(function(o){_cfpPending.add(o);});
+  }
+  if(checked)_cfpPending.add(v);else _cfpPending.delete(v);
+}
+function cfpSelectAll(){_cfpPending=null;var list=document.getElementById('cfpList');list.querySelectorAll('input[type=checkbox]').forEach(function(cb){cb.checked=true;});}
+function cfpClear(){_cfpPending=new Set();var list=document.getElementById('cfpList');list.querySelectorAll('input[type=checkbox]').forEach(function(cb){cb.checked=false;});}
+function cfpApply(){
+  if(!_cfpKey)return;
+  colFilters[_cfpKey]=_cfpPending&&_cfpPending.size>0?_cfpPending:null;
+  closeCFP();renderTable();
+}
+function closeCFP(){document.getElementById('colFilterPopover').style.display='none';_cfpKey=null;}
+document.addEventListener('click',function(e){
+  var pop=document.getElementById('colFilterPopover');
+  if(pop&&pop.style.display!=='none'&&!pop.contains(e.target))closeCFP();
+});
 function updR(tid,rid,f,v){var t=tabs.find(function(x){return x.id===tid;});if(!t)return;if(_editingTabId!==tid){startDraftAndEdit(tid);}var r=t.rows.find(function(x){return x.id===rid;});if(r)r[f]=v;updSum();saveEquip();if(typeof applyDiffHighlights==='function')setTimeout(applyDiffHighlights,0);}
 function delR(tid,rid){
   var t=tabs.find(function(x){return x.id===tid;});if(!t)return;
@@ -2698,5 +2764,14 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   </div>
 </div>
 
+<div id="colFilterPopover">
+  <div class="cfp-hdr"><span id="cfpTitle">Filter</span><button onclick="closeCFP()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1">×</button></div>
+  <div class="cfp-list" id="cfpList"></div>
+  <div class="cfp-foot">
+    <button onclick="cfpSelectAll()" style="background:var(--surface3);color:var(--text)">Select All</button>
+    <button onclick="cfpClear()" style="background:var(--surface3);color:var(--muted)">Clear</button>
+    <button onclick="cfpApply()" style="background:var(--accent);color:#000;border-color:var(--accent);font-weight:700">Apply</button>
+  </div>
+</div>
 </body>
 </html>
