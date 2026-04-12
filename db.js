@@ -8,12 +8,139 @@
 const SUPABASE_URL = 'https://qbsjrccrgkbevncvxbio.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
 
+// ── Auth state ──
+let _authSession = null;
+let _authCompanyId = null;
+let _authUser = null;
+
+// ── Auth functions ──
+async function authSignUp(email, password, companyName) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || 'Signup failed');
+  _authSession = data.session;
+  _authUser = data.user;
+  // Create company + link user as admin
+  if (_authSession && companyName) {
+    await authCreateCompany(companyName);
+  }
+  return data;
+}
+
+async function authSignIn(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || 'Login failed');
+  _authSession = data;
+  _authUser = data.user;
+  localStorage.setItem('hvacnexus_session', JSON.stringify(data));
+  await authLoadCompany();
+  return data;
+}
+
+async function authSignOut() {
+  if (_authSession) {
+    await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${_authSession.access_token}` }
+    });
+  }
+  _authSession = null;
+  _authUser = null;
+  _authCompanyId = null;
+  localStorage.removeItem('hvacnexus_session');
+  window.location.href = 'hvac-login.html';
+}
+
+async function authRefreshSession() {
+  const stored = localStorage.getItem('hvacnexus_session');
+  if (!stored) return false;
+  try {
+    const sess = JSON.parse(stored);
+    // Check if token is still valid (expires_at is in seconds)
+    const expiresAt = sess.expires_at || 0;
+    if (Date.now() / 1000 < expiresAt - 60) {
+      _authSession = sess;
+      _authUser = sess.user;
+      await authLoadCompany();
+      return true;
+    }
+    // Try to refresh
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: sess.refresh_token })
+    });
+    if (!res.ok) { localStorage.removeItem('hvacnexus_session'); return false; }
+    const data = await res.json();
+    _authSession = data;
+    _authUser = data.user;
+    localStorage.setItem('hvacnexus_session', JSON.stringify(data));
+    await authLoadCompany();
+    return true;
+  } catch(e) { return false; }
+}
+
+async function authCreateCompany(name) {
+  // Insert company
+  const comp = await sbFetch('companies', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+    prefer: 'return=representation'
+  });
+  const companyId = comp[0].id;
+  _authCompanyId = companyId;
+  // Link user as admin
+  await sbFetch('company_members', {
+    method: 'POST',
+    body: JSON.stringify({ company_id: companyId, user_id: _authUser.id, role: 'admin' }),
+    prefer: 'return=representation'
+  });
+  localStorage.setItem('hvacnexus_company_id', companyId);
+  return companyId;
+}
+
+async function authLoadCompany() {
+  if (!_authUser) return;
+  try {
+    const members = await sbFetch(`company_members?user_id=eq.${_authUser.id}&select=company_id,role&limit=1`);
+    if (members && members.length) {
+      _authCompanyId = members[0].company_id;
+      localStorage.setItem('hvacnexus_company_id', _authCompanyId);
+    }
+  } catch(e) { console.warn('authLoadCompany failed:', e); }
+}
+
+function authGetCompanyId() { return _authCompanyId || localStorage.getItem('hvacnexus_company_id'); }
+function authGetUser() { return _authUser; }
+function authIsLoggedIn() { return !!_authSession; }
+
+// Auth guard — call on every protected page
+async function authGuard() {
+  const ok = await authRefreshSession();
+  if (!ok) {
+    window.location.href = 'hvac-login.html';
+    return false;
+  }
+  return true;
+}
+
 // ── Core fetch wrapper ──
 async function sbFetch(path, options = {}) {
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  // Use session JWT if logged in, otherwise fall back to anon key
+  const token = _authSession ? _authSession.access_token : SUPABASE_ANON_KEY;
   const headers = {
     'apikey': SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
     'Prefer': options.prefer || 'return=representation',
     ...options.headers

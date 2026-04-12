@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HVAC Nexus — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c12;
+  --surface:#0e1520;
+  --surface2:#111c2d;
+  --border:#1e3050;
+  --accent:#00c8ff;
+  --accent-dim:rgba(0,200,255,.1);
+  --text:#e8f0fe;
+  --text2:#8899bb;
+  --muted:#445566;
+  --danger:#ff4d6d;
+  --green:#00e5a0;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
+
+/* Background grid */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:48px 48px;
+  opacity:.35;pointer-events:none;z-index:0;
+}
+
+.page{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  position:relative;z-index:1;padding:24px;
+}
+
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  width:100%;max-width:440px;padding:40px;
+  box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 0 1px rgba(0,200,255,.06);
+  animation:fadeUp .4s ease;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+.logo{
+  display:flex;align-items:center;gap:10px;margin-bottom:32px;
+}
+.logo-icon{
+  width:36px;height:36px;background:var(--accent);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:#080c12;
+}
+.logo-text{
+  font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:var(--text);
+  letter-spacing:-.3px;
+}
+.logo-text span{color:var(--accent)}
+
+.tab-row{
+  display:flex;gap:0;margin-bottom:28px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;
+}
+.tab{
+  flex:1;padding:9px;text-align:center;font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .15s;color:var(--text2);border:none;background:transparent;
+  font-family:'DM Sans',sans-serif;
+}
+.tab.active{background:var(--accent);color:#080c12;font-weight:600;}
+
+.form-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;margin-bottom:6px}
+.form-sub{font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.5}
+
+.field{margin-bottom:16px}
+.field label{display:block;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;color:var(--text2);margin-bottom:6px}
+.field input{
+  width:100%;padding:11px 14px;
+  background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;
+  transition:border-color .15s;
+}
+.field input:focus{border-color:var(--accent)}
+.field input::placeholder{color:var(--muted)}
+
+.btn-primary{
+  width:100%;padding:12px;border-radius:8px;border:none;
+  background:var(--accent);color:#080c12;
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  cursor:pointer;transition:all .15s;margin-top:8px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn-primary:hover{background:#00dfff;transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,200,255,.3)}
+.btn-primary:active{transform:translateY(0)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.error{
+  background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3);
+  border-radius:8px;padding:10px 14px;font-size:13px;color:var(--danger);
+  margin-bottom:16px;display:none;
+}
+.error.show{display:block}
+
+.success{
+  background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);
+  border-radius:8px;padding:10px 14px;font-size:13px;color:var(--green);
+  margin-bottom:16px;display:none;
+}
+.success.show{display:block}
+
+.divider{
+  display:flex;align-items:center;gap:12px;margin:20px 0;
+  color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;
+}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.forgot{
+  text-align:center;margin-top:16px;font-size:13px;color:var(--text2);
+}
+.forgot a{color:var(--accent);text-decoration:none;cursor:pointer}
+.forgot a:hover{text-decoration:underline}
+
+.spinner{
+  width:16px;height:16px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;
+  border-radius:50%;animation:spin .6s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Reset password view */
+#resetView{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">HN</div>
+      <div class="logo-text">HVAC <span>Nexus</span></div>
+    </div>
+
+    <!-- Login / Signup tabs -->
+    <div id="authView">
+      <div class="tab-row">
+        <button class="tab active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+        <button class="tab" id="tabSignup" onclick="switchTab('signup')">Create Account</button>
+      </div>
+
+      <div id="errorMsg" class="error"></div>
+      <div id="successMsg" class="success"></div>
+
+      <!-- Login form -->
+      <div id="loginForm">
+        <div class="form-title">Welcome back</div>
+        <div class="form-sub">Sign in to your HVAC Nexus workspace</div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="loginEmail" placeholder="you@company.com.au" autocomplete="email">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn-primary" id="loginBtn" onclick="doLogin()">
+          <span>Sign In</span>
+        </button>
+        <div class="forgot"><a onclick="switchView('reset')">Forgot password?</a></div>
+      </div>
+
+      <!-- Signup form -->
+      <div id="signupForm" style="display:none">
+        <div class="form-title">Get started</div>
+        <div class="form-sub">Create your company workspace — free during beta</div>
+        <div class="field">
+          <label>Company Name</label>
+          <input type="text" id="signupCompany" placeholder="Acme HVAC Pty Ltd">
+        </div>
+        <div class="field">
+          <label>Your Name</label>
+          <input type="text" id="signupName" placeholder="Sandeep Kumar">
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="signupEmail" placeholder="you@company.com.au" autocomplete="email">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="signupPassword" placeholder="Min 8 characters" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignup()">
+        </div>
+        <button class="btn-primary" id="signupBtn" onclick="doSignup()">
+          <span>Create Account</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Reset password view -->
+    <div id="resetView">
+      <div class="form-title">Reset password</div>
+      <div class="form-sub">Enter your email and we'll send a reset link</div>
+      <div id="resetError" class="error"></div>
+      <div id="resetSuccess" class="success"></div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="resetEmail" placeholder="you@company.com.au">
+      </div>
+      <button class="btn-primary" onclick="doReset()"><span>Send Reset Link</span></button>
+      <div class="forgot"><a onclick="switchView('auth')">← Back to sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://qbsjrccrgkbevncvxbio.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+
+// If already logged in, redirect to app
+(async function(){
+  const stored=localStorage.getItem('hvacnexus_session');
+  if(stored){
+    try{
+      const sess=JSON.parse(stored);
+      const expiresAt=sess.expires_at||0;
+      if(Date.now()/1000 < expiresAt-60){
+        window.location.href='index.html';return;
+      }
+      // Try refresh
+      const res=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{
+        method:'POST',
+        headers:{'apikey':SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({refresh_token:sess.refresh_token})
+      });
+      if(res.ok){
+        const data=await res.json();
+        localStorage.setItem('hvacnexus_session',JSON.stringify(data));
+        window.location.href='index.html';return;
+      }
+    }catch(e){}
+    localStorage.removeItem('hvacnexus_session');
+  }
+})();
+
+function switchTab(tab){
+  document.getElementById('tabLogin').classList.toggle('active',tab==='login');
+  document.getElementById('tabSignup').classList.toggle('active',tab==='signup');
+  document.getElementById('loginForm').style.display=tab==='login'?'':'none';
+  document.getElementById('signupForm').style.display=tab==='signup'?'':'none';
+  clearMessages();
+}
+
+function switchView(view){
+  document.getElementById('authView').style.display=view==='auth'?'':'none';
+  document.getElementById('resetView').style.display=view==='reset'?'':'none';
+}
+
+function showError(msg){
+  const el=document.getElementById('errorMsg');
+  el.textContent=msg;el.classList.add('show');
+}
+function showSuccess(msg){
+  const el=document.getElementById('successMsg');
+  el.textContent=msg;el.classList.add('show');
+}
+function clearMessages(){
+  document.getElementById('errorMsg').classList.remove('show');
+  document.getElementById('successMsg').classList.remove('show');
+}
+
+function setLoading(btnId,loading){
+  const btn=document.getElementById(btnId);
+  if(loading){
+    btn.disabled=true;
+    btn.innerHTML='<div class="spinner"></div>';
+  } else {
+    btn.disabled=false;
+    btn.innerHTML='<span>'+(btnId==='loginBtn'?'Sign In':btnId==='signupBtn'?'Create Account':'Send Reset Link')+'</span>';
+  }
+}
+
+async function doLogin(){
+  clearMessages();
+  const email=document.getElementById('loginEmail').value.trim();
+  const password=document.getElementById('loginPassword').value;
+  if(!email||!password){showError('Please enter your email and password.');return;}
+  setLoading('loginBtn',true);
+  try{
+    const res=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email,password})
+    });
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error_description||data.msg||'Login failed');
+    localStorage.setItem('hvacnexus_session',JSON.stringify(data));
+    // Load company
+    const token=data.access_token;
+    const members=await fetch(`${SUPABASE_URL}/rest/v1/company_members?user_id=eq.${data.user.id}&select=company_id,role&limit=1`,{
+      headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${token}`}
+    });
+    const mData=await members.json();
+    if(mData&&mData.length){
+      localStorage.setItem('hvacnexus_company_id',mData[0].company_id);
+      localStorage.setItem('hvacnexus_user_role',mData[0].role);
+    }
+    // Store user info
+    localStorage.setItem('hvacnexus_current_user',JSON.stringify({
+      id:data.user.id,
+      email:data.user.email,
+      name:data.user.user_metadata?.name||data.user.email.split('@')[0]
+    }));
+    window.location.href='index.html';
+  }catch(e){
+    setLoading('loginBtn',false);
+    showError(e.message);
+  }
+}
+
+async function doSignup(){
+  clearMessages();
+  const company=document.getElementById('signupCompany').value.trim();
+  const name=document.getElementById('signupName').value.trim();
+  const email=document.getElementById('signupEmail').value.trim();
+  const password=document.getElementById('signupPassword').value;
+  if(!company||!name||!email||!password){showError('Please fill in all fields.');return;}
+  if(password.length<8){showError('Password must be at least 8 characters.');return;}
+  setLoading('signupBtn',true);
+  try{
+    // Sign up
+    const res=await fetch(`${SUPABASE_URL}/auth/v1/signup`,{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email,password,data:{name}})
+    });
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error_description||data.msg||'Signup failed');
+    // If email confirmation required
+    if(!data.session){
+      setLoading('signupBtn',false);
+      showSuccess('Account created! Check your email to confirm your address, then sign in.');
+      switchTab('login');
+      return;
+    }
+    const token=data.session.access_token;
+    localStorage.setItem('hvacnexus_session',JSON.stringify(data.session));
+    // Create company
+    const compRes=await fetch(`${SUPABASE_URL}/rest/v1/companies`,{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify({name:company})
+    });
+    const compData=await compRes.json();
+    const companyId=compData[0].id;
+    // Link user as admin
+    await fetch(`${SUPABASE_URL}/rest/v1/company_members`,{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+      body:JSON.stringify({company_id:companyId,user_id:data.session.user.id,role:'admin'})
+    });
+    localStorage.setItem('hvacnexus_company_id',companyId);
+    localStorage.setItem('hvacnexus_user_role','admin');
+    localStorage.setItem('hvacnexus_current_user',JSON.stringify({id:data.session.user.id,email,name}));
+    window.location.href='index.html';
+  }catch(e){
+    setLoading('signupBtn',false);
+    showError(e.message);
+  }
+}
+
+async function doReset(){
+  const email=document.getElementById('resetEmail').value.trim();
+  if(!email){document.getElementById('resetError').textContent='Enter your email.';document.getElementById('resetError').classList.add('show');return;}
+  const res=await fetch(`${SUPABASE_URL}/auth/v1/recover`,{
+    method:'POST',
+    headers:{'apikey':SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({email})
+  });
+  if(res.ok){
+    document.getElementById('resetSuccess').textContent='Reset link sent! Check your email.';
+    document.getElementById('resetSuccess').classList.add('show');
+  }
+}
+</script>
+</body>
+</html>
