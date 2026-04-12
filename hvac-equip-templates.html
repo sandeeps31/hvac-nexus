@@ -848,7 +848,13 @@ function doStartDraft(){
 }
 function startDraft(tpl,rerender){
   var pubRev=publishedRev(tpl);
-  var newSections=pubRev?JSON.parse(JSON.stringify(pubRev.sections)):[{name:'__none__',fields:[]}];
+  var existingDraft=tpl.revisions&&tpl.revisions.find(function(r){return r.status==='draft';});
+  // Preserve sections from existing draft or published rev — never wipe to empty
+  var newSections=pubRev
+    ?JSON.parse(JSON.stringify(pubRev.sections))
+    :existingDraft&&existingDraft.sections&&existingDraft.sections.length
+      ?JSON.parse(JSON.stringify(existingDraft.sections))
+      :[{name:'__none__',fields:[]}];
   var ver=nextVersion(tpl);
   tpl.revisions=tpl.revisions||[];
   // Remove any existing draft
