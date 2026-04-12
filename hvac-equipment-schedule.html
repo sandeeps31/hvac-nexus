@@ -829,10 +829,14 @@ function renderTable(){
     }).join('');
     var canDel=(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
     var importCls=row._importNew?' import-new':row._importDeleted?' import-deleted':row._importChanged?' import-changed':'';
+    // import-changed gets yellow; individual changed cols handled separately
     var deletedCls=row._deleted?' tr-deleted':'';
     return'<tr data-tid="'+t.id+'" data-rid="'+row.id+'" class="'+importCls+deletedCls+'">'+cells+'<td>'+(canDel?(row._deleted?'<button class="delr" style="opacity:1;color:var(--warn)" title="Restore" onclick="restoreR(\''+t.id+'\',\''+row.id+'\')" >↩</button>':'<button class="delr" onclick="delR(\''+t.id+'\',\''+row.id+'\')">✕</button>'):'')+'</td></tr>';
   }).join('')+'</tbody>';
-  document.getElementById('main').innerHTML='<div class="twrap" id="body-scroll"><table class="etbl" id="etbl">'+th+tb+'</table>'
+  var addRowTr=isEditingDraft(t.id)
+    ?'<tr onclick="openNewRow()" style="cursor:pointer"><td colspan="'+(cols.length+1)+'" style="padding:10px 16px;color:var(--muted);font-size:13px;border-top:2px dashed rgba(255,255,255,.08);transition:all .15s" onmouseover="this.parentElement.style.background=\'var(--accent-dim)\';this.style.color=\'var(--accent)\'" onmouseout="this.parentElement.style.background=\'\';this.style.color=\'var(--muted)\'"><span style="font-size:16px;font-weight:300;margin-right:8px">＋</span>Add Row<span style="font-size:11px;opacity:.4;margin-left:8px">· Tab across · Enter to save</span></td></tr>'
+    :'';
+  document.getElementById('main').innerHTML='<div class="twrap" id="body-scroll"><table class="etbl" id="etbl">'+th+tb+addRowTr+'</table>'
     +''
     +'</div>';
   if(nrVis)appNR();
@@ -1509,35 +1513,68 @@ function doXlsxImport(file,t){
           });
           if(col)colMap[i]=col.k;
         });
-        // Snapshot existing rows for change detection
+        // Build baseline from last published snapshot (clean, no import flags)
+        var tr=getTabRev(t.id);
+        var publishedSnap=[];
+        if(tr&&tr.revisions&&tr.revisions.length){
+          // Find last revision with a non-empty snapshot
+          for(var ri=tr.revisions.length-1;ri>=0;ri--){
+            if(tr.revisions[ri].snapshot&&tr.revisions[ri].snapshot.length){
+              publishedSnap=tr.revisions[ri].snapshot;
+              break;
+            }
+          }
+        }
+        // Fall back to current rows (clean copies, ignore import flags)
+        var baselineRows=publishedSnap.length?publishedSnap:t.rows.map(function(r){
+          var c=Object.assign({},r);
+          delete c._importNew;delete c._importChanged;delete c._importDeleted;
+          return c;
+        });
         var existingMap={};
-        t.rows.forEach(function(r){if(r.tag||r.equipment_id)existingMap[r.tag||r.equipment_id]=r;});
+        baselineRows.forEach(function(r){
+          var k=r.tag||r.equipment_id||'';
+          if(k)existingMap[k]=r;
+        });
+        // Also keep current row IDs so we can preserve them
+        var currentIdMap={};
+        t.rows.forEach(function(r){var k=r.tag||r.equipment_id||'';if(k)currentIdMap[k]=r.id;});
+
         var newTagsSeen=new Set();
         var newRows=[];
         rawRows.slice(hdrRowIdx+1).forEach(function(vals){
           if(!vals.some(function(v){return String(v||'').trim()!=='';})) return;
-          var row={id:nid(),status:'Not Started',_importNew:false,_importChanged:false};
+          var row={id:nid(),status:'Not Started'};
           Object.keys(colMap).forEach(function(i){row[colMap[i]]=String(vals[i]||'').trim();});
           if(!Object.keys(colMap).some(function(i){return vals[i]!=='';})) return;
           var rowTag=row.tag||row.equipment_id||'';
           newTagsSeen.add(rowTag);
-          var existing=rowTag?existingMap[rowTag]:null;
-          if(!existing){
+          var baseline=rowTag?existingMap[rowTag]:null;
+          if(!baseline){
             row._importNew=true;
           } else {
-            // Check for changed cells
+            // Preserve existing row ID
+            if(currentIdMap[rowTag])row.id=currentIdMap[rowTag];
+            // Check for changed cells vs baseline
             var changed=false;
-            Object.keys(colMap).forEach(function(i){var k=colMap[i];if(String(row[k]||'')!==String(existing[k]||''))changed=true;});
-            row._importChanged=changed;
-            row.id=existing.id; // keep same id
+            var changedCols=[];
+            Object.keys(colMap).forEach(function(i){
+              var k=colMap[i];
+              if(k==='status')return; // don't flag status changes
+              if(String(row[k]||'').trim()!==String(baseline[k]||'').trim()){changed=true;changedCols.push(k);}
+            });
+            if(changed){row._importChanged=true;row._importChangedCols=changedCols;}
           }
           newRows.push(row);
           imported++;
         });
-        // Mark deleted rows (in existing but not in new import)
-        t.rows.forEach(function(r){
+        // Add deleted rows (in baseline but not in import) with flag
+        baselineRows.forEach(function(r){
           var tag=r.tag||r.equipment_id||'';
-          if(tag&&!newTagsSeen.has(tag))r._importDeleted=true;
+          if(tag&&!newTagsSeen.has(tag)){
+            var delRow=Object.assign({},r,{_importDeleted:true});
+            newRows.push(delRow);
+          }
         });
         t.rows=newRows;
       }
@@ -2069,6 +2106,7 @@ function updateLayoutToggle(){
   bv.style.fontWeight=isVert?'700':'400';
 }
 
+function clearImportFlags(tab){if(tab&&tab.rows)tab.rows.forEach(function(r){delete r._importNew;delete r._importChanged;delete r._importDeleted;});}
 function startDraftAndEdit(tabId){
   var me=getCurrentUser();
   var tr=getTabRev(tabId);
@@ -2124,6 +2162,8 @@ function confirmPublish(){
     snapshot:JSON.parse(JSON.stringify(liveRows)),
     changeSummary:{added:diff.added.length,deleted:diff.deleted.length,changed:Object.keys(diff.changedIds).length}
   });
+  // Clear import highlight flags — publish makes this the clean baseline
+  tab.rows.forEach(function(r){delete r._importNew;delete r._importChanged;delete r._importDeleted;});
   tr.draft=null;_editingTabId=null;clearLock(tabId);saveRevData();saveEquip();
   closeM('publishModal');viewingRevIdx=null;renderRevBar();renderTable();
   showToast('\u2713 '+revNum+' published');
@@ -2206,7 +2246,7 @@ function exportRevPDF(){
     html+='</tr>';
   });
   html+='</tbody></table>';
-  html+='<div style="margin-top:8px;font-size:7px;color:#bbb;text-align:right">Generated by HVACNex · '+new Date().toLocaleDateString('en-AU')+'</div>';
+  html+='<div style="margin-top:10px;border-top:1px solid #eee;padding-top:6px;display:flex;justify-content:space-between;align-items:center">'    +'<div style="display:flex;align-items:center;gap:8px">'    +'<div style="font-size:10px;font-weight:bold;color:#0e1520">HVACNex</div>'    +'<div style="font-size:7px;color:#aaa">HVAC Project Management Platform</div>'    +'</div>'    +'<div style="font-size:7px;color:#bbb">Generated '+new Date().toLocaleDateString('en-AU')+'</div>'    +'</div>';
   html+='</body></html>';
   var w=window.open('','_blank','width=1200,height=800');w.document.write(html);w.document.close();w.focus();
   setTimeout(function(){w.print();},800);closeM('exportRevModal');
