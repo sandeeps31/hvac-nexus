@@ -868,12 +868,12 @@ function renderVerticalTable(t,rows){
   html+='<thead style="position:sticky;top:0;z-index:10"><tr>'
     +'<th style="'+LS+';'+LP+';font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);position:sticky;left:0;top:0;z-index:12;background:var(--surface3)">FIELD</th>';
    rows.forEach(function(row){
+     var colHdrBg=row._importDeleted?'background:rgba(255,77,109,.15)':row._importNew?'background:rgba(0,229,160,.12)':row._importChanged?'background:rgba(255,184,48,.10)':'';
+     var colHdrStyle=EQH+(colHdrBg?';'+colHdrBg:'');
      if(canEdit){
-       html+='<th style="position:sticky;top:0;z-index:9;'+EQH+'"><input class="ci tag" value="'+X(row.tag||'')+'" placeholder="EQ-001"'
-         +' style="text-align:center;width:100%;min-width:110px;background:transparent;border:none;font-family:DM Mono,monospace;font-size:11px;font-weight:700;color:var(--accent)"'
-         +' onchange="updR(\''+t.id+'\',\''+row.id+'\',\'tag\',this.value)" onblur="saveEquip()"/></th>';
+       html+='<th style="position:sticky;top:0;z-index:9;'+colHdrStyle+'"><input class="ci tag" value="'+X(row.tag||'')+'" placeholder="EQ-001"'         +' style="text-align:center;width:100%;min-width:110px;background:transparent;border:none;font-family:DM Mono,monospace;font-size:11px;font-weight:700;color:var(--accent)"'         +' onchange="updR(\''+t.id+'\',\''+row.id+'\',\'tag\',this.value)" onblur="saveEquip()"/></th>';
      } else {
-       html+='<th style="position:sticky;top:0;z-index:9;'+EQH+'">'+X(row.tag||'—')+'</th>';
+       html+='<th style="position:sticky;top:0;z-index:9;'+colHdrStyle+'">'+X(row.tag||'—')+'</th>';
      }
    });
   if(canEdit)html+='<th style="min-width:80px;background:var(--accent-dim);text-align:center;color:var(--accent);cursor:pointer;font-size:18px;padding:4px" onclick="openNewRow()">＋</th>';
@@ -906,10 +906,18 @@ function renderVerticalTable(t,rows){
       +'</td>';
 
     rows.forEach(function(row){
+      // Diff highlight for this cell
+      var cellBg='';
+      if(row._importDeleted)cellBg='background:rgba(255,77,109,.10)';
+      else if(row._importNew)cellBg='background:rgba(0,229,160,.08)';
+      else if(row._importChanged&&(row._importChangedCols||[]).indexOf(c.k)>=0)cellBg='background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)';
+      var tdStyle='padding:3px 6px;border-right:1px solid var(--border);'+(cellBg?cellBg+';':'');
+      var delStyle=row._importDeleted?'text-decoration:line-through;opacity:.6;':'';
       if(c.sel){
-        html+='<td style="padding:3px 6px;border-right:1px solid var(--border)"><select class="csel" '+roSel+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+        if(ro)html+='<td style="'+tdStyle+'"><span style="font-size:12px;'+delStyle+'">'+X(row[c.k]||'—')+'</span></td>';
+        else html+='<td style="'+tdStyle+'"><select class="csel" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
       } else {
-        html+='<td style="padding:3px 6px;border-right:1px solid var(--border)"><input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+roStyle+'></td>';
+        html+='<td style="'+tdStyle+'"><input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+roStyle+' style="'+delStyle+'">'+'</td>';
       }
     });
     if(canEdit)html+='<td></td>';
@@ -1844,8 +1852,8 @@ document.getElementById('ceModal').addEventListener('click',function(e){if(e.tar
 // ══════════════════════════════════════════════════
 // REVISION / LOCK / CHANGE TRACKING SYSTEM
 // ══════════════════════════════════════════════════
-var REV_SK='hvacnexus_equip_revisions_GCT001';
-var LOCK_SK='hvacnexus_equip_lock_'+_eqPNum;
+var REV_SK='HVAC Nexusus_equip_revisions_GCT001';
+var LOCK_SK='HVAC Nexusus_equip_lock_'+_eqPNum;
 var viewingRevIdx=null;
 var revData={};
 var exportingRevIdx=null;
@@ -2223,13 +2231,16 @@ function getExportRows(){
   var tabId=activeId;var tr=getTabRev(tabId);
   if(exportingRevIdx!==null){var rv=tr.revisions[exportingRevIdx];return rv?rv.snapshot:[];}
   var tab=tabs.find(function(t){return t.id===tabId;});
-  return tab?tab.rows.filter(function(r){return !r._deleted;}):[];
+  // Include _deleted rows so they show red strikethrough in PDF/Excel
+  return tab?tab.rows:[];
 }
 function exportRevPDF(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
   var tr=getTabRev(tabId);
   var rv=exportingRevIdx!==null?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
-  var rows=getExportRows();var cols=tab?getCols(tab):[];
+  var tab_rows=tab?tab.rows:[];
+  var rows=exportingRevIdx!==null?(function(){var rv=tr.revisions[exportingRevIdx];return rv?rv.snapshot:[];})():tab_rows;
+  var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';var revDate=rv?fmtD(rv.date):todayStr();
   var prevRevIdx=exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2;
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
@@ -2255,10 +2266,21 @@ function exportRevPDF(){
     html+='</tr>';
   });
   html+='</tbody></table>';
-  html+='<div style="margin-top:10px;border-top:1px solid #eee;padding-top:6px;display:flex;justify-content:space-between;align-items:center">'    +'<div style="display:flex;align-items:center;gap:8px">'    +'<div style="font-size:10px;font-weight:bold;color:#0e1520">HVACNex</div>'    +'<div style="font-size:7px;color:#aaa">HVAC Project Management Platform</div>'    +'</div>'    +'<div style="font-size:7px;color:#bbb">Generated '+new Date().toLocaleDateString('en-AU')+'</div>'    +'</div>';
+  html+='<div style="margin-top:10px;border-top:1px solid #eee;padding-top:6px;display:flex;justify-content:space-between;align-items:center">'    +'<div style="display:flex;align-items:center;gap:8px">'    +'<div style="font-size:10px;font-weight:bold;color:#0e1520">HVAC Nexus</div>'    +'<div style="font-size:7px;color:#aaa">HVAC Project Management Platform</div>'    +'</div>'    +'<div style="font-size:7px;color:#bbb">Generated '+new Date().toLocaleDateString('en-AU')+'</div>'    +'</div>';
   html+='</body></html>';
-  var w=window.open('','_blank','width=1200,height=800');w.document.write(html);w.document.close();w.focus();
-  setTimeout(function(){w.print();},800);closeM('exportRevModal');
+  var blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var iframe=document.createElement('iframe');
+  iframe.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none';
+  iframe.src=url;
+  document.body.appendChild(iframe);
+  iframe.onload=function(){
+    try{iframe.contentWindow.focus();iframe.contentWindow.print();}catch(e){
+      var w=window.open(url,'_blank');if(w)setTimeout(function(){w.print();},800);
+    }
+    setTimeout(function(){document.body.removeChild(iframe);URL.revokeObjectURL(url);},5000);
+  };
+  closeM('exportRevModal');
 }
 function exportRevXLSX(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
@@ -2308,7 +2330,7 @@ function exportRevXLSX(){
     var sheetName=(tabName+' '+revLabel).substring(0,31);
     XLSX.utils.book_append_sheet(wb,ws,sheetName);
     XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-    XLSX.writeFile(wb,'HVACNex_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+revLabel.replace(/[^a-zA-Z0-9]/g,'')+'.xlsx',{cellStyles:true});
+    XLSX.writeFile(wb,'HVAC Nexus_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+revLabel.replace(/[^a-zA-Z0-9]/g,'')+'.xlsx',{cellStyles:true});
     closeM('exportRevModal');
   }
   if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=doXlsx;document.head.appendChild(s);}else{doXlsx();}
@@ -2328,16 +2350,16 @@ function showToast(msg){
 
 
 // ── SIDEBAR ──
-var SBK='hvacnexus_sb_collapsed';
+var SBK='HVAC Nexusus_sb_collapsed';
 function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
 function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
 function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
 (function(){
   applySB(localStorage.getItem(SBK)==='1');
-  localStorage.removeItem('hvacnexus_sb_groups');
-  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
-  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  localStorage.removeItem('HVAC Nexusus_sb_groups');
+  try{var p=JSON.parse(localStorage.getItem('HVAC Nexusus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=JSON.parse(localStorage.getItem('HVAC Nexusus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
   if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
     handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});
@@ -2827,7 +2849,7 @@ async function confirmPublishToCo(){
 }
 
 // ── SIDEBAR JS ──
-var SBK='hvacnexus_sb_collapsed';
+var SBK='HVAC Nexusus_sb_collapsed';
 function toggleSB(){var col=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,col?'1':'0');applySB(col);}
 function applySB(col){var sb=document.getElementById('sidebar');var mw=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',col);if(mw)mw.style.marginLeft=col?'52px':'230px';if(btn)btn.textContent=col?'»':'«';}
 function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'▸':'▾';}
