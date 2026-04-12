@@ -115,6 +115,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .eq-section-hdr.has-header-style{background:var(--surface3)}
 .eq-field-cols{display:grid;grid-template-columns:22px 1fr 90px 70px 1fr 90px 60px 28px;gap:6px;padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border)}
 .eq-field-row{display:grid;grid-template-columns:22px 1fr 90px 70px 1fr 90px 60px 28px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center;background:var(--surface);transition:background .12s}
+.dd-popover{position:fixed;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;padding:14px 16px;width:280px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none}
+.dd-popover.open{display:block}
+.dd-popover h4{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin:0 0 10px}
+.dd-opt-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.dd-opt-inp{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;font-family:'DM Sans',sans-serif}
+.dd-opt-inp:focus{border-color:var(--accent)}
+.dd-opt-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;line-height:1}
+.dd-opt-del:hover{color:var(--danger)}
+.dd-add-btn{font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 0;font-family:'DM Sans',sans-serif}
+.dd-add-btn:hover{text-decoration:underline}
 .eq-field-row.dragging{opacity:.4;background:var(--surface3)}
 .eq-field-row.drag-over{border-top:2px solid var(--accent)}
 .drag-handle{color:var(--muted);cursor:grab;font-size:14px;display:flex;align-items:center;justify-content:center;user-select:none}
@@ -580,9 +590,9 @@ function renderEditorBody(tpl,rev,canEdit){
           +'</select>'
           +'<input class="si" value="'+escHs(f.unit||'')+'" oninput="fieldUpdate('+si+','+fi+',\'unit\',this.value)" placeholder="l/s"/>'
           +(f.type==='dropdown'
-            ?'<div class="opt-wrap" onclick="this.querySelector(\'input\').focus()">'
-             +(f.options||[]).map(function(o,oi){return'<span class="opt-tag">'+escH(o)+'<span class="opt-x" onclick="fieldRemoveOpt('+si+','+fi+','+oi+')">×</span></span>';}).join('')
-             +'<input type="text" placeholder="Add option…" onkeydown="if(event.key===\'Enter\'||event.key===\',\'){event.preventDefault();fieldAddOpt('+si+','+fi+',this.value);this.value=\'\';}"/>'
+            ?'<div style="display:flex;align-items:center;gap:6px">'
+             +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted);background:var(--surface3);border-radius:3px;padding:2px 6px">'+(f.options&&f.options.length?f.options.length+' option'+(f.options.length!==1?'s':''):'No options')+'</span>'
+             +'<button class="dd-add-btn" onclick="event.stopPropagation();openEqDdPopover('+si+','+fi+',this)">'+(f.options&&f.options.length?'Edit ▼':'+ Add options')+'</button>'
              +'</div>'
             :'<input class="si" value="'+escHs(f.defaultVal||'')+'" oninput="fieldUpdate('+si+','+fi+',\'defaultVal\',this.value)" placeholder="e.g. 1200 l/s"/>'
           )
@@ -711,6 +721,80 @@ function fieldRemoveOpt(si,fi,oi){
   var s=getDraftSections();if(!s)return;
   s[si].fields[fi].options.splice(oi,1);
   markDirty();renderEditor();
+}
+
+// ── Dropdown options popover ──
+var _ddSi=null,_ddFi=null;
+
+function openEqDdPopover(si,fi,anchorEl){
+  _ddSi=si;_ddFi=fi;
+  var s=getDraftSections();
+  if(!s)return;
+  var f=s[si].fields[fi];
+  if(!f.options||!f.options.length)f.options=[''];
+  var pop=document.getElementById('ddPopover');
+  renderDdOpts();
+  pop.classList.add('open');
+  var rect=anchorEl.getBoundingClientRect();
+  var top=rect.bottom+6;
+  var left=rect.left;
+  if(left+290>window.innerWidth)left=window.innerWidth-295;
+  if(top+260>window.innerHeight)top=rect.top-270;
+  pop.style.top=top+'px';pop.style.left=left+'px';
+  setTimeout(function(){document.addEventListener('click',closeDdOnOutside);},10);
+}
+
+function closeDdOnOutside(e){
+  var pop=document.getElementById('ddPopover');
+  if(pop&&!pop.contains(e.target)){closeDdPopover();document.removeEventListener('click',closeDdOnOutside);}
+}
+
+function closeDdPopover(){
+  var pop=document.getElementById('ddPopover');
+  if(pop)pop.classList.remove('open');
+  document.removeEventListener('click',closeDdOnOutside);
+  // Remove empty options and re-render
+  if(_ddSi!==null&&_ddFi!==null){
+    var s=getDraftSections();
+    if(s){
+      var f=s[_ddSi].fields[_ddFi];
+      f.options=(f.options||[]).filter(function(o){return o.trim();});
+      markDirty();renderEditor();
+    }
+  }
+  _ddSi=null;_ddFi=null;
+}
+
+function renderDdOpts(){
+  if(_ddSi===null)return;
+  var s=getDraftSections();if(!s)return;
+  var f=s[_ddSi].fields[_ddFi];
+  var list=document.getElementById('ddOptList');if(!list)return;
+  list.innerHTML='';
+  (f.options||[]).forEach(function(opt,i){
+    var row=document.createElement('div');row.className='dd-opt-row';
+    var inp=document.createElement('input');inp.className='dd-opt-inp';inp.value=opt;inp.placeholder='Option text';
+    inp.oninput=(function(idx){return function(){s[_ddSi].fields[_ddFi].options[idx]=this.value;markDirty();};})(i);
+    inp.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();ddAddOption();}};
+    var del=document.createElement('button');del.className='dd-opt-del';del.innerHTML='&#10005;';
+    del.onclick=(function(idx){return function(){
+      s[_ddSi].fields[_ddFi].options.splice(idx,1);
+      renderDdOpts();markDirty();
+    };})(i);
+    row.appendChild(inp);row.appendChild(del);list.appendChild(row);
+  });
+}
+
+function ddAddOption(){
+  if(_ddSi===null)return;
+  var s=getDraftSections();if(!s)return;
+  var f=s[_ddSi].fields[_ddFi];
+  if(!f.options)f.options=[];
+  f.options.push('');
+  renderDdOpts();
+  markDirty();
+  var inputs=document.getElementById('ddOptList').querySelectorAll('input');
+  if(inputs.length)inputs[inputs.length-1].focus();
 }
 
 // ── Section drag-and-drop ──
@@ -994,5 +1078,14 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   renderRegister();
 })();
 </script>
+<!-- Dropdown options popover -->
+<div class="dd-popover" id="ddPopover">
+  <h4>▼ Dropdown Options</h4>
+  <div id="ddOptList"></div>
+  <button class="dd-add-btn" onclick="ddAddOption()">+ Add option</button>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+    <button class="btn bsm bp" onclick="closeDdPopover()">Done</button>
+  </div>
+</div>
 </body>
 </html>
