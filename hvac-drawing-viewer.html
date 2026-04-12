@@ -460,7 +460,6 @@ function renderHighRes(page){
   var dpr=window.devicePixelRatio||1;
   var hiScale=Math.max(6,dpr*5);
   var vpHi=page.getViewport({scale:hiScale});
-  // Render into a hidden offscreen canvas — never touch main canvas until done
   var offscreen=document.createElement('canvas');
   offscreen.width=vpHi.width;
   offscreen.height=vpHi.height;
@@ -468,17 +467,20 @@ function renderHighRes(page){
   _hiRenderTask=page.render({canvasContext:offCtx,viewport:vpHi});
   _hiRenderTask.promise.then(function(){
     _hiRenderTask=null;
-    // Only NOW swap — draw hi-res into main canvas without changing its size
-    // This avoids any white flash because we never clear the visible canvas
     var canvas=document.getElementById('pdfCanvas');
     var ctx=canvas.getContext('2d');
-    // Resize canvas to hi-res but keep CSS display size = logical size
-    var prevW=_canvasW,prevH=_canvasH;
+    // Set canvas to hi-res pixel dimensions
     canvas.width=vpHi.width;
     canvas.height=vpHi.height;
-    canvas.style.width=prevW+'px';
-    canvas.style.height=prevH+'px';
+    // CRITICAL: update logical dimensions so scale transform uses hi-res coords
+    _canvasW=vpHi.width;
+    _canvasH=vpHi.height;
+    // Remove any CSS size override — let canvas natural size drive layout
+    canvas.style.width='';
+    canvas.style.height='';
     ctx.drawImage(offscreen,0,0);
+    // Re-fit so the scale transform accounts for new canvas size
+    fitToScreen();
     renderPins();
   }).catch(function(){_hiRenderTask=null;});
 }
