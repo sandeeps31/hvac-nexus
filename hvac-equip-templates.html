@@ -288,6 +288,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <span class="draft-save-indicator" id="draftSaveIndicator">Saved</span>
     </div>
     <div class="editor-meta-bar" id="editorMetaBar"></div>
+    <div id="layoutPreview" style="display:none;margin:0 24px 0;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;border-top:none"></div>
     <div class="editor-body" id="editorBody"></div>
   </div>
 </div>
@@ -528,7 +529,53 @@ function renderEditor(){
   }
 
   // Body — field builder
+  renderLayoutPreview(tpl,rev);
   renderEditorBody(tpl,rev,canEdit);
+}
+
+function renderLayoutPreview(tpl,rev){
+  var el=document.getElementById('layoutPreview');
+  if(!el)return;
+  var sections=(rev&&rev.sections)||[];
+  // Get first 4 fields for preview
+  var fields=[];
+  sections.forEach(function(s){(s.fields||[]).forEach(function(f){if(fields.length<5)fields.push({label:f.label,section:s.name==='__none__'?'':s.name});});});
+  if(!fields.length){el.style.display='none';return;}
+  el.style.display='block';
+  var isVert=tpl.layout==='vertical';
+  var previewHtml='<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Layout Preview — '+(isVert?'↕ Vertical (fields as rows, equipment as columns)':'↔ Horizontal (fields as columns, equipment as rows)')+'</div>';
+  if(isVert){
+    // Vertical: field labels in left col, 2 example equipment cols
+    previewHtml+='<div style="display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:11px;max-width:500px">';
+    previewHtml+='<div style="flex:none;width:160px;background:var(--surface3);border-right:1px solid var(--border)">';
+    previewHtml+='<div style="padding:5px 10px;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)">FIELD</div>';
+    fields.forEach(function(f){
+      if(f.section)previewHtml+='<div style="padding:3px 10px;font-size:9px;font-weight:700;color:var(--accent);background:var(--surface3)">'+escH(f.section)+'</div>';
+      previewHtml+='<div style="padding:5px 10px;border-bottom:1px solid var(--border);color:var(--text2)">'+escH(f.label)+'</div>';
+    });
+    previewHtml+='</div>';
+    ['EQ-001','EQ-002'].forEach(function(eq){
+      previewHtml+='<div style="flex:1;border-right:1px solid var(--border)">';
+      previewHtml+='<div style="padding:5px 10px;font-family:DM Mono,monospace;font-size:9px;color:var(--accent);background:var(--surface2);border-bottom:1px solid var(--border);text-align:center">'+eq+'</div>';
+      fields.forEach(function(){previewHtml+='<div style="padding:5px 10px;border-bottom:1px solid var(--border);color:var(--muted);font-size:10px">—</div>';});
+      previewHtml+='</div>';
+    });
+    previewHtml+='</div>';
+  } else {
+    // Horizontal: fields as columns, equipment as rows
+    previewHtml+='<div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:11px;max-width:600px">';
+    previewHtml+='<div style="display:flex;background:var(--surface3);border-bottom:1px solid var(--border)">';
+    fields.forEach(function(f){previewHtml+='<div style="flex:1;padding:5px 8px;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);border-right:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH(f.label)+'</div>';});
+    previewHtml+='</div>';
+    ['EQ-001','EQ-002'].forEach(function(eq){
+      previewHtml+='<div style="display:flex;border-bottom:1px solid var(--border)">';
+      previewHtml+='<div style="flex:1;padding:5px 8px;color:var(--accent);font-family:DM Mono,monospace;font-size:10px;border-right:1px solid var(--border)">'+eq+'</div>';
+      fields.slice(1).forEach(function(){previewHtml+='<div style="flex:1;padding:5px 8px;color:var(--muted);font-size:10px;border-right:1px solid var(--border)">—</div>';});
+      previewHtml+='</div>';
+    });
+    previewHtml+='</div>';
+  }
+  el.innerHTML=previewHtml;
 }
 
 function renderEditorBody(tpl,rev,canEdit){
