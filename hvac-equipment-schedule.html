@@ -47,7 +47,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .etbl thead tr{background:var(--surface2)}
 .etbl tr.import-new td{background:rgba(0,229,160,.08)!important;border-left:3px solid var(--green)}
 .etbl tr.import-changed td{background:rgba(255,184,48,.08)!important;border-left:3px solid var(--warn)}
-.etbl tr.import-deleted td{background:rgba(255,77,109,.08)!important;border-left:3px solid var(--danger);opacity:.6;text-decoration:line-through}.etbl thead{position:sticky;top:0;z-index:4;box-shadow:0 1px 0 var(--border)}
+.etbl tr.import-deleted td{background:rgba(255,77,109,.08)!important;border-left:3px solid var(--danger);opacity:.6;text-decoration:line-through}
+.etbl tr.tr-deleted td{background:rgba(255,77,109,.13)!important;text-decoration:line-through;color:rgba(255,100,100,.9)!important}
+.etbl tr.tr-deleted td:first-child{border-left:3px solid var(--danger)!important}.etbl thead{position:sticky;top:0;z-index:4;box-shadow:0 1px 0 var(--border)}
 .etbl th{padding:8px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 .etbl th:hover{color:var(--text2)}
 .etbl tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
@@ -449,7 +451,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
     </div>
     <button class="btn bg bsm" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3)">⬇ Template</button>
     <label class="btn bg bsm" style="cursor:pointer">⬆ Import<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="doImport(event)"></label>
-    <button class="btn bg bsm">⬇ Export</button>
+    <button class="btn bg bsm" onclick="openExportModal()">⬇ Export</button>
     <button class="btn bg bsm" id="submitToCoBtn" onclick="openPublishToCo()" style="color:var(--purple);border-color:rgba(167,139,250,.3)">↑ Submit to Library</button>
   </div>
 </div>
@@ -697,7 +699,7 @@ return;}
     shType.textContent=t.name||t.type||'';
     var metaParts=[];
     if(t.companyTemplateTplNo)metaParts.push(t.companyTemplateTplNo);
-    if(t.layout)metaParts.push(t.layout==='vertical'?'↕ Vertical':'↔ Horizontal');
+    if(t.layout)metaParts.push(t.layout==='vertical'?'↕ Vertical':'');
     if(t.rows&&t.rows.length)metaParts.push(t.rows.filter(function(r){return!r._deleted;}).length+' items');
     shMeta.textContent=metaParts.join(' · ');
   } else if(sh&&!t){
@@ -804,15 +806,19 @@ function renderTable(){
     var style=c.key?'min-width:180px':c.k==='desc'||c.k==='service'?'min-width:200px':'min-width:140px';
     var sortInd=sortK===c.k?(sortD>0?' ▲':' ▼'):'';
     var hasFilter=colFilters[c.k]&&colFilters[c.k].size>0;
+    var canEditTab=(_editingTabId===t.id);
     return'<th style="'+style+';cursor:pointer;padding:0" ><div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px 7px 12px">'
       +'<span onclick="srtBy(\''+c.k+'\')" style="flex:1;user-select:none">'+X(c.l)+(sortInd?'<span style="font-size:9px;color:var(--accent);margin-left:4px">'+sortInd+'</span>':'')+'</span>'
-      +'<span onclick="openColFilter(event,\''+c.k+'\')" style="font-size:11px;color:'+(hasFilter?'var(--accent)':'rgba(255,255,255,.3)')+';cursor:pointer;padding:2px 4px;border-radius:3px;transition:color .12s" title="Filter">▼</span>'
+      +(canEditTab?'<span onclick="openColFilter(event,\''+c.k+'\')" style="font-size:11px;color:'+(hasFilter?'var(--accent)':'rgba(255,255,255,.3)')+';cursor:pointer;padding:2px 4px;border-radius:3px;transition:color .12s" title="Filter">▼</span>':'')
       +'</div></th>';
   }).join('')+'<th style="width:28px"></th></tr></thead>';
   var tb='<tbody id="etbd">'+rows.map(function(row){
     var cells=cols.map(function(c){
       var ro2=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
-      if(c.sel)return'<td><select class="csel" '+(ro2?'disabled style="opacity:.65;cursor:default"':'')+' onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+      if(c.sel){
+        if(ro2)return'<td><span style="font-size:12px">'+X(row[c.k]||'—')+'</span></td>';
+        return'<td><select class="csel" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+      }
       var ro=!(typeof isEditingDraft==='function'&&isEditingDraft(t.id));
       if(c.num)return'<td><input class="ci num" type="number" value="'+X(row[c.k]||'')+'" placeholder="" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
       return'<td><input class="ci'+(c.key?' tag':'')+'" value="'+X(row[c.k]||'')+'" placeholder="'+X(c.l)+'…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly style="opacity:.65;cursor:default"':'')+'></td>';
@@ -1280,7 +1286,7 @@ function renderAddModalList(){
         var sel=_addSelTplId===t.id;
         html+='<div onclick="pickAddTpl(\''+t.id+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border);background:'+(sel?'var(--accent-dim)':'transparent')+'">'
           +'<div style="flex:1"><div style="font-size:13px;font-weight:600;color:'+(sel?'var(--accent)':'var(--text)')+'">'+X(t.name)+'</div>'
-          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+X(t.tplNo)+(ver?' · '+ver:'')+(t.layout?' · '+(t.layout==='vertical'?'↕ Vertical':'↔ Horizontal'):'')+'</div></div>'
+          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+X(t.tplNo)+(ver?' · '+ver:'')+(t.layout?' · '+(t.layout==='vertical'?'↕ Vertical':''):'')+'</div></div>'
           +(sel?'<span style="color:var(--accent)">✓</span>':'')+'</div>';
       });
     });
@@ -2160,64 +2166,93 @@ function getExportRows(){
 }
 function exportRevPDF(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
-  var def=tab?defn(tab.type):null;var tr=getTabRev(tabId);
+  var tr=getTabRev(tabId);
   var rv=exportingRevIdx!==null?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
   var rows=getExportRows();var cols=tab?getCols(tab):[];
-  var co={};try{var _cu=dbGetCurrentUser();if(_cu)co={userName:_cu.name};}catch(e){}
-  var revLabel=rv?rv.rev:'Current';var revDate=rv?fmtD(rv.date):'';
+  var revLabel=rv?rv.rev:'Draft';var revDate=rv?fmtD(rv.date):todayStr();
   var prevRevIdx=exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2;
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
+  var prevRevLabel=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].rev:'—';
   var diff=computeDiff(baseRows,rows);
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+(def?def.name:'')+' '+revLabel+'</title>'
-    +'<style>body{font-family:Arial,sans-serif;font-size:9.5px;color:#111;padding:20px}'
-    +'h1{font-size:15px;margin:0 0 2px}h2{font-size:11px;color:#555;margin:0 0 10px;font-weight:normal}'
-    +'table{width:100%;border-collapse:collapse}th{background:#0e1520;color:#fff;padding:5px 7px;text-align:left;font-size:9px;white-space:nowrap}'
-    +'td{padding:4px 7px;border-bottom:1px solid #ddd}tr:nth-child(even)td{background:#f7f9fc}'
-    +'.leg{display:flex;gap:16px;margin-bottom:10px;font-size:9px}'
-    +'.ls{display:flex;align-items:center;gap:4px}.lsw{width:10px;height:10px;border-radius:2px}'
-    +'<\/style><\/head><body>';
-  if(co.companyName)html+='<div style="font-weight:bold;font-size:12px;margin-bottom:2px">'+co.companyName+'</div>';
-  html+='<h1>'+(def?def.name:'')+' Equipment Schedule</h1>';
-  html+='<h2>Revision: <strong>'+revLabel+'</strong> | Date: '+revDate+' | Project: Greenfield Commercial Tower (GCT001)</h2>';
-  html+='<div class="leg">'
-    +'<div class="ls"><div class="lsw" style="background:rgba(0,229,160,.35);border:1px solid #00e5a0"></div>Added row</div>'
-    +'<div class="ls"><div class="lsw" style="background:rgba(255,77,109,.35);border:1px solid #ff4d6d"></div>Deleted row</div>'
-    +'<div class="ls"><div class="lsw" style="background:rgba(255,184,48,.35);border:1px solid #ffb830"></div>Changed cell</div>'
-    +'</div>';
-  html+='<table><thead><tr>'+cols.map(function(c){return'<th>'+c.l+'</th>';}).join('')+'</tr></thead><tbody>';
-  rows.forEach(function(r){
+  var proj=dbGetCurrentProject();
+  var projName=proj?proj.name:'[Project Name]';
+  var projNum=proj?proj.num:'';
+  var tabName=tab?tab.name||tab.type:'Equipment';
+  var hasDiff=baseRows.length>0;
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'    +'<title>'+tabName+' — '+revLabel+'</title>'    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:9px;color:#1a1a1a;background:#fff}'    +'@page{size:A3 landscape;margin:12mm}'    +'.co-hdr{background:#f4f4f4;border:1px solid #ddd;border-bottom:none;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}'    +'.co-name{font-size:13px;font-weight:bold}.co-logo{width:110px;height:34px;border:1px dashed #bbb;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:7.5px;border-radius:2px}'    +'.proj-block{display:grid;grid-template-columns:1fr 1fr 1fr 150px;border:1px solid #ddd;margin-bottom:10px}'    +'.pb{padding:7px 12px;border-right:1px solid #ddd}.pb:last-child{border-right:none}'    +'.pb-lbl{font-size:7px;text-transform:uppercase;letter-spacing:.8px;color:#999;margin-bottom:2px}'    +'.pb-val{font-size:10px;font-weight:bold}'    +'.legend{display:flex;gap:14px;margin-bottom:7px;padding:4px 0;border-bottom:1px solid #eee;font-size:8px;color:#555}'    +'.ls{display:flex;align-items:center;gap:4px}.lsw{width:10px;height:10px;border-radius:2px;border:1px solid}'    +'table{width:100%;border-collapse:collapse}'    +'th{background:#0e1520;color:#fff;padding:5px 7px;text-align:left;font-size:7.5px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-right:1px solid #1e3050}'    +'td{padding:4px 7px;border-bottom:1px solid #ebebeb;border-right:1px solid #f4f4f4;vertical-align:middle}'    +'tr.r-added td{background:#e8faf3}tr.r-deleted td{background:#fef0f2;text-decoration:line-through;color:#cc3344;opacity:.8}td.c-chg{background:#fff8e0}'    +'tr:nth-child(even) td{filter:brightness(.975)}<\/style><\/head><body>';
+  html+='<div class="co-hdr"><div><div class="co-name">[Company Name]<\/div><div style="font-size:8px;color:#888;margin-top:2px">[Address · Phone · Email]<\/div><\/div><div class="co-logo">COMPANY LOGO<\/div><\/div>';
+  html+='<div class="proj-block">'    +'<div class="pb"><div class="pb-lbl">Project<\/div><div class="pb-val">'+projName+'<\/div><\/div>'    +'<div class="pb"><div class="pb-lbl">Project No.<\/div><div class="pb-val">'+projNum+'<\/div><\/div>'    +'<div class="pb"><div class="pb-lbl">Schedule<\/div><div class="pb-val">'+tabName+' Equipment Schedule<\/div><\/div>'    +'<div class="pb" style="background:#f9f9f9"><div class="pb-lbl">Revision<\/div><div class="pb-val" style="font-size:13px;color:#0e1520">'+revLabel+'<\/div>'    +'<div style="font-size:7px;color:#999;margin-top:2px">'+revDate+(hasDiff&&prevRevLabel!=='—'?' · Prev: '+prevRevLabel:'')+'<\/div><\/div><\/div>';
+  if(hasDiff)html+='<div class="legend">'    +'<div class="ls"><div class="lsw" style="background:#e8faf3;border-color:#00c48c"><\/div>Added ('+diff.added.length+')<\/div>'    +'<div class="ls"><div class="lsw" style="background:#fef0f2;border-color:#ff4d6d"><\/div>Deleted ('+diff.deleted.length+')<\/div>'    +'<div class="ls"><div class="lsw" style="background:#fff8e0;border-color:#f0b429"><\/div>Changed ('+Object.keys(diff.changedIds).length+' rows)<\/div>'    +'<div class="ls" style="margin-left:auto;color:#aaa">'+prevRevLabel+' → '+revLabel+'<\/div><\/div>';
+  html+='<table><thead><tr><th>#<\/th>'+cols.map(function(c){return'<th>'+c.l+'<\/th>';}).join('')+'<\/tr><\/thead><tbody>';
+  rows.forEach(function(r,ri){
     var key=rowKey(r);
-    var isAdded=diff.added.indexOf(key)>=0;var isDel=r._deleted;var cf=diff.changedIds[key]||[];
-    var rs=isAdded?'background:rgba(0,229,160,.12)':isDel?'background:rgba(255,77,109,.12);text-decoration:line-through':'';
-    html+='<tr style="'+rs+'">';
-    cols.forEach(function(c){
-      var cs=(!isAdded&&!isDel&&cf.indexOf(c.k)>=0)?'background:rgba(255,184,48,.28)':'';
-      html+='<td style="'+cs+'">'+(r[c.k]||'')+'</td>';
-    });
-    html+='</'+'tr>';
+    var isAdded=hasDiff&&diff.added.indexOf(key)>=0;
+    var isDel=r._deleted;
+    var cf=hasDiff?(diff.changedIds[key]||[]):[];
+    html+='<tr class="'+(isAdded?'r-added':isDel?'r-deleted':'')+'"><td style="color:#aaa;text-align:center;font-size:8px">'+(ri+1)+'<\/td>';
+    cols.forEach(function(c){html+='<td class="'+(!isAdded&&!isDel&&cf.indexOf(c.k)>=0?'c-chg':'')+'">'+(r[c.k]||'')+'<\/td>';});
+    html+='<\/tr>';
   });
-  html+='</'+'tbody></'+'table></body></html>';
-  var w=window.open('','_blank','width=1100,height=700');w.document.write(html);w.document.close();w.focus();
-  setTimeout(function(){w.print();},600);closeM('exportRevModal');
+  html+='<\/tbody><\/table>';
+  html+='<div style="margin-top:8px;font-size:7px;color:#bbb;text-align:right">Generated by HVACNex · '+new Date().toLocaleDateString('en-AU')+'<\/div>';
+  html+='<\/body><\/html>';
+  var w=window.open('','_blank','width=1200,height=800');w.document.write(html);w.document.close();w.focus();
+  setTimeout(function(){w.print();},800);closeM('exportRevModal');
+}
 }
 function exportRevXLSX(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
-  var def=tab?defn(tab.type):null;var tr=getTabRev(tabId);
+  var tr=getTabRev(tabId);
   var rv=exportingRevIdx!==null?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
-  var rows=getExportRows();var cols=tab?getCols(tab):[];var revLabel=rv?rv.rev:'Current';
+  var rows=getExportRows();var cols=tab?getCols(tab):[];
+  var revLabel=rv?rv.rev:'Draft';
+  var tabName=tab?tab.name||tab.type:'Equip';
+  var prevRevIdx=exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2;
+  var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
+  var diff=computeDiff(baseRows,rows);
+  var hasDiff=baseRows.length>0;
   function doXlsx(){
     var wb=XLSX.utils.book_new();
+    // Header row + data
     var wsData=[cols.map(function(c){return c.l;})];
     rows.forEach(function(r){wsData.push(cols.map(function(c){return r[c.k]||'';}));});
     var ws=XLSX.utils.aoa_to_sheet(wsData);
-    ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,12)};});
-    XLSX.utils.book_append_sheet(wb,ws,(def?def.name:'Equip').substring(0,28)+' '+revLabel);
-    XLSX.writeFile(wb,'HVAC_'+(def?def.name:'Equip').replace(/[^a-zA-Z0-9]/g,'_')+'_'+revLabel.replace(/ /g,'')+'.xlsx');
+    ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,14)};});
+    // Apply cell colours
+    var GREEN_FILL={patternType:'solid',fgColor:{rgb:'C6EFCE'}};
+    var RED_FILL={patternType:'solid',fgColor:{rgb:'FFC7CE'}};
+    var YEL_FILL={patternType:'solid',fgColor:{rgb:'FFEB9C'}};
+    var HDR_FILL={patternType:'solid',fgColor:{rgb:'0E1520'}};
+    // Style headers
+    cols.forEach(function(c,ci){
+      var ref=XLSX.utils.encode_cell({r:0,c:ci});
+      if(ws[ref])ws[ref].s={font:{bold:true,color:{rgb:'FFFFFF'},name:'Arial',sz:9},fill:HDR_FILL,alignment:{horizontal:'center'}};
+    });
+    // Style data rows
+    if(hasDiff){
+      rows.forEach(function(r,ri){
+        var key=rowKey(r);
+        var isAdded=diff.added.indexOf(key)>=0;
+        var isDel=r._deleted;
+        var cf=diff.changedIds[key]||[];
+        cols.forEach(function(c,ci){
+          var ref=XLSX.utils.encode_cell({r:ri+1,c:ci});
+          if(!ws[ref])return;
+          if(isAdded)ws[ref].s={fill:GREEN_FILL,font:{name:'Arial',sz:9}};
+          else if(isDel)ws[ref].s={fill:RED_FILL,font:{name:'Arial',sz:9,strike:true}};
+          else if(cf.indexOf(c.k)>=0)ws[ref].s={fill:YEL_FILL,font:{name:'Arial',sz:9}};
+          else ws[ref].s={font:{name:'Arial',sz:9}};
+        });
+      });
+    }
+    var sheetName=(tabName+' '+revLabel).substring(0,31);
+    XLSX.utils.book_append_sheet(wb,ws,sheetName);
+    XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
+    XLSX.writeFile(wb,'HVACNex_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+revLabel.replace(/[^a-zA-Z0-9]/g,'')+'.xlsx',{cellStyles:true});
     closeM('exportRevModal');
   }
   if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=doXlsx;document.head.appendChild(s);}else{doXlsx();}
 }
-
 function showToast(msg){
   var t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none';
