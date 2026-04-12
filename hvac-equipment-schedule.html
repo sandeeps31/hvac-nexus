@@ -813,7 +813,7 @@ function renderTable(){
     return'<th style="'+style+';cursor:pointer;padding:0"><div style="display:flex;align-items:center;gap:2px;padding:6px 8px 6px 12px">'
       +'<span onclick="srtBy(\''+c.k+'\')" style="flex:1;user-select:none;font-size:9px;letter-spacing:.8px;text-transform:uppercase">'+X(c.l)+'</span>'
       +'<span onclick="srtBy(\''+c.k+'\')" title="Sort" style="font-size:11px;color:'+sortColor+';cursor:pointer;padding:1px 3px;border-radius:3px;flex-shrink:0;line-height:1;transition:color .12s">'+sortIcon+'</span>'
-      +(canEditTab?'<span onclick="openColFilter(event,\''+c.k+'\')" title="Filter" style="font-size:10px;color:'+filterColor+';cursor:pointer;padding:1px 3px;border-radius:3px;flex-shrink:0;line-height:1;transition:color .12s">'+(hasFilter?'⊠':'⊟')+'</span>':'')
+      +'<span onclick="openColFilter(event,\''+c.k+'\')" title="Filter" style="font-size:10px;color:'+filterColor+';cursor:pointer;padding:1px 3px;border-radius:3px;flex-shrink:0;line-height:1;transition:color .12s">'+(hasFilter?'⊠':'⊟')+'</span>'
       +'</div></th>';
   }).join('')+'<th style="width:28px"></th></tr></thead>';
   var tb='<tbody id="etbd">'+rows.map(function(row){
@@ -1871,10 +1871,18 @@ function applyDiffHighlights(){
     viewRows=tr.revisions[viewingRevIdx].snapshot||[];
     diff=computeDiff(baseRows,viewRows);
   } else if(tr.draft){
-    baseRows=tr.revisions[tr.revisions.length-1].snapshot||[];
+    // Only show highlights if there's a previous published revision to compare against
+    var prevRevisions=tr.revisions.filter(function(r){return r.snapshot&&r.snapshot.length>0;});
+    if(!prevRevisions.length){
+      // No baseline yet — first draft, no highlights
+      trs.forEach(function(el){el.className=el.className.replace(/tr-added|tr-deleted/g,'').trim();el.querySelectorAll('.cell-changed').forEach(function(c){c.classList.remove('cell-changed');});});
+      return;
+    }
+    baseRows=prevRevisions[prevRevisions.length-1].snapshot||[];
     viewRows=tab.rows;
     diff=computeDiff(baseRows,viewRows);
   } else {
+    // No draft, no viewingRevIdx = clean published state, no highlights
     trs.forEach(function(el){el.className=el.className.replace(/tr-added|tr-deleted/g,'').trim();el.querySelectorAll('.cell-changed').forEach(function(c){c.classList.remove('cell-changed');});});
     return;
   }
