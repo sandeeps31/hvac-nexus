@@ -113,8 +113,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .eq-section-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:2px solid var(--border)}
 .eq-section-hdr.no-header-style{background:var(--surface2);border-bottom:1px solid var(--border)}
 .eq-section-hdr.has-header-style{background:var(--surface3)}
-.eq-field-cols{display:grid;grid-template-columns:22px 1fr 90px 70px 1fr 90px 60px 28px;gap:6px;padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border)}
-.eq-field-row{display:grid;grid-template-columns:22px 1fr 90px 70px 1fr 90px 60px 28px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center;background:var(--surface);transition:background .12s}
+.eq-field-cols{display:grid;grid-template-columns:22px 1fr 110px 60px 170px 150px 44px 24px;gap:6px;padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.eq-field-row{display:grid;grid-template-columns:22px 1fr 110px 60px 170px 150px 44px 24px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center;background:var(--surface);transition:background .12s}
 .dd-popover{position:fixed;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;padding:14px 16px;width:280px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none}
 .dd-popover.open{display:block}
 .dd-popover h4{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin:0 0 10px}
@@ -372,7 +372,6 @@ var _inEditor=false;
 var FIELD_TYPES=[
   {key:'text',label:'Text'},
   {key:'number',label:'Number'},
-  {key:'yesno',label:'Yes / No'},
   {key:'dropdown',label:'Dropdown'},
   {key:'date',label:'Date'},
 ];
@@ -590,23 +589,27 @@ function renderEditorBody(tpl,rev,canEdit){
           +'</select>'
           +'<input class="si" value="'+escHs(f.unit||'')+'" oninput="fieldUpdate('+si+','+fi+',\'unit\',this.value)" placeholder="l/s"/>'
           +(f.type==='dropdown'
-            ?'<div style="display:flex;align-items:center;gap:6px">'
-             +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted);background:var(--surface3);border-radius:3px;padding:2px 6px">'+(f.options&&f.options.length?f.options.length+' option'+(f.options.length!==1?'s':''):'No options')+'</span>'
-             +'<button class="dd-add-btn" onclick="event.stopPropagation();openEqDdPopover('+si+','+fi+',this)">'+(f.options&&f.options.length?'Edit ▼':'+ Add options')+'</button>'
-             +'</div>'
-            :'<input class="si" value="'+escHs(f.defaultVal||'')+'" oninput="fieldUpdate('+si+','+fi+',\'defaultVal\',this.value)" placeholder="e.g. 1200 l/s"/>'
+            ?'<div style="display:flex;flex-wrap:wrap;gap:3px;align-items:flex-start;line-height:1.7">'\
+             +(f.options&&f.options.length\
+               ?(f.options.map(function(o){return'<span style="display:inline-block;background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);border-radius:12px;padding:1px 8px;font-size:10px;color:var(--accent);white-space:nowrap">'+escH(o)+'</span>';}).join('')\
+                 +'<button class="dd-add-btn" onclick="event.stopPropagation();openEqDdPopover('+si+','+fi+',this)" style="margin-top:2px">Edit ▼</button>')\
+               :'<button class="dd-add-btn" onclick="event.stopPropagation();openEqDdPopover('+si+','+fi+',this)">+ Add options</button>'\
+             )\
+             +'</div>'\
+            :'<span style="color:var(--muted);font-size:11px">—</span>'\
           )
           +'<input class="si" value="'+escHs(f.exampleVal||'')+'" oninput="fieldUpdate('+si+','+fi+',\'exampleVal\',this.value)" placeholder="e.g. TB1-ATT-01"/>'
           +'<div style="text-align:center"><input type="checkbox" '+(f.required?'checked':'')+' onchange="fieldUpdate('+si+','+fi+',\'required\',this.checked)"/></div>'
           +'<button onclick="fieldDelete('+si+','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1">×</button>'
           +'</div>';
       } else {
-        html+='<div style="display:grid;grid-template-columns:22px 1fr 90px 70px 1fr 90px 60px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center">'
+        html+='<div style="display:grid;grid-template-columns:22px 1fr 110px 60px 170px 150px 44px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center">'
           +'<span></span>'
           +'<span style="font-size:12px;color:var(--text)">'+escH(f.label)+(f.required?'<span style="color:var(--danger);margin-left:3px">*</span>':'')+'</span>'
           +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">'+escH((FIELD_TYPES.find(function(x){return x.key===(f.type||'text');})||{label:'Text'}).label)+'</span>'
           +'<span style="font-size:11px;color:var(--muted)">'+escH(f.unit||'—')+'</span>'
-          +'<span style="font-size:11px;color:var(--muted)">'+(f.type==='dropdown'?(f.options||[]).map(function(o){return'<span style="display:inline-block;background:var(--surface3);border-radius:3px;padding:1px 5px;font-size:10px;margin:1px">'+escH(o)+'</span>';}).join(''):(f.defaultVal?escH(f.defaultVal):'—'))+'</span>'
+          +(f.type==='dropdown'
+            ?'<div style="display:flex;flex-wrap:wrap;gap:3px;line-height:1.7">'+(f.options||[]).map(function(o){return'<span style="display:inline-block;background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);border-radius:12px;padding:1px 8px;font-size:10px;color:var(--accent);white-space:nowrap">'+escH(o)+'</span>';}).join('')+'</div>'            :'<span style="font-size:11px;color:var(--muted)">—</span>')
           +'<span style="font-size:11px;color:var(--accent)">'+escH(f.exampleVal||'—')+'</span>'
           +'<span style="text-align:center;font-size:11px;color:var(--muted)">'+(f.required?'✓':'')+'</span>'
           +'</div>';
@@ -1088,4 +1091,4 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   </div>
 </div>
 </body>
-</html>
+</html>+(f.type==='dropdown'

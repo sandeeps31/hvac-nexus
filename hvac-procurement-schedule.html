@@ -79,7 +79,12 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
 .proc-tbl thead tr{background:var(--surface2)}
 .proc-tbl th{position:sticky;top:0;padding:9px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface2);z-index:10}
 .proc-tbl th.r,.proc-tbl td.r{text-align:right}
-.proc-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:12.5px;vertical-align:middle}
+.proc-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:12.5px;vertical-align:top;white-space:nowrap}
+.proc-tbl td.comments-cell{white-space:pre-wrap;min-width:260px;max-width:340px;word-break:break-word;vertical-align:top}
+.proc-tbl td.wrap-cell{white-space:normal}
+input.proc-edit,select.proc-edit,textarea.proc-edit{background:var(--surface3);border:1.5px solid var(--accent);border-radius:5px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:4px 7px;outline:none;width:100%}
+textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.4}
+.proc-tbl tr.editing td{background:rgba(0,200,255,.04)}
 .proc-tbl tbody tr:last-child td{border-bottom:none}
 .proc-tbl tbody tr{cursor:default;transition:background .13s}
 .proc-tbl tbody tr:hover td{background:var(--surface2)}
@@ -257,6 +262,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
     <button id="viewBtnFull" onclick="setView('full')" style="padding:5px 12px;border:none;cursor:pointer;background:var(--accent);color:#080c12;font-family:inherit;font-size:11px;font-weight:700;transition:all .13s">☰ Full</button>
     <button id="viewBtnSummary" onclick="setView('summary')" style="padding:5px 12px;border:none;cursor:pointer;background:transparent;color:var(--muted);font-family:inherit;font-size:11px;transition:all .13s">⊞ Summary</button>
   </div>
+  <button id="editModeBtn" onclick="toggleEditMode()" style="padding:5px 14px;border:1.5px solid var(--border);border-radius:7px;background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .13s">✏️ Edit</button>
   <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="rowCount"></span>
 </div>
 
@@ -267,11 +273,10 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
 </div>
 
 <div id="summaryView" style="display:none;padding:16px 24px 60px"></div>
-<div id="fullView" style="padding:16px 24px 60px"><div style="overflow-x:auto;border-radius:var(--radius)"><table class="proc-tbl" id="procTable">
+<div id="fullView" style="padding:16px 24px 60px"><div style="overflow:auto;border-radius:var(--radius);max-height:calc(100vh - 280px)"><table class="proc-tbl" id="procTable">
     <thead>
       <tr>
         <th style="width:40px">#</th>
-        <th style="width:46px"></th>
         <th>Asset ID</th>
         <th>Location</th>
         <th>Sub area</th>
@@ -344,6 +349,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
 var _psProj=dbGetCurrentProject();var _psPNum=_psProj.num||_psProj.number||'GCT001';
 
 var _currentView='full';
+var _editMode=false;
 var items=[];
 var editingId=null;
 var _uid=100;
@@ -630,39 +636,24 @@ function renderTable(){
     if(item.status==='Delivered') etaCls='eta-ok';
     var isOverdue=item.eta&&item.eta<td&&item.status!=='Delivered';
     if(isOverdue) tr.className='overdue';
-    // Inline status dropdown
-        var stColor=item.status==='Not ordered'?'var(--danger)':'var(--text)';
-    var stHex=item.status==='Not ordered'?'#ff4d6d':'#ddeeff';
-    var statusSel='<select onchange="inlineUpdate(\''+item.id+'\',\'status\',this.value);this.style.color=this.value===\'Not ordered\'?\'#ff4d6d\':\'#ddeeff\'" style="background:#1a2640;border:1px solid #1e3050;border-radius:5px;color:'+stHex+';font-family:DM Mono,monospace;font-size:11px;padding:4px 6px;outline:none;cursor:pointer;width:140px">'
-      +['Not ordered','Ordered','Ready','Delivered','Supplied by others'].map(function(s){return '<option value="'+s+'"'+(item.status===s?' selected':'')+'>'+s+'</option>';}).join('')
-      +'</select>';
-    // Inline order date input
-    var dateInput='<input type="date" value="'+(item.orderDate||'')+'" onchange="inlineUpdate(\''+item.id+'\',\'orderDate\',this.value)" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:DM Mono,monospace;font-size:11px;padding:3px 5px;outline:none;width:130px" />';
-    // Inline lead time input
-    var lw=item.leadWeeks?parseInt(item.leadWeeks):null;
-    var lwLabel=!lw?'':lw===1?' week':' weeks';
-    var leadInput='<div style="display:flex;align-items:center;gap:5px">'
-      +'<input type="number" value="'+(lw||'')+'" min="1" placeholder="—" '
-      +'onchange="inlineUpdate(\''+item.id+'\',\'leadWeeks\',this.value)" '
-      +'style="background:#1a2640;border:1px solid #1e3050;border-radius:5px;color:#ddeeff;font-family:DM Mono,monospace;font-size:11px;padding:4px 6px;outline:none;width:50px;text-align:right" />'
-
-      +'</div>';
     tr.style.cursor='default';
     tr.setAttribute('data-item-id',item.id);
-
-    var editBtn='<button onclick="openEditModal(\''+item.id+'\')" title="Edit" style="background:none;border:1px solid var(--border);border-radius:5px;color:var(--muted);cursor:pointer;font-size:11px;padding:3px 8px;font-family:DM Mono,monospace;transition:all .13s" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--muted)\'">✏️</button>';
-    tr.innerHTML='<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">'+(idx+1)+'</td>'      +'<td>'+editBtn+'</td>'      +'<td class="asset-id">'+escH(item.assetId||'—')+'</td>'
-      +'<td style="color:var(--text2)">'+escH(item.location||'—')+'</td>'
-      +'<td style="color:var(--muted);font-size:12px">'+escH(item.subarea||'—')+'</td>'
-      +'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>'
-      +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(item.model||'—')+'</td>'
-      +'<td class="equip-type">'+escH(item.equipType||'—')+'</td>'
-      +'<td style="font-size:12px;color:var(--text2)">'+fmtD(item.subApproval)+'</td>'
-      +'<td>'+statusSel+'</td>'
-      +'<td>'+dateInput+'</td>'
-      +'<td style="white-space:nowrap">'+leadInput+'</td>'
-      +'<td class="eta-cell '+etaCls+'">'+etaDisplay+(isOverdue?' ⚠':'')+'</td>'
-      +'<td style="font-size:12px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(item.comments||'')+'">'+escH(item.comments||'')+'</td>';
+    if(_editMode)tr.classList.add('editing');
+    var stHex=item.status==='Not ordered'?'#ff4d6d':'#ddeeff';
+    var lw=item.leadWeeks?parseInt(item.leadWeeks):null;
+    var statusCell=_editMode
+      ?'<select class="proc-edit" onchange="inlineUpdate(\''+item.id+'\',\'status\',this.value)" style="color:'+stHex+'">'+['Not ordered','Ordered','Ready','Delivered','Supplied by others'].map(function(s){return'<option value="'+s+'"'+(item.status===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'
+      :'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+stHex+'">'+escH(item.status||'—')+'</span>';
+    var dateCell=_editMode
+      ?'<input type="date" class="proc-edit" value="'+(item.orderDate||'')+'" onchange="inlineUpdate(\''+item.id+'\',\'orderDate\',this.value)" style="min-width:130px"/>'
+      :'<span style="font-family:DM Mono,monospace;font-size:11px">'+fmtD(item.orderDate)+'</span>';
+    var leadCell=_editMode
+      ?'<input type="number" class="proc-edit" value="'+(lw||'')+'" min="1" placeholder="—" onchange="inlineUpdate(\''+item.id+'\',\'leadWeeks\',this.value)" style="width:70px;text-align:right"/>'
+      :'<span style="font-family:DM Mono,monospace;font-size:11px">'+(lw?lw+' wk':'—')+'</span>';
+    var commentsCell=_editMode
+      ?'<textarea class="proc-edit" onchange="inlineUpdate(\''+item.id+'\',\'comments\',this.value)" style="min-width:260px;min-height:36px">'+escH(item.comments||'')+'</textarea>'
+      :'<span>'+escH(item.comments||'')+'</span>';
+    tr.innerHTML='<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">'+(idx+1)+'</td>'      +'<td class="asset-id">'+escH(item.assetId||'—')+'</td>'      +'<td style="color:var(--text2)">'+escH(item.location||'—')+'</td>'      +'<td style="color:var(--muted);font-size:12px">'+escH(item.subarea||'—')+'</td>'      +'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>'      +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(item.model||'—')+'</td>'      +'<td class="equip-type">'+escH(item.equipType||'—')+'</td>'      +'<td style="font-size:12px;color:var(--text2)">'+fmtD(item.subApproval)+'</td>'      +'<td>'+statusCell+'</td>'      +'<td>'+dateCell+'</td>'      +'<td>'+leadCell+'</td>'      +'<td class="eta-cell '+etaCls+'">'+etaDisplay+(isOverdue?' ⚠':'')+'</td>'      +'<td class="comments-cell">'+commentsCell+'</td>';
     tbody.appendChild(tr);
   });
 }
@@ -772,6 +763,20 @@ function navTo(url){var b=window.location.href.substring(0,window.location.href.
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
 function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
 // ── View toggle ──
+function toggleEditMode(){
+  _editMode=!_editMode;
+  var btn=document.getElementById('editModeBtn');
+  if(btn){
+    btn.textContent=_editMode?'💾 Save':'✏️ Edit';
+    btn.style.background=_editMode?'var(--accent)':'transparent';
+    btn.style.color=_editMode?'#080c12':'var(--muted)';
+    btn.style.borderColor=_editMode?'var(--accent)':'var(--border)';
+    btn.style.fontWeight=_editMode?'700':'400';
+  }
+  if(!_editMode)save();
+  renderTable();
+}
+
 function setView(v){
   _currentView=v;
   document.getElementById('fullView').style.display=v==='full'?'':'none';
