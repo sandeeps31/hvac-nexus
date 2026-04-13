@@ -1428,6 +1428,10 @@ function saveCols(){var t=aTab();if(!t)return;t.cc=JSON.parse(JSON.stringify(eCo
 function doImport(e){
   var f=e.target.files[0]; if(!f) return;
   var t=aTab(); if(!t) return;
+  // Auto-start draft if not already in edit mode
+  if(_editingTabId!==t.id){
+    startDraftAndEdit(t.id);
+  }
   var ext=f.name.split('.').pop().toLowerCase();
   if(ext==='xlsx'||ext==='xls'){
     // Load SheetJS
@@ -2951,6 +2955,9 @@ function scanNewLabelChange(i,val){_scanMappings[i].newLabel=val;}
 
 // ── Import ──
 function doImportScanned(){
+  // Auto-start draft if not already in edit mode
+  var t=aTab();
+  if(t&&_editingTabId!==t.id){startDraftAndEdit(t.id);}
   // Validate: at least one column mapped
   var hasMapped=_scanMappings.some(function(m){return m.mappedKey||(m.isNew&&m.newLabel.trim());});
   if(!hasMapped){alert('Map at least one column before importing.');return;}
