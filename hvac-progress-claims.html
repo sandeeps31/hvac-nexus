@@ -390,10 +390,14 @@ function currentMonth(){var d=new Date();return d.getFullYear()+'-'+String(d.get
 // DATA
 function save(){dbSetProgressClaims(_pcPNum,claimsData).catch(e=>console.error(e));}
 async function load(){
-  try{var s=await dbGetProgressClaims(_pcPNum);if(s&&s.claims){claimsData=s;}}catch(e){}
-  claimsData={contractValue:0,retentionPct:5,lineItems:[],claims:[]};
+  try{
+    if(typeof dbReady!=='undefined')await dbReady;
+    var s=await dbGetProgressClaims(_pcPNum);
+    if(s&&s.claims){claimsData=s;}
+  }catch(e){console.warn('load error',e);}
+  renderList();
+  updateListSummary();
 }
-load();
 
 // COMPANY SETTINGS
 async function loadCoSettings(){try{return await dbGetCompanySettings()||{};}catch(e){return {};}}
@@ -409,41 +413,58 @@ function applyLetterhead(){
 }
 applyLetterhead();
 
-// LOAD BUDGET LINE ITEMS
-function loadBudgetItems(){
+// LOAD BUDGET LINE ITEMS — async, reads from Supabase via db.js
+async function loadBudgetItems(){
   try{
-    var s=null/*use dbGetBudget*/;if(!s)return[];
-    var p=JSON.parse(s);
+    var data=await dbGetBudget(_pcPNum);
+    if(!data||!data.sections)return[];
+    var margin=num(data.margin)||0;
     var items=[];
-    (p.sections||[]).forEach(function(sec){
+    (data.sections||[]).forEach(function(sec){
       (sec.groups||[]).forEach(function(g){
-        if(num(g.budget)>0||g.pos&&g.pos.length){
-          items.push({sectionName:sec.name,name:g.parent,budgetVal:num(g.budget)});
-        }
+        if(g.isL2Header)return;
+        var budgetCost=num(g.budget);
+        if(budgetCost<=0)return;
+        var sellPrice=Math.round(budgetCost*(1+margin/100)*100)/100;
+        items.push({sectionName:sec.name,name:g.parent||'Unnamed',budgetVal:sellPrice});
       });
     });
     return items;
-  }catch(e){return[];}
+  }catch(e){console.warn('loadBudgetItems error',e);return[];}
+}
+
+// Calculate total base contract sell price from budget
+async function getBudgetContractValue(){
+  try{
+    var data=await dbGetBudget(_pcPNum);
+    if(!data||!data.sections)return 0;
+    var margin=num(data.margin)||0;
+    var total=0;
+    (data.sections||[]).forEach(function(sec){
+      (sec.groups||[]).forEach(function(g){
+        if(!g.isL2Header)total+=num(g.budget)*(1+margin/100);
+      });
+    });
+    return Math.round(total*100)/100;
+  }catch(e){return 0;}
 }
 
 // LOAD VARIATIONS (approved only option)
-function loadVariations(approvedOnly){
+async function loadVariations(approvedOnly){
   try{
-    var s=null/*use dbGetVariations*/;if(!s)return[];
-    var p=JSON.parse(s);
-    var vars=Array.isArray(p.variations)?p.variations:[];
-    if(approvedOnly) vars=vars.filter(function(v){return v.status==='Approved';});
+    var data=await dbGetVariations(_pcPNum);
+    var vars=Array.isArray(data)?data:(data&&data.variations?data.variations:[]);
+    if(approvedOnly)vars=vars.filter(function(v){return v.status==='Approved';});
     return vars;
   }catch(e){return[];}
 }
 
 // LOAD VENDOR INVOICES for a month
-function loadInvoicesForMonth(month){
+async function loadInvoicesForMonth(month){
   try{
-    var s=null/*use dbGetVendorInvoices*/;if(!s)return[];
-    var p=JSON.parse(s);
-    var invs=Array.isArray(p.invoices)?p.invoices:[];
-    return invs.filter(function(i){return i.month===month&&i.status==='Approved';});
+    var data=await dbGetVendorInvoices(_pcPNum);
+    var invs=Array.isArray(data)?data:(data&&data.claims?data.claims:[]);
+    return invs.filter(function(i){return i.period===month&&(i.status==='Invoice Approved'||i.status==='Direct Invoice Approved');});
   }catch(e){return[];}
 }
 
@@ -858,16 +879,25 @@ function saveClaim(){save();toggleEditMode(false);}
 
 // WIZARD
 var wizContractVal=0,wizRetPct=5;
-function openNewClaimWizard(){
+async function openNewClaimWizard(){
   wizOpt=0;wizStep=0;
   var nextNum=(claimsData.claims.length?Math.max.apply(null,claimsData.claims.map(function(c){return c.num;}))+1:1);
   document.getElementById('w-claimnum').value=nextNum;
   document.getElementById('w-month').value=currentMonth();
-  // Pre-fill contract value if already set
+  // Auto-populate contract value from budget base contract sell price excl GST
   if(claimsData.contractValue>0){
     document.getElementById('w-contract').value=claimsData.contractValue;
     document.getElementById('w-retention').value=claimsData.retentionPct||5;
     updateContractPreview();
+  } else {
+    // Pull from budget
+    var budgetCV=await getBudgetContractValue();
+    if(budgetCV>0){
+      document.getElementById('w-contract').value=budgetCV.toFixed(2);
+      document.getElementById('w-retention').value=5;
+      updateContractPreview();
+      document.getElementById('w-contract-preview').textContent=fmt(budgetCV*1.1)+' incl GST  ·  Pulled from budget';
+    }
   }
   // Hide first claim setup if not first claim
   var isFirst=claimsData.lineItems.length===0;
@@ -889,7 +919,7 @@ function updateContractPreview(){
   var v=num(document.getElementById('w-contract').value);
   document.getElementById('w-contract-preview').textContent=v>0?'Incl GST: '+fmt(v*1.1):'';
 }
-function wizNext(){
+async function wizNext(){
   var contract=num(document.getElementById('w-contract').value);
   if(!contract){alert('Contract value is required.');return;}
   wizContractVal=contract;
@@ -899,7 +929,7 @@ function wizNext(){
   if(!wizOpt){alert('Please select a setup option.');return;}
   document.getElementById('wizStep0').style.display='none';
   if(wizOpt===1){
-    buildBudgetTree();
+    await buildBudgetTree();
     document.getElementById('wizStep1a').style.display='block';
   } else {
     scratchItems=[{id:'s'+nid(),name:'',price:0}];
@@ -915,8 +945,10 @@ function wizBack(){
   wizStep=0;
 }
 
-function buildBudgetTree(){
-  var budItems=loadBudgetItems();
+async function buildBudgetTree(){
+  var tree=document.getElementById('budgetTree');
+  tree.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">Loading budget…</div>';
+  var budItems=await loadBudgetItems();
   var tree=document.getElementById('budgetTree');
   if(!budItems.length){tree.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">No budget data found. Add items to the Budget module first, or use Option 2.</div>';return;}
   var sections={};
@@ -1014,7 +1046,11 @@ function wizFinish(){
   openClaim(newClaim.id);
 }
 
-renderList();
+// Init — wait for session then load data
+(async function(){
+  if(typeof dbReady!=='undefined')await dbReady;
+  await load();
+})();
 </script>
 <script>
 (function(){try{var cp=localStorage.getItem('hvacnexus_current_project');if(cp){var p=JSON.parse(cp);document.querySelectorAll('.bc-proj-name').forEach(function(el){el.textContent=p.name||el.textContent;});}}catch(e){}})();
