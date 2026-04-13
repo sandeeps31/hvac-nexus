@@ -376,7 +376,7 @@ const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJl
 
 // !! REPLACE with your Supabase service_role key — never expose publicly !!
 // Get from: Supabase Dashboard → Project Settings → API → service_role key
-const SB_SERVICE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTAyNTkyMiwiZXhwIjoyMDkwNjAxOTIyfQ.ZCZRUSnH8WZYoKEAhFF7bM9Og1AI1a0ZmSixHln5BxQ';
+const SB_SERVICE_KEY='REPLACE_WITH_SERVICE_ROLE_KEY';
 
 // Your user ID — only this ID can access this page
 const SUPER_ADMIN_UID='84d5d763-d1d8-4f86-aa22-05bf450b3922';
@@ -435,16 +435,25 @@ var _team=[];
 
 async function loadAll(){
   try{
-    // Load in parallel
+    // Load in parallel — projects uses JSONB pattern (data blob + project_num key)
     var [companies,members,projects,team]=await Promise.all([
       sbGet('companies?select=id,name,created_at&order=created_at.desc'),
       sbGet('company_members?select=id,company_id,user_id,role,created_at&order=created_at.desc'),
-      sbGet('projects?select=id,company_id,name,number,created_at&order=created_at.desc').catch(()=>[]),
-      sbGet('hvacnex_team?select=id,name,email,role,created_at&order=created_at.desc').catch(()=>[])
+      sbGet('projects?select=project_num,company_id,data,created_at&order=created_at.desc').catch(function(){return [];}),
+      sbGet('hvacnex_team?select=id,name,email,role,created_at&order=created_at.desc').catch(function(){return [];})
     ]);
     _companies=companies||[];
     _members=members||[];
-    _projects=projects||[];
+    _projects=(projects||[]).map(function(p){
+      var d=p.data||{};
+      return {
+        id:p.project_num,
+        company_id:p.company_id||d.company_id||null,
+        name:d.name||d.projectName||p.project_num||'—',
+        number:d.num||d.number||p.project_num||'—',
+        created_at:p.created_at
+      };
+    });
     _team=team||[];
     renderAll();
   }catch(e){
