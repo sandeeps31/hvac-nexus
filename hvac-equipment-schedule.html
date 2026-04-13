@@ -406,14 +406,14 @@ body.sb-sm{padding-left:var(--sb-sm)}
   </div>
 </div>
 <div class="abar" id="abar" style="display:none">
-  <div class="sbox" style="flex:1;min-width:0"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search equipment ID, description, location…" oninput="renderTable();renderStrip()"/></div>
+  <div class="sbox" style="flex:1;min-width:0"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search equipment ID, description, location…" oninput="renderTable();updateHeaderMeta()"/></div>
   <select class="fsel" id="stfil" onchange="renderTable()">
     <option value="">All Statuses</option>
     <option>Not Started</option><option>Procurement</option><option>Delivered</option>
     <option>Installation In Progress</option><option>Installed</option>
     <option>Commissioned</option><option>Complete</option>
   </select>
-  <select class="fsel" id="locfil" onchange="renderTable()"><option value="">All Locations</option></select>
+  <select class="fsel" id="locfil" onchange="renderTable();updateHeaderMeta()"><option value="">All Locations</option></select>
   <div class="abtns">
     <div style="display:flex;align-items:center;gap:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;overflow:hidden;font-family:'DM Mono',monospace;font-size:11px" id="layoutToggle">
       <button id="btnHoriz" onclick="setTabLayout('horizontal')" style="padding:5px 10px;border:none;cursor:pointer;font-family:inherit;font-size:11px;transition:all .13s">↔ H</button>
@@ -661,7 +661,7 @@ return;}
        +'<button class="etab-menu" onclick="event.stopPropagation();showCtx(event,\''+t.id+'\')">⋮</button>'
        +'</div>';
   }).join('')+'<button class="add-etab" onclick="openAddModal()">＋ Add</button>';
-  updSum();renderTable();updateSubmitBtn();
+  updSum();renderTable();updateSubmitBtn();setTimeout(updateHeaderMeta,50);
   // Update schedule header
   var t=aTab();
   var sh=document.getElementById('scheduleHeader');
@@ -673,19 +673,9 @@ return;}
     var metaParts=[];
     if(t.companyTemplateTplNo)metaParts.push(t.companyTemplateTplNo);
     if(t.layout)metaParts.push(t.layout==='vertical'?'↕ Vertical':'');
-    // Dynamic count based on active filter
-    var locF=(document.getElementById('locfil')||{}).value||'';
-    var q=(document.getElementById('srch')||{}).value||'';
-    var allRows=t.rows?t.rows.filter(function(r){return!r._deleted;}):[];
-    var filteredRows=allRows.filter(function(row){
-      if(locF&&row.location!==locF)return false;
-      if(q){var qs=q.toLowerCase();var m=false;getCols(t).forEach(function(c){if((row[c.k]||'').toString().toLowerCase().includes(qs))m=true;});if(!m)return false;}
-      return true;
-    });
-    var countStr=filteredRows.length+(locF||q?' of '+allRows.length:'')+' item'+(allRows.length!==1?'s':'');
-    if(locF)countStr+=' · '+locF;
-    metaParts.push(countStr);
     shMeta.textContent=metaParts.join(' · ');
+    // Dynamic count updated separately
+    setTimeout(updateHeaderMeta,0);
   } else if(sh&&!t){
     sh.style.display='none';
   }
@@ -1221,6 +1211,30 @@ function comR(){
 function canR(){nrVis=false;var el=document.getElementById('nrtr');if(el)el.remove();}
 
 function swTab(id){if(_editingTabId&&_editingTabId!==id){if(!confirm('You have unsaved changes. Switch tabs anyway?'))return;_editingTabId=null;}activeId=id;sortK=null;sortD=1;colFilters={};nrVis=false;if(typeof viewingRevIdx!=='undefined')viewingRevIdx=null;renderStrip();updateTplBtnVisibility();}
+
+function updateHeaderMeta(){
+  var t=aTab();
+  var shMeta=document.getElementById('scheduleHeaderMeta');
+  if(!t||!shMeta)return;
+  var locF=(document.getElementById('locfil')||{}).value||'';
+  var q=(document.getElementById('srch')||{}).value||'';
+  var allRows=t.rows?t.rows.filter(function(r){return!r._deleted;}):[];
+  var filteredRows=allRows.filter(function(row){
+    if(locF&&row.location!==locF)return false;
+    if(q){
+      var qs=q.toLowerCase();var m=false;
+      getCols(t).forEach(function(c){if((row[c.k]||'').toString().toLowerCase().includes(qs))m=true;});
+      if(!m)return false;
+    }
+    return true;
+  });
+  var parts=[];
+  if(t.companyTemplateTplNo)parts.push(t.companyTemplateTplNo);
+  var countStr=filteredRows.length+(locF||q?' of '+allRows.length:'')+' item'+(allRows.length!==1?'s':'');
+  if(locF)countStr+=' · '+locF;
+  parts.push(countStr);
+  shMeta.textContent=parts.join(' · ');
+}
 
 function updateTplBtnVisibility(){
   var btn=document.getElementById('downloadTplBtn');if(!btn)return;
@@ -2260,7 +2274,8 @@ function exportRevPDF(){
   var rv=effectiveIdx!==null?tr.revisions[effectiveIdx]:tr.revisions[tr.revisions.length-1];
   var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';var revDate=rv?fmtD(rv.date):todayStr();
-  var prevRevIdx=exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2;
+  var isDraftExportPDF=(exportingRevIdx===null&&viewingRevIdx===null&&tr&&tr.draft);
+  var prevRevIdx=isDraftExportPDF?tr.revisions.length-1:(exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2);
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
   var prevRevLabel=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].rev:'—';
   // Current rows: snapshot for specific rev, or live rows for draft
@@ -2358,7 +2373,8 @@ function exportRevXLSX(){
   var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';
   var tabName=tab?tab.name||tab.type:'Equip';
-  var prevRevIdx=exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2;
+  var isDraftExport2=(exportingRevIdx===null&&viewingRevIdx===null&&tr&&tr.draft);
+  var prevRevIdx=isDraftExport2?tr.revisions.length-1:(exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2);
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
   var isDraftExport=(exportingRevIdx===null&&viewingRevIdx===null&&tr.draft);
   var snapRows;
