@@ -597,11 +597,12 @@ function budgetTplAddRow(type){
           <div class="card-hdr-sub">What each role can access across the platform</div>
         </div>
         <div class="card-body" style="padding:0;overflow-x:auto">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px;padding:0 4px">Click a permission pill to cycle through: <span style="color:var(--muted)">—</span> → <span style="color:#4a9eff">👁 Read</span> → <span style="color:var(--accent)">✏️ Edit</span> → <span style="color:var(--green)">⚡ Admin</span></div>
           <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
             <thead>
               <tr style="background:var(--surface2)">
                 <th style="text-align:left;padding:10px 16px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);width:200px">Module</th>
-                <th style="text-align:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent)">Company Admin</th>
+                <th style="text-align:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent)">Co. Admin<div style="font-size:8px;opacity:.5;font-weight:400;margin-top:1px">Locked</div></th>
                 <th style="text-align:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--green)">Project Admin</th>
                 <th style="text-align:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--warn)">Engineer</th>
                 <th style="text-align:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text2)">Subcontractor</th>
@@ -1264,29 +1265,90 @@ function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 var ROLE_COLOURS={company_admin:'var(--accent)',project_admin:'var(--green)',engineer:'var(--warn)',subcontractor:'var(--text2)',witness:'var(--purple)'};
 var ROLE_LABELS={company_admin:'Company Admin',project_admin:'Project Admin',engineer:'Engineer',subcontractor:'Subcontractor',witness:'Witness'};
 var ROLE_DESC={company_admin:'Full access including Company Settings and billing.',project_admin:'Full project access. Can manage team. No Company Settings.',engineer:'Create and edit technical records. View procurement. No financials.',subcontractor:'View ITPs, Drawings, Tech Submissions. Sign off ITPs. Raise defects.',witness:'Sign off ITPs, Pre-commissioning and Commissioning. View drawings and defects.'};
-var PERM_MATRIX=[
-  {module:'Projects',ca:'Full',pa:'Own projects',eng:'Own projects',sub:'Own projects',wit:'Own projects'},
-  {module:'Project Dashboard',ca:'Full',pa:'Full',eng:'View',sub:'View',wit:'View'},
-  {module:'Budget',ca:'Full',pa:'Full',eng:'—',sub:'—',wit:'—'},
-  {module:'Progress Claims',ca:'Full',pa:'Full',eng:'—',sub:'—',wit:'—'},
-  {module:'Vendor Invoices',ca:'Full',pa:'Full',eng:'—',sub:'—',wit:'—'},
-  {module:'Variations',ca:'Full',pa:'Full',eng:'View',sub:'—',wit:'—'},
-  {module:'Subbie Variations',ca:'Full',pa:'Full',eng:'View',sub:'View own',wit:'—'},
-  {module:'Procurement Schedule',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'—'},
-  {module:'Purchase Orders',ca:'Full',pa:'Full',eng:'View',sub:'—',wit:'—'},
-  {module:'Subcontractor Agreements',ca:'Full',pa:'Full',eng:'View',sub:'View own',wit:'—'},
-  {module:'Tech Submissions',ca:'Full',pa:'Full',eng:'Edit',sub:'View',wit:'—'},
-  {module:'Drawings',ca:'Full',pa:'Full',eng:'Edit',sub:'View',wit:'View'},
-  {module:'Equipment Schedules',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'—'},
-  {module:'ITPs',ca:'Full',pa:'Full',eng:'Edit',sub:'View + Sign off',wit:'Sign off'},
-  {module:'Passive Fire',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'—'},
-  {module:'Defects',ca:'Full',pa:'Full',eng:'Edit',sub:'Raise + View',wit:'View'},
-  {module:'Commissioning Plan',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'View'},
-  {module:'Pre-commissioning',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'Sign off'},
-  {module:'Commissioning Tracker',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'Sign off'},
-  {module:'Project Settings',ca:'Full',pa:'Full',eng:'—',sub:'—',wit:'—'},
-  {module:'Company Settings',ca:'Full',pa:'—',eng:'—',sub:'—',wit:'—'},
+// Permission levels: 0=none, 1=read, 2=edit, 3=admin
+var PERM_LEVELS=['none','read','edit','admin'];
+var PERM_LEVEL_LABELS={none:'—',read:'👁 Read',edit:'✏️ Edit',admin:'⚡ Admin'};
+var PERM_LEVEL_COLORS={none:'var(--muted)',read:'#4a9eff',edit:'var(--accent)',admin:'var(--green)'};
+var PERM_LEVEL_BG={none:'transparent',read:'rgba(74,158,255,.12)',edit:'var(--accent-dim)',admin:'rgba(0,229,160,.12)'};
+
+var PERM_MODULES=[
+  'Projects','Project Dashboard','Budget','Progress Claims','Vendor Invoices',
+  'Variations','Subbie Variations','Procurement Schedule','Purchase Orders',
+  'Subcontractor Agreements','Tech Submissions','Drawings','Equipment Schedules',
+  'ITPs','Passive Fire','Defects','Commissioning Plan','Pre-commissioning',
+  'Commissioning Tracker','Project Settings','Company Settings'
 ];
+
+// Default permissions {module: {role: level}}
+var DEFAULT_PERMS={
+  'Projects':               {project_admin:'admin', engineer:'read',  subcontractor:'read',  witness:'read'},
+  'Project Dashboard':      {project_admin:'admin', engineer:'read',  subcontractor:'read',  witness:'read'},
+  'Budget':                 {project_admin:'admin', engineer:'none',  subcontractor:'none',  witness:'none'},
+  'Progress Claims':        {project_admin:'admin', engineer:'none',  subcontractor:'none',  witness:'none'},
+  'Vendor Invoices':        {project_admin:'admin', engineer:'none',  subcontractor:'none',  witness:'none'},
+  'Variations':             {project_admin:'admin', engineer:'read',  subcontractor:'none',  witness:'none'},
+  'Subbie Variations':      {project_admin:'admin', engineer:'read',  subcontractor:'read',  witness:'none'},
+  'Procurement Schedule':   {project_admin:'admin', engineer:'edit',  subcontractor:'none',  witness:'none'},
+  'Purchase Orders':        {project_admin:'admin', engineer:'read',  subcontractor:'none',  witness:'none'},
+  'Subcontractor Agreements':{project_admin:'admin',engineer:'read',  subcontractor:'read',  witness:'none'},
+  'Tech Submissions':       {project_admin:'admin', engineer:'edit',  subcontractor:'read',  witness:'none'},
+  'Drawings':               {project_admin:'admin', engineer:'edit',  subcontractor:'read',  witness:'read'},
+  'Equipment Schedules':    {project_admin:'admin', engineer:'edit',  subcontractor:'none',  witness:'none'},
+  'ITPs':                   {project_admin:'admin', engineer:'edit',  subcontractor:'read',  witness:'read'},
+  'Passive Fire':           {project_admin:'admin', engineer:'edit',  subcontractor:'none',  witness:'none'},
+  'Defects':                {project_admin:'admin', engineer:'edit',  subcontractor:'read',  witness:'read'},
+  'Commissioning Plan':     {project_admin:'admin', engineer:'edit',  subcontractor:'none',  witness:'read'},
+  'Pre-commissioning':      {project_admin:'admin', engineer:'edit',  subcontractor:'none',  witness:'read'},
+  'Commissioning Tracker':  {project_admin:'admin', engineer:'edit',  subcontractor:'none',  witness:'read'},
+  'Project Settings':       {project_admin:'admin', engineer:'none',  subcontractor:'none',  witness:'none'},
+  'Company Settings':       {project_admin:'none',  engineer:'none',  subcontractor:'none',  witness:'none'},
+};
+
+var _companyPerms=null; // loaded from Supabase
+
+async function loadCompanyPerms(){
+  try{
+    var data=await dbGetCompanySettings();
+    _companyPerms=data.permissions||JSON.parse(JSON.stringify(DEFAULT_PERMS));
+  }catch(e){
+    _companyPerms=JSON.parse(JSON.stringify(DEFAULT_PERMS));
+  }
+}
+
+async function saveCompanyPerms(){
+  try{
+    var data=await dbGetCompanySettings();
+    data.permissions=_companyPerms;
+    await dbSetCompanySettings(data);
+    showToast('✓ Permissions saved');
+  }catch(e){showToast('Error saving: '+e.message);}
+}
+
+function cyclePermLevel(module, role){
+  if(!_companyPerms)return;
+  // Company admin is always admin - locked
+  if(role==='company_admin')return;
+  // Company Settings - project_admin locked to none
+  if(module==='Company Settings'&&role==='project_admin')return;
+  var cur=(_companyPerms[module]||{})[role]||'none';
+  var idx=PERM_LEVELS.indexOf(cur);
+  var next=PERM_LEVELS[(idx+1)%PERM_LEVELS.length];
+  if(!_companyPerms[module])_companyPerms[module]={};
+  _companyPerms[module][role]=next;
+  // Update the pill immediately
+  var cell=document.getElementById('perm_'+module.replace(/[^a-zA-Z0-9]/g,'_')+'_'+role);
+  if(cell)updatePermCell(cell,module,role,next);
+  saveCompanyPerms();
+}
+
+function updatePermCell(el,module,role,level){
+  var locked=(role==='company_admin')||(module==='Company Settings'&&role==='project_admin');
+  el.textContent=PERM_LEVEL_LABELS[level]||'—';
+  el.style.color=PERM_LEVEL_COLORS[level]||'var(--muted)';
+  el.style.background=PERM_LEVEL_BG[level]||'transparent';
+  el.style.cursor=locked?'default':'pointer';
+  el.style.opacity=locked?'0.5':'1';
+}
 
 function renderPermissionsTab(){loadMyAccount();loadMemberList();renderPermMatrix();}
 
@@ -1339,12 +1401,26 @@ async function removeMember(id){
   catch(e){showToast('Error: '+e.message);}
 }
 
-function renderPermMatrix(){
+async function renderPermMatrix(){
   var tbody=document.getElementById('permMatrix');if(!tbody)return;
-  function cs(v){if(v==='Full')return 'color:var(--green);font-weight:600';if(v&&v.indexOf('Edit')>=0)return 'color:var(--accent)';if(v&&v!=='—')return 'color:var(--text2)';return 'color:var(--muted);opacity:.35';}
-  tbody.innerHTML=PERM_MATRIX.map(function(r,i){
+  if(!_companyPerms)await loadCompanyPerms();
+  var roles=['company_admin','project_admin','engineer','subcontractor','witness'];
+  tbody.innerHTML=PERM_MODULES.map(function(mod,i){
     var bg=i%2===0?'':'background:var(--surface2)';
-    return '<tr style="'+bg+'"><td style="padding:8px 16px;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border)">'+escH(r.module)+'</td>'      +'<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-family:DM Mono,monospace;'+cs(r.ca)+'">'+r.ca+'</td>'      +'<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-family:DM Mono,monospace;'+cs(r.pa)+'">'+r.pa+'</td>'      +'<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-family:DM Mono,monospace;'+cs(r.eng)+'">'+r.eng+'</td>'      +'<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-family:DM Mono,monospace;'+cs(r.sub)+'">'+r.sub+'</td>'      +'<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-family:DM Mono,monospace;'+cs(r.wit)+'">'+r.wit+'</td></tr>';
+    var cells=roles.map(function(role){
+      var locked=(role==='company_admin')||(mod==='Company Settings'&&role==='project_admin');
+      var level=locked?'admin':((_companyPerms[mod]||{})[role]||'none');
+      if(mod==='Company Settings'&&role==='project_admin')level='none';
+      var id='perm_'+mod.replace(/[^a-zA-Z0-9]/g,'_')+'_'+role;
+      var color=PERM_LEVEL_COLORS[level]||'var(--muted)';
+      var bg2=PERM_LEVEL_BG[level]||'transparent';
+      var cursor=locked?'default':'pointer';
+      var opacity=locked?'0.5':'1';
+      var title=locked?'Locked':'Click to change';
+      var safeId='perm_'+mod.replace(/[^a-zA-Z0-9]/g,'_')+'_'+role;
+      return '<td style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border)">'        +'<span id="'+safeId+'"'        +' data-module="'+escH(mod)+'"'        +' data-role="'+escH(role)+'"'        +' onclick="var el=this;cyclePermLevel(el.dataset.module,el.dataset.role)"'        +' title="'+(locked?'Locked':'Click to change')+'"'        +' style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:10px;font-family:DM Mono,monospace;cursor:'+cursor+';opacity:'+opacity+';color:'+color+';background:'+bg2+';border:1px solid '+(level==='none'?'transparent':color)+';transition:all .13s;user-select:none">'        +PERM_LEVEL_LABELS[level]+'</span></td>';
+    }).join('');
+    return '<tr style="'+bg+'"><td style="padding:8px 16px;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap">'+escH(mod)+'</td>'+cells+'</tr>';
   }).join('');
 }
 
