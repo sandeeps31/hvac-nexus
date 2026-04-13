@@ -126,6 +126,20 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
+/* PO Slider Panel */
+#poSlider{position:fixed;top:0;right:0;width:380px;max-width:96vw;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:700;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);box-shadow:-8px 0 32px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden}
+#poSlider.open{transform:translateX(0)}
+#poSliderOverlay{position:fixed;inset:0;z-index:699;background:transparent;display:none}
+#poSliderOverlay.open{display:block}
+.po-slider-hdr{padding:18px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.po-slider-body{flex:1;overflow-y:auto;padding:18px 20px}
+.po-slider-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:0 2px;transition:color .13s;flex-shrink:0}
+.po-slider-close:hover{color:var(--danger)}
+.po-field{margin-bottom:14px}
+.po-field-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.po-field-val{font-size:13px;color:var(--text);font-weight:500}
+.po-progress-bar{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-top:6px}
+.po-progress-fill{height:100%;border-radius:3px;transition:width .4s ease}
 </style>
 <script>
 // ── HVAC Nexus Auth Guard ──
@@ -416,7 +430,7 @@ function openClaimModal(id){
   renderClaimLines();
   document.getElementById('claimModal').classList.add('open');
 }
-function closeClaimModal(){document.getElementById('claimModal').classList.remove('open');}
+function closeClaimModal(){document.getElementById('claimModal').classList.remove('open');closePOSlider();}
 function onVendorChange(){checkDupWarn();renderClaimLines();}
 function checkDupWarn(){var vendor=(document.getElementById('cm-vendor').value||'').trim();var period=document.getElementById('cm-period').value;var w=document.getElementById('cm-dup-warn');if(!w)return;if(vendor&&period){var dup=claims.find(function(c){return c.vendor===vendor&&c.period===period&&(!_editingClaimId||c.id!==_editingClaimId);});if(dup){w.style.display='block';w.textContent='Warning: A claim already exists for '+vendor+' for '+fmtM(period)+' ('+dup.claimNo+')';}else w.style.display='none';}else w.style.display='none';}
 
@@ -428,7 +442,12 @@ function renderClaimLines(){
   var html=_claimLines.map(function(line,i){
     var isBase=line.type==='base';
     var poOpts='<option value="">-- Select PO --</option>';
-    vendorPOs.forEach(function(po){poOpts+='<option value="'+escH(po.id)+'"'+(line.poId===po.id?' selected':'')+'>'+escH(po.id)+(po.cat?' ('+escH(po.cat)+')':'')+'</option>';});
+    vendorPOs.forEach(function(po){
+      var rem=getPORemaining(po.id);
+      // Skip POs with no remaining amount (unless this line is already using it)
+      if(rem&&rem.remaining<=0&&line.poId!==po.id)return;
+      poOpts+='<option value="'+escH(po.id)+'"'+(line.poId===po.id?' selected':'')+'>'+escH(po.id)+(po.cat?' ('+escH(po.cat)+')':'')+(rem?' — '+fmt(rem.remaining)+' rem':'')+'</option>';
+    });
     var varOpts='<option value="">-- Select Variation --</option>';
     vendorVars.forEach(function(v){varOpts+='<option value="'+escH(v.num||v.id)+'"'+(line.varNum===v.num?' selected':'')+'>'+escH(v.num||'')+(v.desc?' -- '+v.desc.substring(0,40):'')+'</option>';});
     var remainHtml='';
@@ -443,7 +462,7 @@ function renderClaimLines(){
       +'</div>'
       +(!isBase?'<div style="margin-bottom:8px"><label class="ml">Variation</label><select class="ms" style="width:100%" data-li="'+i+'" onchange="_claimLines[this.dataset.li*1].varNum=this.value;renderClaimLines()">'+varOpts+'</select></div>':'')
       +'<div style="margin-bottom:8px"><label class="ml">Description</label><input class="mi" value="'+escH(line.description||'')+'" placeholder="What is being claimed..." data-li="'+i+'" oninput="_claimLines[this.dataset.li*1].description=this.value"/></div>'
-      +'<div style="margin-bottom:8px"><label class="ml">Linked PO</label><select class="ms" style="width:100%" data-li="'+i+'" onchange="_claimLines[this.dataset.li*1].poId=this.value;renderClaimLines()">'+poOpts+'</select></div>'
+      +'<div style="margin-bottom:8px"><label class="ml">Linked PO</label><select class="ms" style="width:100%" data-li="'+i+'" onchange="_claimLines[this.dataset.li*1].poId=this.value;renderClaimLines();if(this.value)openPOSlider(this.value);else closePOSlider()">'+poOpts+'</select></div>'
       +remainHtml
       +'<div style="margin-top:8px"><label class="ml">Amount (ex GST) *</label><input class="mi" type="number" value="'+(line.amount||'')+'" placeholder="0.00" data-li="'+i+'" oninput="_claimLines[this.dataset.li*1].amount=parseFloat(this.value)||0;updateClaimTotal()"/></div>'
       +'</div>';
@@ -495,7 +514,7 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 </html>
 
 <!-- LOG CLAIM MODAL -->
-<div class="mo" id="claimModal" onclick="if(event.target===this)closeClaimModal()">
+<div class="mo" id="claimModal">
   <div class="modal" style="width:560px">
     <div class="modal-hdr">
       <h3>Log Vendor Claim</h3>
@@ -556,3 +575,72 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
     </div>
   </div>
 </div>
+
+<!-- PO SLIDER PANEL -->
+<div id="poSliderOverlay" onclick="closePOSlider()"></div>
+<div id="poSlider">
+  <div class="po-slider-hdr">
+    <div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Purchase Order</div>
+      <div id="poSliderTitle" style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:var(--text)">—</div>
+    </div>
+    <button class="po-slider-close" onclick="closePOSlider()">×</button>
+  </div>
+  <div class="po-slider-body" id="poSliderBody"></div>
+</div>
+
+<script>
+function openPOSlider(poId){
+  var po=_allPOs.find(function(p){return p.id===poId;});
+  if(!po)return;
+  var rem=getPORemaining(poId);
+  document.getElementById('poSliderTitle').textContent=po.id;
+  var pct=rem?Math.max(0,Math.min(100,Math.round((rem.previouslyClaimed/rem.poValue)*100))):0;
+  var fillColor=rem&&rem.remaining<0?'#ff4d6d':rem&&rem.remaining<rem.poValue*0.1?'#ffb830':'#00e5a0';
+  var html='';
+  // Summary stats
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">';
+  html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px">'
+    +'<div class="po-field-lbl">PO Value</div>'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:16px;font-weight:700;color:var(--text)">'+(rem?fmt(rem.poValue):'—')+'</div>'
+    +'</div>';
+  html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px">'
+    +'<div class="po-field-lbl">Remaining</div>'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:16px;font-weight:700;color:'+(rem&&rem.remaining<0?'var(--danger)':rem&&rem.remaining<rem.poValue*0.1?'var(--warn)':'var(--green)')+'">'+(rem?fmt(rem.remaining):'—')+'</div>'
+    +'</div>';
+  html+='</div>';
+  // Progress bar
+  html+='<div style="margin-bottom:20px">'
+    +'<div style="display:flex;justify-content:space-between;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted);margin-bottom:6px">'
+    +'<span>Claimed</span><span>'+pct+'% of PO value</span></div>'
+    +'<div class="po-progress-bar"><div class="po-progress-fill" style="width:'+pct+'%;background:'+fillColor+'"></div></div>'
+    +'<div style="display:flex;justify-content:space-between;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted);margin-top:4px">'
+    +'<span>'+(rem?fmt(rem.previouslyClaimed):'—')+' claimed</span><span>'+(rem?fmt(rem.remaining)+' left':'')+'</span></div>'
+    +'</div>';
+  // PO details
+  html+='<div style="border-top:1px solid var(--border);padding-top:16px">';
+  html+='<div class="po-field"><div class="po-field-lbl">Supplier</div><div class="po-field-val">'+escH(po.supplier||'—')+'</div></div>';
+  html+='<div class="po-field"><div class="po-field-lbl">Category</div><div class="po-field-val">'+escH(po.cat||'—')+'</div></div>';
+  html+='<div class="po-field"><div class="po-field-lbl">Section</div><div class="po-field-val">'+escH(po.sec||'—')+'</div></div>';
+  // Line items
+  if(po.lineItems&&po.lineItems.length){
+    html+='<div style="margin-top:16px"><div class="po-field-lbl" style="margin-bottom:8px">Line Items</div>';
+    html+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    html+='<thead><tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:5px 0;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Description</th><th style="text-align:right;padding:5px 0;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Amount</th></tr></thead><tbody>';
+    po.lineItems.forEach(function(li){
+      html+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 0;color:var(--text2)">'+escH(li.description||li.desc||'—')+'</td><td style="padding:7px 0;text-align:right;font-family:\'DM Mono\',monospace;font-weight:600;color:var(--text)">'+fmt(li.amount||li.value||0)+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  html+='</div>';
+  document.getElementById('poSliderBody').innerHTML=html;
+  document.getElementById('poSlider').classList.add('open');
+  document.getElementById('poSliderOverlay').classList.add('open');
+}
+function closePOSlider(){
+  document.getElementById('poSlider').classList.remove('open');
+  document.getElementById('poSliderOverlay').classList.remove('open');
+}
+</script>
+</body>
+</html>
