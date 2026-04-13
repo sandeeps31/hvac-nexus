@@ -75,32 +75,29 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .ms:focus{border-color:var(--accent)}.ms option{background:var(--surface2)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 </style>
+<script src="head-common.js"></script>
 <script src="db.js"></script>
 <script>
+// ── HVAC Nexus Auth Guard ──
 (async function(){
+  var DEV_BYPASS=false;
+  if(DEV_BYPASS)return;
   var stored=localStorage.getItem('hvacnexus_session');
   if(!stored){window.location.href='hvac-login.html';return;}
   try{
     var sess=JSON.parse(stored);
-    var el=document.getElementById('hdr-user');
-    if(el&&sess.user)el.textContent=sess.user.user_metadata?.name||sess.user.email||'';
-    if(Date.now()/1000<(sess.expires_at||0)-60)return;
+    if(Date.now()/1000<(sess.expires_at||0)-60){
+      // Set _authSession if db.js loaded
+      if(typeof _authSession!=='undefined')_authSession=sess;
+      return;
+    }
     var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
     var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
     var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
-    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));var el2=document.getElementById('hdr-user');if(el2&&d.user)el2.textContent=d.user.user_metadata?.name||d.user.email||'';}
+    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
     else{localStorage.removeItem('hvacnexus_session');window.location.href='hvac-login.html';}
   }catch(e){window.location.href='hvac-login.html';}
 })();
-function authSignOut(){
-  var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
-  var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
-  var sess=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');
-  if(sess.access_token)fetch(SURL+'/auth/v1/logout',{method:'POST',headers:{'apikey':SKEY,'Authorization':'Bearer '+sess.access_token}});
-  localStorage.removeItem('hvacnexus_session');
-  localStorage.removeItem('hvacnexus_company_id');
-  window.location.href='hvac-login.html';
-}
 </script>
 </head>
 <body>
@@ -113,11 +110,7 @@ function authSignOut(){
       <div class="brand-sub">Project Management Platform</div>
     </div>
   </div>
-  <div style="display:flex;align-items:center;gap:12px">
-    <span id="hdr-user" style="font-size:13px;color:var(--text2);font-family:'DM Mono',monospace"></span>
-    <button class="btn btn-primary" onclick="openCreateModal()">＋ Create Project</button>
-    <button onclick="authSignOut()" title="Sign out" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px;padding:8px 12px;transition:all .13s" onmouseover="this.style.color='var(--danger)';this.style.borderColor='var(--danger)';" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)';">⏻ Sign out</button>
-  </div>
+  <button class="btn btn-primary" onclick="openCreateModal()">＋ Create Project</button>
 </div>
 
 <div class="main">

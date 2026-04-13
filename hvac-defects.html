@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Defects — HVAC NEXUS</title>
 <link rel="stylesheet" href="theme.css">
+<script src="head-common.js"></script>
 <script src="db.js"></script>
 <style>
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex}
@@ -61,65 +62,36 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 .overdue{color:var(--danger);font-weight:600}
 .empty{padding:60px;text-align:center;color:var(--muted)}
 </style>
+<script>
+// ── HVAC Nexus Auth Guard ──
+(async function(){
+  var DEV_BYPASS=false;
+  if(DEV_BYPASS)return;
+  var stored=localStorage.getItem('hvacnexus_session');
+  if(!stored){window.location.href='hvac-login.html';return;}
+  try{
+    var sess=JSON.parse(stored);
+    if(Date.now()/1000<(sess.expires_at||0)-60){
+      // Set _authSession if db.js loaded
+      if(typeof _authSession!=='undefined')_authSession=sess;
+      return;
+    }
+    var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
+    var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+    var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
+    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
+    else{localStorage.removeItem('hvacnexus_session');window.location.href='hvac-login.html';}
+  }catch(e){window.location.href='hvac-login.html';}
+})();
+</script>
 </head>
 <body>
 
 <!-- SIDEBAR -->
-<div class="sb" id="sidebar">
-  <div class="sb-top"><div class="sb-brand"><span class="sb-icon">&#10052;</span><span class="sb-name">HVAC NEXUS</span></div><button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">&laquo;</button></div>
-  <div class="sb-proj-block"><div class="sb-proj-lbl">Current Project</div><div class="sb-proj-name" id="sb-proj-name">—</div><div class="sb-proj-num" id="sb-proj-num">—</div></div>
-  <nav class="sb-nav" id="sbNav">
-    <div class="sb-item" onclick="navTo('index.html')"><span class="sb-item-icon">🏗️</span><span class="sb-item-label">Projects</span></div>
-    <div class="sb-item" onclick="navTo('project-dashboard.html')"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Project Dashboard</span></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('financials')" id="ghdr-financials"><span class="sb-group-chev" id="gchev-financials">▾</span><span class="sb-group-name">Financials</span></div>
-      <div class="sb-group-items" id="gitems-financials" style="display:block">
-    <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
-    <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span></div>
-    <div class="sb-item" onclick="navTo('hvac-vendor-invoices.html')"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
-    <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span></div>
-    <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('procurement')" id="ghdr-procurement"><span class="sb-group-chev" id="gchev-procurement">▾</span><span class="sb-group-name">Procurement</span></div>
-      <div class="sb-group-items" id="gitems-procurement" style="display:block">
-    <div class="sb-item" onclick="navTo('hvac-procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
-    <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
-    <div class="sb-item" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('technical')" id="ghdr-technical"><span class="sb-group-chev" id="gchev-technical">▾</span><span class="sb-group-name">Technical</span></div>
-      <div class="sb-group-items" id="gitems-technical" style="display:block">
-    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span></div>
-    <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span></div>
-    <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></div>
-    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span></div>
-    <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span></div>
-    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📅</span><span class="sb-item-label">Project plan</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
-      <div class="sb-group-items" id="gitems-quality" style="display:block">
-    <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
-    <div class="sb-item" onclick="navTo('hvac-fire-register.html')"><span class="sb-item-icon">🔥</span><span class="sb-item-label">Passive fire</span></div>
-    <div class="sb-item active"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
-    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📄</span><span class="sb-item-label">NCR</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('commissioning')" id="ghdr-commissioning"><span class="sb-group-chev" id="gchev-commissioning">▾</span><span class="sb-group-name">Commissioning</span></div>
-      <div class="sb-group-items" id="gitems-commissioning" style="display:block">
-    <div class="sb-item" onclick="navTo('hvac-commissioning-plan.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning plan</span></div>
-    <div class="sb-item" onclick="navTo('hvac-precommissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span></div>
-    <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('handover')" id="ghdr-handover"><span class="sb-group-chev" id="gchev-handover">▾</span><span class="sb-group-name">Handover</span></div>
-      <div class="sb-group-items" id="gitems-handover" style="display:block">
-    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📦</span><span class="sb-item-label">Asset register</span></div>
-    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📖</span><span class="sb-item-label">O&amp;M manuals</span></div>
-    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">🔧</span><span class="sb-item-label">Maintenance plan</span></div>
-      </div></div>
-    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
-      <div class="sb-group-items" id="gitems-settings" style="display:block">
-    <div class="sb-item" onclick="navTo('hvac-project-settings.html')"><span class="sb-item-icon">🏗️</span><span class="sb-item-label">Project settings</span></div>
-    <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
-      </div></div>
-  </nav>
-  <div class="sb-footer"><div class="sb-av" id="sb-av">?</div><span class="sb-user-name" id="sb-user">—</span></div>
+<div id="app-sidebar"></div>
+<script src="sidebar.js"></script>
+
+<span class="sb-user-name" id="sb-user">—</span></div>
 </div>
 
 <!-- MAIN -->
