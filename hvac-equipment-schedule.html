@@ -2304,13 +2304,15 @@ function exportRevPDF(){
   }
   var diff=computeDiff(baseRows,snapRows);
   var rows=snapRows.slice();
-  baseRows.forEach(function(br){
-    var bk=rowKey(br);
-    if(diff.deleted.indexOf(bk)>=0){
-      // Add deleted row with flag
-      rows.push(Object.assign({},br,{_exportDeleted:true}));
-    }
-  });
+  // For draft exports: only show live rows (no deleted from base)
+  if(hasDiff&&!isDraftExport){
+    baseRows.forEach(function(br){
+      var bk=rowKey(br);
+      if(diff.deleted.indexOf(bk)>=0){
+        rows.push(Object.assign({},br,{_exportDeleted:true}));
+      }
+    });
+  }
   var proj=dbGetCurrentProject();
   var projName=proj?proj.name:'[Project Name]';
   var projNum=proj?proj.num:'';
@@ -2400,9 +2402,14 @@ function exportRevXLSX(){
   }
   var diff=computeDiff(baseRows,snapRows);
   var hasDiff=baseRows.length>0;
-  // Include deleted rows (from base but not in current snapshot)
+  // For draft exports: only show live rows (no deleted from base)
+  // For published revision exports: include rows deleted since previous revision
   var rows=snapRows.slice();
-  if(hasDiff){baseRows.forEach(function(br){if(diff.deleted.indexOf(rowKey(br))>=0)rows.push(Object.assign({},br,{_exportDeleted:true}));});}
+  if(hasDiff&&!isDraftExport){
+    baseRows.forEach(function(br){
+      if(diff.deleted.indexOf(rowKey(br))>=0)rows.push(Object.assign({},br,{_exportDeleted:true}));
+    });
+  }
   function doXlsx(){
     var wb=XLSX.utils.book_new();
     var wsData=[cols.map(function(c){return c.l;})];
