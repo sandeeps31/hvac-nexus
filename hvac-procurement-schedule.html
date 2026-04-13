@@ -235,7 +235,6 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button class="bg bsm btn" onclick="runSync()">⟳ Sync from Equipment Schedule</button>
-    <button class="bg bsm btn" onclick="purgeBlankRows()" style="color:var(--danger);border-color:var(--danger)" title="Remove all rows with no Equipment ID">🗑 Purge blank rows</button>
     <button class="bg bsm btn" onclick="openColSettings()">⚙ Columns</button>
     <button class="bg bsm btn" onclick="exportCSV()">⬇ Export CSV</button>
 
@@ -509,15 +508,6 @@ renderTable();updateSummary();checkEquipSync();
   if(updated)msg.push(updated+' item'+(updated>1?'s':'')+' updated');
   if(added)msg.push(added+' new item'+(added>1?'s':'')+' added');
   showToast('✓ Sync complete — '+(msg.join(', ')||'No changes'));
-}
-
-function purgeBlankRows(){
-  var blanks=items.filter(function(i){return !i.equipId||!i.equipId.trim();});
-  if(!blanks.length){showToast('No blank rows found.');return;}
-  if(!confirm('Remove '+blanks.length+' row'+(blanks.length>1?'s':'')+' with no Equipment ID? This cannot be undone.'))return;
-  items=items.filter(function(i){return i.equipId&&i.equipId.trim();});
-  save();renderTable();updateSummary();
-  showToast('✓ Removed '+blanks.length+' blank row'+(blanks.length>1?'s':''));
 }
 
 function dismissSyncBanner(){
@@ -1014,10 +1004,13 @@ function openColSettings(){
     var checked=!_hiddenCols.has(col.id);
     var locked=col.locked;
     return '<div class="col-setting-row" data-cid="'+col.id+'" style="display:flex;align-items:center;gap:10px;padding:7px 16px;border-radius:6px;transition:background .1s;user-select:none"'
-      +' onmouseover="if(!this.classList.contains(\'dragging\'))this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'      +(locked
-        ?'<span style="color:var(--muted);font-size:14px;cursor:default">⋮⋮</span>'
-        :'<span class="drag-handle" style="color:var(--muted);font-size:14px;cursor:grab;padding:0 2px" title="Drag to reorder">⋮⋮</span>'
-      )      +'<input type="checkbox" '+(checked?'checked':'')+' '+(locked?'disabled':'')      +' onchange="toggleCol(this.dataset.cid,this.checked)" data-cid="'+col.id+'"'      +' style="accent-color:var(--accent);cursor:'+(locked?'default':'pointer')+';width:15px;height:15px;flex-shrink:0"/>'      +'<span style="font-size:13px;color:'+(locked?'var(--muted)':'var(--text)')+'">'+col.label+'</span>'      +(locked?'<span style="font-size:10px;color:var(--muted);margin-left:auto;font-family:DM Mono,monospace">locked</span>':'')
+      +' onmouseover="if(!this.classList.contains(\'dragging\'))this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      +'<span class="drag-handle" style="color:var(--muted);font-size:14px;cursor:grab;padding:0 2px" title="Drag to reorder">⋮⋮</span>'
+      +'<input type="checkbox" '+(checked?'checked':'')+' '+(locked?'disabled':'')
+      +' onchange="toggleCol(this.dataset.cid,this.checked)" data-cid="'+col.id+'"'
+      +' style="accent-color:var(--accent);cursor:'+(locked?'default':'pointer')+';width:15px;height:15px;flex-shrink:0"/>'
+      +'<span style="font-size:13px;color:var(--text)">'+col.label+'</span>'
+      +(locked?'<span style="font-size:10px;color:var(--muted);margin-left:auto;font-family:DM Mono,monospace">locked</span>':'')
       +'</div>';
   }).join('');
   // Init drag on non-locked rows
@@ -1044,9 +1037,8 @@ function initColDrag(){
     var target=document.elementFromPoint(e.clientX,e.clientY);
     if(!target)return;
     var targetRow=target.closest('.col-setting-row');
-    if(targetRow&&targetRow!==dragSrc&&!targetRow.querySelector('span:not(.drag-handle)'+ '~input[disabled]')){
-      var locked=targetRow.dataset.cid&&PROC_COLS.find(function(c){return c.id===targetRow.dataset.cid&&c.locked;});
-      if(!locked){
+      if(targetRow&&targetRow!==dragSrc){
+      {
         var allRows=Array.from(list.querySelectorAll('.col-setting-row'));
         var srcIdx=allRows.indexOf(dragSrc);
         var tgtIdx=allRows.indexOf(targetRow);
