@@ -126,6 +126,9 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
+.main-tab{padding:9px 16px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:transparent;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .13s}
+.main-tab:hover{color:var(--text)}
+.main-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
 /* PO Slider Panel */
 #poSlider{position:fixed;top:0;right:0;width:380px;max-width:96vw;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:700;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);box-shadow:-8px 0 32px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden}
 #poSlider.open{transform:translateX(0)}
@@ -196,19 +199,28 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
   <div class="sc"><div class="sc-lbl">Total claims</div><div class="sc-val" id="sumTotal">0</div><div class="sc-sub">all time</div></div>
 </div>
 
+<!-- AWAITING INVOICE BANNER -->
+<div id="awaitingBanner" style="display:none;margin:12px 16px 0;padding:10px 16px;background:rgba(255,184,48,.1);border:1px solid rgba(255,184,48,.35);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font-size:16px">⚠️</span>
+    <span id="awaitingBannerText" style="font-size:13px;color:var(--warn);font-weight:600"></span>
+  </div>
+  <button class="btn bsm" onclick="switchTab('claims')" style="background:rgba(255,184,48,.15);color:var(--warn);border:1px solid rgba(255,184,48,.35);white-space:nowrap">View Claims →</button>
+</div>
+
+<!-- TABS -->
+<div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin:12px 0 0;padding:0 16px" id="mainTabs">
+  <button class="main-tab active" id="tab-invoices" onclick="switchTab('invoices')">🧾 Invoices <span id="tabBadgeInvoices" style="font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:20px;background:var(--accent-dim);color:var(--accent);margin-left:4px"></span></button>
+  <button class="main-tab" id="tab-claims" onclick="switchTab('claims')">📋 Claims <span id="tabBadgeClaims" style="font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:20px;background:var(--surface2);color:var(--muted);margin-left:4px"></span></button>
+</div>
+
+<!-- TOOLBAR -->
 <div class="toolbar">
-  <div class="search-box"><span style="color:var(--muted)">&#128269;</span><input type="text" id="searchInput" placeholder="Search vendor, period, variation…" oninput="renderClaims()"></div>
-  <select class="fsel" id="stFilter" onchange="renderClaims()">
+  <div class="search-box"><span style="color:var(--muted)">&#128269;</span><input type="text" id="searchInput" placeholder="Search vendor, invoice, period…" oninput="renderActive()"></div>
+  <select class="fsel" id="stFilter" onchange="renderActive()">
     <option value="">All Statuses</option>
-    <option value="Pending">Claim Pending</option>
-    <option value="Approved">Claim Approved</option>
-    <option value="Disputed">Disputed</option>
-    <option value="Invoice Pending">Invoice Pending</option>
-    <option value="Invoice Approved">Invoice Approved</option>
-    <option value="Direct Invoice Pending">Direct Invoice Pending</option>
-    <option value="Direct Invoice Approved">Direct Invoice Approved</option>
   </select>
-  <select class="fsel" id="monthFilter" onchange="renderClaims()"><option value="">All Periods</option></select>
+  <select class="fsel" id="monthFilter" onchange="renderActive()"><option value="">All Periods</option></select>
   <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="claimCount"></span>
 </div>
 <div class="page" id="pageContent"></div>
@@ -352,25 +364,140 @@ function getPORemaining(poId){
   return {poValue:po.value,previouslyClaimed:prev,remaining:po.value-prev};
 }
 
+var _activeTab='invoices';
+
+function switchTab(tab){
+  _activeTab=tab;
+  document.getElementById('tab-invoices').classList.toggle('active',tab==='invoices');
+  document.getElementById('tab-claims').classList.toggle('active',tab==='claims');
+  // Update status filter options per tab
+  var sf=document.getElementById('stFilter');
+  sf.innerHTML='<option value="">All Statuses</option>';
+  if(tab==='invoices'){
+    ['Direct Invoice Pending','Direct Invoice Approved','Invoice Pending','Invoice Approved'].forEach(function(s){sf.innerHTML+='<option value="'+s+'">'+s+'</option>';});
+  } else {
+    ['Pending','Approved','Disputed','Invoice Pending','Invoice Approved'].forEach(function(s){sf.innerHTML+='<option value="'+s+'">'+s+'</option>';});
+  }
+  sf.value='';
+  renderActive();
+}
+
+function renderActive(){
+  if(_activeTab==='invoices')renderInvoicesTab();
+  else renderClaimsTab();
+}
+
 function updateSummary(){
-  var claimPending=claims.filter(function(c){return c.status==='Pending';}).length;
-  var invPending=claims.filter(function(c){return c.status==='Invoice Pending';}).length;
+  var claimPending=claims.filter(function(c){return !c.isDirect&&(c.status==='Pending');}).length;
+  var invPending=claims.filter(function(c){return c.status==='Invoice Pending'||c.status==='Direct Invoice Pending';}).length;
   var cm=new Date().toISOString().substring(0,7);
-  var monthAmt=claims.filter(function(c){return c.period===cm&&c.status==='Invoice Approved';}).reduce(function(a,c){return a+num(c.invoiceAmount||c.totalAmount||0);},0);
+  var monthAmt=claims.filter(function(c){return c.period===cm&&(c.status==='Invoice Approved'||c.status==='Direct Invoice Approved');}).reduce(function(a,c){return a+num(c.invoiceAmount||c.totalAmount||0);},0);
   var sp=document.getElementById('sumPending');if(sp)sp.textContent=claimPending;
   var sip=document.getElementById('sumInvPending');if(sip)sip.textContent=invPending;
   var sm=document.getElementById('sumMonthAmt');if(sm)sm.textContent=fmt(monthAmt);
-  var st=document.getElementById('sumTotal');if(st)st.textContent=claims.length;
+  // Total = invoiced items only
+  var totalInvoiced=claims.filter(function(c){return c.status==='Invoice Approved'||c.status==='Direct Invoice Approved';}).length;
+  var st=document.getElementById('sumTotal');if(st)st.textContent=totalInvoiced;
+  // Period filter
   var mf=document.getElementById('monthFilter');
   if(mf){var ms={};claims.forEach(function(c){if(c.period)ms[c.period]=true;});var cur=mf.value;mf.innerHTML='<option value="">All Periods</option>';Object.keys(ms).sort().reverse().forEach(function(m){mf.innerHTML+='<option value="'+m+'"'+(m===cur?' selected':'')+'>'+fmtM(m)+'</option>';});}
+  // Tab badges
+  var invoiceCount=claims.filter(function(c){return c.isDirect||(c.status==='Invoice Pending'||c.status==='Invoice Approved');}).length;
+  var claimCount=claims.filter(function(c){return !c.isDirect&&c.status!=='Invoice Pending'&&c.status!=='Invoice Approved';}).length;
+  var bi=document.getElementById('tabBadgeInvoices');if(bi)bi.textContent=invoiceCount||'';
+  var bc=document.getElementById('tabBadgeClaims');if(bc)bc.textContent=claimCount||'';
+  // Awaiting invoice banner
+  var awaitingApproved=claims.filter(function(c){return !c.isDirect&&c.status==='Approved';});
+  var banner=document.getElementById('awaitingBanner');
+  var bannerText=document.getElementById('awaitingBannerText');
+  if(banner&&bannerText){
+    if(awaitingApproved.length){
+      banner.style.display='flex';
+      bannerText.textContent=awaitingApproved.length+' approved claim'+(awaitingApproved.length!==1?'s':'')+' awaiting invoice — log the invoice when received';
+    } else {
+      banner.style.display='none';
+    }
+  }
 }
 
-function renderClaims(){
+function renderClaims(){renderActive();}
+
+function renderInvoicesTab(){
   var page=document.getElementById('pageContent');if(!page)return;
   var q=(document.getElementById('searchInput').value||'').toLowerCase();
   var sf=(document.getElementById('stFilter').value||'');
   var mf=(document.getElementById('monthFilter').value||'');
-  var filtered=claims.filter(function(c){
+  // Invoices tab = direct invoices + claims that have been invoiced
+  var invoiced=claims.filter(function(c){
+    return c.isDirect||(c.status==='Invoice Pending'||c.status==='Invoice Approved');
+  });
+  var filtered=invoiced.filter(function(c){
+    if(sf&&c.status!==sf)return false;
+    if(mf&&c.period!==mf)return false;
+    if(q){var s=(c.vendor||'')+' '+(c.invoiceNo||'')+' '+(c.claimNo||'')+' '+(c.period||'');if(s.toLowerCase().indexOf(q)<0)return false;}
+    return true;
+  });
+  var cc=document.getElementById('claimCount');if(cc)cc.textContent=filtered.length+' invoice'+(filtered.length!==1?'s':'');
+  if(!filtered.length){
+    page.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">🧾</div><div style="font-size:14px;font-weight:600;margin-bottom:6px">No invoices yet</div><div style="font-size:13px">Log an invoice directly or approve a claim and convert it.</div></div>';
+    return;
+  }
+  var sorted=filtered.slice().sort(function(a,b){return (b.invoiceDate||b.date||'').localeCompare(a.invoiceDate||a.date||'');});
+  var stMap={'Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Invoice Approved':['var(--green)','rgba(0,200,100,.1)'],'Direct Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Direct Invoice Approved':['var(--green)','rgba(0,200,100,.1)']};
+  var html='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--surface2);border-bottom:1px solid var(--border)">'
+    +'<th style="padding:9px 20px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Vendor</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Invoice No.</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Date</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Period</th>'
+    +'<th style="padding:9px 12px;text-align:right;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Amount</th>'
+    +'<th style="padding:9px 12px;text-align:center;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Status</th>'
+    +'<th style="padding:9px 20px;width:160px"></th>'
+    +'</tr></thead><tbody>';
+  sorted.forEach(function(c){
+    var stColors=stMap[c.status]||['var(--text2)','var(--surface2)'];
+    var isDirect=!!c.isDirect;
+    var invAmt=num(c.invoiceAmount||c.totalAmount||0);
+    var actions='';
+    if(c.status==='Invoice Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveInvoice(this.dataset.cid)">Approve</button> ';}
+    else if(c.status==='Direct Invoice Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveDirectInvoice(this.dataset.cid)">Approve</button> ';}
+    var editFn=isDirect?'openInvoiceModal':'openClaimModal';
+    actions+='<button class="btn bsm" style="color:var(--muted);border-color:var(--border);background:var(--surface2)" data-cid="'+c.id+'" onclick="'+editFn+'(this.dataset.cid)">Edit</button>';
+    // Main invoice row
+    html+='<tr style="border-bottom:'+(isDirect||!c.claimNo?'1px solid var(--border)':'none')+';background:var(--surface)" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+      +'<td style="padding:11px 20px"><div style="font-weight:600;color:var(--text)">'+escH(c.vendor||'--')+'</div>'+(isDirect?'<div style="font-size:10px;color:var(--muted);margin-top:2px;font-family:\'DM Mono\',monospace">DIRECT INVOICE</div>':'')+'</td>'
+      +'<td style="padding:11px 12px;font-family:DM Mono,monospace;font-size:12px;font-weight:600;color:var(--text)">'+escH(c.invoiceNo||'—')+'</td>'
+      +'<td style="padding:11px 12px;font-size:12px;color:var(--text2)">'+fmtD(c.invoiceDate||c.date||'')+'</td>'
+      +'<td style="padding:11px 12px;font-size:12px;color:var(--text2)">'+fmtM(c.period||'')+'</td>'
+      +'<td style="padding:11px 12px;text-align:right;font-family:DM Mono,monospace;font-size:13px;font-weight:700;color:var(--text)">'+fmt(invAmt)+'</td>'
+      +'<td style="padding:11px 12px;text-align:center"><span style="font-family:DM Mono,monospace;font-size:9px;padding:3px 8px;border-radius:20px;font-weight:600;color:'+stColors[0]+';background:'+stColors[1]+'">'+escH(c.status||'')+'</span></td>'
+      +'<td style="padding:8px 20px;text-align:right;white-space:nowrap">'+actions+'</td>'
+      +'</tr>';
+    // Claim sub-row (only for converted claims)
+    if(!isDirect&&c.claimNo){
+      var varAmt=invAmt-num(c.totalAmount||0);
+      var varColor=varAmt>0?'var(--danger)':varAmt<0?'var(--warn)':'var(--green)';
+      var linesSummary=(c.lines||[]).map(function(l){return '<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 5px;border-radius:3px;background:'+(l.type==='base'?'var(--accent-dim)':'var(--warn-dim)')+';color:'+(l.type==='base'?'var(--accent)':'var(--warn)')+'">'+(l.type==='base'?'BASE':'VAR '+(l.varNum||''))+'</span>';}).join(' ');
+      html+='<tr style="border-bottom:1px solid var(--border);background:rgba(0,200,255,.03)">'
+        +'<td style="padding:6px 20px 6px 32px" colspan="2"><div style="display:flex;align-items:center;gap:8px"><span style="color:var(--muted);font-size:11px">↳</span><span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">Claim '+escH(c.claimNo||'')+'</span>'+linesSummary+'</div></td>'
+        +'<td style="padding:6px 12px;font-size:11px;color:var(--muted)">'+fmtD(c.date||'')+'</td>'
+        +'<td style="padding:6px 12px;font-size:11px;color:var(--muted)">'+fmtM(c.period||'')+'</td>'
+        +'<td style="padding:6px 12px;text-align:right;font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+fmt(c.totalAmount||0)+(varAmt!==0?'&nbsp;<span style="font-size:10px;color:'+varColor+'">'+(varAmt>0?'+':'')+fmt(Math.abs(varAmt))+'</span>':'')+'</td>'
+        +'<td colspan="2"></td>'
+        +'</tr>';
+    }
+  });
+  html+='</tbody></table>';
+  page.innerHTML=html;
+}
+
+function renderClaimsTab(){
+  var page=document.getElementById('pageContent');if(!page)return;
+  var q=(document.getElementById('searchInput').value||'').toLowerCase();
+  var sf=(document.getElementById('stFilter').value||'');
+  var mf=(document.getElementById('monthFilter').value||'');
+  // Claims tab = non-direct claims only
+  var claimsOnly=claims.filter(function(c){return !c.isDirect;});
+  var filtered=claimsOnly.filter(function(c){
     if(sf&&c.status!==sf)return false;
     if(mf&&c.period!==mf)return false;
     if(q){var s=(c.vendor||'')+' '+(c.claimNo||'')+' '+(c.period||'')+' '+(c.lines||[]).map(function(l){return (l.varNum||'')+' '+(l.description||'');}).join(' ');if(s.toLowerCase().indexOf(q)<0)return false;}
@@ -378,48 +505,43 @@ function renderClaims(){
   });
   var cc=document.getElementById('claimCount');if(cc)cc.textContent=filtered.length+' claim'+(filtered.length!==1?'s':'');
   if(!filtered.length){
-    page.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">&#128221;</div><div style="font-size:14px;font-weight:600;margin-bottom:6px">No claims yet</div><div style="font-size:13px">Click <strong>+ Log Claim</strong> to get started.</div></div>';
+    page.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">📋</div><div style="font-size:14px;font-weight:600;margin-bottom:6px">No claims yet</div><div style="font-size:13px">Click <strong>+ Log Claim</strong> to get started.</div></div>';
     return;
   }
   var sorted=filtered.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
-  var stMap={'Pending':['var(--warn)','rgba(255,184,48,.1)'],'Approved':['var(--green)','rgba(0,200,100,.1)'],'Disputed':['var(--danger)','rgba(255,77,109,.1)'],'Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Invoice Approved':['var(--green)','rgba(0,200,100,.1)'],'Direct Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Direct Invoice Approved':['var(--green)','rgba(0,200,100,.1)']};
+  var stMap={'Pending':['var(--warn)','rgba(255,184,48,.1)'],'Approved':['var(--green)','rgba(0,200,100,.1)'],'Disputed':['var(--danger)','rgba(255,77,109,.1)'],'Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Invoice Approved':['var(--green)','rgba(0,200,100,.1)']};
   var html='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--surface2);border-bottom:1px solid var(--border)">'
     +'<th style="padding:9px 20px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Vendor</th>'
-    +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Claim No</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Claim No.</th>'
     +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Period</th>'
     +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Lines</th>'
     +'<th style="padding:9px 12px;text-align:right;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Amount</th>'
     +'<th style="padding:9px 12px;text-align:center;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Status</th>'
-    +'<th style="padding:9px 20px;width:180px"></th>'
+    +'<th style="padding:9px 20px;width:200px"></th>'
     +'</tr></thead><tbody>';
   sorted.forEach(function(c){
     var stColors=stMap[c.status]||['var(--text2)','var(--surface2)'];
-    var isDirect=!!c.isDirect;
-    var linesSummary=isDirect
-      ?'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(167,139,250,.15);color:#a78bfa">DIRECT</span>'
-      :(c.lines||[]).map(function(l){return '<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 5px;border-radius:3px;background:'+(l.type==='base'?'var(--accent-dim)':'var(--warn-dim)')+';color:'+(l.type==='base'?'var(--accent)':'var(--warn)')+'">'+(l.type==='base'?'BASE':'VAR '+(l.varNum||''))+'</span>';}).join(' ');
+    var isInvoiced=c.status==='Invoice Pending'||c.status==='Invoice Approved';
+    var linesSummary=(c.lines||[]).map(function(l){return '<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 5px;border-radius:3px;background:'+(l.type==='base'?'var(--accent-dim)':'var(--warn-dim)')+';color:'+(l.type==='base'?'var(--accent)':'var(--warn)')+'">'+(l.type==='base'?'BASE':'VAR '+(l.varNum||''))+'</span>';}).join(' ');
     var actions='';
-    if(isDirect){
-      if(c.status==='Direct Invoice Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveDirectInvoice(this.dataset.cid)">Approve Invoice</button>';}
-      actions+=' <button class="btn bsm" style="color:var(--muted);border-color:var(--border);background:var(--surface2)" data-cid="'+c.id+'" onclick="openInvoiceModal(this.dataset.cid)">Edit</button>';
-    } else {
-      if(c.status==='Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveClaim(this.dataset.cid)">Approve</button> <button class="btn bsm" style="color:var(--danger);border-color:rgba(255,77,109,.3);background:var(--surface2)" data-cid="'+c.id+'" onclick="disputeClaim(this.dataset.cid)">Dispute</button>';}
-      else if(c.status==='Approved'){actions='<button class="btn bsm" style="color:#a78bfa;border-color:rgba(167,139,250,.3);background:var(--surface2)" data-cid="'+c.id+'" onclick="openConvertModal(this.dataset.cid)">+ Log Invoice</button>';}
-      else if(c.status==='Invoice Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveInvoice(this.dataset.cid)">Approve Invoice</button>';}
-      actions+=' <button class="btn bsm" style="color:var(--muted);border-color:var(--border);background:var(--surface2)" data-cid="'+c.id+'" onclick="openClaimModal(this.dataset.cid)">Edit</button>';
+    if(c.status==='Pending'){
+      actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveClaim(this.dataset.cid)">Approve</button> '
+        +'<button class="btn bsm" style="color:var(--danger);border-color:rgba(255,77,109,.3);background:var(--surface2)" data-cid="'+c.id+'" onclick="disputeClaim(this.dataset.cid)">Dispute</button>';
+    } else if(c.status==='Approved'){
+      actions='<button class="btn bsm" style="background:rgba(255,184,48,.15);color:var(--warn);border:1px solid rgba(255,184,48,.4);font-weight:600" data-cid="'+c.id+'" onclick="openConvertModal(this.dataset.cid)">⚠ Log Invoice</button>';
+    } else if(c.status==='Invoice Pending'){
+      actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveInvoice(this.dataset.cid)">Approve Invoice</button>';
     }
-    var refNo=isDirect?escH(c.invoiceNo||'—'):escH(c.claimNo||'—');
-    var rowAmt=isDirect?num(c.invoiceAmount||c.totalAmount||0):num(c.totalAmount||0);
-    html+='<tr style="border-bottom:1px solid var(--border);background:var(--surface)" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'
-      +'<td style="padding:11px 20px;font-weight:600;color:var(--text)">'+escH(c.vendor||'--')+'</td>'
-      +'<td style="padding:11px 12px;font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+refNo+'</td>'
+    if(!isInvoiced){actions+=(actions?' ':'')+'<button class="btn bsm" style="color:var(--muted);border-color:var(--border);background:var(--surface2)" data-cid="'+c.id+'" onclick="openClaimModal(this.dataset.cid)">Edit</button>';}
+    html+='<tr style="border-bottom:1px solid var(--border);background:var(--surface)'+(isInvoiced?';opacity:.65':'')+'" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+      +'<td style="padding:11px 20px"><div style="font-weight:600;color:var(--text)">'+escH(c.vendor||'--')+'</div>'+(isInvoiced?'<div style="font-size:10px;color:var(--green);margin-top:2px;font-family:\'DM Mono\',monospace">✓ Invoiced — '+escH(c.invoiceNo||'')+'</div>':'')+'</td>'
+      +'<td style="padding:11px 12px;font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+escH(c.claimNo||'—')+'</td>'
       +'<td style="padding:11px 12px;font-size:12px;color:var(--text2)">'+fmtM(c.period||'')+'</td>'
       +'<td style="padding:11px 12px">'+linesSummary+'</td>'
-      +'<td style="padding:11px 12px;text-align:right;font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:var(--text)">'+fmt(rowAmt)+'</td>'
+      +'<td style="padding:11px 12px;text-align:right;font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:var(--text)">'+fmt(c.totalAmount||0)+'</td>'
       +'<td style="padding:11px 12px;text-align:center"><span style="font-family:DM Mono,monospace;font-size:9px;padding:3px 8px;border-radius:20px;font-weight:600;color:'+stColors[0]+';background:'+stColors[1]+'">'+escH(c.status||'Pending')+'</span></td>'
       +'<td style="padding:8px 20px;text-align:right;white-space:nowrap">'+actions+'</td>'
       +'</tr>';
-    if(!isDirect&&c.invoiceNo){var varAmt=num(c.invoiceAmount||0)-num(c.totalAmount||0);var varColor=varAmt>0?'var(--danger)':varAmt<0?'var(--warn)':'var(--green)';html+='<tr style="border-bottom:1px solid var(--border);background:rgba(167,139,250,.04)"><td colspan="3" style="padding:7px 20px 7px 36px;font-size:11px;color:var(--muted)">Invoice: '+escH(c.invoiceNo||'')+(c.invoiceDate?' &nbsp;|&nbsp; '+fmtD(c.invoiceDate):'')+'</td><td colspan="2" style="padding:7px 12px;text-align:right;font-family:DM Mono,monospace;font-size:12px;font-weight:600;color:var(--text)">'+fmt(c.invoiceAmount||0)+(varAmt!==0?'&nbsp;<span style="font-size:10px;color:'+varColor+'">'+(varAmt>0?'+':'')+fmt(Math.abs(varAmt))+' vs claim</span>':'')+'</td><td colspan="2"></td></tr>';}
   });
   html+='</tbody></table>';
   page.innerHTML=html;
@@ -433,7 +555,7 @@ var _convertClaimId=null;
 function openConvertModal(id){_convertClaimId=id;var c=claims.find(function(x){return x.id===id;});if(!c)return;document.getElementById('cv-invno').value='';document.getElementById('cv-invdate').value=today_();document.getElementById('cv-amount').value=c.totalAmount||'';document.getElementById('cv-claim-ref').textContent=c.claimNo+' -- '+c.vendor+' -- '+fmt(c.totalAmount);document.getElementById('cv-variance').style.display='none';document.getElementById('convertModal').classList.add('open');}
 function closeConvertModal(){document.getElementById('convertModal').classList.remove('open');}
 function checkInvVariance(){var c=claims.find(function(x){return x.id===_convertClaimId;});if(!c)return;var invAmt=num(document.getElementById('cv-amount').value);var claimAmt=num(c.totalAmount||0);var vEl=document.getElementById('cv-variance');if(!invAmt){vEl.style.display='none';return;}var diff=invAmt-claimAmt;if(diff>0){vEl.style.display='block';vEl.style.cssText='display:block;padding:8px 12px;border-radius:7px;font-size:12px;background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.3)';vEl.textContent='Invoice exceeds claim by '+fmt(diff)+'. Vendor must issue a credit note.';}else if(diff<0){vEl.style.display='block';vEl.style.cssText='display:block;padding:8px 12px;border-radius:7px;font-size:12px;background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)';vEl.textContent='Invoice is '+fmt(Math.abs(diff))+' less than claim. OK to pay as invoiced.';}else{vEl.style.display='block';vEl.style.cssText='display:block;padding:8px 12px;border-radius:7px;font-size:12px;background:rgba(0,200,100,.08);color:var(--green);border:1px solid rgba(0,200,100,.3)';vEl.textContent='Invoice matches claim exactly.';}}
-function saveConvert(){var c=claims.find(function(x){return x.id===_convertClaimId;});if(!c)return;var invNo=document.getElementById('cv-invno').value.trim();if(!invNo){alert('Invoice number is required.');return;}var invAmt=num(document.getElementById('cv-amount').value);if(!invAmt){alert('Amount is required.');return;}if(invAmt>num(c.totalAmount||0)){if(!confirm('Invoice exceeds claim. Save anyway?'))return;}c.invoiceNo=invNo;c.invoiceDate=document.getElementById('cv-invdate').value;c.invoiceAmount=invAmt;c.status='Invoice Pending';save();closeConvertModal();renderClaims();updateSummary();}
+function saveConvert(){var c=claims.find(function(x){return x.id===_convertClaimId;});if(!c)return;var invNo=document.getElementById('cv-invno').value.trim();if(!invNo){alert('Invoice number is required.');return;}var invAmt=num(document.getElementById('cv-amount').value);if(!invAmt){alert('Amount is required.');return;}if(invAmt>num(c.totalAmount||0)){if(!confirm('Invoice exceeds claim. Save anyway?'))return;}c.invoiceNo=invNo;c.invoiceDate=document.getElementById('cv-invdate').value;c.invoiceAmount=invAmt;c.status='Invoice Pending';save();closeConvertModal();switchTab('invoices');updateSummary();}
 
 var _editingClaimId=null,_claimLines=[];
 function openClaimModal(id){
@@ -625,7 +747,7 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   localStorage.removeItem('hvacnexus_sb_groups');
   try{var p=dbGetCurrentProject();if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
   // Load data on init
-  Promise.all([loadClaims(),loadAllPOs(),loadVariations()]).then(function(){renderClaims();updateSummary();});
+  Promise.all([loadClaims(),loadAllPOs(),loadVariations()]).then(function(){switchTab('invoices');updateSummary();});
   try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
   var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
   if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
