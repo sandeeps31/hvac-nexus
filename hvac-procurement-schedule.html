@@ -235,6 +235,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button class="bg bsm btn" onclick="runSync()">⟳ Sync from Equipment Schedule</button>
+    <button class="bg bsm btn" onclick="openColSettings()">⚙ Columns</button>
     <button class="bg bsm btn" onclick="exportCSV()">⬇ Export CSV</button>
 
     <button class="bp bsm btn" onclick="openAddModal()">＋ Add Item</button>
@@ -290,22 +291,9 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 </div>
 <div id="fullView" style="padding:16px 24px 60px"><div style="overflow:auto;border-radius:var(--radius);max-height:calc(100vh - 280px)"><table class="proc-tbl" id="procTable">
     <thead>
-      <tr>
+      <tr id="procThead">
         <th style="width:36px"><input type="checkbox" id="selectAllChk" onchange="toggleSelectAll(this.checked)" style="cursor:pointer;accent-color:var(--accent)"/></th>
         <th style="width:40px">#</th>
-        <th>Equipment ID</th>
-        <th>Location</th>
-        <th>Sub area</th>
-        <th>Manufacturer</th>
-        <th>Model</th>
-        <th>Equipment type</th>
-        <th>Submission approval</th>
-        <th style="width:140px">Order status</th>
-        <th style="width:110px">Order date</th>
-        <th style="width:110px">Lead time (weeks)</th>
-        <th style="width:100px">ETA</th>
-        <th style="width:110px">Delivery date</th>
-        <th>Comments</th>
       </tr>
     </thead>
     <tbody id="procTbody"></tbody>
@@ -321,8 +309,8 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
     <label class="ml">Equipment ID</label>
     <input class="mi" id="f-equipid" placeholder="e.g. GCT001/FCU/L01/0001"/>
     <div class="mgrid2">
-      <div><label class="ml">Location</label><input class="mi" id="f-location" placeholder="e.g. Level 3"/></div>
-      <div><label class="ml">Sub area</label><input class="mi" id="f-subarea" placeholder="e.g. Zone A"/></div>
+      <div><label class="ml">Building</label><input class="mi" id="f-building" placeholder="e.g. Level 3"/></div>
+      <div><label class="ml">Location</label><input class="mi" id="f-location" placeholder="e.g. Zone A"/></div>
     </div>
     <div class="mgrid2">
       <div><label class="ml">Manufacturer</label><input class="mi" id="f-maker" placeholder="e.g. Daikin"/></div>
@@ -418,6 +406,28 @@ function getTypeLabel(tab){return tab.name||TYPE_LABELS[tab.type]||tab.type||'Eq
 
 
 // Check for diffs between equipment schedule and procurement
+// Smart field lookup - searches by key directly OR by matching label in template sections
+function getRowField(row, tab, keys){
+  // 1. Direct key match
+  for(var i=0;i<keys.length;i++){
+    if(row[keys[i]]!==undefined&&row[keys[i]]!=='')return row[keys[i]]||'';
+  }
+  // 2. Look up via template section field labels
+  var sections=tab.sections||[];
+  for(var s=0;s<sections.length;s++){
+    var fields=sections[s].fields||[];
+    for(var f=0;f<fields.length;f++){
+      var fld=fields[f];
+      for(var k=0;k<keys.length;k++){
+        if((fld.label||'').toLowerCase()===(keys[k]||'').toLowerCase()||(fld.key||'')===(keys[k])){
+          if(row[fld.key]!==undefined&&row[fld.key]!=='')return row[fld.key]||'';
+        }
+      }
+    }
+  }
+  return '';
+}
+
 async function checkEquipSync(){
   var raw=null;
   try{raw=await dbGetEquipment(_psPNum);}catch(e){}
@@ -432,12 +442,12 @@ async function checkEquipSync(){
       var ex=items.find(function(i){return i.equipId===id;});
       if(!ex){newItems.push(id);return;}
       // Check for field changes
-      var loc=row.location||'';
-      var sub=row.sublocation||row.subarea||'';
-      var mfr=row.manufacturer||row.make||row.maker||'';
-      var mod=row.model||'';
+      var building=getRowField(row,tab,['location','Location']);
+      var loc=getRowField(row,tab,['sublocation','subLocation','sub_location','Sub Location','Sub location']);
+      var mfr=getRowField(row,tab,['manufacturer','make','maker','Manufacturer','Make']);
+      var mod=getRowField(row,tab,['model','Model']);
       var eqt=typeLabel;
-      if(ex.location!==loc||ex.subarea!==sub||ex.manufacturer!==mfr||ex.model!==mod||ex.equipType!==eqt){
+      if(ex.building!==building||ex.location!==loc||ex.manufacturer!==mfr||ex.model!==mod||ex.equipType!==eqt){
         changes.push(id);
       }
     });
@@ -468,17 +478,18 @@ async function runSync(){
     tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
       var id=(row.tag||row.equipment_id||'').trim();
       if(!id)return;
-      var loc=row.location||'';
-      var sub=row.sublocation||row.subarea||'';
-      var mfr=row.manufacturer||row.make||row.maker||'';
-      var mod=row.model||'';
+      var building=getRowField(row,tab,['location','Location']);
+      var loc=getRowField(row,tab,['sublocation','subLocation','sub_location','Sub Location','Sub location']);
+      var mfr=getRowField(row,tab,['manufacturer','make','maker','Manufacturer','Make']);
+      var mod=getRowField(row,tab,['model','Model']);
       var ex=items.find(function(i){return i.equipId===id;});
       if(ex){
-        ex.location=loc;ex.subarea=sub;ex.manufacturer=mfr;ex.model=mod;ex.equipType=typeLabel;
+        ex.building=building;ex.location=loc;ex.manufacturer=mfr;ex.model=mod;ex.equipType=typeLabel;
         updated++;
       } else {
         items.push({
-          id:'ps'+nid(),equipId:id,location:loc,subarea:sub,
+          id:'ps'+nid(),equipId:id,
+          building:building,location:loc,
           manufacturer:mfr,model:mod,equipType:typeLabel,
           subApproval:'',status:'Not ordered',orderDate:'',leadWeeks:'',
           qty:1,qtyDelivered:0,eta:'',comments:''
@@ -490,7 +501,7 @@ async function runSync(){
   });
   save();
   dismissSyncBanner();
-  renderTable();updateSummary();checkEquipSync();
+  loadColSettings();renderTable();updateSummary();checkEquipSync();
   var msg=[];
   if(updated)msg.push(updated+' item'+(updated>1?'s':'')+' updated');
   if(added)msg.push(added+' new item'+(added>1?'s':'')+' added');
@@ -524,7 +535,7 @@ function getFilteredItems(){
   var tf=document.getElementById('typeFilter').value;
   var lf=document.getElementById('locFilter').value;
   return items.filter(function(i){
-    return(!q||(i.equipId||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
+    return(!q||(i.equipId||'').toLowerCase().includes(q)||(i.building||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
       &&(!sf||i.status===sf)
       &&(!tf||i.equipType===tf)
       &&(!lf||i.location===lf);
@@ -669,6 +680,8 @@ function renderTable(){
     'Delivered':'st-delivered','Ordered':'st-ordered','Ready':'st-ready',
     'Not ordered':'st-notordered','Supplied by others':'st-byfire'
   };
+  // Reset thead dynamic cols each render
+  var thead=document.getElementById('procThead');if(thead){while(thead.children.length>2)thead.removeChild(thead.lastChild);}
   filtered.forEach(function(item,idx){
     // Always recalc ETA from stored orderDate + leadWeeks
     if(item.orderDate&&item.leadWeeks){
@@ -696,7 +709,7 @@ function renderTable(){
       ?'<input type="date" class="proc-edit" value="'+(item.orderDate||'')+'" onchange="inlineUpdate(\''+item.id+'\',\'orderDate\',this.value)" style="min-width:130px"/>'
       :'<span style="font-family:DM Mono,monospace;font-size:11px">'+fmtD(item.orderDate)+'</span>';
     var leadCell=_editMode
-      ?'<input type="number" class="proc-edit" value="'+(lw||'')+'" min="1" placeholder="—" onchange="inlineUpdate(\''+item.id+'\',\'leadWeeks\',this.value)" style="width:70px;text-align:right"/>'
+      ?'<input type="number" class="proc-edit" value="'+(lw||'')+'" min="1" max="999" step="1" inputmode="numeric" placeholder="—" onchange="inlineUpdate(\''+item.id+'\',\'leadWeeks\',this.value)" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" style="width:70px;text-align:right"/>'
       :'<span style="font-family:DM Mono,monospace;font-size:11px">'+(lw?lw+' wk':'—')+'</span>';
     var commentsCell=_editMode
       ?'<textarea class="proc-edit" onchange="inlineUpdate(\''+item.id+'\',\'comments\',this.value)" style="min-width:260px;min-height:36px">'+escH(item.comments||'')+'</textarea>'
@@ -708,21 +721,39 @@ function renderTable(){
     var delivCell=_editMode
       ?'<input type="date" class="proc-edit" value="'+(item.deliveryDate||'')+'" onchange="inlineUpdate(\''+item.id+'\',\'deliveryDate\',this.value)" style="min-width:110px"/>'
       :'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+(isDelivered?'var(--green)':'var(--muted)')+'">'+fmtD(item.deliveryDate||'')+'</span>';
-    tr.innerHTML='<td style="text-align:center"><input type="checkbox" '+(isSelected?'checked':'')+' onchange="toggleSelect(\''+item.id+'\',this.checked)" style="cursor:pointer;accent-color:var(--accent)"/></td>'
-      +'<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">'+(idx+1)+'</td>'
-      +'<td class="equip-id">'+escH(item.equipId||'—')+'</td>'
-      +'<td style="color:var(--text2)">'+escH(item.location||'—')+'</td>'
-      +'<td style="color:var(--muted);font-size:12px">'+escH(item.subarea||'—')+'</td>'
-      +'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>'
-      +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(item.model||'—')+'</td>'
-      +'<td class="equip-type">'+escH(item.equipType||'—')+'</td>'
-      +'<td style="font-size:12px;color:var(--text2)">'+fmtD(item.subApproval)+'</td>'
-      +'<td>'+statusCell+'</td>'
-      +'<td>'+dateCell+'</td>'
-      +'<td>'+leadCell+'</td>'
-      +'<td class="eta-cell '+etaCls+'">'+etaDisplay+(isOverdue?' ⚠':'')+'</td>'
-      +'<td>'+delivCell+'</td>'
-      +'<td class="comments-cell">'+commentsCell+'</td>';
+    // Build dynamic columns
+    var th=document.getElementById('procThead');
+    if(th&&th.children.length<=2){
+      // Build headers
+      var COL_WIDTHS={status:'140px',orderDate:'110px',leadWeeks:'110px',eta:'100px',deliveryDate:'110px'};
+      getOrderedCols().forEach(function(c){
+        if(!isColVisible(c.id))return;
+        var th2=document.createElement('th');
+        if(COL_WIDTHS[c.id])th2.style.width=COL_WIDTHS[c.id];
+        th2.textContent=c.label;
+        th.appendChild(th2);
+      });
+    }
+    // Build cells in user-defined column order
+    var cellMap={
+      equipId:'<td class="equip-id">'+escH(item.equipId||'—')+'</td>',
+      building:'<td style="color:var(--text2)">'+escH(item.building||'—')+'</td>',
+      location:'<td style="color:var(--muted);font-size:12px">'+escH(item.location||'—')+'</td>',
+      manufacturer:'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>',
+      model:'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(item.model||'—')+'</td>',
+      equipType:'<td class="equip-type">'+escH(item.equipType||'—')+'</td>',
+      subApproval:'<td style="font-size:12px;color:var(--text2)">'+fmtD(item.subApproval)+'</td>',
+      status:'<td>'+statusCell+'</td>',
+      orderDate:'<td>'+dateCell+'</td>',
+      leadWeeks:'<td>'+leadCell+'</td>',
+      eta:'<td class="eta-cell '+etaCls+'">'+etaDisplay+(isOverdue?' ⚠':'')+'</td>',
+      deliveryDate:'<td>'+delivCell+'</td>',
+      comments:'<td class="comments-cell">'+commentsCell+'</td>',
+    };
+    var cols='<td style="text-align:center"><input type="checkbox" '+(isSelected?'checked':'')+' onchange="toggleSelect(\''+item.id+'\',this.checked)" style="cursor:pointer;accent-color:var(--accent)"/></td>'
+      +'<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">'+(idx+1)+'</td>';
+    getOrderedCols().forEach(function(c){if(isColVisible(c.id))cols+=cellMap[c.id]||'';});
+    tr.innerHTML=cols;
     tbody.appendChild(tr);
   });
 }
@@ -754,8 +785,8 @@ function openEditModal(id){
   editingId=id;
   document.getElementById('modalTitle').textContent='Edit Item';
   document.getElementById('f-equipid').value=item.equipId||'';
+  document.getElementById('f-building').value=item.building||'';
   document.getElementById('f-location').value=item.location||'';
-  document.getElementById('f-subarea').value=item.subarea||'';
   document.getElementById('f-maker').value=item.manufacturer||'';
   document.getElementById('f-model').value=item.model||'';
   document.getElementById('f-type').value=item.equipType||'';
@@ -780,8 +811,8 @@ function saveItem(){
   var item={
     id:editingId||('ps'+nid()),
     equipId:equipId,
+    building:document.getElementById('f-building').value.trim(),
     location:document.getElementById('f-location').value.trim(),
-    subarea:document.getElementById('f-subarea').value.trim(),
     manufacturer:document.getElementById('f-maker').value.trim(),
     model:document.getElementById('f-model').value.trim(),
     equipType:document.getElementById('f-type').value.trim(),
@@ -895,6 +926,151 @@ function applyBatchComments(){
   save();renderTable();updateSummary();
   showToast('✓ Comments appended to '+_selectedIds.size+' items');
 }
+
+// ── COLUMN SETTINGS ──
+var PROC_COLS = [
+  {id:'equipId',    label:'Equipment ID',       default:true,  locked:true},
+  {id:'building',   label:'Building',            default:true},
+  {id:'location',   label:'Location',            default:true},
+  {id:'manufacturer',label:'Manufacturer',       default:true},
+  {id:'model',      label:'Model',               default:true},
+  {id:'equipType',  label:'Equipment Type',      default:true},
+  {id:'subApproval',label:'Submission Approval', default:false},
+  {id:'status',     label:'Order Status',        default:true,  locked:true},
+  {id:'orderDate',  label:'Order Date',          default:true},
+  {id:'leadWeeks',  label:'Lead Time (wks)',     default:true},
+  {id:'eta',        label:'ETA',                 default:true},
+  {id:'deliveryDate',label:'Delivery Date',      default:true},
+  {id:'comments',   label:'Comments',            default:true},
+];
+var _hiddenCols = new Set();
+
+function loadColSettings(){
+  var COL_SETTINGS_KEY='hvacnexus_proc_cols_'+(_psPNum||'default');
+  try{
+    var stored = localStorage.getItem(COL_SETTINGS_KEY);
+    if(stored){
+      var hidden = JSON.parse(stored);
+      _hiddenCols = new Set(hidden);
+    } else {
+      // Default - show all default cols
+      _hiddenCols = new Set(PROC_COLS.filter(function(c){return !c.default;}).map(function(c){return c.id;}));
+    }
+  }catch(e){_hiddenCols=new Set();}
+}
+
+function saveColSettings(){
+  var COL_SETTINGS_KEY='hvacnexus_proc_cols_'+(_psPNum||'default');
+  try{localStorage.setItem(COL_SETTINGS_KEY, JSON.stringify(Array.from(_hiddenCols)));}catch(e){}
+}
+
+function isColVisible(id){return !_hiddenCols.has(id);}
+
+// Column order stored separately
+var _colOrder = null;
+
+function getColOrder(){
+  if(_colOrder)return _colOrder;
+  try{
+    var key='hvacnexus_proc_col_order_'+(_psPNum||'default');
+    var stored=localStorage.getItem(key);
+    if(stored)_colOrder=JSON.parse(stored);
+  }catch(e){}
+  if(!_colOrder)_colOrder=PROC_COLS.map(function(c){return c.id;});
+  return _colOrder;
+}
+
+function saveColOrder(){
+  try{
+    var key='hvacnexus_proc_col_order_'+(_psPNum||'default');
+    localStorage.setItem(key,JSON.stringify(_colOrder));
+  }catch(e){}
+}
+
+function getOrderedCols(){
+  var order=getColOrder();
+  // Return PROC_COLS sorted by order array
+  return order.map(function(id){return PROC_COLS.find(function(c){return c.id===id;});}).filter(Boolean);
+}
+
+function openColSettings(){
+  var list=document.getElementById('colSettingsList');
+  var ordered=getOrderedCols();
+  list.innerHTML=ordered.map(function(col,i){
+    var checked=!_hiddenCols.has(col.id);
+    var locked=col.locked;
+    return '<div class="col-setting-row" data-cid="'+col.id+'" style="display:flex;align-items:center;gap:10px;padding:7px 16px;border-radius:6px;transition:background .1s;user-select:none"'
+      +' onmouseover="if(!this.classList.contains(\'dragging\'))this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'      +(locked
+        ?'<span style="color:var(--muted);font-size:14px;cursor:default">⋮⋮</span>'
+        :'<span class="drag-handle" style="color:var(--muted);font-size:14px;cursor:grab;padding:0 2px" title="Drag to reorder">⋮⋮</span>'
+      )      +'<input type="checkbox" '+(checked?'checked':'')+' '+(locked?'disabled':'')      +' onchange="toggleCol(this.dataset.cid,this.checked)" data-cid="'+col.id+'"'      +' style="accent-color:var(--accent);cursor:'+(locked?'default':'pointer')+';width:15px;height:15px;flex-shrink:0"/>'      +'<span style="font-size:13px;color:'+(locked?'var(--muted)':'var(--text)')+'">'+col.label+'</span>'      +(locked?'<span style="font-size:10px;color:var(--muted);margin-left:auto;font-family:DM Mono,monospace">locked</span>':'')
+      +'</div>';
+  }).join('');
+  // Init drag on non-locked rows
+  initColDrag();
+  document.getElementById('colSettingsModal').style.display='flex';
+}
+
+function initColDrag(){
+  var list=document.getElementById('colSettingsList');
+  var rows=list.querySelectorAll('.col-setting-row');
+  var dragSrc=null;
+  rows.forEach(function(row){
+    var handle=row.querySelector('.drag-handle');
+    if(!handle)return;
+    handle.addEventListener('mousedown',function(e){
+      dragSrc=row;
+      row.classList.add('dragging');
+      row.style.opacity='0.5';
+      e.preventDefault();
+    });
+  });
+  document.addEventListener('mousemove',function(e){
+    if(!dragSrc)return;
+    var target=document.elementFromPoint(e.clientX,e.clientY);
+    if(!target)return;
+    var targetRow=target.closest('.col-setting-row');
+    if(targetRow&&targetRow!==dragSrc&&!targetRow.querySelector('span:not(.drag-handle)'+ '~input[disabled]')){
+      var locked=targetRow.dataset.cid&&PROC_COLS.find(function(c){return c.id===targetRow.dataset.cid&&c.locked;});
+      if(!locked){
+        var allRows=Array.from(list.querySelectorAll('.col-setting-row'));
+        var srcIdx=allRows.indexOf(dragSrc);
+        var tgtIdx=allRows.indexOf(targetRow);
+        if(srcIdx>tgtIdx)list.insertBefore(dragSrc,targetRow);
+        else list.insertBefore(dragSrc,targetRow.nextSibling);
+      }
+    }
+  });
+  document.addEventListener('mouseup',function(){
+    if(!dragSrc)return;
+    dragSrc.classList.remove('dragging');
+    dragSrc.style.opacity='1';
+    dragSrc=null;
+    // Save new order
+    var newOrder=Array.from(list.querySelectorAll('.col-setting-row')).map(function(r){return r.dataset.cid;});
+    _colOrder=newOrder;
+    saveColOrder();
+  });
+}
+
+function closeColSettings(){
+  document.getElementById('colSettingsModal').style.display='none';
+  renderTable();
+}
+
+function toggleCol(id, visible){
+  if(visible) _hiddenCols.delete(id);
+  else _hiddenCols.add(id);
+  saveColSettings();
+}
+
+function resetColSettings(){
+  var COL_SETTINGS_KEY='hvacnexus_proc_cols_'+(_psPNum||'default');
+  _hiddenCols = new Set(PROC_COLS.filter(function(c){return !c.default;}).map(function(c){return c.id;}));
+  saveColSettings();
+  openColSettings();
+}
+
 function toggleEditMode(){
   _editMode=!_editMode;
   var btn=document.getElementById('editModeBtn');
@@ -987,7 +1163,7 @@ function renderSummary(){
           var stColor=STATUS_COLORS[item.status]||'var(--text2)';
           return '<div class="summary-row" onclick="openEditModal(\''+item.id+'\')">'
             +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);min-width:140px">'+escH(item.equipId||'—')+'</span>'
-            +'<span style="color:var(--text2);min-width:100px">'+escH(item.location||'—')+'</span>'
+            +'<span style="color:var(--text2);min-width:100px">'+escH(item.building||'—')+'</span>'
             +'<span style="color:var(--muted);flex:1">'+escH(item.manufacturer||'—')+(item.model?' · '+escH(item.model):'')+'</span>'
             +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+stColor+';min-width:120px">'+escH(item.status||'—')+'</span>'
             +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+etaColor+';min-width:80px;text-align:right">'+etaD+'</span>'
@@ -1036,6 +1212,20 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 })();
 
 </script>
+<!-- COLUMN SETTINGS MODAL -->
+<div class="mo" id="colSettingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;width:320px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-weight:700;font-size:15px">Column Settings</div>
+      <button onclick="closeColSettings()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">✕</button>
+    </div>
+    <div style="padding:12px 4px;overflow-y:auto;flex:1" id="colSettingsList"></div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="resetColSettings()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:12px;padding:6px 14px">Reset</button>
+      <button onclick="closeColSettings()" style="background:var(--accent);border:none;border-radius:8px;color:#080c12;font-size:12px;font-weight:700;padding:6px 16px;cursor:pointer">Done</button>
+    </div>
+  </div>
+</div>
 <div id="batchBar">
   <span class="batch-count" id="batchCount">0 selected</span>
   <button onclick="toggleSelectAll(false)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 10px;font-family:'DM Mono',monospace">Deselect all</button>
@@ -1050,7 +1240,7 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
     <option value="Supplied by others">Supplied by others</option>
   </select>
   <input type="date" id="batchOrderDate" placeholder="Order date" onchange="applyBatchField('orderDate',this.value)" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none"/>
-  <input type="number" id="batchLeadWeeks" placeholder="Lead weeks" min="1" onchange="applyBatchField('leadWeeks',this.value)" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;width:100px"/>
+  <input type="number" id="batchLeadWeeks" placeholder="Lead weeks" min="1" max="999" step="1" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onchange="applyBatchField('leadWeeks',this.value)" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;width:100px"/>
   <input type="text" id="batchComments" placeholder="Append comments…" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;flex:1;min-width:160px" onkeydown="if(event.key==='Enter')applyBatchComments()"/>
   <button onclick="applyBatchComments()" style="background:var(--accent);border:none;border-radius:6px;color:#080c12;font-size:12px;font-weight:700;padding:5px 14px;cursor:pointer;font-family:'DM Sans',sans-serif">Apply</button>
   <button onclick="clearSelection()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px;line-height:1" title="Dismiss">✕</button>
