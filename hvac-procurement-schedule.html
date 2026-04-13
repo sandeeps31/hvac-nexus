@@ -94,7 +94,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 #batchBar.show{display:flex}
 .batch-count{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:700;white-space:nowrap;min-width:100px}
 .batch-sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
-.asset-id{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:600}
+.equip-id{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:600}
 .equip-type{font-size:11px;color:var(--text2)}
 .st-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px;white-space:nowrap}
 .st-delivered{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
@@ -233,7 +233,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
     <span id="equipTypePill" style="display:none;margin-left:10px;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.25);border-radius:20px;font-family:'DM Mono',monospace;font-size:11px;padding:3px 10px;font-weight:600"></span>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
-    <button class="bg bsm btn" onclick="syncFromEquipment()">⟳ Sync from Equipment Schedule</button>
+    <button class="bg bsm btn" onclick="runSync()">⟳ Sync from Equipment Schedule</button>
     <button class="bg bsm btn" onclick="exportCSV()">⬇ Export CSV</button>
 
     <button class="bp bsm btn" onclick="openAddModal()">＋ Add Item</button>
@@ -274,16 +274,25 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 <div id="syncBanner" style="display:none" class="sync-banner">
   <span style="font-size:18px">⚠</span>
   <span class="sync-banner-text" id="syncBannerText">Equipment schedule has new items not yet in the procurement schedule.</span>
-  <button class="sync-btn" onclick="syncFromEquipment()">⟳ Sync Now</button>
+  <button class="sync-btn" onclick="runSync()">⟳ Sync Now</button>
 </div>
 
 <div id="summaryView" style="display:none;padding:16px 24px 60px"></div>
+<div id="syncBanner" style="display:none;margin:0 24px 12px;padding:12px 16px;background:rgba(255,184,48,.08);border:1px solid rgba(255,184,48,.4);border-radius:10px;display:none;align-items:center;gap:12px">
+  <span style="font-size:18px">⚠️</span>
+  <div style="flex:1">
+    <div style="font-size:13px;font-weight:600;color:var(--warn)">Equipment Schedule changes detected</div>
+    <div id="syncBannerDetail" style="font-size:12px;color:var(--text2);margin-top:2px">Some equipment data has changed since last sync.</div>
+  </div>
+  <button onclick="runSync()" style="background:var(--warn);border:none;border-radius:8px;color:#080c12;font-size:13px;font-weight:700;padding:8px 18px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">↻ Sync Now</button>
+  <button onclick="dismissSyncBanner()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px">✕</button>
+</div>
 <div id="fullView" style="padding:16px 24px 60px"><div style="overflow:auto;border-radius:var(--radius);max-height:calc(100vh - 280px)"><table class="proc-tbl" id="procTable">
     <thead>
       <tr>
         <th style="width:36px"><input type="checkbox" id="selectAllChk" onchange="toggleSelectAll(this.checked)" style="cursor:pointer;accent-color:var(--accent)"/></th>
         <th style="width:40px">#</th>
-        <th>Asset ID</th>
+        <th>Equipment ID</th>
         <th>Location</th>
         <th>Sub area</th>
         <th>Manufacturer</th>
@@ -308,8 +317,8 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
   <div class="modal">
     <h3 id="modalTitle">Add Procurement Item</h3>
     <p class="msub">Enter item details. ETA auto-calculates from order date + lead time.</p>
-    <label class="ml">Asset ID</label>
-    <input class="mi" id="f-assetid" placeholder="e.g. GCT001/FCU/L01/0001"/>
+    <label class="ml">Equipment ID</label>
+    <input class="mi" id="f-equipid" placeholder="e.g. GCT001/FCU/L01/0001"/>
     <div class="mgrid2">
       <div><label class="ml">Location</label><input class="mi" id="f-location" placeholder="e.g. Level 3"/></div>
       <div><label class="ml">Sub area</label><input class="mi" id="f-subarea" placeholder="e.g. Zone A"/></div>
@@ -407,82 +416,89 @@ function getTypeLabel(tab){return tab.name||TYPE_LABELS[tab.type]||tab.type||'Eq
 
 
 
-async function syncFromEquipment(){
+// Check for diffs between equipment schedule and procurement
+async function checkEquipSync(){
   var raw=null;
   try{raw=await dbGetEquipment(_psPNum);}catch(e){}
-  if(!raw||!raw.tabs||!raw.tabs.length){
-    alert('No equipment schedule data found. Open the Equipment Schedule and add equipment first.');return;
-  }
-  var existing=new Set(items.map(function(i){return i.assetId;}));
-  var added=0;
+  if(!raw||!raw.tabs||!raw.tabs.length)return;
+  var changes=[];var newItems=[];
   raw.tabs.forEach(function(tab){
-    if(!Array.isArray(tab.rows)) return;
+    if(!Array.isArray(tab.rows))return;
     var typeLabel=getTypeLabel(tab);
-    // Fix existing items that have stale raw type keys (tpl_EQS-001 etc)
     tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
       var id=(row.tag||row.equipment_id||'').trim();
       if(!id)return;
-      var ex=items.find(function(i){return i.assetId===id;});
-      if(ex&&ex.equipType&&(ex.equipType.startsWith('tpl_')||ex.equipType===tab.type)){
-        ex.equipType=typeLabel;
+      var ex=items.find(function(i){return i.equipId===id;});
+      if(!ex){newItems.push(id);return;}
+      // Check for field changes
+      var loc=row.location||'';
+      var sub=row.sublocation||row.subarea||'';
+      var mfr=row.manufacturer||row.make||row.maker||'';
+      var mod=row.model||'';
+      var eqt=typeLabel;
+      if(ex.location!==loc||ex.subarea!==sub||ex.manufacturer!==mfr||ex.model!==mod||ex.equipType!==eqt){
+        changes.push(id);
       }
     });
-    tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
-      var id=(row.tag||row.equipment_id||'').trim();
-      if(!id||existing.has(id)) return;
-      items.push({
-        id:'ps'+nid(),
-        assetId:id,
-        location:row.location||'',
-        subarea:row.sublocation||row.subarea||'',
-        manufacturer:row.manufacturer||row.make||row.maker||'',
-        model:row.model||'',
-        equipType:typeLabel,
-        subApproval:'',
-        status:'Not ordered',
-        orderDate:'',
-        leadWeeks:'',
-        qty:1,
-        qtyDelivered:0,
-        eta:'',
-        comments:''
-      });
-      existing.add(id);
-      added++;
-    });
   });
-  if(added===0){
-    document.getElementById('syncBanner').style.display='none';
-    showToast('All equipment IDs are already in the procurement schedule.');
-    return;
+  var total=changes.length+newItems.length;
+  if(total>0){
+    var banner=document.getElementById('syncBanner');
+    var detail=document.getElementById('syncBannerDetail');
+    if(banner){
+      var parts=[];
+      if(changes.length)parts.push(changes.length+' item'+(changes.length>1?'s':'')+' changed ('+changes.slice(0,3).join(', ')+(changes.length>3?'…':'')+')');
+      if(newItems.length)parts.push(newItems.length+' new item'+(newItems.length>1?'s':''));
+      if(detail)detail.textContent=parts.join(' · ');
+      banner.style.display='flex';
+    }
   }
-  save();
-  document.getElementById('syncBanner').style.display='none';
-  renderTable();
-  showToast(added+' item'+(added!==1?'s':'')+' synced from Equipment Schedule.');
 }
 
-// CHECK for new equipment not in schedule
-async function checkSyncNeeded(){
+async function runSync(){
   var raw=null;
   try{raw=await dbGetEquipment(_psPNum);}catch(e){}
-  if(!raw||!raw.tabs)return;
-  var existing=new Set(items.map(function(i){return i.assetId;}));
-  var newCount=0;
+  if(!raw||!raw.tabs||!raw.tabs.length){showToast('No equipment schedule data found.');return;}
+  var added=0,updated=0;
+  var existing=new Set(items.map(function(i){return i.equipId;}));
   raw.tabs.forEach(function(tab){
-    if(!Array.isArray(tab.rows)) return;
+    if(!Array.isArray(tab.rows))return;
+    var typeLabel=getTypeLabel(tab);
     tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
       var id=(row.tag||row.equipment_id||'').trim();
-      if(id&&!existing.has(id)) newCount++;
+      if(!id)return;
+      var loc=row.location||'';
+      var sub=row.sublocation||row.subarea||'';
+      var mfr=row.manufacturer||row.make||row.maker||'';
+      var mod=row.model||'';
+      var ex=items.find(function(i){return i.equipId===id;});
+      if(ex){
+        ex.location=loc;ex.subarea=sub;ex.manufacturer=mfr;ex.model=mod;ex.equipType=typeLabel;
+        updated++;
+      } else {
+        items.push({
+          id:'ps'+nid(),equipId:id,location:loc,subarea:sub,
+          manufacturer:mfr,model:mod,equipType:typeLabel,
+          subApproval:'',status:'Not ordered',orderDate:'',leadWeeks:'',
+          qty:1,qtyDelivered:0,eta:'',comments:''
+        });
+        existing.add(id);
+        added++;
+      }
     });
   });
-  var banner=document.getElementById('syncBanner');
-  if(newCount>0){
-    document.getElementById('syncBannerText').textContent=newCount+' equipment item'+(newCount!==1?'s':'')+' in the Equipment Schedule are not yet in the procurement schedule.';
-    banner.style.display='flex';
-  } else {
-    banner.style.display='none';
-  }
+  save();
+  dismissSyncBanner();
+  renderTable();updateSummary();checkEquipSync();
+  var msg=[];
+  if(updated)msg.push(updated+' item'+(updated>1?'s':'')+' updated');
+  if(added)msg.push(added+' new item'+(added>1?'s':'')+' added');
+  showToast('✓ Sync complete — '+(msg.join(', ')||'No changes'));
+}
+
+function dismissSyncBanner(){
+  var b=document.getElementById('syncBanner');
+  if(b)b.style.display='none';
 }
 
 // UPDATE SUMMARY
@@ -507,7 +523,7 @@ function getFilteredItems(){
   var tf=document.getElementById('typeFilter').value;
   var lf=document.getElementById('locFilter').value;
   return items.filter(function(i){
-    return(!q||(i.assetId||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
+    return(!q||(i.equipId||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
       &&(!sf||i.status===sf)
       &&(!tf||i.equipType===tf)
       &&(!lf||i.location===lf);
@@ -693,7 +709,7 @@ function renderTable(){
       :'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+(isDelivered?'var(--green)':'var(--muted)')+'">'+fmtD(item.deliveryDate||'')+'</span>';
     tr.innerHTML='<td style="text-align:center"><input type="checkbox" '+(isSelected?'checked':'')+' onchange="toggleSelect(\''+item.id+'\',this.checked)" style="cursor:pointer;accent-color:var(--accent)"/></td>'
       +'<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">'+(idx+1)+'</td>'
-      +'<td class="asset-id">'+escH(item.assetId||'—')+'</td>'
+      +'<td class="equip-id">'+escH(item.equipId||'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(item.location||'—')+'</td>'
       +'<td style="color:var(--muted);font-size:12px">'+escH(item.subarea||'—')+'</td>'
       +'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>'
@@ -714,7 +730,7 @@ function renderTable(){
 function openAddModal(){
   editingId=null;
   document.getElementById('modalTitle').textContent='Add Procurement Item';
-  document.getElementById('f-assetid').value='';
+  document.getElementById('f-equipid').value='';
   document.getElementById('f-location').value='';
   document.getElementById('f-subarea').value='';
   document.getElementById('f-maker').value='';
@@ -730,13 +746,13 @@ function openAddModal(){
   document.getElementById('etaPreview').textContent='—';
   document.getElementById('deleteBtn').style.display='none';
   document.getElementById('addModal').classList.add('open');
-  setTimeout(function(){document.getElementById('f-assetid').focus();},80);
+  setTimeout(function(){document.getElementById('f-equipid').focus();},80);
 }
 function openEditModal(id){
   var item=items.find(function(i){return i.id===id;});if(!item)return;
   editingId=id;
   document.getElementById('modalTitle').textContent='Edit Item';
-  document.getElementById('f-assetid').value=item.assetId||'';
+  document.getElementById('f-equipid').value=item.equipId||'';
   document.getElementById('f-location').value=item.location||'';
   document.getElementById('f-subarea').value=item.subarea||'';
   document.getElementById('f-maker').value=item.manufacturer||'';
@@ -755,14 +771,14 @@ function openEditModal(id){
 }
 function closeModal(){document.getElementById('addModal').classList.remove('open');}
 function saveItem(){
-  var assetId=document.getElementById('f-assetid').value.trim();
-  if(!assetId){showToast('Asset ID is required.');return;}
+  var equipId=document.getElementById('f-equipid').value.trim();
+  if(!equipId){showToast('Equipment ID is required.');return;}
   var od=document.getElementById('f-orderdate').value;
   var lw=document.getElementById('f-leadtime').value;
   var eta=od&&lw?calcETA(od,lw):'';
   var item={
     id:editingId||('ps'+nid()),
-    assetId:assetId,
+    equipId:equipId,
     location:document.getElementById('f-location').value.trim(),
     subarea:document.getElementById('f-subarea').value.trim(),
     manufacturer:document.getElementById('f-maker').value.trim(),
@@ -789,11 +805,11 @@ function deleteItem(){
 
 // EXPORT CSV
 function exportCSV(){
-  var headers=['Asset ID','Location','Sub area','Manufacturer','Model','Equipment type','Submission approval date','Order status','Order date','Normal lead time (weeks)','ETA','Comments'];
+  var headers=['Equipment ID','Location','Sub area','Manufacturer','Model','Equipment type','Submission approval date','Order status','Order date','Normal lead time (weeks)','ETA','Comments'];
   var rows=[headers.join(',')];
   var filtered=getFilteredItems();
   filtered.forEach(function(item){
-    var row=[item.assetId,item.location,item.subarea,item.manufacturer,item.model,item.equipType,item.subApproval,item.status,item.orderDate,item.leadWeeks,item.eta,item.comments];
+    var row=[item.equipId,item.location,item.subarea,item.manufacturer,item.model,item.equipType,item.subApproval,item.status,item.orderDate,item.leadWeeks,item.eta,item.comments];
     rows.push(row.map(function(v){return '"'+(String(v||'').replace(/"/g,'""'))+'"';}).join(','));
   });
   var blob=new Blob([rows.join('\n')],{type:'text/csv'});
@@ -969,7 +985,7 @@ function renderSummary(){
           var etaColor=item.status==='Delivered'?'var(--green)':item.eta&&item.eta<td?'var(--danger)':item.eta?'var(--text2)':'var(--muted)';
           var stColor=STATUS_COLORS[item.status]||'var(--text2)';
           return '<div class="summary-row" onclick="openEditModal(\''+item.id+'\')">'
-            +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);min-width:140px">'+escH(item.assetId||'—')+'</span>'
+            +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);min-width:140px">'+escH(item.equipId||'—')+'</span>'
             +'<span style="color:var(--text2);min-width:100px">'+escH(item.location||'—')+'</span>'
             +'<span style="color:var(--muted);flex:1">'+escH(item.manufacturer||'—')+(item.model?' · '+escH(item.model):'')+'</span>'
             +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+stColor+';min-width:120px">'+escH(item.status||'—')+'</span>'
