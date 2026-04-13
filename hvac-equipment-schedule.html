@@ -406,7 +406,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
   </div>
 </div>
 <div class="abar" id="abar" style="display:none">
-  <div class="sbox" style="flex:1;min-width:0"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search equipment ID, description, location…" oninput="renderTable()"/></div>
+  <div class="sbox" style="flex:1;min-width:0"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search equipment ID, description, location…" oninput="renderTable();renderStrip()"/></div>
   <select class="fsel" id="stfil" onchange="renderTable()">
     <option value="">All Statuses</option>
     <option>Not Started</option><option>Procurement</option><option>Delivered</option>
@@ -424,7 +424,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
       <button id="gbFlat" onclick="setGroupBy(false)" style="padding:4px 11px;border:none;cursor:pointer;background:var(--accent);color:#080c12;font-family:inherit;font-size:11px;font-weight:700;transition:all .13s">☰ Flat</button>
       <button id="gbGroup" onclick="setGroupBy(true)" style="padding:4px 11px;border:none;cursor:pointer;background:transparent;color:var(--muted);font-family:inherit;font-size:11px;transition:all .13s">⊞ By Board</button>
     </div>
-    <button class="btn bg bsm" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3)">⬇ Template</button>
+    <button class="btn bg bsm" id="downloadTplBtn" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3)">⬇ Template</button>
     <label class="btn bg bsm" style="cursor:pointer">⬆ Import<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="doImport(event)"></label>
     <button class="btn bg bsm" onclick="openExportModal()">⬇ Export</button>
     <button class="btn bg bsm" id="submitToCoBtn" onclick="openPublishToCo()" style="color:var(--purple);border-color:rgba(167,139,250,.3)">↑ Submit to Library</button>
@@ -673,7 +673,18 @@ return;}
     var metaParts=[];
     if(t.companyTemplateTplNo)metaParts.push(t.companyTemplateTplNo);
     if(t.layout)metaParts.push(t.layout==='vertical'?'↕ Vertical':'');
-    if(t.rows&&t.rows.length)metaParts.push(t.rows.filter(function(r){return!r._deleted;}).length+' items');
+    // Dynamic count based on active filter
+    var locF=(document.getElementById('locfil')||{}).value||'';
+    var q=(document.getElementById('srch')||{}).value||'';
+    var allRows=t.rows?t.rows.filter(function(r){return!r._deleted;}):[];
+    var filteredRows=allRows.filter(function(row){
+      if(locF&&row.location!==locF)return false;
+      if(q){var qs=q.toLowerCase();var m=false;getCols(t).forEach(function(c){if((row[c.k]||'').toString().toLowerCase().includes(qs))m=true;});if(!m)return false;}
+      return true;
+    });
+    var countStr=filteredRows.length+(locF||q?' of '+allRows.length:'')+' item'+(allRows.length!==1?'s':'');
+    if(locF)countStr+=' · '+locF;
+    metaParts.push(countStr);
     shMeta.textContent=metaParts.join(' · ');
   } else if(sh&&!t){
     sh.style.display='none';
@@ -682,15 +693,34 @@ return;}
   var t=aTab();
   var cbtn=document.getElementById('colSettingsBtn');
   if(cbtn&&t)cbtn.textContent='⚙ '+(t.layout==='vertical'?'Row Settings':'Column Settings');
-  updateLayoutToggle();
+  updateLayoutToggle();updateTplBtnVisibility();
 }
 
 function updSum(){
   var t=aTab();if(!t)return;
   var r=t.rows;
+  // Rebuild location filter
   var locs=[];r.forEach(function(x){if(x.location&&!locs.includes(x.location))locs.push(x.location);});
-  var lf=document.getElementById('locfil'),cv=lf.value;
-  lf.innerHTML='<option value="">All Locations</option>'+locs.map(function(l){return'<option'+(l===cv?' selected':'')+'>'+X(l)+'</option>';}).join('');
+  var lf=document.getElementById('locfil'),cv=lf?lf.value:'';
+  if(lf)lf.innerHTML='<option value="">All Locations</option>'+locs.map(function(l){return'<option'+(l===cv?' selected':'')+'>'+X(l)+'</option>';}).join('');
+  // Update header stats based on current filter
+  var q=(document.getElementById('srch')||{}).value||'';
+  var locF=cv||'';
+  var filtered=r.filter(function(row){
+    if(row._deleted)return false;
+    if(locF&&row.location!==locF)return false;
+    if(q){
+      var qs=q.toLowerCase();
+      var matches=false;
+      var t2=aTab();
+      if(t2)getCols(t2).forEach(function(c){if((row[c.k]||'').toString().toLowerCase().includes(qs))matches=true;});
+      if(!matches)return false;
+    }
+    return true;
+  });
+  var total=filtered.length;
+  var el=document.getElementById('hdr-row-count');
+  if(el)el.textContent=total+' item'+(total!==1?'s':'')+(locF?' · '+locF:'');
 }
 
 function renderEmpty(){
@@ -1190,7 +1220,16 @@ function comR(){
 }
 function canR(){nrVis=false;var el=document.getElementById('nrtr');if(el)el.remove();}
 
-function swTab(id){if(_editingTabId&&_editingTabId!==id){if(!confirm('You have unsaved changes. Switch tabs anyway?'))return;_editingTabId=null;}activeId=id;sortK=null;sortD=1;colFilters={};nrVis=false;if(typeof viewingRevIdx!=='undefined')viewingRevIdx=null;renderStrip();}
+function swTab(id){if(_editingTabId&&_editingTabId!==id){if(!confirm('You have unsaved changes. Switch tabs anyway?'))return;_editingTabId=null;}activeId=id;sortK=null;sortD=1;colFilters={};nrVis=false;if(typeof viewingRevIdx!=='undefined')viewingRevIdx=null;renderStrip();updateTplBtnVisibility();}
+
+function updateTplBtnVisibility(){
+  var btn=document.getElementById('downloadTplBtn');if(!btn)return;
+  var t=aTab();if(!t){btn.style.display='';return;}
+  var tr=getTabRev(t.id);
+  // Hide after first publish
+  var hasPublished=tr&&tr.revisions&&tr.revisions.length>0;
+  btn.style.display=hasPublished?'none':'';
+}
 
 var ctxId=null,ctxEl=document.getElementById('ctxm');
 document.addEventListener('click',function(){ctxEl.style.display='none';});
@@ -2161,6 +2200,7 @@ function confirmPublish(){
   tab.rows.forEach(function(r){delete r._importNew;delete r._importChanged;delete r._importDeleted;});
   tr.draft=null;_editingTabId=null;clearLock(tabId);saveRevData();saveEquip();
   closeM('publishModal');viewingRevIdx=null;renderRevBar();renderTable();
+  updateTplBtnVisibility();
   showToast('\u2713 '+revNum+' published');
 }
 
@@ -2215,16 +2255,28 @@ function getExportRows(){
 function exportRevPDF(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
   var tr=getTabRev(tabId);
-  var rv=exportingRevIdx!==null?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
+  // Use viewingRevIdx if set (viewing a specific rev), else use draft state
+  var effectiveIdx=exportingRevIdx!==null?exportingRevIdx:(viewingRevIdx!==null?viewingRevIdx:null);
+  var rv=effectiveIdx!==null?tr.revisions[effectiveIdx]:tr.revisions[tr.revisions.length-1];
   var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';var revDate=rv?fmtD(rv.date):todayStr();
   var prevRevIdx=exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2;
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
   var prevRevLabel=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].rev:'—';
   // Current rows: snapshot for specific rev, or live rows for draft
-  var snapRows=exportingRevIdx!==null?(tr.revisions[exportingRevIdx]?tr.revisions[exportingRevIdx].snapshot||[]:[]):(tab?tab.rows.filter(function(r){return!r._deleted;}):[]); 
+  // Draft: use live rows with diff vs last published. Viewing rev: use snapshot. Exporting specific rev: use that snapshot.
+  var isDraftExport=(exportingRevIdx===null&&viewingRevIdx===null&&tr.draft);
+  var snapRows;
+  if(exportingRevIdx!==null){
+    snapRows=tr.revisions[exportingRevIdx]?tr.revisions[exportingRevIdx].snapshot||[]:[];
+  } else if(isDraftExport){
+    snapRows=tab?tab.rows.filter(function(r){return!r._deleted;}):[];
+  } else if(viewingRevIdx!==null){
+    snapRows=tr.revisions[viewingRevIdx]?tr.revisions[viewingRevIdx].snapshot||[]:[];
+  } else {
+    snapRows=tr.revisions.length?tr.revisions[tr.revisions.length-1].snapshot||[]:[];
+  }
   var diff=computeDiff(baseRows,snapRows);
-  // Build full export rows: current snapshot + deleted rows (from base but not in current)
   var rows=snapRows.slice();
   baseRows.forEach(function(br){
     var bk=rowKey(br);
@@ -2301,13 +2353,24 @@ function exportRevPDF(){
 function exportRevXLSX(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
   var tr=getTabRev(tabId);
-  var rv=exportingRevIdx!==null?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
+  var effectiveIdx=exportingRevIdx!==null?exportingRevIdx:(viewingRevIdx!==null?viewingRevIdx:null);
+  var rv=effectiveIdx!==null?tr.revisions[effectiveIdx]:tr.revisions[tr.revisions.length-1];
   var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';
   var tabName=tab?tab.name||tab.type:'Equip';
   var prevRevIdx=exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2;
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
-  var snapRows=exportingRevIdx!==null?(tr.revisions[exportingRevIdx]?tr.revisions[exportingRevIdx].snapshot||[]:[]):(tab?tab.rows.filter(function(r){return!r._deleted&&!r._importDeleted;}):[]); 
+  var isDraftExport=(exportingRevIdx===null&&viewingRevIdx===null&&tr.draft);
+  var snapRows;
+  if(exportingRevIdx!==null){
+    snapRows=tr.revisions[exportingRevIdx]?tr.revisions[exportingRevIdx].snapshot||[]:[];
+  } else if(isDraftExport){
+    snapRows=tab?tab.rows.filter(function(r){return!r._deleted&&!r._importDeleted;}):[];
+  } else if(viewingRevIdx!==null){
+    snapRows=tr.revisions[viewingRevIdx]?tr.revisions[viewingRevIdx].snapshot||[]:[];
+  } else {
+    snapRows=tr.revisions.length?tr.revisions[tr.revisions.length-1].snapshot||[]:[];
+  }
   var diff=computeDiff(baseRows,snapRows);
   var hasDiff=baseRows.length>0;
   // Include deleted rows (from base but not in current snapshot)
