@@ -123,6 +123,35 @@ function authGetCompanyId() { return _authCompanyId || localStorage.getItem('hva
 function authGetUser() { return _authUser; }
 function authIsLoggedIn() { return !!_authSession; }
 
+// ── Auto-load session on startup ──
+(async function(){
+  const stored = localStorage.getItem('hvacnexus_session');
+  if(!stored) return;
+  try{
+    const sess = JSON.parse(stored);
+    const expiresAt = sess.expires_at || 0;
+    if(Date.now()/1000 < expiresAt - 60){
+      _authSession = sess;
+      _authUser = sess.user;
+      _authCompanyId = localStorage.getItem('hvacnexus_company_id');
+      return;
+    }
+    // Refresh token
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:sess.refresh_token})
+    });
+    if(res.ok){
+      const data = await res.json();
+      _authSession = data;
+      _authUser = data.user;
+      _authCompanyId = localStorage.getItem('hvacnexus_company_id');
+      localStorage.setItem('hvacnexus_session', JSON.stringify(data));
+    }
+  }catch(e){ console.warn('Session auto-load failed:', e); }
+})();
+
 // Auth guard — call on every protected page
 async function authGuard() {
   const ok = await authRefreshSession();
