@@ -235,6 +235,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button class="bg bsm btn" onclick="runSync()">⟳ Sync from Equipment Schedule</button>
+    <button class="bg bsm btn" onclick="purgeBlankRows()" style="color:var(--danger);border-color:var(--danger)" title="Remove all rows with no Equipment ID">🗑 Purge blank rows</button>
     <button class="bg bsm btn" onclick="openColSettings()">⚙ Columns</button>
     <button class="bg bsm btn" onclick="exportCSV()">⬇ Export CSV</button>
 
@@ -501,11 +502,22 @@ async function runSync(){
   });
   save();
   dismissSyncBanner();
-  loadColSettings();renderTable();updateSummary();checkEquipSync();
+  loadColSettings();// Migrate legacy assetId → equipId
+items.forEach(function(i){if(!i.equipId&&i.assetId)i.equipId=i.assetId;});
+renderTable();updateSummary();checkEquipSync();
   var msg=[];
   if(updated)msg.push(updated+' item'+(updated>1?'s':'')+' updated');
   if(added)msg.push(added+' new item'+(added>1?'s':'')+' added');
   showToast('✓ Sync complete — '+(msg.join(', ')||'No changes'));
+}
+
+function purgeBlankRows(){
+  var blanks=items.filter(function(i){return !i.equipId||!i.equipId.trim();});
+  if(!blanks.length){showToast('No blank rows found.');return;}
+  if(!confirm('Remove '+blanks.length+' row'+(blanks.length>1?'s':'')+' with no Equipment ID? This cannot be undone.'))return;
+  items=items.filter(function(i){return i.equipId&&i.equipId.trim();});
+  save();renderTable();updateSummary();
+  showToast('✓ Removed '+blanks.length+' blank row'+(blanks.length>1?'s':''));
 }
 
 function dismissSyncBanner(){
