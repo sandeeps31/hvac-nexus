@@ -123,10 +123,13 @@ function authGetCompanyId() { return _authCompanyId || localStorage.getItem('hva
 function authGetUser() { return _authUser; }
 function authIsLoggedIn() { return !!_authSession; }
 
-// ── Auto-load session on startup ──
+// ── Session ready promise — await dbReady before loading data ──
+let _dbReadyResolve;
+const dbReady = new Promise(function(resolve){ _dbReadyResolve = resolve; });
+
 (async function(){
   const stored = localStorage.getItem('hvacnexus_session');
-  if(!stored) return;
+  if(!stored){ _dbReadyResolve(false); return; }
   try{
     const sess = JSON.parse(stored);
     const expiresAt = sess.expires_at || 0;
@@ -134,6 +137,7 @@ function authIsLoggedIn() { return !!_authSession; }
       _authSession = sess;
       _authUser = sess.user;
       _authCompanyId = localStorage.getItem('hvacnexus_company_id');
+      _dbReadyResolve(true);
       return;
     }
     // Refresh token
@@ -148,8 +152,14 @@ function authIsLoggedIn() { return !!_authSession; }
       _authUser = data.user;
       _authCompanyId = localStorage.getItem('hvacnexus_company_id');
       localStorage.setItem('hvacnexus_session', JSON.stringify(data));
+      _dbReadyResolve(true);
+    } else {
+      _dbReadyResolve(false);
     }
-  }catch(e){ console.warn('Session auto-load failed:', e); }
+  }catch(e){
+    console.warn('Session auto-load failed:', e);
+    _dbReadyResolve(false);
+  }
 })();
 
 // Auth guard — call on every protected page
