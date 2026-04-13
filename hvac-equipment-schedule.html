@@ -2460,7 +2460,12 @@ function exportRevXLSX(){
 
       // Patch sheet XML to add s= attributes to cells
       var sheetKey=null;
-      zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
+      zip.forEach(function(path,file){if(/xl[\/\\]worksheets[\/\\]sheet\d+\.xml$/i.test(path)&&!sheetKey)sheetKey=path;});
+      console.log('sheetKey found:',sheetKey);
+      if(!sheetKey){
+        // Try alternate path format
+        zip.forEach(function(path){if(path.indexOf('sheet1.xml')>=0&&!sheetKey)sheetKey=path;});
+      }
       if(!sheetKey){fallback(wbout);return;}
 
       zip.file(sheetKey).async('string').then(function(sheetXml){
@@ -2517,9 +2522,11 @@ function exportRevXLSX(){
 
     // Load JSZip and apply styles
     function runWithJSZip(JSZipLib){
-      new JSZipLib().loadAsync(new Uint8Array(wbout)).then(function(zip){
-        applyStyles(zip);
-      }).catch(function(){fallback(wbout);});
+      try{
+        new JSZipLib().loadAsync(new Uint8Array(wbout)).then(function(zip){
+          try{applyStyles(zip);}catch(e){console.warn('applyStyles error:',e);fallback(wbout);}
+        }).catch(function(e){console.warn('JSZip load error:',e);fallback(wbout);});
+      }catch(e){console.warn('JSZip error:',e);fallback(wbout);}
     }
     if(typeof JSZip!=='undefined'){runWithJSZip(JSZip);}
     else{
