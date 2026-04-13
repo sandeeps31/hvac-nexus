@@ -182,30 +182,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script src="head-common.js"></script>
 <script src="db.js"></script>
-<script>
-// ── HVAC Nexus Auth Guard ──
-(async function(){
-  var DEV_BYPASS=false;
-  if(DEV_BYPASS)return;
-  var stored=localStorage.getItem('hvacnexus_session');
-  if(!stored){window.location.href='hvac-login.html';return;}
-  try{
-    var sess=JSON.parse(stored);
-    if(Date.now()/1000<(sess.expires_at||0)-60){
-      // Set _authSession if db.js loaded
-      if(typeof _authSession!=='undefined')_authSession=sess;
-      return;
-    }
-    var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
-    var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
-    var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
-    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
-    else{localStorage.removeItem('hvacnexus_session');window.location.href='hvac-login.html';}
-  }catch(e){window.location.href='hvac-login.html';}
-})();
-</script>
+<script src="head-common.js"></script>
 </head>
 <body>
 
@@ -213,6 +191,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 function navTo(url){window.location.href=url;}
 function switchTab(tab){
   ['info','templates','contacts','notifications','permissions'].forEach(function(t){
+  if(tab==='permissions')setTimeout(renderPermissionsTab,50);
     var el=document.getElementById('tab-'+t);
     var btn=document.getElementById('stab-'+t);
     if(el)el.style.display=t===tab?'':'none';
@@ -575,48 +554,96 @@ function budgetTplAddRow(type){
     <!-- ── PERMISSIONS TAB ── -->
     <div id="tab-permissions" style="display:none">
 
+      <!-- YOUR ACCOUNT -->
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">Your Account</div>
+          <div class="card-hdr-sub">Your details and role in this company</div>
+        </div>
+        <div class="card-body" id="myAccountCard">
+          <div style="display:flex;align-items:center;gap:16px;padding:4px 0 20px">
+            <div id="myAvatar" style="width:52px;height:52px;border-radius:50%;background:var(--accent-dim);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);font-size:22px;flex-shrink:0">S</div>
+            <div>
+              <div id="myName" style="font-size:16px;font-weight:700;color:var(--text)">—</div>
+              <div id="myEmail" style="font-size:12px;color:var(--text2);margin-top:2px">—</div>
+              <div id="myRoleBadge" style="display:inline-block;margin-top:6px;padding:2px 10px;border-radius:12px;font-size:11px;font-family:'DM Mono',monospace;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.3)">—</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid var(--border);padding-top:16px">
+            <div><div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Company</div><div id="myCompany" style="font-size:13px;color:var(--text)">—</div></div>
+            <div><div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Member Since</div><div id="myJoined" style="font-size:13px;color:var(--text)">—</div></div>
+          </div>
+        </div>
+      </div>
+
       <!-- TEAM MEMBERS -->
       <div class="settings-card">
         <div class="card-hdr" style="display:flex;align-items:center;justify-content:space-between">
           <div>
             <div class="card-hdr-title">Team Members</div>
-            <div class="card-hdr-sub">People who have access to HVAC NEXUS</div>
+            <div class="card-hdr-sub">People who have access to HVAC Nexus</div>
           </div>
-          <div style="display:flex;gap:8px">
-            <button class="bg bsm btn" onclick="openSwitchUser()">🔑 Switch User</button>
-            <button class="bp bsm btn" onclick="openAddUserModal()">+ Add Member</button>
-          </div>
+          <button class="bp bsm btn" onclick="openInviteModal()">+ Invite Member</button>
         </div>
         <div class="card-body" style="padding:0">
-          <div id="currentUserBanner" style="padding:12px 20px;background:rgba(0,200,255,.05);border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);display:none"></div>
-          <div id="userList"></div>
+          <div id="memberList"><div style="padding:24px;text-align:center;color:var(--muted);font-size:13px">Loading...</div></div>
         </div>
       </div>
 
-      <!-- ROLES -->
+      <!-- ROLE PERMISSIONS MATRIX -->
       <div class="settings-card">
         <div class="card-hdr">
           <div class="card-hdr-title">Role Permissions</div>
-          <div class="card-hdr-sub">What each role can see and do</div>
+          <div class="card-hdr-sub">What each role can access across the platform</div>
         </div>
-        <div class="card-body">
-          <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+        <div class="card-body" style="padding:0;overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
             <thead>
-              <tr style="border-bottom:1px solid var(--border)">
-                <th style="text-align:left;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">Permission</th>
-                <th style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent)">Admin</th>
-                <th style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--green)">PM</th>
-                <th style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn)">Engineer</th>
-                <th style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2)">Subcontractor</th>
-                <th style="text-align:center;padding:8px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2)">Witness</th>
+              <tr style="background:var(--surface2)">
+                <th style="text-align:left;padding:10px 16px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);width:200px">Module</th>
+                <th style="text-align:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent)">Company Admin</th>
+                <th style="text-align:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--green)">Project Admin</th>
+                <th style="text-align:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--warn)">Engineer</th>
+                <th style="text-align:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text2)">Subcontractor</th>
+                <th style="text-align:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--purple)">Witness</th>
               </tr>
             </thead>
-            <tbody id="permTable"></tbody>
+            <tbody id="permMatrix"></tbody>
           </table>
         </div>
       </div>
 
     </div><!-- /tab-permissions -->
+
+    <!-- INVITE MODAL -->
+    <div class="mo" id="inviteModal">
+      <div class="md" style="max-width:460px">
+        <div class="mh3">Invite Team Member</div>
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <label class="field-label">Email Address</label>
+            <input type="email" id="invite-email" class="fi" placeholder="colleague@company.com.au" style="width:100%">
+          </div>
+          <div>
+            <label class="field-label">Role</label>
+            <select id="invite-role" class="fi" style="width:100%">
+              <option value="project_admin">Project Admin (PM)</option>
+              <option value="engineer" selected>Engineer</option>
+              <option value="subcontractor">Subcontractor</option>
+              <option value="witness">Witness</option>
+            </select>
+          </div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--text2)">
+            <div id="roleDescription">Can create and edit technical records. No access to financials.</div>
+          </div>
+          <div id="inviteError" style="display:none;color:var(--danger);font-size:12px;padding:8px 12px;background:rgba(255,77,109,.1);border-radius:6px;border:1px solid rgba(255,77,109,.3)"></div>
+        </div>
+        <div class="mac">
+          <button class="btn bg bsm" onclick="closeInviteModal()">Cancel</button>
+          <button class="btn bp bsm" onclick="sendInvite()">Send Invite</button>
+        </div>
+      </div>
+    </div>
 
   </div><!-- /page -->
 </div><!-- /main -->
@@ -1233,56 +1260,109 @@ function deleteContact(i){if(confirm('Delete this contact?')){_contacts.splice(i
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // ── USERS ──
-function openSwitchUser(){
+// ── PERMISSIONS TAB ──
+var ROLE_COLOURS={company_admin:'var(--accent)',project_admin:'var(--green)',engineer:'var(--warn)',subcontractor:'var(--text2)',witness:'var(--purple)'};
+var ROLE_LABELS={company_admin:'Company Admin',project_admin:'Project Admin',engineer:'Engineer',subcontractor:'Subcontractor',witness:'Witness'};
+var ROLE_DESC={company_admin:'Full access including Company Settings and billing.',project_admin:'Full project access. Can manage team. No Company Settings.',engineer:'Create and edit technical records. View procurement. No financials.',subcontractor:'View ITPs, Drawings, Tech Submissions. Sign off ITPs. Raise defects.',witness:'Sign off ITPs, Pre-commissioning and Commissioning. View drawings and defects.'};
+var PERM_MATRIX=[
+  {module:'Projects',ca:'Full',pa:'Own projects',eng:'Own projects',sub:'Own projects',wit:'Own projects'},
+  {module:'Project Dashboard',ca:'Full',pa:'Full',eng:'View',sub:'View',wit:'View'},
+  {module:'Budget',ca:'Full',pa:'Full',eng:'—',sub:'—',wit:'—'},
+  {module:'Progress Claims',ca:'Full',pa:'Full',eng:'—',sub:'—',wit:'—'},
+  {module:'Vendor Invoices',ca:'Full',pa:'Full',eng:'—',sub:'—',wit:'—'},
+  {module:'Variations',ca:'Full',pa:'Full',eng:'View',sub:'—',wit:'—'},
+  {module:'Subbie Variations',ca:'Full',pa:'Full',eng:'View',sub:'View own',wit:'—'},
+  {module:'Procurement Schedule',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'—'},
+  {module:'Purchase Orders',ca:'Full',pa:'Full',eng:'View',sub:'—',wit:'—'},
+  {module:'Subcontractor Agreements',ca:'Full',pa:'Full',eng:'View',sub:'View own',wit:'—'},
+  {module:'Tech Submissions',ca:'Full',pa:'Full',eng:'Edit',sub:'View',wit:'—'},
+  {module:'Drawings',ca:'Full',pa:'Full',eng:'Edit',sub:'View',wit:'View'},
+  {module:'Equipment Schedules',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'—'},
+  {module:'ITPs',ca:'Full',pa:'Full',eng:'Edit',sub:'View + Sign off',wit:'Sign off'},
+  {module:'Passive Fire',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'—'},
+  {module:'Defects',ca:'Full',pa:'Full',eng:'Edit',sub:'Raise + View',wit:'View'},
+  {module:'Commissioning Plan',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'View'},
+  {module:'Pre-commissioning',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'Sign off'},
+  {module:'Commissioning Tracker',ca:'Full',pa:'Full',eng:'Edit',sub:'—',wit:'Sign off'},
+  {module:'Project Settings',ca:'Full',pa:'Full',eng:'—',sub:'—',wit:'—'},
+  {module:'Company Settings',ca:'Full',pa:'—',eng:'—',sub:'—',wit:'—'},
+];
+
+function renderPermissionsTab(){loadMyAccount();loadMemberList();renderPermMatrix();}
+
+async function loadMyAccount(){
   try{
-    var users=dbGetUsers()||[];
-    if(!users.length){alert('No users set up yet. Add a member first.');return;}
-    var names=users.map(function(u,i){return (i+1)+'. '+u.name+' ('+u.role+')'}).join('\n');
-    var choice=prompt('Switch to user (enter number):\n'+names);
-    if(!choice)return;
-    var idx=parseInt(choice)-1;
-    if(idx>=0&&idx<users.length){
-      dbSetCurrentUser(users[idx]);
-      showToast('Switched to '+users[idx].name);
+    var sess=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');
+    var user=sess.user||{};
+    var name=user.user_metadata?.name||user.email||'—';
+    document.getElementById('myAvatar').textContent=name.charAt(0).toUpperCase();
+    document.getElementById('myName').textContent=name;
+    document.getElementById('myEmail').textContent=user.email||'—';
+    var role=localStorage.getItem('hvacnexus_user_role')||'member';
+    var badge=document.getElementById('myRoleBadge');
+    badge.textContent=ROLE_LABELS[role]||role;
+    badge.style.color=ROLE_COLOURS[role]||'var(--text2)';
+    var companyId=localStorage.getItem('hvacnexus_company_id');
+    if(companyId){
+      var comps=await sbFetch('companies?id=eq.'+companyId+'&select=name,created_at&limit=1');
+      if(comps&&comps.length){
+        document.getElementById('myCompany').textContent=comps[0].name||'—';
+        document.getElementById('myJoined').textContent=new Date(comps[0].created_at).toLocaleDateString('en-AU');
+      }
     }
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){console.warn('loadMyAccount:',e);}
 }
-function openAddUserModal(){
-  document.getElementById('um-name').value='';
-  document.getElementById('um-role').value='PM';
-  document.getElementById('um-pin').value='';
-  document.getElementById('userModal').classList.add('open');
-}
-function closeUserModal(){document.getElementById('userModal').classList.remove('open');}
-function saveUser(){
-  var name=document.getElementById('um-name').value.trim();
-  if(!name){alert('Name is required.');return;}
+
+async function loadMemberList(){
+  var el=document.getElementById('memberList');
   try{
-    var users=dbGetUsers()||[];
-    users.push({id:'u'+Date.now(),name:name,role:document.getElementById('um-role').value,pin:document.getElementById('um-pin').value.trim()});
-    dbSetUsers(users);
-    renderUsers();
-    closeUserModal();
-    showToast('User added');
-  }catch(e){alert('Error: '+e.message);}
-}
-function renderUsers(){
-  var el=document.getElementById('usersList');
-  if(!el)return;
-  try{
-    var users=dbGetUsers()||[];
-    if(!users.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No users yet</div>';return;}
-    el.innerHTML=users.map(function(u,i){
-      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border)">'
-        +'<div style="width:32px;height:32px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);font-size:14px">'+escH((u.name||'?').charAt(0).toUpperCase())+'</div>'
-        +'<div style="flex:1"><div style="font-weight:600;font-size:13px">'+escH(u.name)+'</div>'
-        +'<div style="font-size:11px;color:var(--muted)">'+escH(u.role)+'</div></div>'
-      +'<button data-i="'+i+'" onclick="deleteUser(+this.dataset.i)" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">x</button>'
-        +'</div>';
+    var companyId=localStorage.getItem('hvacnexus_company_id');
+    if(!companyId){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted)">No company found</div>';return;}
+    var members=await sbFetch('company_members?company_id=eq.'+companyId+'&select=id,user_id,role,created_at');
+    if(!members||!members.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No members yet</div>';return;}
+    var myUserId=(JSON.parse(localStorage.getItem('hvacnexus_session')||'{}').user||{}).id;
+    el.innerHTML=members.map(function(m){
+      var isMe=m.user_id===myUserId;
+      var roleCol=ROLE_COLOURS[m.role]||'var(--text2)';
+      var roleLabel=ROLE_LABELS[m.role]||m.role;
+      return '<div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border)">'        +'<div style="width:36px;height:36px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--text);font-size:15px;flex-shrink:0">'+escH(m.user_id.substring(0,1).toUpperCase())+'</div>'        +'<div style="flex:1"><div style="font-size:11px;color:var(--text2);font-family:DM Mono,monospace">'+escH(m.user_id)+(isMe?' <span style="color:var(--accent)">(you)</span>':'')+'</div>'        +'<div style="display:inline-block;margin-top:4px;padding:1px 8px;border-radius:10px;font-size:10px;font-family:DM Mono,monospace;color:'+roleCol+';background:rgba(0,0,0,.2);border:1px solid '+roleCol+'">'+escH(roleLabel)+'</div>'        +'</div>'        +(!isMe?'<button onclick="removeMember(''+m.id+'')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:4px 8px;border-radius:4px" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'">✕</button>':'')        +'</div>';
     }).join('');
-  }catch(e){}
+  }catch(e){el.innerHTML='<div style="padding:20px;color:var(--danger);font-size:13px">Error: '+e.message+'</div>';}
 }
-function deleteUser(i){if(confirm('Delete this user?')){try{var u=dbGetUsers()||[];u.splice(i,1);dbSetUsers(u);renderUsers();}catch(e){}}}
+
+async function removeMember(id){
+  if(!confirm('Remove this member?'))return;
+  try{await sbFetch('company_members?id=eq.'+id,{method:'DELETE'});showToast('Member removed');loadMemberList();}
+  catch(e){showToast('Error: '+e.message);}
+}
+
+function renderPermMatrix(){
+  var tbody=document.getElementById('permMatrix');if(!tbody)return;
+  function cs(v){if(v==='Full')return 'color:var(--green);font-weight:600';if(v&&v.indexOf('Edit')>=0)return 'color:var(--accent)';if(v&&v!=='—')return 'color:var(--text2)';return 'color:var(--muted);opacity:.35';}
+  tbody.innerHTML=PERM_MATRIX.map(function(r,i){
+    var bg=i%2===0?'':'background:var(--surface2)';
+    return '<tr style="'+bg+'"><td style="padding:8px 16px;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border)">'+escH(r.module)+'</td>'      +'<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-family:DM Mono,monospace;'+cs(r.ca)+'">'+r.ca+'</td>'      +'<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-family:DM Mono,monospace;'+cs(r.pa)+'">'+r.pa+'</td>'      +'<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-family:DM Mono,monospace;'+cs(r.eng)+'">'+r.eng+'</td>'      +'<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-family:DM Mono,monospace;'+cs(r.sub)+'">'+r.sub+'</td>'      +'<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-family:DM Mono,monospace;'+cs(r.wit)+'">'+r.wit+'</td></tr>';
+  }).join('');
+}
+
+function openInviteModal(){
+  document.getElementById('invite-email').value='';
+  document.getElementById('invite-role').value='engineer';
+  document.getElementById('inviteError').style.display='none';
+  updateRoleDesc();
+  document.getElementById('inviteModal').classList.add('open');
+}
+function closeInviteModal(){document.getElementById('inviteModal').classList.remove('open');}
+function updateRoleDesc(){var role=document.getElementById('invite-role').value;var el=document.getElementById('roleDescription');if(el)el.textContent=ROLE_DESC[role]||'';}
+async function sendInvite(){
+  var email=document.getElementById('invite-email').value.trim();
+  var errEl=document.getElementById('inviteError');
+  if(!email){errEl.textContent='Email is required.';errEl.style.display='block';return;}
+  errEl.style.display='none';
+  showToast('Invite feature coming soon — ask them to sign up at hvacnex.com.au/hvac-login.html');
+  closeInviteModal();
+}
+
 </script>
 
 </body>
