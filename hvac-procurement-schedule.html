@@ -89,6 +89,11 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 .proc-tbl tbody tr{cursor:default;transition:background .13s}
 .proc-tbl tbody tr:hover td{background:var(--surface2)}
 .proc-tbl tbody tr.overdue td{background:rgba(255,77,109,.04)}
+.proc-tbl tbody tr.selected td{background:rgba(0,200,255,.05)!important}
+#batchBar{position:fixed;bottom:0;left:0;right:0;background:var(--surface2);border-top:2px solid var(--accent);padding:12px 24px;display:none;align-items:center;gap:12px;z-index:500;box-shadow:0 -4px 20px rgba(0,0,0,.4)}
+#batchBar.show{display:flex}
+.batch-count{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:700;white-space:nowrap;min-width:100px}
+.batch-sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
 .asset-id{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:600}
 .equip-type{font-size:11px;color:var(--text2)}
 .st-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px;white-space:nowrap}
@@ -155,36 +160,65 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
 </style>
-<script>
-// ── HVAC Nexus Auth Guard ──
-(async function(){
-  var DEV_BYPASS=false;
-  if(DEV_BYPASS)return;
-  var stored=localStorage.getItem('hvacnexus_session');
-  if(!stored){window.location.href='hvac-login.html';return;}
-  try{
-    var sess=JSON.parse(stored);
-    if(Date.now()/1000<(sess.expires_at||0)-60){
-      // Set _authSession if db.js loaded
-      if(typeof _authSession!=='undefined')_authSession=sess;
-      return;
-    }
-    var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
-    var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
-    var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
-    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
-    else{localStorage.removeItem('hvacnexus_session');window.location.href='hvac-login.html';}
-  }catch(e){window.location.href='hvac-login.html';}
-})();
-</script>
 </head>
 <body>
 
 <!-- SIDEBAR -->
-<div id="app-sidebar"></div>
-<script src="sidebar.js"></script>
-
-<span class="sb-user-name" id="sb-user">—</span></div>
+<div class="sb" id="sidebar"><div class="sb-resize-handle" id="sbResize"></div>
+  <div class="sb-top"><div class="sb-brand"><span class="sb-icon">&#10052;</span><span class="sb-name">HVAC NEXUS</span></div><button class="sb-toggle" onclick="toggleSB()" id="sbToggleBtn">&laquo;</button></div>
+  <div class="sb-proj-block"><div class="sb-proj-lbl">Current Project</div><div class="sb-proj-name" id="sb-proj-name">—</div><div class="sb-proj-num" id="sb-proj-num">—</div></div>
+  <nav class="sb-nav" id="sbNav">
+    <div class="sb-item" onclick="navTo('index.html')"><span class="sb-item-icon">🏗️</span><span class="sb-item-label">Projects</span></div>
+    <div class="sb-item" onclick="navTo('project-dashboard.html')"><span class="sb-item-icon">🏠</span><span class="sb-item-label">Project Dashboard</span></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('financials')" id="ghdr-financials"><span class="sb-group-chev" id="gchev-financials">▾</span><span class="sb-group-name">Financials</span></div>
+      <div class="sb-group-items" id="gitems-financials" style="display:block">
+    <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
+    <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span></div>
+    <div class="sb-item" onclick="navTo('hvac-vendor-invoices.html')"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
+    <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span></div>
+    <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('procurement')" id="ghdr-procurement"><span class="sb-group-chev" id="gchev-procurement">▾</span><span class="sb-group-name">Procurement</span></div>
+      <div class="sb-group-items" id="gitems-procurement" style="display:block">
+    <div class="sb-item active"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
+    <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
+    <div class="sb-item" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('technical')" id="ghdr-technical"><span class="sb-group-chev" id="gchev-technical">▾</span><span class="sb-group-name">Technical</span></div>
+      <div class="sb-group-items" id="gitems-technical" style="display:block">
+    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span></div>
+    <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span></div>
+    <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></div>
+    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span></div>
+    <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span></div>
+    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📅</span><span class="sb-item-label">Project plan</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('quality')" id="ghdr-quality"><span class="sb-group-chev" id="gchev-quality">▾</span><span class="sb-group-name">Quality</span></div>
+      <div class="sb-group-items" id="gitems-quality" style="display:block">
+    <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
+    <div class="sb-item" onclick="navTo('hvac-fire-register.html')"><span class="sb-item-icon">🔥</span><span class="sb-item-label">Passive fire</span></div>
+    <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
+    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📄</span><span class="sb-item-label">NCR</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('commissioning')" id="ghdr-commissioning"><span class="sb-group-chev" id="gchev-commissioning">▾</span><span class="sb-group-name">Commissioning</span></div>
+      <div class="sb-group-items" id="gitems-commissioning" style="display:block">
+    <div class="sb-item" onclick="navTo('hvac-commissioning-plan.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning plan</span></div>
+    <div class="sb-item" onclick="navTo('hvac-precommissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span></div>
+    <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('handover')" id="ghdr-handover"><span class="sb-group-chev" id="gchev-handover">▾</span><span class="sb-group-name">Handover</span></div>
+      <div class="sb-group-items" id="gitems-handover" style="display:block">
+    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📦</span><span class="sb-item-label">Asset register</span></div>
+    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📖</span><span class="sb-item-label">O&amp;M manuals</span></div>
+    <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">🔧</span><span class="sb-item-label">Maintenance plan</span></div>
+      </div></div>
+    <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('settings')" id="ghdr-settings"><span class="sb-group-chev" id="gchev-settings">▾</span><span class="sb-group-name">Settings</span></div>
+      <div class="sb-group-items" id="gitems-settings" style="display:block">
+    <div class="sb-item" onclick="navTo('hvac-project-settings.html')"><span class="sb-item-icon">🏗️</span><span class="sb-item-label">Project settings</span></div>
+    <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
+      </div></div>
+  </nav>
+  <div class="sb-footer"><div class="sb-av" id="sb-av">S</div><span class="sb-user-name" id="sb-user">—</span></div>
 </div>
 
 
@@ -247,6 +281,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 <div id="fullView" style="padding:16px 24px 60px"><div style="overflow:auto;border-radius:var(--radius);max-height:calc(100vh - 280px)"><table class="proc-tbl" id="procTable">
     <thead>
       <tr>
+        <th style="width:36px"><input type="checkbox" id="selectAllChk" onchange="toggleSelectAll(this.checked)" style="cursor:pointer;accent-color:var(--accent)"/></th>
         <th style="width:40px">#</th>
         <th>Asset ID</th>
         <th>Location</th>
@@ -259,6 +294,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
         <th style="width:110px">Order date</th>
         <th style="width:110px">Lead time (weeks)</th>
         <th style="width:100px">ETA</th>
+        <th style="width:110px">Delivery date</th>
         <th>Comments</th>
       </tr>
     </thead>
@@ -315,13 +351,13 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
   </div>
 </div>
 
-<script src="head-common.js"></script>
 <script src="db.js"></script>
 <script>
 var _psProj=dbGetCurrentProject();var _psPNum=_psProj.num||_psProj.number||'GCT001';
 
 var _currentView='full';
 var _editMode=false;
+var _selectedIds=new Set();
 var items=[];
 var editingId=null;
 function showToast(msg){
@@ -517,14 +553,37 @@ function eqSchedLink(equipType,location){
 }
 
 
-function inlineUpdate(id,field,value){
+function inlineUpdate(id,field,value,skipBatch){
   var item=items.find(function(i){return i.id===id;});
   if(!item) return;
   if(field==='leadWeeks') value=parseInt(value)||'';
-  if(field==='leadWeeks') value=parseInt(value)||'';
+  // Auto-set delivery date when status set to Delivered
+  if(field==='status'&&value==='Delivered'&&!item.deliveryDate){
+    item.deliveryDate=today();
+  }
+  // Append comments instead of replace
+  if(field==='comments'&&!skipBatch){
+    // direct edit - replace as normal
+  }
   item[field]=value;
-  // Always recalc ETA
+  // Recalc ETA
   item.eta=(item.orderDate&&item.leadWeeks)?calcETA(item.orderDate,item.leadWeeks):'';
+  // Batch propagate to selected items
+  if(!skipBatch&&_selectedIds.size>1&&_selectedIds.has(id)){
+    _selectedIds.forEach(function(sid){
+      if(sid===id)return;
+      var sItem=items.find(function(i){return i.id===sid;});
+      if(!sItem)return;
+      if(field==='comments'){
+        // append to each
+        sItem.comments=(sItem.comments?(sItem.comments+'\n'):'')+(value||'');
+      } else {
+        sItem[field]=value;
+        if(field==='status'&&value==='Delivered'&&!sItem.deliveryDate)sItem.deliveryDate=today();
+      }
+      sItem.eta=(sItem.orderDate&&sItem.leadWeeks)?calcETA(sItem.orderDate,sItem.leadWeeks):'';
+    });
+  }
   save();
   updateSummary();
   // Update ETA cell and lead label in place without losing focus
@@ -609,6 +668,7 @@ function renderTable(){
     if(isOverdue) tr.className='overdue';
     tr.style.cursor='default';
     tr.setAttribute('data-item-id',item.id);
+    tr.setAttribute('data-id',item.id);
     if(_editMode)tr.classList.add('editing');
     var stHex=item.status==='Not ordered'?'#ff4d6d':'#ddeeff';
     var lw=item.leadWeeks?parseInt(item.leadWeeks):null;
@@ -624,7 +684,28 @@ function renderTable(){
     var commentsCell=_editMode
       ?'<textarea class="proc-edit" onchange="inlineUpdate(\''+item.id+'\',\'comments\',this.value)" style="min-width:260px;min-height:36px">'+escH(item.comments||'')+'</textarea>'
       :'<span>'+escH(item.comments||'')+'</span>';
-    tr.innerHTML='<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">'+(idx+1)+'</td>'      +'<td class="asset-id">'+escH(item.assetId||'—')+'</td>'      +'<td style="color:var(--text2)">'+escH(item.location||'—')+'</td>'      +'<td style="color:var(--muted);font-size:12px">'+escH(item.subarea||'—')+'</td>'      +'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>'      +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(item.model||'—')+'</td>'      +'<td class="equip-type">'+escH(item.equipType||'—')+'</td>'      +'<td style="font-size:12px;color:var(--text2)">'+fmtD(item.subApproval)+'</td>'      +'<td>'+statusCell+'</td>'      +'<td>'+dateCell+'</td>'      +'<td>'+leadCell+'</td>'      +'<td class="eta-cell '+etaCls+'">'+etaDisplay+(isOverdue?' ⚠':'')+'</td>'      +'<td class="comments-cell">'+commentsCell+'</td>';
+    var isSelected=_selectedIds.has(item.id);
+    if(isSelected)tr.classList.add('selected');
+    // Delivery date cell - only shows when Delivered
+    var isDelivered=item.status==='Delivered';
+    var delivCell=_editMode
+      ?'<input type="date" class="proc-edit" value="'+(item.deliveryDate||'')+'" onchange="inlineUpdate(\''+item.id+'\',\'deliveryDate\',this.value)" style="min-width:110px"/>'
+      :'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+(isDelivered?'var(--green)':'var(--muted)')+'">'+fmtD(item.deliveryDate||'')+'</span>';
+    tr.innerHTML='<td style="text-align:center"><input type="checkbox" '+(isSelected?'checked':'')+' onchange="toggleSelect(\''+item.id+'\',this.checked)" style="cursor:pointer;accent-color:var(--accent)"/></td>'
+      +'<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">'+(idx+1)+'</td>'
+      +'<td class="asset-id">'+escH(item.assetId||'—')+'</td>'
+      +'<td style="color:var(--text2)">'+escH(item.location||'—')+'</td>'
+      +'<td style="color:var(--muted);font-size:12px">'+escH(item.subarea||'—')+'</td>'
+      +'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>'
+      +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(item.model||'—')+'</td>'
+      +'<td class="equip-type">'+escH(item.equipType||'—')+'</td>'
+      +'<td style="font-size:12px;color:var(--text2)">'+fmtD(item.subApproval)+'</td>'
+      +'<td>'+statusCell+'</td>'
+      +'<td>'+dateCell+'</td>'
+      +'<td>'+leadCell+'</td>'
+      +'<td class="eta-cell '+etaCls+'">'+etaDisplay+(isOverdue?' ⚠':'')+'</td>'
+      +'<td>'+delivCell+'</td>'
+      +'<td class="comments-cell">'+commentsCell+'</td>';
     tbody.appendChild(tr);
   });
 }
@@ -734,6 +815,69 @@ function navTo(url){var b=window.location.href.substring(0,window.location.href.
 function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
 function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
 // ── View toggle ──
+function toggleSelect(id,checked){
+  if(checked)_selectedIds.add(id);else _selectedIds.delete(id);
+  updateBatchBar();
+  // Re-apply selected class without full re-render
+  var rows=document.querySelectorAll('#procTbody tr[data-id]');
+  rows.forEach(function(tr){
+    var sel=_selectedIds.has(tr.dataset.id);
+    tr.classList.toggle('selected',sel);
+    var chk=tr.querySelector('input[type=checkbox]');
+    if(chk)chk.checked=sel;
+  });
+}
+function toggleSelectAll(checked){
+  var filtered=getFilteredItems();
+  if(checked){filtered.forEach(function(i){_selectedIds.add(i.id);});}
+  else{_selectedIds.clear();}
+  updateBatchBar();
+  renderTable();
+}
+function clearSelection(){_selectedIds.clear();updateBatchBar();renderTable();}
+function updateBatchBar(){
+  var bar=document.getElementById('batchBar');
+  var cnt=document.getElementById('batchCount');
+  if(_selectedIds.size>0){
+    bar.classList.add('show');
+    cnt.textContent=_selectedIds.size+' selected';
+  } else {
+    bar.classList.remove('show');
+    // Reset batch inputs
+    var bs=document.getElementById('batchStatus');
+    var bod=document.getElementById('batchOrderDate');
+    var blw=document.getElementById('batchLeadWeeks');
+    if(bs)bs.value='';if(bod)bod.value='';if(blw)blw.value='';
+  }
+  // Sync select-all checkbox
+  var allChk=document.getElementById('selectAllChk');
+  if(allChk){var filtered=getFilteredItems();allChk.checked=filtered.length>0&&filtered.every(function(i){return _selectedIds.has(i.id);});}
+}
+function applyBatchField(field,value){
+  if(!value||_selectedIds.size===0)return;
+  if(field==='leadWeeks')value=parseInt(value)||'';
+  _selectedIds.forEach(function(id){
+    var item=items.find(function(i){return i.id===id;});
+    if(!item)return;
+    item[field]=value;
+    if(field==='status'&&value==='Delivered'&&!item.deliveryDate)item.deliveryDate=today();
+    item.eta=(item.orderDate&&item.leadWeeks)?calcETA(item.orderDate,item.leadWeeks):'';
+  });
+  save();renderTable();updateSummary();
+  showToast('✓ Updated '+_selectedIds.size+' items');
+}
+function applyBatchComments(){
+  var val=document.getElementById('batchComments').value.trim();
+  if(!val||_selectedIds.size===0)return;
+  _selectedIds.forEach(function(id){
+    var item=items.find(function(i){return i.id===id;});
+    if(!item)return;
+    item.comments=item.comments?(item.comments+'\n'+val):val;
+  });
+  document.getElementById('batchComments').value='';
+  save();renderTable();updateSummary();
+  showToast('✓ Comments appended to '+_selectedIds.size+' items');
+}
 function toggleEditMode(){
   _editMode=!_editMode;
   var btn=document.getElementById('editModeBtn');
@@ -875,5 +1019,24 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 })();
 
 </script>
+<div id="batchBar">
+  <span class="batch-count" id="batchCount">0 selected</span>
+  <button onclick="toggleSelectAll(false)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 10px;font-family:'DM Mono',monospace">Deselect all</button>
+  <div class="batch-sep"></div>
+  <span style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">BATCH UPDATE:</span>
+  <select id="batchStatus" onchange="applyBatchField('status',this.value);this.value=''" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;cursor:pointer">
+    <option value="">— Status —</option>
+    <option value="Not ordered">Not ordered</option>
+    <option value="Ordered">Ordered</option>
+    <option value="Ready">Ready</option>
+    <option value="Delivered">Delivered</option>
+    <option value="Supplied by others">Supplied by others</option>
+  </select>
+  <input type="date" id="batchOrderDate" placeholder="Order date" onchange="applyBatchField('orderDate',this.value)" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none"/>
+  <input type="number" id="batchLeadWeeks" placeholder="Lead weeks" min="1" onchange="applyBatchField('leadWeeks',this.value)" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;width:100px"/>
+  <input type="text" id="batchComments" placeholder="Append comments…" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;flex:1;min-width:160px" onkeydown="if(event.key==='Enter')applyBatchComments()"/>
+  <button onclick="applyBatchComments()" style="background:var(--accent);border:none;border-radius:6px;color:#080c12;font-size:12px;font-weight:700;padding:5px 14px;cursor:pointer;font-family:'DM Sans',sans-serif">Apply</button>
+  <button onclick="clearSelection()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px;line-height:1" title="Dismiss">✕</button>
+</div>
 </body>
 </html>
