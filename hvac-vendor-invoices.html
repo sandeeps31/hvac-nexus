@@ -184,6 +184,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
     <span class="bcc">Vendor Claims</span>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn bsm" onclick="openInvoiceModal(null)" style="background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.3)">&#65291; Log Invoice</button>
     <button class="bp bsm btn" onclick="openClaimModal(null)">&#65291; Log Claim</button>
   </div>
 </div>
@@ -204,6 +205,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
     <option value="Disputed">Disputed</option>
     <option value="Invoice Pending">Invoice Pending</option>
     <option value="Invoice Approved">Invoice Approved</option>
+    <option value="Direct Invoice Pending">Direct Invoice Pending</option>
+    <option value="Direct Invoice Approved">Direct Invoice Approved</option>
   </select>
   <select class="fsel" id="monthFilter" onchange="renderClaims()"><option value="">All Periods</option></select>
   <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="claimCount"></span>
@@ -379,7 +382,7 @@ function renderClaims(){
     return;
   }
   var sorted=filtered.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
-  var stMap={'Pending':['var(--warn)','rgba(255,184,48,.1)'],'Approved':['var(--green)','rgba(0,200,100,.1)'],'Disputed':['var(--danger)','rgba(255,77,109,.1)'],'Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Invoice Approved':['var(--green)','rgba(0,200,100,.1)']};
+  var stMap={'Pending':['var(--warn)','rgba(255,184,48,.1)'],'Approved':['var(--green)','rgba(0,200,100,.1)'],'Disputed':['var(--danger)','rgba(255,77,109,.1)'],'Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Invoice Approved':['var(--green)','rgba(0,200,100,.1)'],'Direct Invoice Pending':['#a78bfa','rgba(167,139,250,.1)'],'Direct Invoice Approved':['var(--green)','rgba(0,200,100,.1)']};
   var html='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--surface2);border-bottom:1px solid var(--border)">'
     +'<th style="padding:9px 20px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Vendor</th>'
     +'<th style="padding:9px 12px;text-align:left;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase">Claim No</th>'
@@ -391,14 +394,32 @@ function renderClaims(){
     +'</tr></thead><tbody>';
   sorted.forEach(function(c){
     var stColors=stMap[c.status]||['var(--text2)','var(--surface2)'];
-    var linesSummary=(c.lines||[]).map(function(l){return '<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 5px;border-radius:3px;background:'+(l.type==='base'?'var(--accent-dim)':'var(--warn-dim)')+';color:'+(l.type==='base'?'var(--accent)':'var(--warn)')+'">'+(l.type==='base'?'BASE':'VAR '+(l.varNum||''))+'</span>';}).join(' ');
+    var isDirect=!!c.isDirect;
+    var linesSummary=isDirect
+      ?'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(167,139,250,.15);color:#a78bfa">DIRECT</span>'
+      :(c.lines||[]).map(function(l){return '<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 5px;border-radius:3px;background:'+(l.type==='base'?'var(--accent-dim)':'var(--warn-dim)')+';color:'+(l.type==='base'?'var(--accent)':'var(--warn)')+'">'+(l.type==='base'?'BASE':'VAR '+(l.varNum||''))+'</span>';}).join(' ');
     var actions='';
-    if(c.status==='Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveClaim(this.dataset.cid)">Approve</button> <button class="btn bsm" style="color:var(--danger);border-color:rgba(255,77,109,.3);background:var(--surface2)" data-cid="'+c.id+'" onclick="disputeClaim(this.dataset.cid)">Dispute</button>';}
-    else if(c.status==='Approved'){actions='<button class="btn bsm" style="color:#a78bfa;border-color:rgba(167,139,250,.3);background:var(--surface2)" data-cid="'+c.id+'" onclick="openConvertModal(this.dataset.cid)">+ Log Invoice</button>';}
-    else if(c.status==='Invoice Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveInvoice(this.dataset.cid)">Approve Invoice</button>';}
-    actions+=' <button class="btn bsm" style="color:var(--muted);border-color:var(--border);background:var(--surface2)" data-cid="'+c.id+'" onclick="openClaimModal(this.dataset.cid)">Edit</button>';
-    html+='<tr style="border-bottom:1px solid var(--border);background:var(--surface)" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'+'<td style="padding:11px 20px;font-weight:600;color:var(--text)">'+escH(c.vendor||'--')+'</td>'+'<td style="padding:11px 12px;font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+escH(c.claimNo||'--')+'</td>'+'<td style="padding:11px 12px;font-size:12px;color:var(--text2)">'+fmtM(c.period||'')+'</td>'+'<td style="padding:11px 12px">'+linesSummary+'</td>'+'<td style="padding:11px 12px;text-align:right;font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:var(--text)">'+fmt(c.totalAmount||0)+'</td>'+'<td style="padding:11px 12px;text-align:center"><span style="font-family:DM Mono,monospace;font-size:9px;padding:3px 8px;border-radius:20px;font-weight:600;color:'+stColors[0]+';background:'+stColors[1]+'">'+escH(c.status||'Pending')+'</span></td>'+'<td style="padding:8px 20px;text-align:right;white-space:nowrap">'+actions+'</td>'+'</tr>';
-    if(c.invoiceNo){var varAmt=num(c.invoiceAmount||0)-num(c.totalAmount||0);var varColor=varAmt>0?'var(--danger)':varAmt<0?'var(--warn)':'var(--green)';html+='<tr style="border-bottom:1px solid var(--border);background:rgba(167,139,250,.04)"><td colspan="3" style="padding:7px 20px 7px 36px;font-size:11px;color:var(--muted)">Invoice: '+escH(c.invoiceNo||'')+(c.invoiceDate?' &nbsp;|&nbsp; '+fmtD(c.invoiceDate):'')+'</td><td colspan="2" style="padding:7px 12px;text-align:right;font-family:DM Mono,monospace;font-size:12px;font-weight:600;color:var(--text)">'+fmt(c.invoiceAmount||0)+(varAmt!==0?'&nbsp;<span style="font-size:10px;color:'+varColor+'">'+(varAmt>0?'+':'')+fmt(Math.abs(varAmt))+' vs claim</span>':'')+'</td><td colspan="2"></td></tr>';}
+    if(isDirect){
+      if(c.status==='Direct Invoice Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveDirectInvoice(this.dataset.cid)">Approve Invoice</button>';}
+      actions+=' <button class="btn bsm" style="color:var(--muted);border-color:var(--border);background:var(--surface2)" data-cid="'+c.id+'" onclick="openInvoiceModal(this.dataset.cid)">Edit</button>';
+    } else {
+      if(c.status==='Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveClaim(this.dataset.cid)">Approve</button> <button class="btn bsm" style="color:var(--danger);border-color:rgba(255,77,109,.3);background:var(--surface2)" data-cid="'+c.id+'" onclick="disputeClaim(this.dataset.cid)">Dispute</button>';}
+      else if(c.status==='Approved'){actions='<button class="btn bsm" style="color:#a78bfa;border-color:rgba(167,139,250,.3);background:var(--surface2)" data-cid="'+c.id+'" onclick="openConvertModal(this.dataset.cid)">+ Log Invoice</button>';}
+      else if(c.status==='Invoice Pending'){actions='<button class="btn bp bsm" data-cid="'+c.id+'" onclick="approveInvoice(this.dataset.cid)">Approve Invoice</button>';}
+      actions+=' <button class="btn bsm" style="color:var(--muted);border-color:var(--border);background:var(--surface2)" data-cid="'+c.id+'" onclick="openClaimModal(this.dataset.cid)">Edit</button>';
+    }
+    var refNo=isDirect?escH(c.invoiceNo||'—'):escH(c.claimNo||'—');
+    var rowAmt=isDirect?num(c.invoiceAmount||c.totalAmount||0):num(c.totalAmount||0);
+    html+='<tr style="border-bottom:1px solid var(--border);background:var(--surface)" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+      +'<td style="padding:11px 20px;font-weight:600;color:var(--text)">'+escH(c.vendor||'--')+'</td>'
+      +'<td style="padding:11px 12px;font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+refNo+'</td>'
+      +'<td style="padding:11px 12px;font-size:12px;color:var(--text2)">'+fmtM(c.period||'')+'</td>'
+      +'<td style="padding:11px 12px">'+linesSummary+'</td>'
+      +'<td style="padding:11px 12px;text-align:right;font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:var(--text)">'+fmt(rowAmt)+'</td>'
+      +'<td style="padding:11px 12px;text-align:center"><span style="font-family:DM Mono,monospace;font-size:9px;padding:3px 8px;border-radius:20px;font-weight:600;color:'+stColors[0]+';background:'+stColors[1]+'">'+escH(c.status||'Pending')+'</span></td>'
+      +'<td style="padding:8px 20px;text-align:right;white-space:nowrap">'+actions+'</td>'
+      +'</tr>';
+    if(!isDirect&&c.invoiceNo){var varAmt=num(c.invoiceAmount||0)-num(c.totalAmount||0);var varColor=varAmt>0?'var(--danger)':varAmt<0?'var(--warn)':'var(--green)';html+='<tr style="border-bottom:1px solid var(--border);background:rgba(167,139,250,.04)"><td colspan="3" style="padding:7px 20px 7px 36px;font-size:11px;color:var(--muted)">Invoice: '+escH(c.invoiceNo||'')+(c.invoiceDate?' &nbsp;|&nbsp; '+fmtD(c.invoiceDate):'')+'</td><td colspan="2" style="padding:7px 12px;text-align:right;font-family:DM Mono,monospace;font-size:12px;font-weight:600;color:var(--text)">'+fmt(c.invoiceAmount||0)+(varAmt!==0?'&nbsp;<span style="font-size:10px;color:'+varColor+'">'+(varAmt>0?'+':'')+fmt(Math.abs(varAmt))+' vs claim</span>':'')+'</td><td colspan="2"></td></tr>';}
   });
   html+='</tbody></table>';
   page.innerHTML=html;
@@ -427,10 +448,126 @@ function openClaimModal(id){
   document.getElementById('cm-date').value=existing?existing.date:today_();
   document.getElementById('cm-period').value=existing?existing.period:today_().substring(0,7);
   document.getElementById('cm-dup-warn').style.display='none';
+  var delBtn=document.getElementById('cm-delete-btn');
+  if(delBtn)delBtn.style.display=_editingClaimId?'':'none';
   renderClaimLines();
   document.getElementById('claimModal').classList.add('open');
 }
 function closeClaimModal(){document.getElementById('claimModal').classList.remove('open');closePOSlider();}
+function deleteClaim(){
+  if(!_editingClaimId)return;
+  var c=claims.find(function(x){return x.id===_editingClaimId;});
+  if(!confirm('Delete claim '+(c?c.claimNo||'this claim':'')+'? This cannot be undone.'))return;
+  claims=claims.filter(function(x){return x.id!==_editingClaimId;});
+  save();closeClaimModal();renderClaims();updateSummary();
+}
+
+// ── DIRECT INVOICE ──
+var _editingInvoiceId=null,_invoiceLines=[];
+
+function openInvoiceModal(id){
+  _editingInvoiceId=id||null;
+  var existing=id?claims.find(function(c){return c.id===id&&c.isDirect;}):null;
+  _invoiceLines=existing?JSON.parse(JSON.stringify(existing.lines||[])):[{id:'il_'+Date.now(),description:'',poId:'',amount:0}];
+  var vendorSel=document.getElementById('im-vendor');
+  var vendors=getVendorsFromPOs();
+  vendorSel.innerHTML='<option value="">-- Select Vendor --</option>';
+  vendors.forEach(function(v){vendorSel.innerHTML+='<option value="'+escH(v)+'"'+(existing&&existing.vendor===v?' selected':'')+'>'+escH(v)+'</option>';});
+  document.getElementById('im-invno').value=existing?existing.invoiceNo||'':'';
+  document.getElementById('im-invdate').value=existing?existing.invoiceDate||today_():today_();
+  document.getElementById('im-period').value=existing?existing.period:today_().substring(0,7);
+  var delBtn=document.getElementById('im-delete-btn');
+  if(delBtn)delBtn.style.display=_editingInvoiceId?'':'none';
+  renderInvoiceLines();
+  document.getElementById('invoiceModal').classList.add('open');
+}
+function closeInvoiceModal(){document.getElementById('invoiceModal').classList.remove('open');closePOSlider();}
+function onInvoiceVendorChange(){renderInvoiceLines();}
+
+function renderInvoiceLines(){
+  var el=document.getElementById('im-lines');if(!el)return;
+  var vendor=(document.getElementById('im-vendor').value||'').trim();
+  var vendorPOs=vendor?getPOsForVendor(vendor):[];
+  var html=_invoiceLines.map(function(line,i){
+    var poOpts='<option value="">-- Select PO --</option>';
+    vendorPOs.forEach(function(po){
+      var rem=getPORemaining(po.id);
+      if(rem&&rem.remaining<=0&&line.poId!==po.id)return;
+      poOpts+='<option value="'+escH(po.id)+'"'+(line.poId===po.id?' selected':'')+'>'+escH(po.id)+(po.cat?' ('+escH(po.cat)+')':'')+(rem?' — '+fmt(rem.remaining)+' rem':'')+'</option>';
+    });
+    var remainHtml='';
+    if(line.poId){
+      var rem=getPORemaining(line.poId);
+      if(rem){
+        var remColor=rem.remaining<0?'var(--danger)':rem.remaining<rem.poValue*0.1?'var(--warn)':'var(--green)';
+        remainHtml='<div style="margin-top:6px;padding:8px 12px;background:var(--surface2);border-radius:6px;font-family:DM Mono,monospace;font-size:11px;display:flex;gap:16px;flex-wrap:wrap"><span>PO Value: <strong>'+fmt(rem.poValue)+'</strong></span><span>Previously Claimed: <strong style="color:var(--warn)">'+fmt(rem.previouslyClaimed)+'</strong></span><span>Remaining: <strong style="color:'+remColor+'">'+fmt(rem.remaining)+'</strong></span></div>';
+      }
+    }
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+        +'<span style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Line '+(i+1)+'</span>'
+        +(_invoiceLines.length>1?'<button data-li="'+i+'" onclick="_invoiceLines.splice(this.dataset.li*1,1);renderInvoiceLines()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">×</button>':'')
+      +'</div>'
+      +'<div style="margin-bottom:8px"><label class="ml">Description</label><input class="mi" value="'+escH(line.description||'')+'" placeholder="What is being invoiced..." data-li="'+i+'" oninput="_invoiceLines[this.dataset.li*1].description=this.value"/></div>'
+      +'<div style="margin-bottom:8px"><label class="ml">Linked PO</label><select class="ms" style="width:100%" data-li="'+i+'" onchange="_invoiceLines[this.dataset.li*1].poId=this.value;renderInvoiceLines();if(this.value)openPOSlider(this.value);else closePOSlider()">'+poOpts+'</select></div>'
+      +remainHtml
+      +'<div style="margin-top:8px"><label class="ml">Amount (ex GST) *</label><input class="mi" type="number" value="'+(line.amount||'')+'" placeholder="0.00" data-li="'+i+'" oninput="_invoiceLines[this.dataset.li*1].amount=parseFloat(this.value)||0;updateInvoiceTotal()"/></div>'
+      +'</div>';
+  }).join('');
+  el.innerHTML=html;
+  updateInvoiceTotal();
+}
+function updateInvoiceTotal(){
+  var t=_invoiceLines.reduce(function(a,l){return a+num(l.amount);},0);
+  var el=document.getElementById('im-total');if(el)el.textContent=fmt(t);
+}
+function addInvoiceLine(){
+  _invoiceLines.push({id:'il_'+Date.now(),description:'',poId:'',amount:0});
+  renderInvoiceLines();
+}
+function saveInvoice(){
+  var vendor=(document.getElementById('im-vendor').value||'').trim();
+  var invNo=(document.getElementById('im-invno').value||'').trim();
+  var period=document.getElementById('im-period').value;
+  if(!vendor){alert('Please select a vendor.');return;}
+  if(!invNo){alert('Invoice number is required.');return;}
+  if(!period){alert('Billing period is required.');return;}
+  if(!_invoiceLines.some(function(l){return num(l.amount)>0;})){alert('At least one line must have an amount.');return;}
+  var total=_invoiceLines.reduce(function(a,l){return a+num(l.amount);},0);
+  var invoice={
+    id:_editingInvoiceId||('inv_'+Date.now()),
+    isDirect:true,
+    vendor:vendor,
+    invoiceNo:invNo,
+    invoiceDate:document.getElementById('im-invdate').value,
+    invoiceAmount:total,
+    period:period,
+    lines:JSON.parse(JSON.stringify(_invoiceLines)),
+    totalAmount:total,
+    status:'Direct Invoice Pending',
+    claimNo:'—'
+  };
+  if(_editingInvoiceId){
+    var idx=claims.findIndex(function(c){return c.id===_editingInvoiceId;});
+    if(idx>=0)claims[idx]=invoice;else claims.push(invoice);
+  }else claims.push(invoice);
+  save();closeInvoiceModal();renderClaims();updateSummary();
+}
+function deleteInvoice(){
+  if(!_editingInvoiceId)return;
+  var c=claims.find(function(x){return x.id===_editingInvoiceId;});
+  if(!confirm('Delete invoice '+(c?c.invoiceNo||'this invoice':'')+'? This cannot be undone.'))return;
+  claims=claims.filter(function(x){return x.id!==_editingInvoiceId;});
+  save();closeInvoiceModal();renderClaims();updateSummary();
+}
+function approveDirectInvoice(id){
+  var c=claims.find(function(x){return x.id===id;});if(!c)return;
+  var u=dbGetCurrentUser();
+  c.status='Direct Invoice Approved';
+  c.invoiceApprovedBy=(u&&(u.name||u.username))||'PM';
+  c.invoiceApprovedDate=today_();
+  save();renderClaims();updateSummary();
+}
 function onVendorChange(){checkDupWarn();renderClaimLines();}
 function checkDupWarn(){var vendor=(document.getElementById('cm-vendor').value||'').trim();var period=document.getElementById('cm-period').value;var w=document.getElementById('cm-dup-warn');if(!w)return;if(vendor&&period){var dup=claims.find(function(c){return c.vendor===vendor&&c.period===period&&(!_editingClaimId||c.id!==_editingClaimId);});if(dup){w.style.display='block';w.textContent='Warning: A claim already exists for '+vendor+' for '+fmtM(period)+' ('+dup.claimNo+')';}else w.style.display='none';}else w.style.display='none';}
 
@@ -542,6 +679,7 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
       </div>
     </div>
     <div class="modal-footer">
+      <button class="btn bsm" id="cm-delete-btn" onclick="deleteClaim()" style="background:var(--danger-dim,rgba(255,77,109,.1));color:var(--danger);border:1px solid rgba(255,77,109,.3);display:none;margin-right:auto">🗑 Delete</button>
       <button class="btn bg bsm" onclick="closeClaimModal()">Cancel</button>
       <button class="btn bp bsm" onclick="saveClaim()">Save Claim</button>
     </div>
@@ -572,6 +710,41 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
     <div class="modal-footer">
       <button class="btn bg bsm" onclick="closeConvertModal()">Cancel</button>
       <button class="btn bp bsm" onclick="saveConvert()">Save Invoice</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOG DIRECT INVOICE MODAL -->
+<div class="mo" id="invoiceModal">
+  <div class="modal" style="width:560px">
+    <div class="modal-hdr">
+      <h3>Log Invoice</h3>
+      <p>Log a vendor invoice directly — no claim required.</p>
+    </div>
+    <div class="modal-body" style="max-height:65vh;overflow-y:auto">
+      <div>
+        <label class="ml">Vendor *</label>
+        <select class="ms" id="im-vendor" style="width:100%" onchange="onInvoiceVendorChange()">
+          <option value="">-- Select Vendor --</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label class="ml">Invoice No. *</label><input class="mi" id="im-invno" placeholder="e.g. INV-2025-001"/></div>
+        <div><label class="ml">Invoice Date</label><input class="mi" id="im-invdate" type="date"/></div>
+      </div>
+      <div><label class="ml">Billing Period *</label><input class="mi" id="im-period" type="month"/></div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px">Invoice Lines</div>
+      <div id="im-lines"></div>
+      <button class="btn bg bsm" onclick="addInvoiceLine()" style="width:100%;justify-content:center">+ Add Line</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 0;border-top:1px solid var(--border)">
+        <span style="font-size:13px;color:var(--text2)">Total Invoice (ex GST)</span>
+        <span id="im-total" style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#a78bfa">--</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bsm" id="im-delete-btn" onclick="deleteInvoice()" style="background:var(--danger-dim,rgba(255,77,109,.1));color:var(--danger);border:1px solid rgba(255,77,109,.3);display:none;margin-right:auto">🗑 Delete</button>
+      <button class="btn bg bsm" onclick="closeInvoiceModal()">Cancel</button>
+      <button class="btn bsm" onclick="saveInvoice()" style="background:#a78bfa;color:#fff">Save Invoice</button>
     </div>
   </div>
 </div>
