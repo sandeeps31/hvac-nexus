@@ -2246,11 +2246,22 @@ function openRevHistory(){
   document.getElementById('revHistModal').classList.add('open');
 }
 
+// exportingRevIdx: null=last published, -1=draft, >=0=specific revision
 function openExportModal(){
-  exportingRevIdx=viewingRevIdx;
   var tr=getTabRev(activeId);
-  var rv=exportingRevIdx!==null?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
-  document.getElementById('exportRevSubtitle').textContent='Exporting: '+(rv?rv.rev:'current');
+  if(viewingRevIdx!==null){
+    // Viewing a specific published revision
+    exportingRevIdx=viewingRevIdx;
+  } else if(tr&&tr.draft){
+    // In active draft - use -1 as draft sentinel
+    exportingRevIdx=-1;
+  } else {
+    // No draft, show last published
+    exportingRevIdx=null;
+  }
+  var rv=exportingRevIdx>=0?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
+  var label=exportingRevIdx===-1?'Draft (current changes)':rv?rv.rev:'current';
+  document.getElementById('exportRevSubtitle').textContent='Exporting: '+label;
   document.getElementById('exportRevModal').classList.add('open');
 }
 function exportRevAtIdx(idx){
@@ -2270,19 +2281,19 @@ function exportRevPDF(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
   var tr=getTabRev(tabId);
   // Use viewingRevIdx if set (viewing a specific rev), else use draft state
-  var effectiveIdx=exportingRevIdx!==null?exportingRevIdx:(viewingRevIdx!==null?viewingRevIdx:null);
+  var effectiveIdx=exportingRevIdx>=0?exportingRevIdx:(viewingRevIdx!==null?viewingRevIdx:null);
   var rv=effectiveIdx!==null?tr.revisions[effectiveIdx]:tr.revisions[tr.revisions.length-1];
   var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';var revDate=rv?fmtD(rv.date):todayStr();
-  var isDraftExportPDF=(exportingRevIdx===null&&viewingRevIdx===null&&tr&&tr.draft);
-  var prevRevIdx=isDraftExportPDF?tr.revisions.length-1:(exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2);
+  var isDraftExportPDF=(exportingRevIdx===-1);
+  var prevRevIdx=isDraftExportPDF?tr.revisions.length-1:(exportingRevIdx!==null&&exportingRevIdx>=0?exportingRevIdx-1:tr.revisions.length-2);
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
   var prevRevLabel=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].rev:'—';
   // Current rows: snapshot for specific rev, or live rows for draft
   // Draft: use live rows with diff vs last published. Viewing rev: use snapshot. Exporting specific rev: use that snapshot.
-  var isDraftExport=(exportingRevIdx===null&&viewingRevIdx===null&&tr.draft);
+  var isDraftExport=(exportingRevIdx===-1);
   var snapRows;
-  if(exportingRevIdx!==null){
+  if(exportingRevIdx>=0){
     snapRows=tr.revisions[exportingRevIdx]?tr.revisions[exportingRevIdx].snapshot||[]:[];
   } else if(isDraftExport){
     snapRows=tab?tab.rows.filter(function(r){return!r._deleted;}):[];
@@ -2368,17 +2379,17 @@ function exportRevPDF(){
 function exportRevXLSX(){
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
   var tr=getTabRev(tabId);
-  var effectiveIdx=exportingRevIdx!==null?exportingRevIdx:(viewingRevIdx!==null?viewingRevIdx:null);
+  var effectiveIdx=exportingRevIdx>=0?exportingRevIdx:(viewingRevIdx!==null?viewingRevIdx:null);
   var rv=effectiveIdx!==null?tr.revisions[effectiveIdx]:tr.revisions[tr.revisions.length-1];
   var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';
   var tabName=tab?tab.name||tab.type:'Equip';
-  var isDraftExport2=(exportingRevIdx===null&&viewingRevIdx===null&&tr&&tr.draft);
-  var prevRevIdx=isDraftExport2?tr.revisions.length-1:(exportingRevIdx!==null?exportingRevIdx-1:tr.revisions.length-2);
+  var isDraftExport2=(exportingRevIdx===-1);
+  var prevRevIdx=isDraftExport2?tr.revisions.length-1:(exportingRevIdx!==null&&exportingRevIdx>=0?exportingRevIdx-1:tr.revisions.length-2);
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
-  var isDraftExport=(exportingRevIdx===null&&viewingRevIdx===null&&tr.draft);
+  var isDraftExport=(exportingRevIdx===-1);
   var snapRows;
-  if(exportingRevIdx!==null){
+  if(exportingRevIdx>=0){
     snapRows=tr.revisions[exportingRevIdx]?tr.revisions[exportingRevIdx].snapshot||[]:[];
   } else if(isDraftExport){
     snapRows=tab?tab.rows.filter(function(r){return!r._deleted&&!r._importDeleted;}):[];
