@@ -2292,7 +2292,11 @@ function exportRevPDF(){
   var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';var revDate=rv?fmtD(rv.date):todayStr();
   var isDraftExportPDF=(exportingRevIdx===-1);
-  var prevRevIdx=isDraftExportPDF?tr.revisions.length-1:((typeof exportingRevIdx==='number'&&exportingRevIdx>=0)?exportingRevIdx-1:tr.revisions.length-2);
+  // Clean published state (null/null): diff against itself → zero changes shown
+  // Draft (-1): diff against last published rev
+  // Specific rev (>=0): diff against previous rev
+  var isCleanPublished=(exportingRevIdx===null&&viewingRevIdx===null);
+  var prevRevIdx=isCleanPublished?(tr.revisions.length-1):isDraftExportPDF?tr.revisions.length-1:((typeof exportingRevIdx==='number'&&exportingRevIdx>=0)?exportingRevIdx-1:tr.revisions.length-2);
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
   var prevRevLabel=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].rev:'—';
   // Current rows: snapshot for specific rev, or live rows for draft
@@ -2393,7 +2397,11 @@ function exportRevXLSX(){
   var revLabel=rv?rv.rev:'Draft';
   var tabName=tab?tab.name||tab.type:'Equip';
   var isDraftExport2=(exportingRevIdx===-1);
-  var prevRevIdx=isDraftExport2?tr.revisions.length-1:((typeof exportingRevIdx==='number'&&exportingRevIdx>=0)?exportingRevIdx-1:tr.revisions.length-2);
+  // Clean published state (null/null): diff against itself → zero changes shown
+  // Draft (-1): diff against last published rev
+  // Specific rev (>=0): diff against previous rev
+  var isCleanPublished=(exportingRevIdx===null&&viewingRevIdx===null);
+  var prevRevIdx=isCleanPublished?(tr.revisions.length-1):isDraftExport2?tr.revisions.length-1:((typeof exportingRevIdx==='number'&&exportingRevIdx>=0)?exportingRevIdx-1:tr.revisions.length-2);
   var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
   var isDraftExport=(exportingRevIdx===-1);
   var snapRows;
