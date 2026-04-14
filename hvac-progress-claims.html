@@ -151,7 +151,22 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .bud-area-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;transition:color .12s}
 .bud-area-del:hover{color:var(--danger)}
 .bud-add-area{background:none;border:none;color:var(--accent);cursor:pointer;font-size:11.5px;font-family:'DM Sans',sans-serif;padding:2px 0;text-align:left}
-/* SETUP GRID SECTION HEADERS */
+/* DETAIL TABS */
+.detail-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 24px;background:var(--surface)}
+.dtab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px 16px;margin-bottom:-1px;transition:all .15s}
+.dtab:hover{color:var(--text)}
+.dtab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+/* COST BANNER */
+.cost-banner{margin:14px 24px 0;padding:12px 16px;border-radius:8px;border:1px solid;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cost-banner-dismiss{background:none;border:none;cursor:pointer;color:inherit;font-size:16px;opacity:.7;padding:0;line-height:1;flex-shrink:0}
+.cost-banner-dismiss:hover{opacity:1}
+/* CLAIM INPUT - dual % and $ */
+.claim-dual{display:flex;align-items:center;gap:5px;justify-content:flex-end}
+.claim-pct-inp{width:58px;text-align:right;background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:4px 5px;outline:none}
+.claim-pct-inp:focus{border-color:var(--accent)}
+.claim-amt-inp{width:90px;text-align:right;background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;padding:4px 5px;outline:none}
+.claim-amt-inp:focus{border-color:var(--accent)}
+.claim-inp-sep{color:var(--muted);font-size:11px;font-family:'DM Mono',monospace}
 .sg-section-hdr td{border-bottom:2px solid var(--border)!important}
 .sg-section-hdr:hover td{background:var(--surface3)!important}
 .sg-subheader td{border-bottom:1px solid var(--border)!important}
@@ -329,7 +344,6 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
       <button class="bg bsm btn" id="saveClaimBtn" style="display:none;color:var(--green);border-color:var(--green)" onclick="saveClaim()">✓ Save</button>
       <button class="bg bsm btn" id="cancelEditBtn" style="display:none" onclick="toggleEditMode(false)">Cancel</button>
       <button class="btn bdanger bsm" id="deleteClaimBtn" style="display:none" onclick="deleteDraftClaim(currentClaimId)">🗑 Delete</button>
-      <button class="bg bsm btn" onclick="openEditSellPrices()" title="Edit area sell prices">⚙ Sell Prices</button>
       <select class="fsel" id="claimStatusSel" onchange="updateClaimStatus()" style="font-size:12px;padding:4px 8px">
         <option value="Draft">Draft</option>
         <option value="Submitted">Submitted</option>
@@ -339,7 +353,13 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
     </div>
   </div>
 
-  <div class="detail-sum no-print">
+  <!-- TABS -->
+  <div class="detail-tabs no-print">
+    <button class="dtab active" id="dtab-claim" onclick="switchDetailTab('claim')">📋 Claim</button>
+    <button class="dtab" id="dtab-costs" onclick="switchDetailTab('costs')">💰 Costs</button>
+  </div>
+
+  <div class="detail-sum no-print" id="detailSum">
     <div class="ds-item"><div class="ds-lbl">This claim (ex GST)</div><div class="ds-val" id="ds-current" style="color:var(--accent)">—</div></div>
     <div class="ds-item"><div class="ds-lbl">GST</div><div class="ds-val" id="ds-gst" style="color:var(--text2);font-size:13px">—</div></div>
     <div class="ds-item"><div class="ds-lbl">This claim (incl GST)</div><div class="ds-val" id="ds-incl" style="color:var(--accent)">—</div></div>
@@ -350,7 +370,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
   </div>
 
   <div id="detailContent" style="padding-bottom:60px"></div>
-</div>
+  <div id="costsContent" style="padding-bottom:60px;display:none"></div>
 </div>
 
 <!-- SETUP WIZARD MODAL -->
@@ -453,10 +473,10 @@ async function load(){
     if(typeof dbReady!=='undefined')await dbReady;
     var s=await dbGetProgressClaims(_pcPNum);
     if(s&&s.claims){claimsData=s;}
+    prefetchVendorInvoices(); // non-blocking prefetch
   }catch(e){console.warn('load error',e);}
   renderList();
   updateListSummary();
-  // Auto-open wizard if no claims exist yet
   if(!claimsData.claims.length&&(!claimsData.lineItems||!claimsData.lineItems.length)){
     setTimeout(openNewClaimWizard,300);
   }
@@ -528,12 +548,21 @@ async function loadVariations(approvedOnly){
 }
 
 // LOAD VENDOR INVOICES for a month
-async function loadInvoicesForMonth(month){
+function loadInvoicesForMonth(month){
+  try{
+    // Use cached vendor invoice data if available
+    if(window._cachedVendorInvoices){
+      var invs=Array.isArray(window._cachedVendorInvoices)?window._cachedVendorInvoices:[];
+      return invs.filter(function(i){return i.period===month&&(i.status==='Invoice Approved'||i.status==='Direct Invoice Approved');});
+    }
+    return [];
+  }catch(e){return[];}
+}
+async function prefetchVendorInvoices(){
   try{
     var data=await dbGetVendorInvoices(_pcPNum);
-    var invs=Array.isArray(data)?data:(data&&data.claims?data.claims:[]);
-    return invs.filter(function(i){return i.period===month&&(i.status==='Invoice Approved'||i.status==='Direct Invoice Approved');});
-  }catch(e){return[];}
+    window._cachedVendorInvoices=Array.isArray(data)?data:(data&&data.claims?data.claims:[]);
+  }catch(e){window._cachedVendorInvoices=[];}
 }
 
 // CALC previous claimed for a line item area up to (but not including) claimId
@@ -628,8 +657,7 @@ function renderList(){
       '<span class="claim-month">'+fmtM(c.month)+'</span>'+
       '<div style="margin-left:auto;display:flex;align-items:center;gap:8px">'+
       '<span class="claim-status-badge '+(stMap[c.status]||'cs-draft')+'">'+escH(c.status||'Draft')+'</span>'+
-      (isDraft?'<button class="btn bdanger bsm" style="font-size:11px" onclick="event.stopPropagation();deleteDraftClaim(\''+c.id+'\')">🗑 Delete</button>':'')+
-      '</div>'+
+      (isDraft?'<button class="btn bdanger bsm" style="font-size:11px" onclick="event.stopPropagation();deleteDraftClaim(\''+c.id+'\')">🗑 Delete</button>':'')+      '</div>'+
       '</div>'+
       '<div class="claim-amounts">'+
       '<div class="ca-item"><div class="ca-lbl">This claim ex GST</div><div class="ca-val" style="color:var(--accent)">'+fmt(claimAmt)+'</div></div>'+
@@ -645,9 +673,15 @@ function renderList(){
 function openClaim(id){
   currentClaimId=id;
   editMode=false;
+  _activeDetailTab='claim';
   applyLetterhead();
   renderDetail();
   showView('detail');
+  document.getElementById('detailContent').style.display='';
+  document.getElementById('costsContent').style.display='none';
+  document.getElementById('dtab-claim').classList.add('active');
+  document.getElementById('dtab-costs').classList.remove('active');
+  document.getElementById('detailSum').style.display='';
   var c=claimsData.claims.find(function(x){return x.id===id;});
   document.getElementById('bcCurr').textContent=c?fmtClaimNum(c.num):'Claim';
   document.getElementById('topBtns').innerHTML='';
@@ -660,7 +694,9 @@ function deleteDraftClaim(id){
   if(!c||(c.status||'').trim().toLowerCase()!=='draft'){alert('Only Draft claims can be deleted.');return;}
   if(!confirm('Delete '+fmtClaimNum(c.num)+'? This cannot be undone.'))return;
   claimsData.claims=claimsData.claims.filter(function(x){return x.id!==id;});
-  save();renderList();
+  if(currentClaimId===id)currentClaimId=null;
+  save();
+  renderList();
 }
 
 function goList(){
@@ -781,24 +817,17 @@ function renderDetail(){
 
       var claimCell='';
       if(editMode){
-        var modeToggle='<div class="pct-toggle">'
-          +'<button class="pct-btn'+(entry.mode==='pct'?' on':'')+'" onclick="setEntryMode(\''+ek+'\',\'pct\',\''+claim.id+'\')">%</button>'
-          +'<button class="pct-btn'+(entry.mode==='amt'?' on':'')+'" onclick="setEntryMode(\''+ek+'\',\'amt\',\''+claim.id+'\')">$</button>'
+        var pctVal=sellPrice>0?Math.round(currentAmt/sellPrice*1000)/10:0;
+        var claimId=claim.id;
+        claimCell='<div class="claim-dual">'
+          +'<input class="claim-pct-inp" type="number" min="0" max="100" step="0.1" placeholder="%" value="'+(pctVal||'')+'" '
+          +'oninput="syncClaimPct(this,\''+ek+'\',\''+claimId+'\','+sellPrice+','+prevAmt+')" />'
+          +'<span class="claim-inp-sep">%&thinsp;/</span>'
+          +'<input class="claim-amt-inp" type="number" min="0" placeholder="$" value="'+(currentAmt||'')+'" '
+          +'oninput="syncClaimAmt(this,\''+ek+'\',\''+claimId+'\','+sellPrice+','+prevAmt+')" />'
           +'</div>';
-        if(entry.mode==='pct'){
-          var pctVal=sellPrice>0?Math.round(currentAmt/sellPrice*100):0;
-          claimCell='<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+modeToggle
-            +'<input class="claim-input" type="number" value="'+pctVal+'" min="0" max="100" placeholder="%" '
-            +'onchange="setEntryByPct(\''+ek+'\',\''+claim.id+'\',this.value,'+sellPrice+','+prevAmt+')"/>'
-            +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">%</span>'
-            +'</div>';
-        }else{
-          claimCell='<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+modeToggle
-            +'<input class="claim-input" type="number" value="'+currentAmt+'" min="0" placeholder="$" '
-            +'onchange="setEntryByAmt(\''+ek+'\',\''+claim.id+'\',this.value,'+sellPrice+','+prevAmt+')" />'
-            +'</div>';
-        }
       }else{
+        var pctDone=sellPrice>0?Math.round((prevAmt+currentAmt)/sellPrice*100):0;
         claimCell=fmt(currentAmt)+'<div style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace">'+pctDone+'% complete</div>';
       }
 
@@ -875,22 +904,14 @@ function renderDetail(){
 
       var claimCellV='';
       if(editMode){
-        var modeToggleV='<div class="pct-toggle">'+
-          '<button class="pct-btn'+(varEntry.mode==='pct'?' on':'')+'" onclick="setVarEntryMode(\''+v.id+'\',\'pct\',\''+claim.id+'\')">%</button>'+
-          '<button class="pct-btn'+(varEntry.mode==='amt'?' on':'')+'" onclick="setVarEntryMode(\''+v.id+'\',\'amt\',\''+claim.id+'\')">$</button>'+
-          '</div>';
-        if(varEntry.mode==='pct'){
-          var pctValV=varVal>0?Math.round(currentVarAmt/varVal*100):0;
-          claimCellV='<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+modeToggleV+
-            '<input class="claim-input" type="number" value="'+pctValV+'" min="0" max="100" placeholder="%" '+
-            'onchange="setVarEntryByPct(\''+v.id+'\',\''+claim.id+'\',this.value,'+varVal+','+prevVarAmt+')"/>'+
-            '<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">%</span></div>';
-        } else {
-          claimCellV='<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+modeToggleV+
-            '<input class="claim-input" type="number" value="'+currentVarAmt+'" min="0" placeholder="$" '+
-            'onchange="setVarEntryByAmt(\''+v.id+'\',\''+claim.id+'\',this.value)"/>'+
-            '</div>';
-        }
+        var pctValV=varVal>0?Math.round(currentVarAmt/varVal*1000)/10:0;
+        claimCellV='<div class="claim-dual">'
+          +'<input class="claim-pct-inp" type="number" min="0" max="100" step="0.1" placeholder="%" value="'+(pctValV||'')+'" '
+          +'oninput="syncVarPct(this,\''+v.id+'\',\''+claim.id+'\','+varVal+','+prevVarAmt+')" />'
+          +'<span class="claim-inp-sep">%&thinsp;/</span>'
+          +'<input class="claim-amt-inp" type="number" min="0" placeholder="$" value="'+(currentVarAmt||'')+'" '
+          +'oninput="syncVarAmt(this,\''+v.id+'\',\''+claim.id+'\','+varVal+','+prevVarAmt+')" />'
+          +'</div>';
       } else {
         claimCellV=fmt(currentVarAmt);
       }
@@ -952,76 +973,218 @@ function renderDetail(){
   });
   content.appendChild(gtDiv);
 
-  // COST INDICATOR (vendor invoices for this month - hidden on print)
+  // ── COST BANNER (Claim tab) ──
   var invoices=loadInvoicesForMonth(claim.month);
-  if(invoices.length){
-    var ciDiv=document.createElement('div');ciDiv.className='cost-indicator no-print';
-    var vendors={};
-    invoices.forEach(function(i){if(!vendors[i.vendor])vendors[i.vendor]=0;vendors[i.vendor]+=num(i.amount);});
-    var ciRows='';
-    var ciTotal=0;
-    Object.keys(vendors).forEach(function(v){
-      ciRows+='<tr><td style="padding:8px 16px;color:var(--text2)">'+escH(v)+'</td>'+
-        '<td style="padding:8px 16px;text-align:right;font-family:DM Mono,monospace;font-size:12px;color:var(--text)">'+fmt(vendors[v])+'</td>'+
-        '<td style="padding:8px 16px;text-align:right;font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmt(vendors[v]*0.1)+'</td>'+
-        '<td style="padding:8px 16px;text-align:right;font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">'+fmt(vendors[v]*1.1)+'</td></tr>';
-      ciTotal+=vendors[v];
-    });
-    var margin=grandCurrent>0?((grandCurrent-ciTotal)/grandCurrent*100).toFixed(1):0;
-    ciDiv.innerHTML='<div class="ci-hdr">'+
-      '<span class="ci-title">Cost indicator — '+fmtM(claim.month)+'</span>'+
-      '<span class="ci-note">Vendor invoices only · Hidden on print</span>'+
-      '</div>'+
-      '<table style="width:100%;border-collapse:collapse">'+
-      '<thead><tr>'+
-      '<th style="padding:7px 16px;text-align:left;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Vendor</th>'+
-      '<th style="padding:7px 16px;text-align:right;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Ex GST</th>'+
-      '<th style="padding:7px 16px;text-align:right;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">GST</th>'+
-      '<th style="padding:7px 16px;text-align:right;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">Incl GST</th>'+
-      '</tr></thead><tbody>'+ciRows+'</tbody></table>'+
-      '<div style="padding:10px 16px;background:var(--surface3);display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border)">'+
-      '<span style="font-size:12px;color:var(--text2)">Total vendor costs: <strong style="color:var(--danger)">'+fmt(ciTotal*1.1)+'</strong> incl GST</span>'+
-      '<span style="font-size:12px;color:var(--text2)">Implied margin on costs: <strong style="color:var(--green)">'+margin+'%</strong></span>'+
-      '</div>';
-    content.appendChild(ciDiv);
+  var totalCosts=0;
+  var costByTrade={};
+  invoices.forEach(function(inv){
+    var exGST=num(inv.amount);
+    totalCosts+=exGST;
+    var trade=inv.vendor||inv.trade||'Other';
+    if(!costByTrade[trade])costByTrade[trade]=0;
+    costByTrade[trade]+=exGST;
+  });
+
+  if(totalCosts>0&&!_dismissedCostBanner[claim.id]){
+    var retPctB=claimsData.retentionPct||5;
+    var targetWithMarginAndRet=totalCosts+(totalCosts*0.05)-(grandCurrent*(retPctB/100))+(totalCosts*0.10);
+    // 🔴 loss: costs > claim
+    // 🟡 margin risk: claim > costs but net after retention < 10% margin
+    // 🟢 healthy: net - costs >= 10% of costs
+    var netAfterRet=grandCurrent*(1-retPctB/100);
+    var marginPct=totalCosts>0?((netAfterRet-totalCosts)/totalCosts*100):0;
+    var bannerType=grandCurrent<totalCosts?'danger':marginPct<10?'warn':'green';
+    var bannerColors={danger:['rgba(255,77,109,.12)','#ff4d6d'],warn:['rgba(255,184,48,.12)','#ffb830'],green:['rgba(0,229,160,.1)','#00e5a0']};
+    var bc=bannerColors[bannerType];
+    var bannerIcon=bannerType==='danger'?'🔴':bannerType==='warn'?'🟡':'🟢';
+    var bannerMsg=bannerType==='danger'
+      ?'Claim ('+fmt(grandCurrent)+') is below costs ('+fmt(totalCosts)+') — potential loss of '+fmt(totalCosts-grandCurrent)
+      :bannerType==='warn'
+      ?'Costs covered but margin after retention is '+marginPct.toFixed(1)+'% — below 10% target'
+      :'Margin after retention is '+marginPct.toFixed(1)+'% — looking healthy';
+    var costBanner=document.createElement('div');costBanner.className='cost-banner no-print';
+    costBanner.style.cssText='margin:14px 24px 0;padding:12px 16px;border-radius:8px;border:1px solid '+bc[1]+';background:'+bc[0]+';display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+    costBanner.innerHTML='<div style="display:flex;align-items:center;gap:10px;flex:1;flex-wrap:wrap">'
+      +'<span style="font-size:16px">'+bannerIcon+'</span>'
+      +'<span style="font-size:13px;color:var(--text);font-weight:500">'+bannerMsg+'</span>'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Vendor costs: <strong style="color:var(--text2)">'+fmt(totalCosts)+'</strong> ex GST · Switch to <strong>Costs tab</strong> for full breakdown</span>'
+      +'</div>'
+      +'<button class="cost-banner-dismiss" onclick="dismissCostBanner(\''+claim.id+'\')" title="Dismiss">✕</button>';
+    content.appendChild(costBanner);
   }
 }
 
-// ENTRY SETTERS
+var _dismissedCostBanner={};
+function dismissCostBanner(claimId){
+  _dismissedCostBanner[claimId]=true;
+  renderDetail();
+}
+
+// ── TAB SWITCHING ──
+var _activeDetailTab='claim';
+function switchDetailTab(tab){
+  _activeDetailTab=tab;
+  document.getElementById('dtab-claim').classList.toggle('active',tab==='claim');
+  document.getElementById('dtab-costs').classList.toggle('active',tab==='costs');
+  document.getElementById('detailContent').style.display=tab==='claim'?'':'none';
+  document.getElementById('costsContent').style.display=tab==='costs'?'':'none';
+  document.getElementById('detailSum').style.display=tab==='claim'?'':'none';
+  if(tab==='costs')renderCostsTab();
+}
+
+async function renderCostsTab(){
+  var claim=claimsData.claims.find(function(c){return c.id===currentClaimId;});
+  if(!claim)return;
+  var cont=document.getElementById('costsContent');
+  cont.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">Loading costs…</div>';
+
+  var invoices=loadInvoicesForMonth(claim.month);
+  if(!invoices.length){
+    cont.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">💰</div><div style="font-weight:600;color:var(--text2)">No vendor invoices found for '+fmtM(claim.month)+'</div></div>';
+    return;
+  }
+
+  var retPct=claimsData.retentionPct||5;
+  var grandCurrent=0;
+  (claim.entries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
+  (claim.varEntries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
+  var netAfterRet=grandCurrent*(1-retPct/100);
+
+  // Group by trade/vendor
+  var byTrade={};var tradeOrder=[];
+  invoices.forEach(function(inv){
+    var trade=inv.vendor||inv.trade||'Other';
+    if(!byTrade[trade]){byTrade[trade]=[];tradeOrder.push(trade);}
+    byTrade[trade].push(inv);
+  });
+  var totalCosts=invoices.reduce(function(s,i){return s+num(i.amount);},0);
+  var marginPct=totalCosts>0?((netAfterRet-totalCosts)/totalCosts*100):0;
+  var marginColor=marginPct>=10?'var(--green)':marginPct>=0?'var(--warn)':'var(--danger)';
+
+  var html='';
+  // Summary bar
+  html+='<div style="background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;gap:24px;flex-wrap:wrap;align-items:center">'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">This Claim <strong style="color:var(--accent);font-size:13px">'+fmt(grandCurrent)+'</strong></div>'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Net After Retention <strong style="color:var(--text);font-size:13px">'+fmt(netAfterRet)+'</strong></div>'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Total Costs <strong style="color:var(--danger);font-size:13px">'+fmt(totalCosts)+'</strong></div>'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Margin on Costs <strong style="color:'+marginColor+';font-size:13px">'+marginPct.toFixed(1)+'%</strong></div>'
+    +'</div>';
+
+  // Trade breakdown
+  html+='<div style="padding:16px 24px">';
+  tradeOrder.forEach(function(trade){
+    var invs=byTrade[trade];
+    var tradeTotal=invs.reduce(function(s,i){return s+num(i.amount);},0);
+    html+='<div style="margin-bottom:20px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:2px solid var(--border);margin-bottom:6px">'
+      +'<span style="font-family:\'Syne\',sans-serif;font-size:13px;font-weight:700;color:var(--text)">'+escH(trade)+'</span>'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--text2)">'+fmt(tradeTotal)+' ex GST</span>'
+      +'</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +'<thead><tr>'
+      +'<th style="text-align:left;padding:5px 8px;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px">Invoice / Ref</th>'
+      +'<th style="text-align:left;padding:5px 8px;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px">Description</th>'
+      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px">Ex GST</th>'
+      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px">GST</th>'
+      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px">Incl GST</th>'
+      +'</tr></thead><tbody>';
+    invs.forEach(function(inv){
+      var exGST=num(inv.amount);
+      html+='<tr style="border-bottom:1px solid var(--border)">'
+        +'<td style="padding:7px 8px;color:var(--accent);font-family:\'DM Mono\',monospace">'+escH(inv.invoiceNum||inv.ref||'—')+'</td>'
+        +'<td style="padding:7px 8px;color:var(--text2)">'+escH(inv.desc||inv.description||'—')+'</td>'
+        +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace">'+fmt(exGST)+'</td>'
+        +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text2)">'+fmt(exGST*0.1)+'</td>'
+        +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text)">'+fmt(exGST*1.1)+'</td>'
+        +'</tr>';
+    });
+    html+='<tr style="background:var(--surface2)">'
+      +'<td colspan="2" style="padding:7px 8px;font-weight:600;color:var(--text)">'+escH(trade)+' subtotal</td>'
+      +'<td style="padding:7px 8px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace">'+fmt(tradeTotal)+'</td>'
+      +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text2)">'+fmt(tradeTotal*0.1)+'</td>'
+      +'<td style="padding:7px 8px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace">'+fmt(tradeTotal*1.1)+'</td>'
+      +'</tr>'
+      +'</tbody></table></div>';
+  });
+
+  // Grand total
+  html+='<div style="margin-top:8px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center">'
+    +'<span style="font-weight:700;font-size:14px;color:var(--text)">Total Costs</span>'
+    +'<div style="display:flex;gap:24px">'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Ex GST <strong style="color:var(--danger)">'+fmt(totalCosts)+'</strong></span>'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Incl GST <strong style="color:var(--danger)">'+fmt(totalCosts*1.1)+'</strong></span>'
+    +'</div></div>';
+  html+='</div>';
+  cont.innerHTML=html;
+}
+
+// ── ENTRY SETTERS — synced % and $ ──
 function getClaimEntry(lineItemId, claimId){
   var c=claimsData.claims.find(function(x){return x.id===claimId;});
-  if(!c){return null;}
+  if(!c)return null;
   if(!c.entries)c.entries=[];
   var e=c.entries.find(function(x){return x.lineItemId===lineItemId;});
-  if(!e){e={lineItemId:lineItemId,currentAmt:0,mode:'pct'};c.entries.push(e);}
+  if(!e){e={lineItemId:lineItemId,currentAmt:0};c.entries.push(e);}
   return e;
 }
-function setEntryMode(liId,mode,claimId){var e=getClaimEntry(liId,claimId);if(e){e.mode=mode;save();renderDetail();}}
-function setEntryByPct(liId,claimId,pct,sellPrice,prevAmt){
-  var e=getClaimEntry(liId,claimId);if(!e)return;
-  e.currentAmt=Math.max(0,Math.min(sellPrice-prevAmt,sellPrice*(num(pct)/100)));save();renderDetail();
+function syncClaimPct(inp,ek,claimId,sellPrice,prevAmt){
+  var pct=num(inp.value);
+  var amt=Math.round(sellPrice*(pct/100)*100)/100;
+  amt=Math.max(0,Math.min(sellPrice-prevAmt,amt));
+  var e=getClaimEntry(ek,claimId);if(e){e.currentAmt=amt;}
+  // Update sibling $ input
+  var dual=inp.closest?inp.closest('.claim-dual'):inp.parentElement;
+  if(dual){var amtInp=dual.querySelector('.claim-amt-inp');if(amtInp)amtInp.value=amt||'';}
+  save();updateDetailSummary();
 }
-function setEntryByAmt(liId,claimId,amt,sellPrice,prevAmt){
-  var e=getClaimEntry(liId,claimId);if(!e)return;
-  e.currentAmt=Math.max(0,Math.min(sellPrice-prevAmt,num(amt)));save();renderDetail();
+function syncClaimAmt(inp,ek,claimId,sellPrice,prevAmt){
+  var amt=Math.max(0,Math.min(sellPrice-prevAmt,num(inp.value)));
+  var e=getClaimEntry(ek,claimId);if(e){e.currentAmt=amt;}
+  // Update sibling % input
+  var dual=inp.closest?inp.closest('.claim-dual'):inp.parentElement;
+  if(dual){var pctInp=dual.querySelector('.claim-pct-inp');if(pctInp)pctInp.value=sellPrice>0?Math.round(amt/sellPrice*1000)/10:'';}
+  save();updateDetailSummary();
 }
-function setVarEntryMode(varId,mode,claimId){
-  var c=claimsData.claims.find(function(x){return x.id===claimId;});if(!c||!c.varEntries)return;
-  var e=c.varEntries.find(function(x){return x.varId===varId;});if(e){e.mode=mode;save();renderDetail();}
-}
-function setVarEntryByPct(varId,claimId,pct,varVal,prevAmt){
+function syncVarPct(inp,varId,claimId,varVal,prevAmt){
+  var pct=num(inp.value);
+  var amt=Math.round(varVal*(pct/100)*100)/100;
+  amt=Math.max(0,Math.min(varVal-prevAmt,amt));
   var c=claimsData.claims.find(function(x){return x.id===claimId;});if(!c)return;
   if(!c.varEntries)c.varEntries=[];
   var e=c.varEntries.find(function(x){return x.varId===varId;});
-  if(!e){e={varId:varId,currentAmt:0,mode:'pct'};c.varEntries.push(e);}
-  e.currentAmt=Math.max(0,Math.min(varVal-prevAmt,varVal*(num(pct)/100)));save();renderDetail();
+  if(!e){e={varId:varId,currentAmt:0};c.varEntries.push(e);}
+  e.currentAmt=amt;
+  var dual=inp.closest?inp.closest('.claim-dual'):inp.parentElement;
+  if(dual){var amtInp=dual.querySelector('.claim-amt-inp');if(amtInp)amtInp.value=amt||'';}
+  save();updateDetailSummary();
 }
-function setVarEntryByAmt(varId,claimId,amt){
+function syncVarAmt(inp,varId,claimId,varVal,prevAmt){
+  var amt=Math.max(0,Math.min(varVal-prevAmt,num(inp.value)));
   var c=claimsData.claims.find(function(x){return x.id===claimId;});if(!c)return;
   if(!c.varEntries)c.varEntries=[];
   var e=c.varEntries.find(function(x){return x.varId===varId;});
-  if(!e){e={varId:varId,currentAmt:0,mode:'pct'};c.varEntries.push(e);}
-  e.currentAmt=Math.max(0,num(amt));save();renderDetail();
+  if(!e){e={varId:varId,currentAmt:0};c.varEntries.push(e);}
+  e.currentAmt=amt;
+  var dual=inp.closest?inp.closest('.claim-dual'):inp.parentElement;
+  if(dual){var pctInp=dual.querySelector('.claim-pct-inp');if(pctInp)pctInp.value=varVal>0?Math.round(amt/varVal*1000)/10:'';}
+  save();updateDetailSummary();
+}
+// Live update summary bar without full re-render
+function updateDetailSummary(){
+  var claim=claimsData.claims.find(function(c){return c.id===currentClaimId;});
+  if(!claim)return;
+  var grandCurrent=0;
+  (claim.entries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
+  (claim.varEntries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
+  var retPct=claimsData.retentionPct||5;
+  var retAmt=grandCurrent*(retPct/100);
+  var gst=grandCurrent*0.1;
+  var el=function(id){return document.getElementById(id);};
+  if(el('ds-current'))el('ds-current').textContent=fmt(grandCurrent);
+  if(el('ds-gst'))el('ds-gst').textContent=fmt(gst);
+  if(el('ds-incl'))el('ds-incl').textContent=fmt(grandCurrent*1.1);
+  if(el('ds-ret'))el('ds-ret').textContent=fmt(retAmt)+' ('+retPct+'%)';
+  if(el('ds-net'))el('ds-net').textContent=fmt((grandCurrent-retAmt)*1.1);
 }
 function toggleVarApproved(claimId,val){
   var c=claimsData.claims.find(function(x){return x.id===claimId;});if(c){c.varApprovedOnly=val;save();renderDetail();}
