@@ -601,7 +601,7 @@ function renderList(){
       emp.innerHTML='<div class="empty-icon">📈</div>'
         +'<div style="font-size:15px;font-weight:600;color:var(--text2)">'+(hasLineItems?'Claim sheet ready':'No claim sheet yet')+'</div>'
         +'<div>'+(hasLineItems?'Click <strong>＋ Log Claim</strong> to record your first claim.':'Click <strong>Setup Claim Sheet</strong> to get started.')+'</div>'
-        +(hasLineItems?'<div style="margin-top:12px"><button class="btn bg bsm" onclick="resetLineItems()" style="color:var(--muted);font-size:11px">↺ Reset & start over</button></div>':'');
+        +(hasLineItems?'':'');
       el.innerHTML='';el.appendChild(emp);
     }
     return;
@@ -1186,37 +1186,19 @@ function openSetupViewEdit(){
   renderSetupAreaCols();renderSetupGrid();
 }
 
-// Open setup view in LOG CLAIM mode (Total Sell locked, areas editable for this claim)
 function openLogClaimView(){
-  _logClaimMode=true;
-  _setupMode='budget';
-  // Same as edit but Total Sell locked
-  var allAreaNames=[];var areaMap={};
-  claimsData.lineItems.forEach(function(li){
-    (li.areas||[]).forEach(function(ar){
-      if(ar.areaName&&!areaMap[ar.areaName]){areaMap[ar.areaName]=true;allAreaNames.push(ar.areaName);}
-    });
-  });
-  if(!allAreaNames.length)allAreaNames=['General'];
-  _gridAreas=allAreaNames.map(function(n){return {id:'ga_'+n.replace(/\W/g,'_'),name:n};});
-  _gridItems=claimsData.lineItems.map(function(li){
-    var prices={};
-    _gridAreas.forEach(function(ga){
-      var match=(li.areas||[]).find(function(a){return a.areaName===ga.name;});
-      prices[ga.id]=match?match.sellingPrice:0;
-    });
-    return {id:li.id,type:'item',sectionName:li.sectionName||'',name:li.name,
-            checked:true,totalSell:li.totalSell||0,prices:{},budgetVal:li.totalSell||0}; // prices blank for new claim entry
-  });
-  document.getElementById('view-list').classList.remove('active');
-  document.getElementById('view-setup').classList.add('active');
-  document.getElementById('setupViewTitle').textContent='Log Claim';
-  document.getElementById('sv-contract').textContent=fmt(claimsData.contractValue||0);
-  document.getElementById('topBtns').innerHTML='';
-  document.getElementById('setupFinishBtn').textContent='Save Claim →';
-  document.getElementById('setupFinishBtn').onclick=saveLogClaim;
-  document.getElementById('setupAddAreaBtn').style.display='none'; // no adding areas in log mode
-  renderSetupAreaCols();renderSetupGrid();
+  // Open wizard in log-claim mode (line items already set — just need month + number)
+  var nextNum=(claimsData.claims.length?Math.max.apply(null,claimsData.claims.map(function(c){return c.num;}))+1:1);
+  document.getElementById('w-claimnum').value=nextNum;
+  document.getElementById('w-month').value=currentMonth();
+  document.getElementById('w-contract').value=claimsData.contractValue||'';
+  document.getElementById('w-retention').value=claimsData.retentionPct||5;
+  document.getElementById('firstClaimSetup').style.display='none';
+  document.getElementById('w-contract-preview').textContent='';
+  document.getElementById('wizStep0').style.display='block';
+  wizContractVal=claimsData.contractValue||0;
+  wizRetPct=claimsData.retentionPct||5;
+  document.getElementById('wizardModal').classList.add('open');
 }
 
 function saveLogClaim(){
