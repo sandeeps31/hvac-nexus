@@ -1132,16 +1132,14 @@ async function openSetupView(mode){
   document.getElementById('sv-contract').textContent=fmt(wizContractVal);
   document.getElementById('topBtns').innerHTML='';
   if(mode==='budget'){
-    _gridAreas=[{id:'ga'+nid(),name:'General'}];
-    var _firstAreaId=_gridAreas[0].id;
+    _gridAreas=[{id:'ga'+nid(),name:''}];
     var budItems=await loadBudgetItems();
     _gridItems=budItems.map(function(item){
       if(item.type==='subheader'){
-        return {id:'gh'+nid(),type:'subheader',sectionName:item.sectionName,name:item.name,checked:false,prices:{}};
+        return {id:'gh'+nid(),type:'subheader',sectionName:item.sectionName,name:item.name};
       }
-      var prices={};
-      if(item.budgetVal>0)prices[_firstAreaId]=item.budgetVal;
-      return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,checked:true,prices:prices,budgetVal:item.budgetVal};
+      return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,
+              checked:true,totalSell:item.budgetVal,prices:{},budgetVal:item.budgetVal};
     });
   } else {
     _scratchAreas=[{id:'sa'+nid(),name:''}];
@@ -1192,7 +1190,7 @@ function renderSetupGrid(){
   var wrap=document.getElementById('setupGridWrap');if(!wrap)return;
   var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
   var rows=_setupMode==='budget'?_gridItems:_scratchRows;
-  var colSpan=areas.length+((_setupMode==='budget')?4:3); // name + [cb] + areas + total + remaining
+  var colSpan=areas.length+((_setupMode==='budget')?4:3); // name + [cb] + total + areas + remaining
 
   var tbl=document.createElement('table');tbl.className='sp-grid';tbl.style.width='100%';
 
@@ -1200,9 +1198,10 @@ function renderSetupGrid(){
   var thead=document.createElement('thead');var htr=document.createElement('tr');
   var th0=document.createElement('th');th0.style.cssText='text-align:left;min-width:220px';th0.textContent='Line Item';htr.appendChild(th0);
   if(_setupMode==='budget'){var thCb=document.createElement('th');thCb.style.cssText='width:36px;text-align:center';thCb.textContent='✓';htr.appendChild(thCb);}
-  areas.forEach(function(ar){var th=document.createElement('th');th.textContent=ar.name||'(Area)';th.style.minWidth='120px';htr.appendChild(th);});
-  var thTot=document.createElement('th');thTot.textContent='Total Sell';thTot.style.cssText='text-align:right;min-width:110px;color:var(--accent)';htr.appendChild(thTot);
-  var thRem=document.createElement('th');thRem.textContent='Remaining';thRem.style.cssText='text-align:right;min-width:110px;color:var(--warn)';htr.appendChild(thRem);
+  // Total Sell comes BEFORE area columns
+  var thTot=document.createElement('th');thTot.textContent='Total Sell Price';thTot.style.cssText='text-align:right;min-width:130px;color:var(--accent)';htr.appendChild(thTot);
+  areas.forEach(function(ar){var th=document.createElement('th');th.textContent=ar.name||'Area';th.style.minWidth='120px';htr.appendChild(th);});
+  var thRem=document.createElement('th');thRem.textContent='Remaining';thRem.style.cssText='text-align:right;min-width:120px;color:var(--warn)';htr.appendChild(thRem);
   thead.appendChild(htr);tbl.appendChild(thead);
 
   var tbody=document.createElement('tbody');
@@ -1244,13 +1243,13 @@ function renderSetupGrid(){
       }
 
       // ── LINE ITEM ROW ──
-      var secClass='sg-sec-'+currentSection.replace(/\s/g,'-');
-      var subClass=currentSubheader?'sg-sub-'+currentSection.replace(/\s/g,'-')+'-'+currentSubheader.replace(/\s/g,'-'):'';
+      var secClass='sg-sec-'+currentSection.replace(/\W/g,'-');
+      var subClass=currentSubheader?'sg-sub-'+currentSection.replace(/\W/g,'-')+'-'+currentSubheader.replace(/\W/g,'-'):'';
       var tr=document.createElement('tr');tr.id='sgrow-'+ri;
       tr.className='sg-item '+secClass+(subClass?' '+subClass:'');
       tr.style.cssText='border-bottom:1px solid var(--border)';
 
-      // Name cell with indentation
+      // Name cell
       var tdName=document.createElement('td');
       var indent=currentSubheader?44:28;
       tdName.style.cssText='font-size:13px;color:var(--text2);padding-left:'+indent+'px';
@@ -1261,28 +1260,33 @@ function renderSetupGrid(){
       var tdCb=document.createElement('td');tdCb.style.textAlign='center';
       var cb=document.createElement('input');cb.type='checkbox';cb.checked=row.checked!==false;
       cb.style.cssText='width:14px;height:14px;accent-color:var(--accent);cursor:pointer';
-      (function(idx){cb.addEventListener('change',function(){_gridItems[idx].checked=this.checked;updateSetupRowTotal(idx);updateSetupTotals();});})(ri);
+      (function(idx){cb.addEventListener('change',function(){_gridItems[idx].checked=this.checked;updateSetupRowTotal(idx);});})(ri);
       tdCb.appendChild(cb);tr.appendChild(tdCb);
 
-      // Price cells
+      // Total Sell — editable, pre-filled from budget
+      var tdTot=document.createElement('td');
+      var totInp=document.createElement('input');totInp.type='number';totInp.className='sp-price-inp';
+      totInp.style.cssText='font-weight:600;color:var(--accent);text-align:right;width:100%';
+      totInp.placeholder='0.00';totInp.value=row.totalSell||'';
+      (function(idx){totInp.addEventListener('input',function(){_gridItems[idx].totalSell=num(this.value);updateSetupRowTotal(idx);});})(ri);
+      tdTot.appendChild(totInp);tr.appendChild(tdTot);
+
+      // Area price cells — start blank
       areas.forEach(function(ar){
         var td=document.createElement('td');
         if(!row.prices)row.prices={};
         var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
-        inp.placeholder='0.00';inp.value=row.prices[ar.id]||'';inp.dataset.ri=ri;inp.dataset.aid=ar.id;
+        inp.placeholder='0.00';inp.value=row.prices[ar.id]||'';
         (function(rIdx,aId){inp.addEventListener('input',function(){
           if(!_gridItems[rIdx].prices)_gridItems[rIdx].prices={};
           _gridItems[rIdx].prices[aId]=num(this.value);
-          updateSetupRowTotal(rIdx);updateSetupTotals();
+          updateSetupRowTotal(rIdx);
         });})(ri,ar.id);
         td.appendChild(inp);tr.appendChild(td);
       });
 
-      // Total cell
-      var tdTot=document.createElement('td');tdTot.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;color:var(--accent)';
-      tdTot.id='sg-tot-'+ri;tdTot.textContent='$0.00';tr.appendChild(tdTot);
       // Remaining cell
-      var tdRem=document.createElement('td');tdRem.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px';
+      var tdRem=document.createElement('td');tdRem.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;white-space:nowrap';
       tdRem.id='sg-rem-'+ri;tdRem.textContent='—';tr.appendChild(tdRem);
       tbody.appendChild(tr);
     });
@@ -1297,6 +1301,14 @@ function renderSetupGrid(){
       nameInp.placeholder='Line item name';nameInp.value=row.name||'';
       (function(idx){nameInp.addEventListener('input',function(){_scratchRows[idx].name=this.value;});})(ri);
       tdName.appendChild(nameInp);tr.appendChild(tdName);
+      // Total Sell — editable
+      var tdTot=document.createElement('td');
+      var totInp=document.createElement('input');totInp.type='number';totInp.className='sp-price-inp';
+      totInp.style.cssText='font-weight:600;color:var(--accent);text-align:right;width:100%';
+      totInp.placeholder='Total sell price';totInp.value=row.totalSell||'';
+      (function(idx){totInp.addEventListener('input',function(){_scratchRows[idx].totalSell=num(this.value);updateSetupRowTotal(idx);});})(ri);
+      tdTot.appendChild(totInp);tr.appendChild(tdTot);
+      // Area price cells
       areas.forEach(function(ar){
         var td=document.createElement('td');if(!row.prices)row.prices={};
         var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
@@ -1304,13 +1316,11 @@ function renderSetupGrid(){
         (function(rIdx,aId){inp.addEventListener('input',function(){
           if(!_scratchRows[rIdx].prices)_scratchRows[rIdx].prices={};
           _scratchRows[rIdx].prices[aId]=num(this.value);
-          updateSetupRowTotal(rIdx);updateSetupTotals();
+          updateSetupRowTotal(rIdx);
         });})(ri,ar.id);
         td.appendChild(inp);tr.appendChild(td);
       });
-      var tdTot=document.createElement('td');tdTot.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;color:var(--accent)';
-      tdTot.id='sg-tot-'+ri;tdTot.textContent='$0.00';tr.appendChild(tdTot);
-      var tdRem=document.createElement('td');tdRem.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px';
+      var tdRem=document.createElement('td');tdRem.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;white-space:nowrap';
       tdRem.id='sg-rem-'+ri;tdRem.textContent='—';tr.appendChild(tdRem);
       tbody.appendChild(tr);
     });
@@ -1349,31 +1359,33 @@ function updateSetupRowTotal(ri){
   var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
   var rows=_setupMode==='budget'?_gridItems:_scratchRows;
   var row=rows[ri];if(!row||row.type==='subheader')return;
-  var total=0;
-  areas.forEach(function(ar){total+=num((row.prices||{})[ar.id]||0);});
-  var totEl=document.getElementById('sg-tot-'+ri);
+  var areaSum=0;
+  areas.forEach(function(ar){areaSum+=num((row.prices||{})[ar.id]||0);});
+  var totalSell=num(row.totalSell||0);
+  var remaining=totalSell-areaSum;
   var remEl=document.getElementById('sg-rem-'+ri);
-  if(totEl)totEl.textContent=fmt(total);
-  // Remaining = contract value / num rows — just show total for now, remaining vs contract shown in header
   if(remEl){
-    // No per-row target, just show total again dimmed
-    remEl.textContent=total>0?'✓ '+fmt(total):'—';
-    remEl.style.color=total>0?'var(--green)':'var(--muted)';
+    if(totalSell===0){remEl.textContent='—';remEl.style.color='var(--muted)';}
+    else if(remaining<0){remEl.textContent='⚠ '+fmt(Math.abs(remaining))+' over';remEl.style.color='var(--danger)';}
+    else if(remaining===0){remEl.textContent='✓ Fully allocated';remEl.style.color='var(--green)';}
+    else{remEl.textContent=fmt(remaining)+' rem';remEl.style.color='var(--warn)';}
   }
+  updateSetupTotals();
 }
 
 function updateSetupTotals(){
   var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
   var rows=_setupMode==='budget'?_gridItems:_scratchRows;
-  var totalAllocated=0;
+  var totalSellAll=0,totalAllocated=0;
   rows.forEach(function(row){
     if(row.type==='subheader')return;
     if(_setupMode==='budget'&&row.checked===false)return;
+    totalSellAll+=num(row.totalSell||0);
     areas.forEach(function(ar){totalAllocated+=num((row.prices||{})[ar.id]||0);});
   });
-  var remaining=wizContractVal-totalAllocated;
-  var remEl=document.getElementById('sv-remaining');
+  var remaining=totalSellAll-totalAllocated;
   var allocEl=document.getElementById('sv-allocated');
+  var remEl=document.getElementById('sv-remaining');
   if(allocEl)allocEl.textContent=fmt(totalAllocated);
   if(remEl){
     remEl.textContent=fmt(Math.abs(remaining))+(remaining<0?' over':remaining===0?' ✓ fully allocated':' to go');
@@ -1387,16 +1399,14 @@ var _scratchRows=[]; // [{id, name, prices:{areaId:price}}]
 
 // ── BUDGET GRID ──
 async function buildBudgetTree(){
-  _gridAreas=[{id:'ga'+nid(),name:'General'}];
-  var _firstAreaId=_gridAreas[0].id;
+  _gridAreas=[{id:'ga'+nid(),name:''}];
   var budItems=await loadBudgetItems();
   _gridItems=budItems.map(function(item){
     if(item.type==='subheader'){
-      return {id:'gh'+nid(),type:'subheader',sectionName:item.sectionName,name:item.name,checked:false,prices:{}};
+      return {id:'gh'+nid(),type:'subheader',sectionName:item.sectionName,name:item.name};
     }
-    var prices={};
-    if(item.budgetVal>0)prices[_firstAreaId]=item.budgetVal;
-    return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,checked:true,prices:prices,budgetVal:item.budgetVal};
+    return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,
+            checked:true,totalSell:item.budgetVal,prices:{},budgetVal:item.budgetVal};
   });
   if(!_gridItems.length){
     document.getElementById('budgetGrid').innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">No budget data found. Use Option 2 instead.</div>';
@@ -1533,14 +1543,20 @@ function wizFinish(){
       if(row.type==='subheader')return;
       if(_setupMode==='budget'&&row.checked===false)return;
       var name=row.name;if(!name||!name.trim())return;
+      var totalSell=num(row.totalSell||0);
       var itemAreas=[];
       areas.forEach(function(ar){
         var price=num((row.prices||{})[ar.id]||0);
-        var aName=(ar.name||'').trim()||'General';
+        var aName=(ar.name||'').trim()||'Area';
+        // Include area if it has a price OR if it's the only area
         if(price>0)itemAreas.push({areaId:ar.id,areaName:aName,sellingPrice:price});
       });
-      if(itemAreas.length)newItems.push({id:'li'+nid(),name:name.trim(),areas:itemAreas});
-      else newItems.push({id:'li'+nid(),name:name.trim(),areas:[{areaId:'a'+nid(),areaName:(areas[0]&&areas[0].name)||'General',sellingPrice:0}]});
+      // If no areas have prices, store totalSell under first area
+      if(!itemAreas.length){
+        var aName=(areas[0]&&areas[0].name)||'General';
+        itemAreas=[{areaId:(areas[0]&&areas[0].id)||'a'+nid(),areaName:aName,sellingPrice:totalSell}];
+      }
+      newItems.push({id:'li'+nid(),name:name.trim(),totalSell:totalSell,areas:itemAreas});
     });
     if(!newItems.length){alert('Please add at least one line item with a sell price.');return;}
     claimsData.lineItems=newItems;
