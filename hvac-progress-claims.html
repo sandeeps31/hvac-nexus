@@ -150,7 +150,12 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .bud-area-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;transition:color .12s}
 .bud-area-del:hover{color:var(--danger)}
 .bud-add-area{background:none;border:none;color:var(--accent);cursor:pointer;font-size:11.5px;font-family:'DM Sans',sans-serif;padding:2px 0;text-align:left}
-/* SELL PRICE GRID */
+/* SETUP GRID SECTION HEADERS */
+.sg-section-hdr td{border-bottom:2px solid var(--border)!important}
+.sg-section-hdr:hover td{background:var(--surface3)!important}
+.sg-subheader td{border-bottom:1px solid var(--border)!important}
+.sg-subheader:hover td{background:var(--surface2)!important}
+.sg-item:hover td{background:var(--surface2)}
 .sp-grid{width:100%;border-collapse:collapse;min-width:400px}
 .sp-grid th{padding:8px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
 .sp-grid th:first-child{text-align:left;min-width:160px}
@@ -463,12 +468,17 @@ async function loadBudgetItems(){
     var margin=num(data.margin)||0;
     var items=[];
     (data.sections||[]).forEach(function(sec){
+      var secName=sec.name||'';
       (sec.groups||[]).forEach(function(g){
-        if(g.isL2Header)return;
+        if(g.isL2Header){
+          // Sub-section header row — no price, just label
+          items.push({type:'subheader',sectionName:secName,name:g.parent||'',budgetVal:0});
+          return;
+        }
         var budgetCost=num(g.budget);
         if(budgetCost<=0)return;
         var sellPrice=Math.round(budgetCost*(1+margin/100)*100)/100;
-        items.push({sectionName:sec.name,name:g.parent||'Unnamed',budgetVal:sellPrice});
+        items.push({type:'item',sectionName:secName,name:g.parent||'Unnamed',budgetVal:sellPrice});
       });
     });
     return items;
@@ -1121,9 +1131,17 @@ async function openSetupView(mode){
   document.getElementById('sv-contract').textContent=fmt(wizContractVal);
   document.getElementById('topBtns').innerHTML='';
   if(mode==='budget'){
-    _gridAreas=[{id:'ga'+nid(),name:''}];
+    _gridAreas=[{id:'ga'+nid(),name:'General'}];
     var budItems=await loadBudgetItems();
-    _gridItems=budItems.map(function(item){return {id:'gi'+nid(),name:item.name,checked:true,prices:{}};});
+    // Store full structure including section/subheader rows
+    _gridItems=budItems.map(function(item){
+      if(item.type==='subheader'){
+        return {id:'gh'+nid(),type:'subheader',sectionName:item.sectionName,name:item.name,checked:false,prices:{}};
+      }
+      var prices={};
+      if(_gridAreas.length&&item.budgetVal>0)prices[_gridAreas[0].id]=item.budgetVal;
+      return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,checked:true,prices:{},budgetVal:item.budgetVal,_defaultPrices:{[_gridAreas[0].id]:item.budgetVal}};
+    });
   } else {
     _scratchAreas=[{id:'sa'+nid(),name:''}];
     _scratchRows=[{id:'sr'+nid(),name:'',prices:{}}];
@@ -1173,70 +1191,130 @@ function renderSetupGrid(){
   var wrap=document.getElementById('setupGridWrap');if(!wrap)return;
   var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
   var rows=_setupMode==='budget'?_gridItems:_scratchRows;
+  var colSpan=areas.length+((_setupMode==='budget')?4:3); // name + [cb] + areas + total + remaining
 
   var tbl=document.createElement('table');tbl.className='sp-grid';tbl.style.width='100%';
-  // Header
+
+  // ── HEADER ROW ──
   var thead=document.createElement('thead');var htr=document.createElement('tr');
-  var th0=document.createElement('th');th0.style.textAlign='left';th0.textContent='Line Item';th0.style.minWidth='180px';htr.appendChild(th0);
+  var th0=document.createElement('th');th0.style.cssText='text-align:left;min-width:220px';th0.textContent='Line Item';htr.appendChild(th0);
   if(_setupMode==='budget'){var thCb=document.createElement('th');thCb.style.cssText='width:36px;text-align:center';thCb.textContent='✓';htr.appendChild(thCb);}
   areas.forEach(function(ar){var th=document.createElement('th');th.textContent=ar.name||'(Area)';th.style.minWidth='120px';htr.appendChild(th);});
-  // Total & Remaining cols
   var thTot=document.createElement('th');thTot.textContent='Total Sell';thTot.style.cssText='text-align:right;min-width:110px;color:var(--accent)';htr.appendChild(thTot);
   var thRem=document.createElement('th');thRem.textContent='Remaining';thRem.style.cssText='text-align:right;min-width:110px;color:var(--warn)';htr.appendChild(thRem);
   thead.appendChild(htr);tbl.appendChild(thead);
 
   var tbody=document.createElement('tbody');
-  rows.forEach(function(row,ri){
-    var tr=document.createElement('tr');tr.id='sgrow-'+ri;
-    // Name cell
-    var tdName=document.createElement('td');
-    if(_setupMode==='budget'){
-      tdName.style.cssText='font-size:13px;color:var(--text2)';tdName.textContent=row.name;
-    } else {
+
+  if(_setupMode==='budget'){
+    // Group by section then render section header → subheaders → items
+    var currentSection=null;
+    var currentSubheader=null;
+    var _collapsedSections={};
+    var _collapsedSubheaders={};
+
+    rows.forEach(function(row,ri){
+      // ── SECTION HEADER ──
+      if(row.sectionName!==currentSection){
+        currentSection=row.sectionName;
+        currentSubheader=null;
+        var secId='sec-'+currentSection.replace(/\s/g,'-');
+        var secTr=document.createElement('tr');secTr.className='sg-section-hdr';secTr.id=secId+'-hdr';
+        secTr.style.cssText='background:var(--surface2);cursor:pointer;user-select:none';
+        secTr.onclick=(function(sid){return function(){toggleSetupSection(sid);};})(secId);
+        var secTd=document.createElement('td');secTd.colSpan=colSpan;
+        secTd.style.cssText='padding:8px 12px;font-family:\'Syne\',sans-serif;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border)';
+        secTd.innerHTML='<span id="'+secId+'-chev" style="font-size:10px;color:var(--muted);margin-right:8px;display:inline-block;transition:transform .2s">▼</span>'+escH(currentSection);
+        secTr.appendChild(secTd);tbody.appendChild(secTr);
+      }
+
+      // ── SUBHEADER ROW ──
+      if(row.type==='subheader'){
+        currentSubheader=row.name;
+        var subId='sub-'+currentSection.replace(/\s/g,'-')+'-'+currentSubheader.replace(/\s/g,'-');
+        var subTr=document.createElement('tr');subTr.className='sg-subheader sg-sec-'+currentSection.replace(/\s/g,'-');
+        subTr.id=subId+'-hdr';subTr.style.cssText='background:var(--surface3);cursor:pointer;user-select:none';
+        subTr.onclick=(function(sid,subid){return function(){toggleSetupSubheader(subid);};})(currentSection,subId);
+        var subTd=document.createElement('td');subTd.colSpan=colSpan;
+        subTd.style.cssText='padding:6px 12px 6px 28px;font-size:12px;font-weight:600;color:var(--text2);border-bottom:1px solid var(--border)';
+        subTd.innerHTML='<span id="'+subId+'-chev" style="font-size:9px;color:var(--muted);margin-right:7px;display:inline-block;transition:transform .2s">▼</span>'+escH(currentSubheader);
+        subTr.appendChild(subTd);tbody.appendChild(subTr);
+        return;
+      }
+
+      // ── LINE ITEM ROW ──
+      var secClass='sg-sec-'+currentSection.replace(/\s/g,'-');
+      var subClass=currentSubheader?'sg-sub-'+currentSection.replace(/\s/g,'-')+'-'+currentSubheader.replace(/\s/g,'-'):'';
+      var tr=document.createElement('tr');tr.id='sgrow-'+ri;
+      tr.className='sg-item '+secClass+(subClass?' '+subClass:'');
+      tr.style.cssText='border-bottom:1px solid var(--border)';
+
+      // Name cell with indentation
+      var tdName=document.createElement('td');
+      var indent=currentSubheader?44:28;
+      tdName.style.cssText='font-size:13px;color:var(--text2);padding-left:'+indent+'px';
+      tdName.textContent=row.name;
+      tr.appendChild(tdName);
+
+      // Checkbox
+      var tdCb=document.createElement('td');tdCb.style.textAlign='center';
+      var cb=document.createElement('input');cb.type='checkbox';cb.checked=row.checked!==false;
+      cb.style.cssText='width:14px;height:14px;accent-color:var(--accent);cursor:pointer';
+      (function(idx){cb.addEventListener('change',function(){_gridItems[idx].checked=this.checked;updateSetupRowTotal(idx);updateSetupTotals();});})(ri);
+      tdCb.appendChild(cb);tr.appendChild(tdCb);
+
+      // Price cells
+      areas.forEach(function(ar){
+        var td=document.createElement('td');
+        if(!row.prices)row.prices={};
+        var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
+        inp.placeholder='0.00';inp.value=row.prices[ar.id]||'';inp.dataset.ri=ri;inp.dataset.aid=ar.id;
+        (function(rIdx,aId){inp.addEventListener('input',function(){
+          if(!_gridItems[rIdx].prices)_gridItems[rIdx].prices={};
+          _gridItems[rIdx].prices[aId]=num(this.value);
+          updateSetupRowTotal(rIdx);updateSetupTotals();
+        });})(ri,ar.id);
+        td.appendChild(inp);tr.appendChild(td);
+      });
+
+      // Total cell
+      var tdTot=document.createElement('td');tdTot.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;color:var(--accent)';
+      tdTot.id='sg-tot-'+ri;tdTot.textContent='$0.00';tr.appendChild(tdTot);
+      // Remaining cell
+      var tdRem=document.createElement('td');tdRem.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px';
+      tdRem.id='sg-rem-'+ri;tdRem.textContent='—';tr.appendChild(tdRem);
+      tbody.appendChild(tr);
+    });
+
+  } else {
+    // SCRATCH MODE — simple rows
+    rows.forEach(function(row,ri){
+      var tr=document.createElement('tr');tr.id='sgrow-'+ri;tr.style.cssText='border-bottom:1px solid var(--border)';
+      var tdName=document.createElement('td');
       var nameInp=document.createElement('input');
       nameInp.style.cssText='background:transparent;border:none;outline:none;color:var(--text);font-family:\'DM Sans\',sans-serif;font-size:13px;width:100%;padding:2px';
       nameInp.placeholder='Line item name';nameInp.value=row.name||'';
       (function(idx){nameInp.addEventListener('input',function(){_scratchRows[idx].name=this.value;});})(ri);
-      tdName.appendChild(nameInp);
-    }
-    tr.appendChild(tdName);
-    // Checkbox for budget mode
-    if(_setupMode==='budget'){
-      var tdCb=document.createElement('td');tdCb.style.textAlign='center';
-      var cb=document.createElement('input');cb.type='checkbox';cb.checked=row.checked!==false;
-      cb.style.cssText='width:14px;height:14px;accent-color:var(--accent);cursor:pointer';
-      (function(idx){cb.addEventListener('change',function(){_gridItems[idx].checked=this.checked;updateSetupTotals();});})(ri);
-      tdCb.appendChild(cb);tr.appendChild(tdCb);
-    }
-    // Price cells
-    areas.forEach(function(ar){
-      var td=document.createElement('td');
-      if(!row.prices)row.prices={};
-      var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
-      inp.placeholder='0.00';inp.value=row.prices[ar.id]||'';inp.dataset.ri=ri;inp.dataset.aid=ar.id;
-      (function(rIdx,aId){
-        inp.addEventListener('input',function(){
-          if(!rows[rIdx].prices)rows[rIdx].prices={};
-          rows[rIdx].prices[aId]=num(this.value);
-          updateSetupRowTotal(rIdx);
-          updateSetupTotals();
-        });
-      })(ri,ar.id);
-      td.appendChild(inp);tr.appendChild(td);
+      tdName.appendChild(nameInp);tr.appendChild(tdName);
+      areas.forEach(function(ar){
+        var td=document.createElement('td');if(!row.prices)row.prices={};
+        var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
+        inp.placeholder='0.00';inp.value=row.prices[ar.id]||'';
+        (function(rIdx,aId){inp.addEventListener('input',function(){
+          if(!_scratchRows[rIdx].prices)_scratchRows[rIdx].prices={};
+          _scratchRows[rIdx].prices[aId]=num(this.value);
+          updateSetupRowTotal(rIdx);updateSetupTotals();
+        });})(ri,ar.id);
+        td.appendChild(inp);tr.appendChild(td);
+      });
+      var tdTot=document.createElement('td');tdTot.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;color:var(--accent)';
+      tdTot.id='sg-tot-'+ri;tdTot.textContent='$0.00';tr.appendChild(tdTot);
+      var tdRem=document.createElement('td');tdRem.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px';
+      tdRem.id='sg-rem-'+ri;tdRem.textContent='—';tr.appendChild(tdRem);
+      tbody.appendChild(tr);
     });
-    // Total cell
-    var tdTot=document.createElement('td');tdTot.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;color:var(--accent)';
-    tdTot.id='sg-tot-'+ri;tdTot.textContent='$0.00';tr.appendChild(tdTot);
-    // Remaining cell
-    var tdRem=document.createElement('td');tdRem.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px';
-    tdRem.id='sg-rem-'+ri;tdRem.textContent='—';tr.appendChild(tdRem);
-    tbody.appendChild(tr);
-  });
-
-  // Add row button for scratch mode
-  if(_setupMode==='scratch'){
-    var addTr=document.createElement('tr');
-    var addTd=document.createElement('td');addTd.colSpan=areas.length+3;
+    // Add row button
+    var addTr=document.createElement('tr');var addTd=document.createElement('td');addTd.colSpan=colSpan;
     addTd.style.cssText='padding:8px 12px;border-top:1px solid var(--border)';
     var addBtn=document.createElement('button');
     addBtn.style.cssText='background:none;border:none;color:var(--accent);cursor:pointer;font-size:12.5px;font-family:\'DM Sans\',sans-serif';
@@ -1246,15 +1324,30 @@ function renderSetupGrid(){
   }
 
   tbl.appendChild(tbody);wrap.innerHTML='';wrap.appendChild(tbl);
-  // Update all row totals after render
   rows.forEach(function(_,ri){updateSetupRowTotal(ri);});
   updateSetupTotals();
+}
+
+function toggleSetupSection(secId){
+  var chev=document.getElementById(secId+'-chev');
+  var items=document.querySelectorAll('.'+secId.replace('sec-','sg-sec-'));
+  var isVisible=items.length&&items[0].style.display!=='none';
+  items.forEach(function(el){el.style.display=isVisible?'none':'';});
+  if(chev)chev.style.transform=isVisible?'rotate(-90deg)':'';
+}
+
+function toggleSetupSubheader(subId){
+  var chev=document.getElementById(subId+'-chev');
+  var items=document.querySelectorAll('.'+subId.replace('sub-','sg-sub-'));
+  var isVisible=items.length&&items[0].style.display!=='none';
+  items.forEach(function(el){el.style.display=isVisible?'none':'';});
+  if(chev)chev.style.transform=isVisible?'rotate(-90deg)':'';
 }
 
 function updateSetupRowTotal(ri){
   var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
   var rows=_setupMode==='budget'?_gridItems:_scratchRows;
-  var row=rows[ri];if(!row)return;
+  var row=rows[ri];if(!row||row.type==='subheader')return;
   var total=0;
   areas.forEach(function(ar){total+=num((row.prices||{})[ar.id]||0);});
   var totEl=document.getElementById('sg-tot-'+ri);
@@ -1273,6 +1366,7 @@ function updateSetupTotals(){
   var rows=_setupMode==='budget'?_gridItems:_scratchRows;
   var totalAllocated=0;
   rows.forEach(function(row){
+    if(row.type==='subheader')return;
     if(_setupMode==='budget'&&row.checked===false)return;
     areas.forEach(function(ar){totalAllocated+=num((row.prices||{})[ar.id]||0);});
   });
@@ -1294,7 +1388,14 @@ var _scratchRows=[]; // [{id, name, prices:{areaId:price}}]
 async function buildBudgetTree(){
   _gridAreas=[{id:'ga'+nid(),name:'General'}];
   var budItems=await loadBudgetItems();
-  _gridItems=budItems.map(function(item){return {id:'gi'+nid(),name:item.name,checked:true,prices:{}};});
+  _gridItems=budItems.map(function(item){
+    if(item.type==='subheader'){
+      return {id:'gh'+nid(),type:'subheader',sectionName:item.sectionName,name:item.name,checked:false,prices:{}};
+    }
+    var prices={};
+    if(_gridAreas.length&&item.budgetVal>0)prices[_gridAreas[0].id]=item.budgetVal;
+    return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,checked:true,prices:prices,budgetVal:item.budgetVal};
+  });
   if(!_gridItems.length){
     document.getElementById('budgetGrid').innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">No budget data found. Use Option 2 instead.</div>';
     renderGridAreaCols();return;
@@ -1427,6 +1528,7 @@ function wizFinish(){
     var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
     var rows=_setupMode==='budget'?_gridItems:_scratchRows;
     rows.forEach(function(row){
+      if(row.type==='subheader')return;
       if(_setupMode==='budget'&&row.checked===false)return;
       var name=row.name;if(!name||!name.trim())return;
       var itemAreas=[];
