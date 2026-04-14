@@ -263,7 +263,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
     <span class="bcc" id="bcCurr">Progress Claims</span>
   </div>
   <div style="display:flex;gap:8px" id="topBtns">
-    <button class="bp bsm btn" onclick="openNewClaimWizard()">＋ New Claim</button>
+    <button class="bp bsm btn" onclick="openNewClaimWizard()">📋 Setup Claim Sheet</button>
   </div>
 </div>
 
@@ -290,12 +290,12 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
   <div class="detail-topbar no-print" style="position:sticky;top:0;z-index:200">
     <div style="display:flex;align-items:center;gap:10px">
       <button class="bg bsm btn" onclick="closeSetupView()">← Back</button>
-      <span style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text)" id="setupViewTitle">Set Up Line Items</span>
+      <span style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text)" id="setupViewTitle">Set Up Claim Sheet</span>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div style="display:flex;gap:8px;align-items:center" id="setupViewBtns">
       <div id="setupAreaColsBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
-      <button onclick="addSetupArea()" class="btn bg bsm" style="color:var(--accent);border-color:rgba(0,200,255,.3);white-space:nowrap">＋ Area</button>
-      <button class="bp bsm btn" onclick="wizFinish()">Create Claim →</button>
+      <button onclick="addSetupArea()" class="btn bg bsm" id="setupAddAreaBtn" style="color:var(--accent);border-color:rgba(0,200,255,.3);white-space:nowrap">＋ Area</button>
+      <button class="bp bsm btn" id="setupFinishBtn" onclick="wizFinish()">Finalise Claim Sheet →</button>
     </div>
   </div>
   <!-- Total bar -->
@@ -419,6 +419,15 @@ function nid(){return ++_uid;}
 function num(v){return parseFloat(v)||0;}
 function fmt(n){var v=num(n);return '$'+v.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtR(n){var v=num(n);return v===0?'—':'$'+Math.round(v).toLocaleString('en-AU');}
+// Attach $ formatting on blur to a number input
+function attachPriceFmt(inp){
+  inp.addEventListener('focus',function(){this.value=num(this.value)||'';this.type='number';});
+  inp.addEventListener('blur',function(){
+    var v=num(this.value);
+    this.type='text';
+    this.value=v>0?fmt(v):'';
+  });
+}
 function fmtM(m){if(!m)return '—';try{var p=m.split('-');var d=new Date(parseInt(p[0]),parseInt(p[1])-1,1);return d.toLocaleDateString('en-AU',{month:'long',year:'numeric'});}catch(e){return m;}}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
@@ -442,7 +451,7 @@ async function load(){
   renderList();
   updateListSummary();
   // Auto-open wizard if no claims exist yet
-  if(!claimsData.claims.length){
+  if(!claimsData.claims.length&&(!claimsData.lineItems||!claimsData.lineItems.length)){
     setTimeout(openNewClaimWizard,300);
   }
 }
@@ -558,23 +567,37 @@ function updateListSummary(){
   document.getElementById('sumRetPct').textContent=retPct+'% retention';
 }
 
+function updateTopBtns(){
+  var el=document.getElementById('topBtns');if(!el)return;
+  var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
+  var hasClaims=claimsData.claims&&claimsData.claims.length>0;
+  if(!hasLineItems){
+    el.innerHTML='<button class="bp bsm btn" onclick="openNewClaimWizard()">📋 Setup Claim Sheet</button>';
+  } else if(!hasClaims){
+    el.innerHTML='<button class="btn bg bsm" onclick="openSetupViewEdit()">📋 View Claim Sheet</button>'
+      +'<button class="bp bsm btn" onclick="openLogClaimView()">＋ Log Claim</button>';
+  } else {
+    el.innerHTML='<button class="btn bg bsm" onclick="openSetupViewEdit()">📋 View Claim Sheet</button>'
+      +'<button class="bp bsm btn" onclick="openLogClaimView()">＋ Log Claim</button>';
+  }
+}
+
 // RENDER LIST
 function renderList(){
   updateListSummary();
+  updateTopBtns();
   var el=document.getElementById('claimList');
   var emp=document.getElementById('emptyState');
   if(!el)return;
+  var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
   if(!claimsData.claims.length){
-    var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
     if(emp){
       emp.style.display='flex';
       emp.innerHTML='<div class="empty-icon">📈</div>'
-        +'<div style="font-size:15px;font-weight:600;color:var(--text2)">No claims yet</div>'
-        +'<div>Click <strong>＋ New Claim</strong> to get started.</div>'
-        +(hasLineItems?'<div style="margin-top:12px"><button class="btn bg bsm" onclick="resetLineItems()" style="color:var(--muted);font-size:11px">↺ Reset line items & start over</button></div>':'');
+        +'<div style="font-size:15px;font-weight:600;color:var(--text2)">'+(hasLineItems?'Claim sheet ready':'No claim sheet yet')+'</div>'
+        +'<div>'+(hasLineItems?'Click <strong>＋ Log Claim</strong> to record your first claim.':'Click <strong>Setup Claim Sheet</strong> to get started.')+'</div>'
+        +(hasLineItems?'<div style="margin-top:12px"><button class="btn bg bsm" onclick="resetLineItems()" style="color:var(--muted);font-size:11px">↺ Reset & start over</button></div>':'');
       el.innerHTML='';el.appendChild(emp);
-    } else {
-      el.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">📋</div><div style="font-size:14px;font-weight:600">No claims yet</div><div style="font-size:13px;margin-top:6px">Click <strong>+ New Claim</strong> to get started.</div></div>';
     }
     return;
   }
@@ -692,9 +715,9 @@ function deleteDraftClaim(id){
 function goList(){
   currentClaimId=null;editMode=false;
   document.getElementById('view-detail').classList.remove('active');
+  document.getElementById('view-setup').classList.remove('active');
   document.getElementById('view-list').classList.add('active');
   document.getElementById('bcCurr').textContent='Progress Claims';
-  document.getElementById('topBtns').innerHTML='<button class="bp bsm btn" onclick="openNewClaimWizard()">＋ New Claim</button>';
   renderList();
 }
 
@@ -1123,6 +1146,89 @@ function wizBack(){
 
 // ── FULL PAGE SETUP VIEW ──
 var _setupMode='budget'; // 'budget' or 'scratch'
+var _logClaimMode=false; // true = Log Claim mode (Total Sell read-only, areas editable only)
+
+// Open setup view to VIEW/EDIT the claim sheet (all fields editable)
+function openSetupViewEdit(){
+  _logClaimMode=false;
+  _setupMode='budget';
+  // Rebuild _gridAreas and _gridItems from existing lineItems
+  var allAreaNames=[];var areaMap={};
+  claimsData.lineItems.forEach(function(li){
+    (li.areas||[]).forEach(function(ar){
+      if(ar.areaName&&!areaMap[ar.areaName]){areaMap[ar.areaName]=true;allAreaNames.push(ar.areaName);}
+    });
+  });
+  if(!allAreaNames.length)allAreaNames=['General'];
+  _gridAreas=allAreaNames.map(function(n){return {id:'ga_'+n.replace(/\W/g,'_'),name:n};});
+  _gridItems=claimsData.lineItems.map(function(li){
+    var prices={};
+    _gridAreas.forEach(function(ga){
+      var match=(li.areas||[]).find(function(a){return a.areaName===ga.name;});
+      prices[ga.id]=match?match.sellingPrice:0;
+    });
+    return {id:li.id,type:'item',sectionName:li.sectionName||'',name:li.name,
+            checked:true,totalSell:li.totalSell||0,prices:prices};
+  });
+  document.getElementById('view-list').classList.remove('active');
+  document.getElementById('view-setup').classList.add('active');
+  document.getElementById('setupViewTitle').textContent='Claim Sheet';
+  document.getElementById('sv-contract').textContent=fmt(claimsData.contractValue||0);
+  document.getElementById('topBtns').innerHTML='';
+  document.getElementById('setupFinishBtn').textContent='Save Changes';
+  document.getElementById('setupFinishBtn').onclick=saveClaimSheetEdit;
+  document.getElementById('setupAddAreaBtn').style.display='';
+  renderSetupAreaCols();renderSetupGrid();
+}
+
+// Open setup view in LOG CLAIM mode (Total Sell locked, areas editable for this claim)
+function openLogClaimView(){
+  _logClaimMode=true;
+  _setupMode='budget';
+  // Same as edit but Total Sell locked
+  var allAreaNames=[];var areaMap={};
+  claimsData.lineItems.forEach(function(li){
+    (li.areas||[]).forEach(function(ar){
+      if(ar.areaName&&!areaMap[ar.areaName]){areaMap[ar.areaName]=true;allAreaNames.push(ar.areaName);}
+    });
+  });
+  if(!allAreaNames.length)allAreaNames=['General'];
+  _gridAreas=allAreaNames.map(function(n){return {id:'ga_'+n.replace(/\W/g,'_'),name:n};});
+  _gridItems=claimsData.lineItems.map(function(li){
+    var prices={};
+    _gridAreas.forEach(function(ga){
+      var match=(li.areas||[]).find(function(a){return a.areaName===ga.name;});
+      prices[ga.id]=match?match.sellingPrice:0;
+    });
+    return {id:li.id,type:'item',sectionName:li.sectionName||'',name:li.name,
+            checked:true,totalSell:li.totalSell||0,prices:{},budgetVal:li.totalSell||0}; // prices blank for new claim entry
+  });
+  document.getElementById('view-list').classList.remove('active');
+  document.getElementById('view-setup').classList.add('active');
+  document.getElementById('setupViewTitle').textContent='Log Claim';
+  document.getElementById('sv-contract').textContent=fmt(claimsData.contractValue||0);
+  document.getElementById('topBtns').innerHTML='';
+  document.getElementById('setupFinishBtn').textContent='Save Claim →';
+  document.getElementById('setupFinishBtn').onclick=wizFinish;
+  document.getElementById('setupAddAreaBtn').style.display='none'; // no adding areas in log mode
+  renderSetupAreaCols();renderSetupGrid();
+}
+
+function saveClaimSheetEdit(){
+  // Save updated totalSell and area prices back to lineItems
+  _gridItems.forEach(function(item){
+    var li=claimsData.lineItems.find(function(x){return x.id===item.id;});
+    if(!li)return;
+    li.totalSell=num(item.totalSell||0);
+    var updatedAreas=[];
+    _gridAreas.forEach(function(ga){
+      var price=num((item.prices||{})[ga.id]||0);
+      updatedAreas.push({areaId:ga.id,areaName:ga.name,sellingPrice:price});
+    });
+    li.areas=updatedAreas;
+  });
+  save();closeSetupView();
+}
 
 async function openSetupView(mode){
   _setupMode=mode;
@@ -1263,20 +1369,30 @@ function renderSetupGrid(){
       (function(idx){cb.addEventListener('change',function(){_gridItems[idx].checked=this.checked;updateSetupRowTotal(idx);});})(ri);
       tdCb.appendChild(cb);tr.appendChild(tdCb);
 
-      // Total Sell — editable, pre-filled from budget
+      // Total Sell — editable in setup mode, read-only in log claim mode
       var tdTot=document.createElement('td');
-      var totInp=document.createElement('input');totInp.type='number';totInp.className='sp-price-inp';
-      totInp.style.cssText='font-weight:600;color:var(--accent);text-align:right;width:100%';
-      totInp.placeholder='0.00';totInp.value=row.totalSell||'';
-      (function(idx){totInp.addEventListener('input',function(){_gridItems[idx].totalSell=num(this.value);updateSetupRowTotal(idx);});})(ri);
-      tdTot.appendChild(totInp);tr.appendChild(tdTot);
+      if(_logClaimMode){
+        tdTot.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:13px;font-weight:600;color:var(--accent);padding:6px 10px';
+        tdTot.textContent=fmt(num(row.totalSell||0));
+      } else {
+        var totInp=document.createElement('input');totInp.type='text';totInp.className='sp-price-inp';
+        totInp.style.cssText='font-weight:600;color:var(--accent);text-align:right;width:100%';
+        totInp.placeholder='$0.00';
+        var totVal=num(row.totalSell||0);if(totVal>0){totInp.value=fmt(totVal);}
+        attachPriceFmt(totInp);
+        (function(idx){totInp.addEventListener('input',function(){_gridItems[idx].totalSell=num(this.value);updateSetupRowTotal(idx);});})(ri);
+        tdTot.appendChild(totInp);
+      }
+      tr.appendChild(tdTot);
 
       // Area price cells — start blank
       areas.forEach(function(ar){
         var td=document.createElement('td');
         if(!row.prices)row.prices={};
-        var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
-        inp.placeholder='0.00';inp.value=row.prices[ar.id]||'';
+        var inp=document.createElement('input');inp.type='text';inp.className='sp-price-inp';
+        inp.placeholder='$0.00';
+        var aVal=num((row.prices||{})[ar.id]||0);if(aVal>0){inp.value=fmt(aVal);}
+        attachPriceFmt(inp);
         (function(rIdx,aId){inp.addEventListener('input',function(){
           if(!_gridItems[rIdx].prices)_gridItems[rIdx].prices={};
           _gridItems[rIdx].prices[aId]=num(this.value);
@@ -1303,16 +1419,20 @@ function renderSetupGrid(){
       tdName.appendChild(nameInp);tr.appendChild(tdName);
       // Total Sell — editable
       var tdTot=document.createElement('td');
-      var totInp=document.createElement('input');totInp.type='number';totInp.className='sp-price-inp';
+      var totInp=document.createElement('input');totInp.type='text';totInp.className='sp-price-inp';
       totInp.style.cssText='font-weight:600;color:var(--accent);text-align:right;width:100%';
-      totInp.placeholder='Total sell price';totInp.value=row.totalSell||'';
+      totInp.placeholder='$0.00';
+      var sTotVal=num(row.totalSell||0);if(sTotVal>0)totInp.value=fmt(sTotVal);
+      attachPriceFmt(totInp);
       (function(idx){totInp.addEventListener('input',function(){_scratchRows[idx].totalSell=num(this.value);updateSetupRowTotal(idx);});})(ri);
       tdTot.appendChild(totInp);tr.appendChild(tdTot);
       // Area price cells
       areas.forEach(function(ar){
         var td=document.createElement('td');if(!row.prices)row.prices={};
-        var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
-        inp.placeholder='0.00';inp.value=row.prices[ar.id]||'';
+        var inp=document.createElement('input');inp.type='text';inp.className='sp-price-inp';
+        inp.placeholder='$0.00';
+        var sAVal=num(row.prices[ar.id]||0);if(sAVal>0)inp.value=fmt(sAVal);
+        attachPriceFmt(inp);
         (function(rIdx,aId){inp.addEventListener('input',function(){
           if(!_scratchRows[rIdx].prices)_scratchRows[rIdx].prices={};
           _scratchRows[rIdx].prices[aId]=num(this.value);
@@ -1367,8 +1487,8 @@ function updateSetupRowTotal(ri){
   if(remEl){
     if(totalSell===0){remEl.textContent='—';remEl.style.color='var(--muted)';}
     else if(remaining<0){remEl.textContent='⚠ '+fmt(Math.abs(remaining))+' over';remEl.style.color='var(--danger)';}
-    else if(remaining===0){remEl.textContent='✓ Fully allocated';remEl.style.color='var(--green)';}
-    else{remEl.textContent=fmt(remaining)+' rem';remEl.style.color='var(--warn)';}
+    else if(remaining===0){remEl.textContent='✓ '+fmt(0);remEl.style.color='var(--green)';}
+    else{remEl.textContent=fmt(remaining);remEl.style.color='var(--warn)';}
   }
   updateSetupTotals();
 }
@@ -1573,6 +1693,7 @@ function wizFinish(){
   claimsData.claims.push(newClaim);
   save();
   document.getElementById('view-list').classList.remove('active');
+  document.getElementById('view-setup').classList.remove('active');
   document.getElementById('topBtns').innerHTML='';
   renderList();openClaim(newClaim.id);
 }
