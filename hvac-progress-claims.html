@@ -445,6 +445,10 @@ async function load(){
   }catch(e){console.warn('load error',e);}
   renderList();
   updateListSummary();
+  // Auto-open wizard if no claims exist yet
+  if(!claimsData.claims.length){
+    setTimeout(openNewClaimWizard,300);
+  }
 }
 
 // COMPANY SETTINGS
@@ -560,8 +564,17 @@ function renderList(){
   var emp=document.getElementById('emptyState');
   if(!el)return;
   if(!claimsData.claims.length){
-    if(emp){emp.style.display='flex';el.innerHTML='';el.appendChild(emp);}
-    else{el.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">📋</div><div style="font-size:14px;font-weight:600">No claims yet</div><div style="font-size:13px;margin-top:6px">Click <strong>+ New Claim</strong> to get started.</div></div>';}
+    var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
+    if(emp){
+      emp.style.display='flex';
+      emp.innerHTML='<div class="empty-icon">📈</div>'
+        +'<div style="font-size:15px;font-weight:600;color:var(--text2)">No claims yet</div>'
+        +'<div>Click <strong>＋ New Claim</strong> to get started.</div>'
+        +(hasLineItems?'<div style="margin-top:12px"><button class="btn bg bsm" onclick="resetLineItems()" style="color:var(--muted);font-size:11px">↺ Reset line items & start over</button></div>':'');
+      el.innerHTML='';el.appendChild(emp);
+    } else {
+      el.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">📋</div><div style="font-size:14px;font-weight:600">No claims yet</div><div style="font-size:13px;margin-top:6px">Click <strong>+ New Claim</strong> to get started.</div></div>';
+    }
     return;
   }
   if(emp)emp.style.display='none';
@@ -670,6 +683,13 @@ function saveSellPrices(){
   save();closeM('sellPricesModal');renderDetail();
 }
 
+
+function resetLineItems(){
+  if(!confirm('This will clear all line item setup so you can start fresh. Are you sure?'))return;
+  claimsData.lineItems=[];
+  save();
+  openNewClaimWizard();
+}
 
 function deleteDraftClaim(id){
   var c=claimsData.claims.find(function(x){return x.id===id;});
