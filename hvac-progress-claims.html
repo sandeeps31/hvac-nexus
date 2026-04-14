@@ -1326,6 +1326,7 @@ function updateDetailSummary(){
   (claim.varEntries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
   var retPct=claimsData.retentionPct||5;
   var retAmt=grandCurrent*(retPct/100);
+  var netPayable=grandCurrent-retAmt;
   var gst=grandCurrent*0.1;
   var el=function(id){return document.getElementById(id);};
   if(el('ds-current'))el('ds-current').textContent=fmt(grandCurrent);
@@ -1333,6 +1334,31 @@ function updateDetailSummary(){
   if(el('ds-incl'))el('ds-incl').textContent=fmt(grandCurrent*1.1);
   if(el('ds-ret'))el('ds-ret').textContent=fmt(retAmt)+' ('+retPct+'%)';
   if(el('ds-net'))el('ds-net').textContent=fmt((grandCurrent-retAmt)*1.1);
+  // Update cost banner live
+  var invoicesBanner=loadInvoicesForMonth(claim.month);
+  var totalCostsBanner=0;
+  invoicesBanner.forEach(function(inv){totalCostsBanner+=num(inv.totalAmount||inv.invoiceAmount||inv.amount||0);});
+  if(totalCostsBanner>0){
+    var marginForBanner=totalCostsBanner>0?((netPayable-totalCostsBanner)/totalCostsBanner*100):0;
+    var bType=grandCurrent<totalCostsBanner?'danger':marginForBanner<10?'warn':'green';
+    var bColors={danger:['rgba(255,77,109,.12)','#ff4d6d'],warn:['rgba(255,184,48,.12)','#ffb830'],green:['rgba(0,229,160,.1)','#00e5a0']};
+    var bc=bColors[bType];
+    var bIcon=bType==='danger'?'🔴':bType==='warn'?'🟡':'🟢';
+    var bMsg=bType==='danger'
+      ?'Claim ('+fmt(grandCurrent)+') is below costs ('+fmt(totalCostsBanner)+') — potential loss of '+fmt(totalCostsBanner-grandCurrent)
+      :bType==='warn'
+      ?'Costs covered but margin is '+marginForBanner.toFixed(1)+'% — below 10% target'
+      :'Margin on costs is '+marginForBanner.toFixed(1)+'% — looking healthy';
+    var bannerEl=document.querySelector('.cost-banner');
+    if(bannerEl){
+      bannerEl.style.borderColor=bc[1];
+      bannerEl.style.background=bc[0];
+      var msgEl=bannerEl.querySelector('span:nth-child(2)');
+      var iconEl=bannerEl.querySelector('span:first-child');
+      if(iconEl)iconEl.textContent=bIcon;
+      if(msgEl)msgEl.textContent=bMsg;
+    }
+  }
 }
 function toggleVarApproved(claimId,val){
   var c=claimsData.claims.find(function(x){return x.id===claimId;});if(c){c.varApprovedOnly=val;save();renderDetail();}
