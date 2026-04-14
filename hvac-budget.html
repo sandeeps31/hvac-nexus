@@ -914,17 +914,29 @@ function renderAll(){
   const newMarginPct    = newBudgetEx > 0 ? (newProfit / newContractEx * 100) : 0;
   const varColor        = totalVarExGst > 0 ? 'color:var(--green)' : 'color:var(--muted)';
 
+  // Committed margin calculations
+  const committedProfit = baseSellEx - gc;
+  const committedMarginPct = baseSellEx > 0 ? (committedProfit / baseSellEx * 100) : 0;
+
   const totalsCard = document.createElement('div');
   totalsCard.innerHTML = `<div class="totals-card">
     <div class="totals-hdr">Totals</div>
-    <table class="totals-tbl">
-      <tr><td colspan="2" style="padding:8px 18px 4px">
-        <div style="background:rgba(0,200,255,.04);border:1px solid rgba(0,200,255,.18);border-radius:8px;overflow:hidden">
-          <div style="padding:7px 14px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);border-bottom:1px solid rgba(0,200,255,.12)">Base Contract</div>
-          <table style="width:100%;border-collapse:collapse">
+    <div style="padding:10px 18px 6px">
+      <div style="background:rgba(0,200,255,.04);border:1px solid rgba(0,200,255,.18);border-radius:8px;overflow:hidden">
+        <div style="padding:7px 14px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);border-bottom:1px solid rgba(0,200,255,.12)">Base Contract</div>
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:8px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid rgba(0,200,255,.12);width:40%"></th>
+              <th style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);border-bottom:1px solid rgba(0,200,255,.12);width:160px">Budget</th>
+              <th style="padding:8px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--warn);border-bottom:1px solid rgba(0,200,255,.12);width:160px">Committed</th>
+            </tr>
+          </thead>
+          <tbody>
             <tr>
-              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Budget (ex GST)</td>
+              <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Cost (ex GST)</td>
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--accent)">${fmt(gb)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--warn)">${gc>0?fmt(gc):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Sell Price (ex GST)</td>
@@ -934,30 +946,35 @@ function renderAll(){
                   : '<span style="font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:var(--green)" id="sellPriceInput">'+fmt(baseSellEx)+'</span>'
                 }
               </td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--green)">${gc>0?fmt(baseSellEx):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Profit (ex GST)</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600" id="profitVal" style="${baseProfit>=0?'color:var(--green)':'color:var(--danger)'}">${fmt(baseProfit)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${baseProfit>=0?'var(--green)':'var(--danger)'}" id="profitVal">${fmt(baseProfit)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${committedProfit>=0?'var(--green)':'var(--danger)'}">${gc>0?fmt(committedProfit):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08)">
               <td style="padding:9px 14px;font-size:13px;color:var(--text2)">Margin %</td>
-              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600" id="marginVal" style="${baseMarginPct>=0?'color:var(--green)':'color:var(--danger)'}">
-                <span id="marginDisplay">${baseMarginPct.toFixed(1)}%</span>
-              </td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${baseMarginPct>=0?'var(--green)':'var(--danger)'}" id="marginVal"><span id="marginDisplay">${baseMarginPct.toFixed(1)}%</span></td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${committedMarginPct>=0?'var(--green)':'var(--danger)'}">${gc>0?committedMarginPct.toFixed(1)+'%':'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.12)">
               <td style="padding:9px 14px;font-size:13px;color:var(--muted)">GST @ 10%</td>
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)" id="gstVal">${fmt(baseSellEx*0.1)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)">${gc>0?fmt(baseSellEx*0.1):'--'}</td>
             </tr>
             <tr style="border-top:1px solid rgba(0,200,255,.08);background:rgba(0,200,255,.03)">
               <td style="padding:9px 14px;font-size:13px;font-weight:600;color:var(--text)">Sell Price (incl GST)</td>
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)" id="sellInclVal">${fmt(baseSellEx*1.1)}</td>
+              <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${gc>0?fmt(baseSellEx*1.1):'--'}</td>
             </tr>
-          </table>
-        </div>
-      </td></tr>
-      <tr><td colspan="2" style="padding:2px 18px 4px">
-        <div style="background:rgba(255,184,48,.04);border:1px solid rgba(255,184,48,.18);border-radius:8px;overflow:hidden;margin-bottom:4px">
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+    <div style="padding:4px 18px 10px">
+      <div style="background:rgba(255,184,48,.04);border:1px solid rgba(255,184,48,.18);border-radius:8px;overflow:hidden;margin-bottom:4px">
           <div style="padding:7px 14px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn);border-bottom:1px solid rgba(255,184,48,.12)">Variations</div>
           <table style="width:100%;border-collapse:collapse">
             <tr>
@@ -985,9 +1002,8 @@ function renderAll(){
               <td style="padding:9px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)">${totalVarExGst>0?fmt(newContractIncl):'--'}</td>
             </tr>
           </table>
-        </div>
-      </td></tr>
-    </table>
+      </div>
+    </div>
   </div>`;
   page.appendChild(totalsCard);
 
@@ -1179,7 +1195,7 @@ function showTemplateToast(msg){
   if(typeof dbReady !== 'undefined') await dbReady;
   var _cu=dbGetCurrentUser();
   var _role=(_cu&&_cu.role)||'';
-  _canEditBudget=['Admin','Director','Estimator'].some(function(r){return _role.toLowerCase()===r.toLowerCase();});
+  _canEditBudget=['Admin','Director','Estimator','company_admin','project_admin'].some(function(r){return _role.toLowerCase()===r.toLowerCase();})||!_role;
   var banner=document.getElementById('budgetRoleBanner');
   if(banner)banner.style.display=_canEditBudget?'flex':'none';
   var editBtn=document.getElementById('editBudgetBtn');

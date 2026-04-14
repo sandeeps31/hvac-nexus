@@ -1384,14 +1384,16 @@ async function loadMemberList(){
     var members=await sbFetch('company_members?company_id=eq.'+companyId+'&select=id,user_id,role,created_at');
     if(!members||!members.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No members yet</div>';return;}
     var myUserId=(JSON.parse(localStorage.getItem('hvacnexus_session')||'{}').user||{}).id;
+    var cu=dbGetCurrentUser();
     el.innerHTML=members.map(function(m){
       var isMe=m.user_id===myUserId;
       var roleCol=ROLE_COLOURS[m.role]||'var(--text2)';
-      var roleLabel=ROLE_LABELS[m.role]||m.role;
-      var av=m.user_id.substring(0,1).toUpperCase();
+      var roleLabel=ROLE_LABELS[m.role]||m.role||'No role';
+      var displayName=isMe?(cu&&cu.name?cu.name:m.name||m.email||m.user_id):(m.name||m.email||m.user_id.substring(0,8)+'…');
+      var av=(displayName||'?').charAt(0).toUpperCase();
       var youTag=isMe?' <span style="color:var(--accent);font-size:10px">(you)</span>':'';
       var removeBtn=!isMe?'<button onclick="removeMember(this.dataset.mid)" data-mid="'+m.id+'" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:4px 8px;border-radius:4px" onmouseover="this.style.color=\'var(--danger)\'" onmouseout="this.style.color=\'var(--muted)\'">✕</button>':'';
-      return '<div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border)">'        +'<div style="width:36px;height:36px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--text);font-size:15px;flex-shrink:0">'+av+'</div>'        +'<div style="flex:1">'        +'<div style="font-size:11px;color:var(--text2);font-family:DM Mono,monospace">'+escH(m.user_id)+youTag+'</div>'        +'<div style="display:inline-block;margin-top:4px;padding:1px 8px;border-radius:10px;font-size:10px;font-family:DM Mono,monospace;color:'+roleCol+';background:rgba(0,0,0,.2);border:1px solid '+roleCol+'">'+escH(roleLabel)+'</div>'        +'</div>'        +removeBtn        +'</div>';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border)">'        +'<div style="width:36px;height:36px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--text);font-size:15px;flex-shrink:0">'+av+'</div>'        +'<div style="flex:1">'        +'<div style="font-size:13px;font-weight:600;color:var(--text)">'+escH(displayName)+youTag+'</div>'        +'<div style="display:inline-block;margin-top:4px;padding:1px 8px;border-radius:10px;font-size:10px;font-family:DM Mono,monospace;color:'+roleCol+';background:rgba(0,0,0,.2);border:1px solid '+roleCol+'">'+escH(roleLabel)+'</div>'        +'</div>'        +removeBtn        +'</div>';
     }).join('');
   }catch(e){el.innerHTML='<div style="padding:20px;color:var(--danger);font-size:13px">Error: '+e.message+'</div>';}
 }
