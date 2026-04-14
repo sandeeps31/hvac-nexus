@@ -129,26 +129,34 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .setup-opt-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
 .setup-opt-desc{font-size:12.5px;color:var(--text2)}
 /* BUDGET IMPORT TREE */
-.bud-section{margin-bottom:8px}
+.bud-section{margin-bottom:6px}
 .bud-sec-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface2);border-radius:6px;cursor:pointer;user-select:none}
 .bud-sec-name{font-size:13px;font-weight:600;color:var(--text);flex:1}
 .bud-sec-chev{font-size:10px;color:var(--muted);transition:transform .2s}
 .bud-section.col .bud-sec-chev{transform:rotate(-90deg)}
 .bud-section.col .bud-items{display:none}
-.bud-item{display:flex;align-items:center;gap:10px;padding:7px 12px 7px 28px;border-bottom:1px solid var(--border);transition:background .12s}
+.bud-item{border-bottom:1px solid var(--border)}
 .bud-item:last-child{border-bottom:none}
-.bud-item:hover{background:var(--surface2)}
+.bud-item-hdr{display:flex;align-items:center;gap:10px;padding:8px 12px 8px 28px;transition:background .12s}
+.bud-item-hdr:hover{background:var(--surface2)}
 .bud-item-name{flex:1;font-size:13px;color:var(--text2)}
-.bud-item-area{background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:3px 8px;outline:none;width:130px}
-.bud-item-area:focus{border-color:var(--accent)}
-.bud-item-price{background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:3px 8px;outline:none;width:100px;text-align:right}
-.bud-item-price:focus{border-color:var(--accent)}
 .bud-item-cb{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.bud-item-areas{padding:0 12px 8px 44px;display:flex;flex-direction:column;gap:5px}
+.bud-area-row{display:flex;align-items:center;gap:8px}
+.bud-item-area{background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:4px 8px;outline:none;flex:1;min-width:0}
+.bud-item-area:focus{border-color:var(--accent)}
+.bud-item-price{background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:4px 8px;outline:none;width:110px;text-align:right}
+.bud-item-price:focus{border-color:var(--accent)}
+.bud-area-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;transition:color .12s}
+.bud-area-del:hover{color:var(--danger)}
+.bud-add-area{background:none;border:none;color:var(--accent);cursor:pointer;font-size:11.5px;font-family:'DM Sans',sans-serif;padding:2px 0;text-align:left}
 /* SCRATCH LINE ITEMS */
-.scratch-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
+.scratch-item{border-bottom:1px solid var(--border)}
 .scratch-item:last-child{border-bottom:none}
+.scratch-item-hdr{display:flex;align-items:center;gap:8px;padding:10px 12px}
 .scratch-name{flex:1;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 9px;outline:none}
 .scratch-name:focus{border-color:var(--accent)}
+.scratch-areas{padding:0 12px 10px 28px;display:flex;flex-direction:column;gap:5px}
 .scratch-price{width:120px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:6px 9px;outline:none;text-align:right}
 .scratch-price:focus{border-color:var(--accent)}
 /* PRINT */
@@ -277,6 +285,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
       <button class="bg bsm btn" id="editClaimBtn" onclick="toggleEditMode(true)">✎ Edit</button>
       <button class="bg bsm btn" id="saveClaimBtn" style="display:none;color:var(--green);border-color:var(--green)" onclick="saveClaim()">✓ Save</button>
       <button class="bg bsm btn" id="cancelEditBtn" style="display:none" onclick="toggleEditMode(false)">Cancel</button>
+      <button class="btn bdanger bsm" id="deleteClaimBtn" style="display:none" onclick="deleteDraftClaim(currentClaimId)">🗑 Delete</button>
+      <button class="bg bsm btn" onclick="openEditSellPrices()" title="Edit area sell prices">⚙ Sell Prices</button>
       <select class="fsel" id="claimStatusSel" onchange="updateClaimStatus()" style="font-size:12px;padding:4px 8px">
         <option value="Draft">Draft</option>
         <option value="Submitted">Submitted</option>
@@ -301,6 +311,18 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 </div>
 
 <!-- SETUP WIZARD MODAL -->
+<div class="mo" id="sellPricesModal" onclick="if(event.target===this)closeM('sellPricesModal')">
+  <div class="modal" style="width:640px">
+    <h3>Edit Sell Prices</h3>
+    <p class="msub">Adjust area sell prices for any line item. Changes apply to all future claims.</p>
+    <div id="sellPricesBody" style="max-height:60vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px"></div>
+    <div class="mac">
+      <button class="bg bsm btn" onclick="closeM('sellPricesModal')">Cancel</button>
+      <button class="bp bsm btn" onclick="saveSellPrices()">✓ Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <div class="mo" id="wizardModal" onclick="if(event.target===this&&wizStep===0)closeWizard()">
   <div class="modal" id="wizardInner" style="width:620px">
     <div id="wizStep0">
@@ -337,8 +359,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
     <!-- STEP 1a: Budget import -->
     <div id="wizStep1a" style="display:none">
       <h3>Select Line Items from Budget</h3>
-      <p class="msub">Tick items to include. Set the area and your selling price for each.</p>
-      <div style="max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:8px" id="budgetTree"></div>
+      <p class="msub">Tick items to include. For each item, add one or more areas with a selling price.</p>
+      <div style="max-height:460px;overflow-y:auto;border:1px solid var(--border);border-radius:8px" id="budgetTree"></div>
       <div class="mac">
         <button class="bg bsm btn" onclick="wizBack()">← Back</button>
         <button class="bp bsm btn" onclick="wizFinish()">Create Claim →</button>
@@ -348,9 +370,9 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
     <!-- STEP 1b: Scratch -->
     <div id="wizStep1b" style="display:none">
       <h3>Build Line Items</h3>
-      <p class="msub">Add your claim line items and selling prices.</p>
-      <div id="scratchItems" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;max-height:380px;overflow-y:auto"></div>
-      <button onclick="addScratchItem()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12.5px;margin-top:8px;font-family:'DM Sans',sans-serif">＋ Add line item</button>
+      <p class="msub">Add your claim line items. For each, add one or more areas with a selling price.</p>
+      <div id="scratchItems" style="border:1px solid var(--border);border-radius:8px;padding:0;max-height:420px;overflow-y:auto"></div>
+      <button onclick="addScratchItem()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12.5px;margin-top:10px;font-family:'DM Sans',sans-serif">＋ Add line item</button>
       <div class="mac">
         <button class="bg bsm btn" onclick="wizBack()">← Back</button>
         <button class="bp bsm btn" onclick="wizFinish()">Create Claim →</button>
@@ -468,15 +490,14 @@ async function loadInvoicesForMonth(month){
   }catch(e){return[];}
 }
 
-// CALC previous claimed for a line item up to (but not including) claimId
-function prevClaimed(lineItemId, claimId){
+// CALC previous claimed for a line item area up to (but not including) claimId
+function prevClaimed(entryKey, claimId){
   var total=0;
+  var thisNum=(claimsData.claims.find(function(x){return x.id===claimId;})||{}).num||0;
   claimsData.claims.forEach(function(c){
-    if(c.id===claimId) return;
-    // Only count claims before this one
-    if(c.num>=claimsData.claims.find(function(x){return x.id===claimId;}).num) return;
+    if(c.id===claimId||c.num>=thisNum)return;
     (c.entries||[]).forEach(function(e){
-      if(e.lineItemId===lineItemId) total+=num(e.currentAmt);
+      if(e.lineItemId===entryKey)total+=num(e.currentAmt);
     });
   });
   return total;
@@ -529,7 +550,10 @@ function renderList(){
       '<div class="claim-card-hdr">'+
       '<span class="claim-num">Claim '+c.num+'</span>'+
       '<span class="claim-month">'+fmtM(c.month)+'</span>'+
+      '<div style="margin-left:auto;display:flex;align-items:center;gap:8px">'+
       '<span class="claim-status-badge '+(stMap[c.status]||'cs-draft')+'">'+escH(c.status)+'</span>'+
+      (c.status==='Draft'?'<button class="btn bdanger bsm" style="font-size:11px" onclick="event.stopPropagation();deleteDraftClaim(\''+c.id+'\')">🗑 Delete</button>':'')+
+      '</div>'+
       '</div>'+
       '<div class="claim-amounts">'+
       '<div class="ca-item"><div class="ca-lbl">This claim ex GST</div><div class="ca-val" style="color:var(--accent)">'+fmt(claimAmt)+'</div></div>'+
@@ -551,6 +575,66 @@ function openClaim(id){
   document.getElementById('view-detail').classList.add('active');
   document.getElementById('bcCurr').textContent='Claim '+claimsData.claims.find(function(c){return c.id===id;}).num;
   document.getElementById('topBtns').innerHTML='';
+}
+
+function closeM(id){document.getElementById(id).classList.remove('open');}
+
+function openEditSellPrices(){
+  var body=document.getElementById('sellPricesBody');
+  var html='';
+  claimsData.lineItems.forEach(function(li,li_i){
+    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+    html+='<div style="border-bottom:1px solid var(--border);padding:10px 14px">'
+      +'<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">'+escH(li.name)+'</div>'
+      +'<div id="sp-areas-'+li_i+'" style="display:flex;flex-direction:column;gap:6px">';
+    areas.forEach(function(ar,ai){
+      html+='<div class="bud-area-row" style="gap:10px">'
+        +'<input class="bud-item-area" placeholder="Area name" value="'+escH(ar.areaName||'')+'" data-li="'+li_i+'" data-ai="'+ai+'" id="sp-name-'+li_i+'-'+ai+'"/>'
+        +'<input class="bud-item-price" type="number" placeholder="$ sell price" value="'+(ar.sellingPrice||'')+'" data-li="'+li_i+'" data-ai="'+ai+'" id="sp-price-'+li_i+'-'+ai+'"/>'
+        +'</div>';
+    });
+    html+='</div>'
+      +'<button class="bud-add-area" style="margin-top:6px" onclick="spAddArea('+li_i+')">＋ Add Area</button>'
+      +'</div>';
+  });
+  body.innerHTML=html||'<div style="padding:24px;text-align:center;color:var(--muted)">No line items set up yet.</div>';
+  document.getElementById('sellPricesModal').classList.add('open');
+}
+
+function spAddArea(li_i){
+  var li=claimsData.lineItems[li_i];
+  if(!li)return;
+  if(!li.areas)li.areas=[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+  li.areas.push({areaId:'a'+nid(),areaName:'',sellingPrice:0});
+  openEditSellPrices(); // re-render
+}
+
+function saveSellPrices(){
+  claimsData.lineItems.forEach(function(li,li_i){
+    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+    var updated=[];
+    areas.forEach(function(ar,ai){
+      var nameEl=document.getElementById('sp-name-'+li_i+'-'+ai);
+      var priceEl=document.getElementById('sp-price-'+li_i+'-'+ai);
+      if(!nameEl||!priceEl)return;
+      var aName=nameEl.value.trim();
+      var aPrice=num(priceEl.value);
+      if(aName||aPrice>0)updated.push({areaId:ar.areaId,areaName:aName,sellingPrice:aPrice});
+    });
+    if(updated.length)li.areas=updated;
+  });
+  save();
+  closeM('sellPricesModal');
+  renderDetail();
+}
+
+function deleteDraftClaim(id){
+  var c=claimsData.claims.find(function(x){return x.id===id;});
+  if(!c||c.status!=='Draft'){alert('Only Draft claims can be deleted.');return;}
+  if(!confirm('Delete Claim '+c.num+'? This cannot be undone.'))return;
+  claimsData.claims=claimsData.claims.filter(function(x){return x.id!==id;});
+  save();
+  if(currentClaimId===id){goList();}else{renderList();}
 }
 
 function goList(){
@@ -578,100 +662,140 @@ function updateClaimStatus(){
 // RENDER DETAIL
 function renderDetail(){
   var claim=claimsData.claims.find(function(c){return c.id===currentClaimId;});
-  if(!claim) return;
+  if(!claim)return;
   document.getElementById('detailClaimNum').textContent='Claim '+claim.num;
   document.getElementById('detailClaimTitle').textContent=fmtM(claim.month);
   document.getElementById('claimStatusSel').value=claim.status||'Draft';
   document.getElementById('editClaimBtn').style.display=editMode?'none':'';
   document.getElementById('saveClaimBtn').style.display=editMode?'':'none';
   document.getElementById('cancelEditBtn').style.display=editMode?'':'none';
+  var delBtn=document.getElementById('deleteClaimBtn');
+  if(delBtn)delBtn.style.display=(claim.status==='Draft'&&!editMode)?'':'none';
 
   var content=document.getElementById('detailContent');
   content.innerHTML='';
 
-  // Group line items by area
+  // ── Build area map: areaName → [{li, area, entryKey}]
+  // Support both old model (li.area + li.sellingPrice) and new (li.areas[])
   var areaMap={};
   claimsData.lineItems.forEach(function(li){
-    var area=li.area||'General';
-    if(!areaMap[area]) areaMap[area]=[];
-    areaMap[area].push(li);
+    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+    areas.forEach(function(ar){
+      if(num(ar.sellingPrice)<=0)return; // skip zero-value areas
+      var aName=ar.areaName||'General';
+      if(!areaMap[aName])areaMap[aName]=[];
+      var entryKey=li.id+'__'+ar.areaId;
+      areaMap[aName].push({li:li,area:ar,entryKey:entryKey});
+    });
   });
 
-  var totalCurrentAmt=0;
-  var totalPrevAmt=0;
-  var totalContractVal=0;
+  // ── Remaining banner
+  var totalSell=0,totalPrevAll=0,totalCurrAll=0;
+  claimsData.lineItems.forEach(function(li){
+    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+    areas.forEach(function(ar){
+      totalSell+=num(ar.sellingPrice);
+      var ek=li.id+'__'+ar.areaId;
+      totalPrevAll+=prevClaimed(ek,claim.id);
+      var entry=(claim.entries||[]).find(function(e){return e.lineItemId===ek;});
+      totalCurrAll+=entry?num(entry.currentAmt):0;
+    });
+  });
+  var remainAll=totalSell-totalPrevAll-totalCurrAll;
+  var bannerColor=remainAll<0?'var(--danger)':remainAll===0?'var(--green)':'var(--warn)';
+  var bannerBg=remainAll<0?'rgba(255,77,109,.1)':remainAll===0?'rgba(0,229,160,.1)':'rgba(255,184,48,.1)';
+  var bannerDiv=document.createElement('div');
+  bannerDiv.style.cssText='margin:14px 24px 0;padding:10px 16px;border-radius:8px;background:'+bannerBg+';border:1px solid '+bannerColor+';display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px';
+  bannerDiv.innerHTML='<div style="display:flex;gap:20px;flex-wrap:wrap">'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Total Sell Price <strong style="color:var(--text)">'+fmt(totalSell)+'</strong></span>'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Previously Claimed <strong style="color:var(--text2)">'+fmt(totalPrevAll)+'</strong></span>'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">This Claim <strong style="color:var(--accent)">'+fmt(totalCurrAll)+'</strong></span>'
+    +'</div>'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;font-weight:700;color:'+bannerColor+'">'+(remainAll<0?'⚠ Over by '+fmt(Math.abs(remainAll)):remainAll===0?'✓ Fully claimed':'Remaining: '+fmt(remainAll))+'</span>';
+  content.appendChild(bannerDiv);
 
-  Object.keys(areaMap).forEach(function(area){
-    var items=areaMap[area];
+  // ── Render each area as collapsible section
+  var totalCurrentAmt=0,totalPrevAmt=0,totalContractVal=0;
+
+  Object.keys(areaMap).forEach(function(areaName){
+    var items=areaMap[areaName];
     var secCard=document.createElement('div');secCard.className='section-card claim-section';
+    var areaCurrentTotal=0,areaPrevTotal=0,areaContractTotal=0;
+    // Pre-calc for header
+    items.forEach(function(row){
+      var e=(claim.entries||[]).find(function(x){return x.lineItemId===row.entryKey;});
+      var curr=e?num(e.currentAmt):0;
+      var prev=prevClaimed(row.entryKey,claim.id);
+      areaCurrentTotal+=curr;areaPrevTotal+=prev;areaContractTotal+=num(row.area.sellingPrice);
+      totalCurrentAmt+=curr;totalPrevAmt+=prev;totalContractVal+=num(row.area.sellingPrice);
+    });
+
     var secHdr=document.createElement('div');secHdr.className='sec-hdr';
-    secHdr.innerHTML='<span class="sec-title">'+escH(area)+'</span><span class="sec-chev">▾</span>';
+    secHdr.innerHTML='<span class="sec-title">'+escH(areaName)+'</span>'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text2);margin-left:auto;margin-right:12px">'+fmt(areaCurrentTotal)+' this claim</span>'
+      +'<span class="sec-chev">▾</span>';
     secHdr.addEventListener('click',function(){secCard.classList.toggle('collapsed');});
 
     var secBody=document.createElement('div');secBody.className='sec-body';
     var tbl=document.createElement('table');tbl.className='claim-tbl';
-    tbl.innerHTML='<thead><tr>'+
-      '<th style="width:40%">Description</th>'+
-      '<th class="r">Selling price</th>'+
-      '<th class="r">Previous claims</th>'+
-      '<th class="r" style="min-width:160px">This claim</th>'+
-      '<th class="r">Remaining</th>'+
-      '</tr></thead>';
+    tbl.innerHTML='<thead><tr>'
+      +'<th style="width:38%">Description</th>'
+      +'<th class="r">Sell Price</th>'
+      +'<th class="r">Prev Claimed</th>'
+      +'<th class="r" style="min-width:170px">This Claim</th>'
+      +'<th class="r">Remaining</th>'
+      +'</tr></thead>';
     var tbody=document.createElement('tbody');
 
-    var areaCurrentTotal=0,areaPrevTotal=0,areaContractTotal=0;
-
-    items.forEach(function(li){
-      var entry=(claim.entries||[]).find(function(e){return e.lineItemId===li.id;});
-      if(!entry){entry={lineItemId:li.id,currentAmt:0,mode:'pct'};if(!claim.entries)claim.entries=[];claim.entries.push(entry);}
-      var prevAmt=prevClaimed(li.id,claim.id);
+    items.forEach(function(row){
+      var li=row.li,ar=row.area,ek=row.entryKey;
+      var entry=(claim.entries||[]).find(function(e){return e.lineItemId===ek;});
+      if(!entry){entry={lineItemId:ek,currentAmt:0,mode:'pct'};if(!claim.entries)claim.entries=[];claim.entries.push(entry);}
+      var prevAmt=prevClaimed(ek,claim.id);
       var currentAmt=num(entry.currentAmt);
-      var remaining=Math.max(0,li.sellingPrice-prevAmt-currentAmt);
-      areaCurrentTotal+=currentAmt;areaPrevTotal+=prevAmt;areaContractTotal+=li.sellingPrice;
-      totalCurrentAmt+=currentAmt;totalPrevAmt+=prevAmt;totalContractVal+=li.sellingPrice;
+      var sellPrice=num(ar.sellingPrice);
+      var remaining=Math.max(0,sellPrice-prevAmt-currentAmt);
+      var pctDone=sellPrice>0?Math.round((prevAmt+currentAmt)/sellPrice*100):0;
 
-      var tr=document.createElement('tr');
-      var pctDone=li.sellingPrice>0?Math.round((prevAmt+currentAmt)/li.sellingPrice*100):0;
-
-      // Current claim cell
       var claimCell='';
       if(editMode){
-        var modeToggle='<div class="pct-toggle">'+
-          '<button class="pct-btn'+(entry.mode==='pct'?' on':'')+'" onclick="setEntryMode(\''+li.id+'\',\'pct\',\''+claim.id+'\')">%</button>'+
-          '<button class="pct-btn'+(entry.mode==='amt'?' on':'')+'" onclick="setEntryMode(\''+li.id+'\',\'amt\',\''+claim.id+'\')">$</button>'+
-          '</div>';
+        var modeToggle='<div class="pct-toggle">'
+          +'<button class="pct-btn'+(entry.mode==='pct'?' on':'')+'" onclick="setEntryMode(\''+ek+'\',\'pct\',\''+claim.id+'\')">%</button>'
+          +'<button class="pct-btn'+(entry.mode==='amt'?' on':'')+'" onclick="setEntryMode(\''+ek+'\',\'amt\',\''+claim.id+'\')">$</button>'
+          +'</div>';
         if(entry.mode==='pct'){
-          var pctVal=li.sellingPrice>0?Math.round(currentAmt/li.sellingPrice*100):0;
-          claimCell='<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+modeToggle+
-            '<input class="claim-input" type="number" value="'+pctVal+'" min="0" max="100" placeholder="%" '+
-            'onchange="setEntryByPct(\''+li.id+'\',\''+claim.id+'\',this.value,'+li.sellingPrice+','+prevAmt+')"/>'+
-            '<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">%</span>'+
-            '</div>';
-        } else {
-          claimCell='<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+modeToggle+
-            '<input class="claim-input" type="number" value="'+currentAmt+'" min="0" placeholder="$" '+
-            'onchange="setEntryByAmt(\''+li.id+'\',\''+claim.id+'\',this.value,'+li.sellingPrice+','+prevAmt+')"/>'+
-            '</div>';
+          var pctVal=sellPrice>0?Math.round(currentAmt/sellPrice*100):0;
+          claimCell='<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+modeToggle
+            +'<input class="claim-input" type="number" value="'+pctVal+'" min="0" max="100" placeholder="%" '
+            +'onchange="setEntryByPct(\''+ek+'\',\''+claim.id+'\',this.value,'+sellPrice+','+prevAmt+')"/>'
+            +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">%</span>'
+            +'</div>';
+        }else{
+          claimCell='<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+modeToggle
+            +'<input class="claim-input" type="number" value="'+currentAmt+'" min="0" placeholder="$" '
+            +'onchange="setEntryByAmt(\''+ek+'\',\''+claim.id+'\',this.value,'+sellPrice+','+prevAmt+')" />'
+            +'</div>';
         }
-      } else {
+      }else{
         claimCell=fmt(currentAmt)+'<div style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace">'+pctDone+'% complete</div>';
       }
 
-      tr.innerHTML='<td>'+escH(li.name)+'</td>'+
-        '<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(li.sellingPrice)+'</td>'+
-        '<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmt(prevAmt)+'</td>'+
-        '<td class="r">'+claimCell+'</td>'+
-        '<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:'+(remaining<=0?'var(--muted)':'var(--text)')+'">'+fmt(remaining)+'</td>';
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+escH(li.name)+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(sellPrice)+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmt(prevAmt)+'</td>'
+        +'<td class="r">'+claimCell+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:'+(remaining<=0?'var(--muted)':'var(--text)')+'">'+fmt(remaining)+'</td>';
       tbody.appendChild(tr);
     });
 
-    // Area subtotal
+    // Area subtotal row
     var subTr=document.createElement('tr');subTr.className='subtot-row';
-    subTr.innerHTML='<td>'+escH(area)+' subtotal</td>'+
-      '<td class="r">'+fmt(areaContractTotal)+'</td>'+
-      '<td class="r">'+fmt(areaPrevTotal)+'</td>'+
-      '<td class="r" style="color:var(--accent)">'+fmt(areaCurrentTotal)+'</td>'+
-      '<td class="r">'+fmt(Math.max(0,areaContractTotal-areaPrevTotal-areaCurrentTotal))+'</td>';
+    subTr.innerHTML='<td>'+escH(areaName)+' subtotal</td>'
+      +'<td class="r">'+fmt(areaContractTotal)+'</td>'
+      +'<td class="r">'+fmt(areaPrevTotal)+'</td>'
+      +'<td class="r" style="color:var(--accent)">'+fmt(areaCurrentTotal)+'</td>'
+      +'<td class="r">'+fmt(Math.max(0,areaContractTotal-areaPrevTotal-areaCurrentTotal))+'</td>';
     tbody.appendChild(subTr);
 
     tbl.appendChild(tbody);secBody.appendChild(tbl);secCard.appendChild(secHdr);secCard.appendChild(secBody);
@@ -937,7 +1061,7 @@ async function wizNext(){
     await buildBudgetTree();
     document.getElementById('wizStep1a').style.display='block';
   } else {
-    scratchItems=[{id:'s'+nid(),name:'',price:0}];
+    scratchItems=[{id:'s'+nid(),name:'',areas:[{areaId:'a'+nid(),areaName:'',sellingPrice:0}]}];
     renderScratchItems();
     document.getElementById('wizStep1b').style.display='block';
   }
@@ -954,101 +1078,137 @@ async function buildBudgetTree(){
   var tree=document.getElementById('budgetTree');
   tree.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">Loading budget…</div>';
   var budItems=await loadBudgetItems();
-  var tree=document.getElementById('budgetTree');
-  if(!budItems.length){tree.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">No budget data found. Add items to the Budget module first, or use Option 2.</div>';return;}
+  if(!budItems.length){tree.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">No budget data found. Use Option 2 instead.</div>';return;}
   var sections={};
   budItems.forEach(function(item){
     var sec=item.sectionName.replace(/^\d+\.\s*/,'');
     if(!sections[sec])sections[sec]=[];
     sections[sec].push(item);
   });
-  var html='';
+  var container=document.createElement('div');
   Object.keys(sections).forEach(function(sec){
-    html+='<div class="bud-section" id="bsec-'+escH(sec).replace(/\s/g,'-')+'">';
-    html+='<div class="bud-sec-hdr" onclick="toggleBudSec(this)"><input type="checkbox" style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0" onclick="event.stopPropagation();toggleSecCheck(this)" checked/><span class="bud-sec-name">'+escH(sec)+'</span><span class="bud-sec-chev">▾</span></div>';
-    html+='<div class="bud-items">';
-    sections[sec].forEach(function(item,i){
-      var uid='bi-'+escH(item.name).replace(/\s/g,'-')+i;
-      html+='<div class="bud-item">'+
-        '<input type="checkbox" class="bud-item-cb" id="'+uid+'" checked/>'+
-        '<label for="'+uid+'" class="bud-item-name">'+escH(item.name)+'</label>'+
-        '<input class="bud-item-area" placeholder="Area (e.g. Level 1)" value=""/>'+
-        '<input class="bud-item-price" type="number" placeholder="Selling $" value="'+(item.budgetVal||0)+'"/>'+
-        '</div>';
+    var secDiv=document.createElement('div');secDiv.className='bud-section';
+    secDiv.innerHTML='<div class="bud-sec-hdr" onclick="this.parentElement.classList.toggle(\'col\')">'
+      +'<input type="checkbox" style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0" onclick="event.stopPropagation();toggleSecCheck(this)" checked/>'
+      +'<span class="bud-sec-name">'+escH(sec)+'</span><span class="bud-sec-chev">▾</span></div>';
+    var itemsDiv=document.createElement('div');itemsDiv.className='bud-items';
+    sections[sec].forEach(function(item){
+      itemsDiv.appendChild(makeBudItemEl(item.name));
     });
-    html+='</div></div>';
+    secDiv.appendChild(itemsDiv);
+    container.appendChild(secDiv);
   });
-  tree.innerHTML=html;
+  tree.innerHTML='';tree.appendChild(container);
 }
-function toggleBudSec(hdr){hdr.parentElement.classList.toggle('col');}
+
+function makeBudItemEl(name){
+  var itemDiv=document.createElement('div');itemDiv.className='bud-item';
+  var uid='bi-'+Math.random().toString(36).slice(2,7);
+  itemDiv.innerHTML='<div class="bud-item-hdr">'
+    +'<input type="checkbox" class="bud-item-cb" id="'+uid+'" checked/>'
+    +'<label for="'+uid+'" class="bud-item-name">'+escH(name)+'</label>'
+    +'</div>'
+    +'<div class="bud-item-areas"></div>'
+    +'<div style="padding:0 12px 8px 44px">'
+    +'<button class="bud-add-area" onclick="addBudArea(this)">＋ Add Area</button>'
+    +'</div>';
+  // Add one area row by default
+  addBudArea(itemDiv.querySelector('.bud-add-area'));
+  return itemDiv;
+}
+
+function addBudArea(btn){
+  var areasDiv=btn.closest('.bud-item').querySelector('.bud-item-areas');
+  var row=document.createElement('div');row.className='bud-area-row';
+  row.innerHTML='<input class="bud-item-area" placeholder="Area name (e.g. Level 1)"/>'
+    +'<input class="bud-item-price" type="number" placeholder="$ sell price"/>'
+    +'<button class="bud-area-del" onclick="this.closest(\'.bud-area-row\').remove()" title="Remove area">✕</button>';
+  areasDiv.appendChild(row);
+  row.querySelector('.bud-item-area').focus();
+}
 function toggleSecCheck(cb){
   var sec=cb.closest('.bud-section');
   sec.querySelectorAll('.bud-item-cb').forEach(function(c){c.checked=cb.checked;});
 }
 
 function addScratchItem(){
-  scratchItems.push({id:'s'+nid(),name:'',price:0});
+  scratchItems.push({id:'s'+nid(),name:'',areas:[{areaId:'a'+nid(),areaName:'',sellingPrice:0}]});
   renderScratchItems();
 }
 function renderScratchItems(){
   var cont=document.getElementById('scratchItems');cont.innerHTML='';
   scratchItems.forEach(function(item,i){
-    var row=document.createElement('div');row.className='scratch-item';
-    var nameInp=document.createElement('input');nameInp.type='text';nameInp.className='scratch-name';nameInp.placeholder='Line item description';nameInp.value=item.name||'';
+    var div=document.createElement('div');div.className='scratch-item';
+    // Header row with name + delete item
+    var hdr=document.createElement('div');hdr.className='scratch-item-hdr';
+    var nameInp=document.createElement('input');nameInp.type='text';nameInp.className='scratch-name';
+    nameInp.placeholder='Line item description';nameInp.value=item.name||'';
     (function(idx){nameInp.addEventListener('input',function(){scratchItems[idx].name=this.value;});})(i);
-    var priceInp=document.createElement('input');priceInp.type='number';priceInp.className='scratch-price';priceInp.placeholder='Selling price $';priceInp.value=item.price||'';
-    (function(idx){priceInp.addEventListener('input',function(){scratchItems[idx].price=num(this.value);});})(i);
-    var del=document.createElement('button');del.textContent='✕';del.style.cssText='background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;flex-shrink:0';
+    var del=document.createElement('button');del.textContent='✕';
+    del.style.cssText='background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;flex-shrink:0';
     (function(idx){del.addEventListener('click',function(){scratchItems.splice(idx,1);renderScratchItems();});})(i);
-    row.appendChild(nameInp);row.appendChild(priceInp);row.appendChild(del);cont.appendChild(row);
+    hdr.appendChild(nameInp);hdr.appendChild(del);div.appendChild(hdr);
+    // Areas
+    var areasDiv=document.createElement('div');areasDiv.className='scratch-areas';
+    item.areas.forEach(function(ar,ai){
+      var row=document.createElement('div');row.className='bud-area-row';
+      var areaInp=document.createElement('input');areaInp.type='text';areaInp.className='bud-item-area';
+      areaInp.placeholder='Area name (e.g. Level 1)';areaInp.value=ar.areaName||'';
+      (function(ii,jj){areaInp.addEventListener('input',function(){scratchItems[ii].areas[jj].areaName=this.value;});})(i,ai);
+      var priceInp=document.createElement('input');priceInp.type='number';priceInp.className='bud-item-price';
+      priceInp.placeholder='$ sell price';priceInp.value=ar.sellingPrice||'';
+      (function(ii,jj){priceInp.addEventListener('input',function(){scratchItems[ii].areas[jj].sellingPrice=num(this.value);});})(i,ai);
+      var delArea=document.createElement('button');delArea.className='bud-area-del';delArea.textContent='✕';
+      (function(ii,jj){delArea.addEventListener('click',function(){if(scratchItems[ii].areas.length>1){scratchItems[ii].areas.splice(jj,1);renderScratchItems();}});})(i,ai);
+      row.appendChild(areaInp);row.appendChild(priceInp);row.appendChild(delArea);areasDiv.appendChild(row);
+    });
+    // Add area button
+    var addAreaBtn=document.createElement('button');addAreaBtn.className='bud-add-area';addAreaBtn.textContent='＋ Add Area';
+    (function(idx){addAreaBtn.addEventListener('click',function(){scratchItems[idx].areas.push({areaId:'a'+nid(),areaName:'',sellingPrice:0});renderScratchItems();});})(i);
+    areasDiv.appendChild(addAreaBtn);
+    div.appendChild(areasDiv);
+    cont.appendChild(div);
   });
 }
 
 function wizFinish(){
   var isFirst=claimsData.lineItems.length===0;
-  // Update contract/retention values
   claimsData.contractValue=wizContractVal;
   claimsData.retentionPct=wizRetPct;
 
   if(isFirst){
-    // Build line items
     var newItems=[];
     if(wizOpt===1){
-      // From budget tree
-      document.querySelectorAll('.bud-item').forEach(function(row){
-        var cb=row.querySelector('.bud-item-cb');
-        if(!cb||!cb.checked) return;
-        var name=row.querySelector('.bud-item-name').textContent;
-        var area=row.querySelector('.bud-item-area').value.trim()||'General';
-        var price=num(row.querySelector('.bud-item-price').value);
-        if(name) newItems.push({id:'li'+nid(),name:name,area:area,sellingPrice:price});
+      // From budget tree — new model: {id, name, areas:[{areaId,areaName,sellingPrice}]}
+      document.querySelectorAll('.bud-item').forEach(function(itemEl){
+        var cb=itemEl.querySelector('.bud-item-cb');
+        if(!cb||!cb.checked)return;
+        var name=itemEl.querySelector('.bud-item-name').textContent.trim();
+        if(!name)return;
+        var areas=[];
+        itemEl.querySelectorAll('.bud-area-row').forEach(function(row){
+          var areaName=(row.querySelector('.bud-item-area').value||'').trim();
+          var price=num(row.querySelector('.bud-item-price').value);
+          if(areaName&&price>0)areas.push({areaId:'a'+nid(),areaName:areaName,sellingPrice:price});
+        });
+        if(areas.length)newItems.push({id:'li'+nid(),name:name,areas:areas});
       });
     } else {
       scratchItems.forEach(function(item){
-        if(item.name.trim()) newItems.push({id:'li'+nid(),name:item.name.trim(),area:'General',sellingPrice:num(item.price)});
+        if(!item.name.trim())return;
+        var areas=item.areas.filter(function(a){return a.areaName&&a.sellingPrice>0;});
+        if(areas.length)newItems.push({id:'li'+nid(),name:item.name.trim(),areas:areas});
       });
     }
-    if(!newItems.length){alert('Please add at least one line item.');return;}
+    if(!newItems.length){alert('Please add at least one line item with an area and selling price.');return;}
     claimsData.lineItems=newItems;
   }
 
-  // Create claim record
   var month=document.getElementById('w-month').value;
   var claimNum=parseInt(document.getElementById('w-claimnum').value)||1;
-  var newClaim={
-    id:'claim'+nid(),
-    num:claimNum,
-    month:month,
-    status:'Draft',
-    entries:[],
-    varEntries:[],
-    varApprovedOnly:false
-  };
+  var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[],varApprovedOnly:false};
   claimsData.claims.push(newClaim);
-  save();
-  closeWizard();
-  renderList();
-  openClaim(newClaim.id);
+  save();closeWizard();renderList();openClaim(newClaim.id);
 }
 
 // Init — wait for session then load data
