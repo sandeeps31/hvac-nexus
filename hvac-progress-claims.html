@@ -576,22 +576,29 @@ function updateListSummary(){
 function updateTopBtns(){
   var el=document.getElementById('topBtns');if(!el)return;
   var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
-  var hasClaims=claimsData.claims&&claimsData.claims.length>0;
   if(!hasLineItems){
     el.innerHTML='<button class="bp bsm btn" onclick="openNewClaimWizard()">📋 Setup Claim Sheet</button>';
-  } else if(!hasClaims){
-    el.innerHTML='<button class="btn bg bsm" onclick="openSetupViewEdit()">📋 View Claim Sheet</button>'
-      +'<button class="bp bsm btn" onclick="openLogClaimView()">＋ Log Claim</button>';
   } else {
     el.innerHTML='<button class="btn bg bsm" onclick="openSetupViewEdit()">📋 View Claim Sheet</button>'
       +'<button class="bp bsm btn" onclick="openLogClaimView()">＋ Log Claim</button>';
   }
 }
 
+// ── VIEW SWITCHER ──
+function showView(name){
+  // name = 'list' | 'detail' | 'setup'
+  ['list','detail','setup'].forEach(function(v){
+    var el=document.getElementById('view-'+v);
+    if(el)el.classList.toggle('active',v===name);
+  });
+}
+
 // RENDER LIST
 function renderList(){
   updateListSummary();
+  showView('list');
   updateTopBtns();
+  document.getElementById('bcCurr').textContent='Progress Claims';
   var el=document.getElementById('claimList');
   var emp=document.getElementById('emptyState');
   if(!el)return;
@@ -601,8 +608,7 @@ function renderList(){
       emp.style.display='flex';
       emp.innerHTML='<div class="empty-icon">📈</div>'
         +'<div style="font-size:15px;font-weight:600;color:var(--text2)">'+(hasLineItems?'Claim sheet ready':'No claim sheet yet')+'</div>'
-        +'<div>'+(hasLineItems?'Click <strong>＋ Log Claim</strong> to record your first claim.':'Click <strong>Setup Claim Sheet</strong> to get started.')+'</div>'
-        +(hasLineItems?'':'');
+        +'<div>'+(hasLineItems?'Click <strong>＋ Log Claim</strong> to record your first claim.':'Click <strong>Setup Claim Sheet</strong> to get started.')+'</div>';
       el.innerHTML='';el.appendChild(emp);
     }
     return;
@@ -615,13 +621,14 @@ function renderList(){
       +(c.varEntries||[]).reduce(function(s,e){return s+num(e.currentAmt);},0);
     var net=claimAmt*(1-((claimsData.retentionPct||5)/100));
     var stMap={Draft:'cs-draft',Submitted:'cs-submitted',Certified:'cs-certified'};
+    var isDraft=(c.status||'').trim().toLowerCase()==='draft';
     html+='<div class="claim-card" onclick="openClaim(\''+c.id+'\')">'+
       '<div class="claim-card-hdr">'+
-      '<span class="claim-num">Claim '+c.num+'</span>'+
+      '<span class="claim-num">'+fmtClaimNum(c.num)+'</span>'+
       '<span class="claim-month">'+fmtM(c.month)+'</span>'+
       '<div style="margin-left:auto;display:flex;align-items:center;gap:8px">'+
-      '<span class="claim-status-badge '+(stMap[c.status]||'cs-draft')+'">'+escH(c.status)+'</span>'+
-      (c.status==='Draft'?'<button class="btn bdanger bsm" style="font-size:11px" onclick="event.stopPropagation();deleteDraftClaim(\''+c.id+'\')">🗑 Delete</button>':'')+
+      '<span class="claim-status-badge '+(stMap[c.status]||'cs-draft')+'">'+escH(c.status||'Draft')+'</span>'+
+      (isDraft?'<button class="btn bdanger bsm" style="font-size:11px" onclick="event.stopPropagation();deleteDraftClaim(\''+c.id+'\')">🗑 Delete</button>':'')+
       '</div>'+
       '</div>'+
       '<div class="claim-amounts">'+
@@ -640,90 +647,24 @@ function openClaim(id){
   editMode=false;
   applyLetterhead();
   renderDetail();
-  document.getElementById('view-list').classList.remove('active');
-  document.getElementById('view-detail').classList.add('active');
-  document.getElementById('bcCurr').textContent='Claim '+claimsData.claims.find(function(c){return c.id===id;}).num;
+  showView('detail');
+  var c=claimsData.claims.find(function(x){return x.id===id;});
+  document.getElementById('bcCurr').textContent=c?fmtClaimNum(c.num):'Claim';
   document.getElementById('topBtns').innerHTML='';
 }
 
 function closeM(id){document.getElementById(id).classList.remove('open');}
-
-function openEditSellPrices(){
-  // Build state from existing lineItems for editing
-  var allAreas={};var areaOrder=[];
-  claimsData.lineItems.forEach(function(li){
-    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
-    areas.forEach(function(ar){if(ar.areaName&&!allAreas[ar.areaName]){allAreas[ar.areaName]=true;areaOrder.push(ar.areaName);}});
-  });
-  if(!areaOrder.length)areaOrder=['General'];
-  // Rebuild _gridAreas and _gridItems from existing data
-  _setupMode='budget';
-  _gridAreas=areaOrder.map(function(n){return {id:'ga_'+n,name:n};});
-  _gridItems=claimsData.lineItems.map(function(li){
-    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
-    var prices={};
-    _gridAreas.forEach(function(ga){
-      var match=areas.find(function(a){return a.areaName===ga.name;});
-      prices[ga.id]=match?match.sellingPrice:0;
-    });
-    return {id:li.id,name:li.name,checked:true,prices:prices,_liRef:li};
-  });
-  // Switch to setup view in edit mode
-  document.getElementById('view-detail').classList.remove('active');
-  document.getElementById('view-setup').classList.add('active');
-  document.getElementById('setupViewTitle').textContent='Edit Sell Prices';
-  document.getElementById('sv-contract').textContent=fmt(claimsData.contractValue||0);
-  document.getElementById('topBtns').innerHTML='';
-  // Override Create Claim button to Save instead
-  var btn=document.querySelector('#view-setup .bp.bsm');
-  if(btn){btn.textContent='✓ Save Changes';btn.onclick=saveEditSellPrices;}
-  renderSetupAreaCols();renderSetupGrid();
-}
-
-function saveEditSellPrices(){
-  var areas=_gridAreas;
-  _gridItems.forEach(function(item){
-    var li=claimsData.lineItems.find(function(x){return x.id===item.id;});
-    if(!li)return;
-    var updatedAreas=[];
-    areas.forEach(function(ga){
-      var price=num((item.prices||{})[ga.id]||0);
-      if(price>0||ga.name)updatedAreas.push({areaId:ga.id,areaName:ga.name,sellingPrice:price});
-    });
-    if(updatedAreas.length)li.areas=updatedAreas;
-  });
-  save();
-  document.getElementById('view-setup').classList.remove('active');
-  document.getElementById('view-detail').classList.add('active');
-  // Restore Create Claim button
-  var btn=document.querySelector('#view-setup .bp.bsm');
-  if(btn){btn.textContent='Create Claim →';btn.onclick=wizFinish;}
-  renderDetail();
-}
-
-
-function resetLineItems(){
-  if(!confirm('This will clear all line item setup so you can start fresh. Are you sure?'))return;
-  claimsData.lineItems=[];
-  save();
-  openNewClaimWizard();
-}
 
 function deleteDraftClaim(id){
   var c=claimsData.claims.find(function(x){return x.id===id;});
   if(!c||(c.status||'').trim().toLowerCase()!=='draft'){alert('Only Draft claims can be deleted.');return;}
   if(!confirm('Delete '+fmtClaimNum(c.num)+'? This cannot be undone.'))return;
   claimsData.claims=claimsData.claims.filter(function(x){return x.id!==id;});
-  save();
-  if(currentClaimId===id){goList();}else{renderList();}
+  save();renderList();
 }
 
 function goList(){
   currentClaimId=null;editMode=false;
-  document.getElementById('view-detail').classList.remove('active');
-  document.getElementById('view-setup').classList.remove('active');
-  document.getElementById('view-list').classList.add('active');
-  document.getElementById('bcCurr').textContent='Progress Claims';
   renderList();
 }
 
@@ -1177,8 +1118,7 @@ function openSetupViewEdit(){
     return {id:li.id,type:'item',sectionName:li.sectionName||'',name:li.name,
             checked:true,totalSell:li.totalSell||0,prices:prices};
   });
-  document.getElementById('view-list').classList.remove('active');
-  document.getElementById('view-setup').classList.add('active');
+  showView('setup');
   document.getElementById('setupViewTitle').textContent='Claim Sheet';
   document.getElementById('sv-contract').textContent=fmt(claimsData.contractValue||0);
   document.getElementById('topBtns').innerHTML='';
@@ -1219,7 +1159,6 @@ function saveLogClaim(){
     var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[],varApprovedOnly:false};
     claimsData.claims.push(newClaim);
     save();closeWizard();
-    document.getElementById('view-setup').classList.remove('active');
     renderList();openClaim(newClaim.id);
     // Restore button
     nextBtn.textContent='Next →';nextBtn.onclick=wizNext;
@@ -1228,25 +1167,27 @@ function saveLogClaim(){
 }
 
 function saveClaimSheetEdit(){
-  // Save updated totalSell and area prices back to lineItems
   _gridItems.forEach(function(item){
     var li=claimsData.lineItems.find(function(x){return x.id===item.id;});
     if(!li)return;
-    li.totalSell=num(item.totalSell||0);
+    li.totalSell=numRaw(item.totalSell||0);
     var updatedAreas=[];
     _gridAreas.forEach(function(ga){
-      var price=num((item.prices||{})[ga.id]||0);
+      var price=numRaw((item.prices||{})[ga.id]||0);
       updatedAreas.push({areaId:ga.id,areaName:ga.name,sellingPrice:price});
     });
     li.areas=updatedAreas;
   });
-  save();closeSetupView();
+  save();
+  // Reset finish button back to default
+  document.getElementById('setupFinishBtn').textContent='Finalise Claim Sheet →';
+  document.getElementById('setupFinishBtn').onclick=wizFinish;
+  renderList();
 }
 
 async function openSetupView(mode){
   _setupMode=mode;
-  document.getElementById('view-list').classList.remove('active');
-  document.getElementById('view-setup').classList.add('active');
+  showView('setup');
   document.getElementById('setupViewTitle').textContent=mode==='budget'?'Select Line Items from Budget':'Build Line Items from Scratch';
   document.getElementById('sv-contract').textContent=fmt(wizContractVal);
   document.getElementById('topBtns').innerHTML='';
@@ -1269,9 +1210,7 @@ async function openSetupView(mode){
 }
 
 function closeSetupView(){
-  document.getElementById('view-setup').classList.remove('active');
-  document.getElementById('view-list').classList.add('active');
-  document.getElementById('topBtns').innerHTML='<button class="bp bsm btn" onclick="openNewClaimWizard()">＋ New Claim</button>';
+  renderList();
   wizStep=0;
 }
 
@@ -1694,7 +1633,6 @@ function wizFinish(){
     claimsData.lineItems=newItems;
     save();
     // Close setup view and return to list — user will Log Claim separately
-    document.getElementById('view-setup').classList.remove('active');
     renderList();
     return;
   }
@@ -1706,8 +1644,7 @@ function wizFinish(){
   claimsData.claims.push(newClaim);
   save();
   closeWizard();
-  document.getElementById('view-setup').classList.remove('active');
-  document.getElementById('view-list').classList.remove('active');
+  openClaim(newClaim.id);
   renderList();openClaim(newClaim.id);
 }
 
