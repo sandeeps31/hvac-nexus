@@ -277,6 +277,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
     <span class="bcc">Budget</span>
   </div>
   <div style="display:flex;gap:10px;align-items:center">
+    <button class="bg bsm btn" onclick="navTo('hvac-procurement-pos.html')">📦 Procurement →</button>
     <button class="bg bsm btn" onclick="expandAll()">Expand All</button>
     <button class="bg bsm btn" onclick="collapseAll()">Collapse All</button>
     <button class="bg bsm btn" id="editBudgetBtn" onclick="enterBudgetEdit()" style="display:none;color:var(--warn);border-color:rgba(255,184,48,.3)">✏️ Edit Budget</button>
@@ -292,8 +293,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
   <div class="sc cb"><div class="sc-lbl">Budget</div><div class="sc-val" id="sum-budget">—</div><div class="sc-sub">Tender estimate</div></div>
   <div class="sc cw"><div class="sc-lbl">Committed</div><div class="sc-val" id="sum-committed">—</div><div class="sc-sub">Ex GST</div></div>
   <div class="sc"><div class="sc-lbl">Actuals</div><div class="sc-val" id="sum-actual">—</div><div class="sc-sub">Approved invoices</div></div>
-  <div class="sc"><div class="sc-lbl">Actual (Invoiced)</div><div class="sc-val" id="sum-actual">—</div><div class="sc-sub">Ex GST</div></div>
-  <div class="sc"><div class="sc-lbl">Variance</div><div class="sc-val" id="sum-var">—</div><div class="sc-sub" id="sum-var-sub">vs budget</div></div>
+    <div class="sc"><div class="sc-lbl">Variance</div><div class="sc-val" id="sum-var">—</div><div class="sc-sub" id="sum-var-sub">vs budget</div></div>
   <div class="sc"><div class="sc-lbl">Margin %</div><div class="sc-val" id="sum-margin">—</div><div class="sc-sub" id="sum-margin-sub">—</div></div>
 </div>
 
@@ -334,6 +334,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 var _pNum=(dbGetCurrentProject()||{}).num||'GCT001';
 var _canEditBudget=false;
 var _budgetEditMode=false;
+var varRegCollapsed=false;
+var _budgetInitDone=false;
 var _invoiceData=[];
 const STORAGE_KEY = 'hvacnexus_budget_GCT001';
 const RAW_GROUPED = {"01. Air Conditioning Equipment": [{"parent": "Active Chilled Beam", "children": ["Active Chilled Beam", "ACB 2x flexible hoses"]}, {"parent": "Chiller", "children": ["Chiller - Air Cooled", "Chiller - Water Cooled", "Chiller - Associated Items", "Chiller - Cathodic Protection", "Chiller - Buffer Tank"]}, {"parent": "CRAC Unit", "children": ["CRAC Unit", "CRAC Unit Bases", "CRAC Unit Plenums", "CRAC Unit Control panel"]}, {"parent": "Waffle pads", "children": ["Waffle pads"]}, {"parent": "Gas - Water - Leak detection", "children": ["Gas - Water - Leak detection"]}, {"parent": "Package Unit", "children": ["Package Unit - Air Cooled", "Package Unit - Water Cooled"]}, {"parent": "PAC Unit", "children": ["PAC - Wall controllers", "PAC - Vibration  mounts"]}, {"parent": "DX Systems", "children": ["DX Wall Split System", "DX Ducted Split system", "DX Split CU", "DX system - Wall controllers", "DX system - Split System Interface card"]}, {"parent": "VRF Systems", "children": ["VRF systems", "VRF systems - Branch box", "VRF systems - Central controller", "VRF systems - Wall controller", "VRF systems - Vibration mounts"]}], "02. AHU & Fan Coils": [{"parent": "Air Handling Unit", "children": ["Air Handling Unit", "Air Handling Unit  - Associated Items"]}, {"parent": "Fan Coil Unit", "children": ["Fan Coil Unit", "Fan Coil Unit  - Associated Items"]}, {"parent": "Air Filter", "children": ["Air Filter - Standard", "Air Filter - Special", "Air Filter - Terminal Unit"]}, {"parent": "Bygold", "children": ["Bygold"]}], "03. Cooling Tower Equipment": [{"parent": "Cooling Tower", "children": ["Cooling Tower", "Cooling Tower - Associated Item"]}, {"parent": "Expansion Tank", "children": ["Expansion Tank"]}, {"parent": "Dosing Equipment", "children": ["Dosing Equipment"]}, {"parent": "Water Treatment", "children": ["Water Treatment"]}, {"parent": "Sidestream Filtration", "children": ["Sidestream Filtration"]}], "04. Heating Equipment": [{"parent": "Boiler", "children": ["Boiler", "Boiler - Associated Items", "Boiler  - flue"]}, {"parent": "Heat Exchanger - Water", "children": ["Heat Exchanger - Water"]}, {"parent": "Humidifier", "children": ["Humidifier"]}], "05. Compressed air/ POL systems": [{"parent": "Compressed air installation", "children": ["Compressed air installation"]}, {"parent": "Air Compressor", "children": ["Air Compressor"]}, {"parent": "Air receiver", "children": ["Air receiver"]}, {"parent": "Underground pipes", "children": ["Underground pipes"]}, {"parent": "Above ground pipes", "children": ["Above ground pipes"]}, {"parent": "Service pits", "children": ["Service pits"]}, {"parent": "Underground Tracer wire", "children": ["Underground Tracer wire"]}, {"parent": "Sampling point control panel", "children": ["Sampling point control panel"]}, {"parent": "Air hose reels", "children": ["Air hose reels"]}, {"parent": "Oil water speprator", "children": ["Oil water speprator"]}, {"parent": "Oil drum pump", "children": ["Oil drum pump"]}, {"parent": "Oil reels", "children": ["Oil reels"]}], "06. Pumps": [{"parent": "Pumps", "children": ["Pump - Chilled Water", "Pump - Condensor Water", "Pump - Hot Water", "Pump - Condensate", "Pump - Associated Items"]}, {"parent": "Inertia bases", "children": ["Inertia bases"]}], "07. Coolroom Equipment": [{"parent": "Coolroom Panel", "children": ["Coolroom Panel"]}, {"parent": "Coolroom  Refrigeration System", "children": ["Coolroom  Refrigeration System"]}], "08. Fans & ventilation": [{"parent": "Fans", "children": ["Fans"]}, {"parent": "Roof Mounted Fans", "children": ["Roof Mounted Fans"]}, {"parent": "Fan - Vibration mounts", "children": ["Fan - Vibration mounts"]}, {"parent": "Fan - Speed pots", "children": ["Fan - Speed pots"]}, {"parent": "Roof cowls", "children": ["Roof cowls"]}, {"parent": "Silencers and Attenuators", "children": ["Silencers and Attenuators"]}, {"parent": "Fume Cupboard", "children": ["Fume Cupboard"]}, {"parent": "Fume Cupboard - Associated Items", "children": ["Fume Cupboard - Associated Items"]}, {"parent": "Exhaust Hood", "children": ["Exhaust Hood"]}, {"parent": "General Fume Exhaust Equipment", "children": ["General Fume Exhaust Equipment"]}, {"parent": "Welding extraction system", "children": ["Welding extraction system"]}, {"parent": "Dust extraction system", "children": ["Dust extraction system"]}], "09. Filtering equipment": [{"parent": "Electrostatic precipitation filter", "children": ["Electrostatic precipitation filter"]}], "11. Air Flow Control Equipment": [{"parent": "VAVs", "children": ["VAVs"]}, {"parent": "VCDs", "children": ["VCDs"]}, {"parent": "MVCDs", "children": ["MVCDs"]}, {"parent": "NRDs", "children": ["NRDs"]}, {"parent": "Fire Damper", "children": ["Fire Damper"]}, {"parent": "MFSD", "children": ["MFSD"]}, {"parent": "MSD", "children": ["MSD"]}, {"parent": "Pressure relief damper", "children": ["Pressure relief damper"]}], "10. Air Diffusion Equipment": [{"parent": "Cushion boxes & grilles", "children": ["Cushion boxes & grilles"]}, {"parent": "Flexible Duct", "children": ["Flexible Duct"]}, {"parent": "Starting collars/spigots", "children": ["Starting collars/spigots"]}, {"parent": "Flexible Duct - wall tubes/joining collars", "children": ["Flexible Duct - wall tubes/joining collars"]}, {"parent": "Reducers for felxible duct", "children": ["Reducers for felxible duct"]}, {"parent": "Thermafusers", "children": ["Thermafusers"]}], "12. Rigid Ductwork": [{"parent": "Grill - Relocates", "children": ["Grill - Relocates"]}, {"parent": "Grill - Installation", "children": ["Grill - Installation"]}, {"parent": "Duct - Spiral", "children": ["Duct - Spiral"]}, {"parent": "Duct - Square", "children": ["Duct - Square"]}, {"parent": "Duct - Exhaust", "children": ["Duct - Exhaust"]}, {"parent": "Duct - Fabric", "children": ["Duct - Fabric"]}, {"parent": "Duct - Duct Board", "children": ["Duct - Duct Board"]}, {"parent": "Duct - Kitchen Exhaust", "children": ["Duct - Kitchen Exhaust"]}, {"parent": "Duct - Associated Item", "children": ["Duct - Associated Item"]}, {"parent": "Duct - Installation", "children": ["Duct - Installation"]}, {"parent": "Duct - Relocation", "children": ["Duct - Relocation"]}, {"parent": "Duct - Cleaning", "children": ["Duct - Cleaning"]}, {"parent": "Duct - Supply & Installation", "children": ["Duct - Supply & Installation"]}, {"parent": "Duct - Weathproof protective covering for piping/cabling", "children": ["Duct - Weathproof protective covering for piping/cabling"]}, {"parent": "Pressure relief damper install", "children": ["Pressure relief damper install"]}, {"parent": "Security bars", "children": ["Security bars"]}, {"parent": "Plinths and Support Frames", "children": ["Plinths and Support Frames"]}], "13. Mechanical Electrical Systems": [{"parent": "Electrical - Electronic Controls", "children": ["Electrical - Electronic Controls"]}, {"parent": "Electrical - Switchboard", "children": ["Electrical - Switchboard"]}, {"parent": "Electrical - S & I", "children": ["Electrical - S & I"]}, {"parent": "Electrical - Installation", "children": ["Electrical - Installation"]}, {"parent": "Electrical - Duct Heater", "children": ["Electrical - Duct Heater"]}, {"parent": "Electrical - Variable Speed Drive", "children": ["Electrical - Variable Speed Drive"]}, {"parent": "MSSBs", "children": ["MSSBs"]}, {"parent": "Equipment labels", "children": ["Equipment labels"]}, {"parent": "Electrical - Smoke Detector", "children": ["Electrical - Smoke Detector"]}, {"parent": "Electrical - Associated Item", "children": ["Electrical - Associated Item"]}], "14. Mechanical plumbing": [{"parent": "Pipe - Water", "children": ["Pipe - Water"]}, {"parent": "Pipe - Refigeration", "children": ["Pipe - Refigeration"]}, {"parent": "Pipe - Drain", "children": ["Pipe - Drain"]}, {"parent": "Pipe - S&I - Water", "children": ["Pipe - S&I - Water"]}, {"parent": "Pipe - S&I - Refrigeration", "children": ["Pipe - S&I - Refrigeration"]}, {"parent": "Pipe - Associated Items", "children": ["Pipe - Associated Items"]}, {"parent": "Pipeworks and valve labels", "children": ["Pipeworks and valve labels"]}, {"parent": "Flushing", "children": ["Flushing"]}, {"parent": "Pipe - installation", "children": ["Pipe - installation"]}], "15. Controls & BMCS": [{"parent": "Air Conditioning Controls", "children": ["Air Conditioning Controls"]}, {"parent": "BMS - Control Hardware", "children": ["BMS - Control Hardware"]}, {"parent": "BMS - Installation", "children": ["BMS - Installation"]}, {"parent": "BMS - S & I", "children": ["BMS - S & I"]}, {"parent": "BMS - Associated Item", "children": ["BMS - Associated Item"]}, {"parent": "Sensor relocation", "children": ["Sensor relocation"]}, {"parent": "Refrigerant Detection System", "children": ["Refrigerant Detection System"]}], "16. Fire stopping": [{"parent": "Pasive fire rating", "children": ["Pasive fire rating"]}, {"parent": "Duct Fyre wrapping", "children": ["Duct Fyre wrapping"]}, {"parent": "Fire spraying", "children": ["Fire spraying"]}, {"parent": "FD install", "children": ["FD install"]}], "17. Insulation": [{"parent": "Pipe -  Lagging & Insulation", "children": ["Pipe -  Lagging & Insulation"]}, {"parent": "Sounlag AC units", "children": ["Sounlag AC units"]}, {"parent": "Duct - External Insulation", "children": ["Duct - External Insulation"]}], "18. Acoustic Treatment": [{"parent": "Acoustic Treatment", "children": ["Acoustic Treatment"]}], "19. Equipment Installation/ Rigging": [{"parent": "Equipment installation", "children": ["Equipment installation"]}, {"parent": "Hoisting Cranage", "children": ["Hoisting Cranage"]}, {"parent": "Hire Equipment", "children": ["Hire Equipment"]}, {"parent": "Plinths and Support Frames", "children": ["Plinths and Support Frames"]}, {"parent": "Consumables - Nuts & Bolts", "children": ["Consumables - Nuts & Bolts"]}], "20. Seismics": [{"parent": "Gripple wires, Fames and materials", "children": ["Gripple wires, Fames and materials"]}, {"parent": "Design", "children": ["Design"]}], "21. Building works": [{"parent": "Core Holes & Penetrations", "children": ["Core Holes & Penetrations"]}, {"parent": "Scaffolding", "children": ["Scaffolding"]}, {"parent": "Painting", "children": ["Painting"]}, {"parent": "Structural", "children": ["Structural"]}, {"parent": "Associated Item", "children": ["Associated Item"]}, {"parent": "Demolition Work", "children": ["Demolition Work"]}, {"parent": "Asbestos removal", "children": ["Asbestos removal"]}, {"parent": "Tipping / Recycling", "children": ["Tipping / Recycling"]}], "22. Equipment hire": [{"parent": "Aircon rental", "children": ["Aircon rental"]}, {"parent": "Craneage", "children": ["Craneage"]}, {"parent": "EWPs", "children": ["EWPs"]}], "23. Filters": [{"parent": "Panel filters", "children": ["Panel filters"]}, {"parent": "Bag filters", "children": ["Bag filters"]}, {"parent": "Premedia filter", "children": ["Premedia filter"]}], "24. Commissioning": [{"parent": "Pre Commissioning - Technician", "children": ["Pre Commissioning - Technician"]}, {"parent": "Commissioning - Air", "children": ["Commissioning - Air"]}, {"parent": "Commissioning - Water", "children": ["Commissioning - Water"]}], "25. Design & Documentation": [{"parent": "Drafting", "children": ["Drafting"]}, {"parent": "Design - Working Drawings", "children": ["Design - Working Drawings"]}, {"parent": "Design - As Built & Manual", "children": ["Design - As Built & Manual"]}, {"parent": "Design - Engineering", "children": ["Design - Engineering"]}], "26. Supervision &  Site Costs": [{"parent": "After hours Work", "children": ["After hours Work"]}, {"parent": "Insurances and Fees", "children": ["Insurances and Fees"]}, {"parent": "Site Costs", "children": ["Site Costs"]}, {"parent": "General Sundries", "children": ["General Sundries"]}, {"parent": "Freight and Delivery", "children": ["Freight and Delivery"]}, {"parent": "Project Manager", "children": ["Project Manager"]}, {"parent": "Site Manager", "children": ["Site Manager"]}, {"parent": "Parking", "children": ["Parking"]}], "27. DLP & Maintenance": [{"parent": "Maintenance - Warranty Allowance", "children": ["Maintenance - Warranty Allowance"]}, {"parent": "Maintenance - Preventative", "children": ["Maintenance - Preventative"]}, {"parent": "Maintenance - Existing equipment servicing", "children": ["Maintenance - Existing equipment servicing"]}], "28. Miscellaneous": [{"parent": "Platform install", "children": ["Platform install"]}, {"parent": "Plant maintenance", "children": ["Plant maintenance"]}]};
@@ -375,6 +377,7 @@ function makeSellPriceEditable(){
 function onSellPriceInput(val){
   var gb=grandBudget();
   var sp=parseFloat(String(val).replace(/,/g,''))||0;
+  _sellPrice=sp;
   if(sp>0)margin=(sp-gb)/sp*100;
   else margin=0;
   var profit=sp-gb;
@@ -481,7 +484,7 @@ function refreshBudgetNumbers(){
     });
   }
   // Totals card - sell price, margin, etc
-  var baseSellEx=gb*(1+margin/100);
+  var baseSellEx=(_sellPrice>0)?_sellPrice:gb*(1+margin/100);
   var baseProfit=baseSellEx-gb;
   var baseMarginPct=baseSellEx>0?(baseProfit/baseSellEx*100):0;
   ['budgetVal','sellPriceVal','profitVal','marginVal','gstVal','sellInclVal'].forEach(function(id){
@@ -497,7 +500,7 @@ function refreshBudgetNumbers(){
 }
 
 function saveData(){
-  dbSetBudget(_pNum,{sections,margin,ts:Date.now()}).catch(e=>console.error('saveBudget:',e));
+  dbSetBudget(_pNum,{sections,margin,_sellPrice,viewMode,ts:Date.now()}).catch(e=>console.error('saveBudget:',e));
 }
 
 function buildDefault(){
@@ -508,6 +511,7 @@ function buildDefault(){
 }
 
 let margin = 15;
+let _sellPrice = 0; // 0 = derive from margin; >0 = explicit sell price
 let sections = buildDefault(); // populated in async init
 
 let viewMode = 'all'; // 'all' or 'filled'
@@ -643,16 +647,21 @@ function renderVarSection(){
   var newIncl=newEx*1.1;
   var sumEl=document.getElementById('varSummaryBlock');
   if(sumEl)sumEl.innerHTML=
-    '<div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--border)">'
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--border)">'
     +'<div style="padding:16px 20px;border-right:1px solid var(--border)">'
     +  '<div style="font-family:\'DM Mono\',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:5px">Total Submitted (incl GST)</div>'
-    +  '<div style="font-family:\'Syne\',sans-serif;font-size:20px;font-weight:700;color:var(--warn)">'+(allVars.length?fmt(totalSubEx*1.1):'--')+'</div>'
+    +  '<div style="font-family:\'Syne\',sans-serif;font-size:20px;font-weight:700;color:var(--warn)">'+fmt(totalSubEx*1.1)+'</div>'
     +  '<div style="font-size:11px;color:var(--muted);margin-top:3px">'+allVars.length+' total &bull; '+pendingCt+' pending</div>'
     +'</div>'
-    +'<div style="padding:16px 20px">'
+    +'<div style="padding:16px 20px;border-right:1px solid var(--border)">'
     +  '<div style="font-family:\'DM Mono\',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:5px">Total Approved (incl GST)</div>'
-    +  '<div style="font-family:\'Syne\',sans-serif;font-size:20px;font-weight:700;color:var(--green)">'+(approvedCt?fmt(totalAppEx*1.1):'--')+'</div>'
-    +  '<div style="font-size:11px;color:var(--muted);margin-top:3px">'+(approvedCt?approvedCt+' approved':'No approved variations')+'</div>'
+    +  '<div style="font-family:\'Syne\',sans-serif;font-size:20px;font-weight:700;color:var(--green)">'+fmt(totalAppEx*1.1)+'</div>'
+    +  '<div style="font-size:11px;color:var(--muted);margin-top:3px">'+approvedCt+' approved</div>'
+    +'</div>'
+    +'<div style="padding:16px 20px;background:var(--accent-dim)">'
+    +  '<div style="font-family:\'DM Mono\',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:5px">New Contract Value (incl GST)</div>'
+    +  '<div style="font-family:\'Syne\',sans-serif;font-size:20px;font-weight:700;color:var(--accent)">'+fmt(newIncl)+'</div>'
+    +  '<div style="font-size:11px;color:var(--muted);margin-top:3px">ex GST: '+fmt(newEx)+'</div>'
     +'</div>'
     +'</div>';
 }
@@ -680,7 +689,7 @@ function updateSummary(){
 function renderPOPanel(g,secId){
   var procUrl = 'hvac-procurement-pos.html';
   if(!g.pos.length) return '<div class="po-empty">No POs -- <button onclick="navTo(\''+procUrl+'\')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-family:DM Sans,sans-serif">+ Create PO in Procurement</button></div>';
-  return '<table class="po-tbl"><thead><tr><th style="width:130px">PO No.</th><th>Supplier</th><th class="r" style="min-width:90px">Amount</th><th class="r" style="min-width:90px">Actual</th></tr></thead><tbody>'
+  return '<table class="po-tbl"><thead><tr><th style="width:130px">PO No.</th><th>Vendor</th><th class="r" style="min-width:90px">Amount</th><th class="r" style="min-width:90px">Actual</th></tr></thead><tbody>'
     +g.pos.map(function(po){return '<tr><td class="po-num" onclick="navTo(\''+procUrl+'\')">'+po.id+'</td><td style="font-weight:500;color:var(--text)">'+(po.supplier||'--')+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">'+fmt(liSub(po.lineItems||[]))+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(po.actual)+'</td></tr>';}).join('')
     +'</tbody></table><button class="add-po-btn" onclick="navTo(\''+procUrl+'\')">+ Create PO in Procurement</button>';
 }
@@ -700,6 +709,7 @@ function togglePOPanel(secId,grpId){
 
 // -- RENDER --
 function renderAll(){
+  updateSummary();
   const q=(document.getElementById('searchInput').value||'').toLowerCase();
   const page=document.getElementById('pageContent');
   page.innerHTML='';
@@ -732,12 +742,11 @@ function renderAll(){
   const colHdrEl = document.createElement('div');
   colHdrEl.className='col-header';
   colHdrEl.style.cssText='';
-  colHdrEl.innerHTML='<span style="flex:1;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding-left:24px">Category</span>'
+  colHdrEl.innerHTML='<span style="flex:1;font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Category</span>'
     +'<span class="col-h" style="width:110px">Budget</span>'
     +'<span class="col-h" style="width:110px">Committed</span>'
     +'<span class="col-h" style="width:110px">Actuals</span>'
     +'<span class="col-h" style="width:100px">Variance</span>'
-    +'<span style="width:16px;flex-shrink:0"></span>'
     +'<span class="col-h" style="width:70px;text-align:center">POs</span>'
     +'<span style="width:28px"></span>';
   baseBody.appendChild(colHdrEl);
@@ -767,7 +776,7 @@ function renderAll(){
         <span data-col="actuals" style="width:110px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;${sa>0?'color:var(--green)':'color:var(--muted)'}">${fmt(sa)}</span>
         <span data-col="variance" style="width:100px;text-align:right;font-family:'DM Mono',monospace;font-size:12px" class="${svCls}">${fmtV(sv)==='--'?'--':fmtV(sv)}</span>
         <span style="width:70px"></span>
-        <button style="width:28px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;text-align:center" onclick="event.stopPropagation();delSec('${sec.id}')" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'" title="Delete category">x</button>
+        ${_budgetEditMode ? '<button style="width:28px;background:none;border:none;cursor:pointer;font-size:12px;padding:0;text-align:center;color:var(--muted)" onclick="event.stopPropagation();delSec(\'' + sec.id + '\')" title="Delete category">x</button>' : '<span style="width:28px;display:inline-block"></span>'}
       </div>
       <div class="sec-body">
         ${(function(){
@@ -871,15 +880,15 @@ function renderAll(){
     +     '<th style="padding:10px 18px;text-align:right;font-family:\'DM Mono\',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);width:160px">Approved (incl GST)</th>'
     +     '<th style="padding:10px 18px;text-align:left;font-family:\'DM Mono\',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);width:120px">Status</th>'
     +   '</tr></thead><tbody id="varRegTbl"></tbody></table>'
-    + '<div id="varSummaryBlock"></div>'
-    + '</div>';
+    + '</div>'
+    + '<div id="varSummaryBlock"></div>';
   page.appendChild(varCard);
 
   renderVarSection();
 
   // ── TOTALS CALCULATIONS ──
   // Base contract
-  const baseSellEx    = gb * (1 + margin/100);
+  const baseSellEx    = (_sellPrice > 0) ? _sellPrice : gb * (1 + margin/100);
   const baseProfit    = baseSellEx - gb;
   const baseMarginPct = baseSellEx > 0 ? (baseProfit / baseSellEx * 100) : 0;
   // Variations
@@ -1177,6 +1186,8 @@ function showTemplateToast(msg){
   if(editBtn)editBtn.style.display=_canEditBudget?'':'none';
   var saved = await loadData();
   if(saved?.margin) margin = saved.margin;
+  if(saved?.viewMode) { viewMode = saved.viewMode; setViewMode(viewMode); }
+  if(saved?._sellPrice) _sellPrice = saved._sellPrice;
   if(saved?.sections && saved.sections.length){
     // Use saved sections DIRECTLY - do not merge into buildDefault
     // This preserves company template structure on reload
@@ -1266,6 +1277,7 @@ function showTemplateToast(msg){
       }
     }
   }
+  _budgetInitDone=true;
   try{ renderAll(); }
   catch(e){
     console.error('renderAll error:', e);
