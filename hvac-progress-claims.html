@@ -550,10 +550,10 @@ async function loadVariations(approvedOnly){
 // LOAD VENDOR INVOICES for a month
 function loadInvoicesForMonth(month){
   try{
-    // Use cached vendor invoice data if available
     if(window._cachedVendorInvoices){
       var invs=Array.isArray(window._cachedVendorInvoices)?window._cachedVendorInvoices:[];
-      return invs.filter(function(i){return i.period===month&&(i.status==='Invoice Approved'||i.status==='Direct Invoice Approved');});
+      // Return ALL records for the month — no status filter
+      return month?invs.filter(function(i){return i.period===month;}):invs;
     }
     return [];
   }catch(e){return[];}
@@ -561,7 +561,9 @@ function loadInvoicesForMonth(month){
 async function prefetchVendorInvoices(){
   try{
     var data=await dbGetVendorInvoices(_pcPNum);
-    window._cachedVendorInvoices=Array.isArray(data)?data:(data&&data.claims?data.claims:[]);
+    // Data is {claims:[...]} JSONB blob
+    var raw=data&&data.claims?data.claims:(Array.isArray(data)?data:[]);
+    window._cachedVendorInvoices=raw;
   }catch(e){window._cachedVendorInvoices=[];}
 }
 
@@ -977,10 +979,10 @@ function renderDetail(){
   var invoices=loadInvoicesForMonth(claim.month);
   var totalCosts=0;
   var costByTrade={};
-  invoices.forEach(function(inv){
-    var exGST=num(inv.amount);
+  invoices.filter(function(r){return (r.status||'').toLowerCase().includes('approved');}).forEach(function(inv){
+    var exGST=num(inv.invoiceAmount||inv.totalAmount||inv.amount||0);
     totalCosts+=exGST;
-    var trade=inv.vendor||inv.trade||'Other';
+    var trade=inv.vendor||'Other';
     if(!costByTrade[trade])costByTrade[trade]=0;
     costByTrade[trade]+=exGST;
   });
@@ -1038,79 +1040,112 @@ async function renderCostsTab(){
   var cont=document.getElementById('costsContent');
   cont.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">Loading costs…</div>';
 
-  var invoices=loadInvoicesForMonth(claim.month);
-  if(!invoices.length){
-    cont.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">💰</div><div style="font-weight:600;color:var(--text2)">No vendor invoices found for '+fmtM(claim.month)+'</div></div>';
+  // Refresh cache if empty
+  if(!window._cachedVendorInvoices){await prefetchVendorInvoices();}
+
+  var allRecords=loadInvoicesForMonth(claim.month);
+  if(!allRecords.length){
+    cont.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">💰</div>'
+      +'<div style="font-weight:600;color:var(--text2)">No invoices or claims found for '+fmtM(claim.month)+'</div>'
+      +'<div style="font-size:12px;margin-top:6px">Vendor invoices for this period will appear here once added.</div></div>';
     return;
   }
+
+  // Status helpers
+  var isApproved=function(r){
+    var s=(r.status||'').toLowerCase();
+    return s.includes('approved');
+  };
+  var statusColor=function(s){
+    var sl=(s||'').toLowerCase();
+    if(sl.includes('approved'))return 'var(--green)';
+    if(sl.includes('pending'))return 'var(--warn)';
+    if(sl.includes('direct'))return 'var(--purple)';
+    return 'var(--muted)';
+  };
+  var getAmt=function(r){return num(r.invoiceAmount||r.totalAmount||r.amount||0);};
+  var getRef=function(r){return r.invoiceNo||r.claimNo||r.ref||'—';};
+  var getDesc=function(r){return r.poRef||r.desc||r.description||'';};
+  var getType=function(r){return r.isDirect?'Direct Invoice':'Vendor Claim';};
+
+  // All costs — no approved filter
+  var totalCosts=allRecords.reduce(function(s,r){return s+getAmt(r);},0);
 
   var retPct=claimsData.retentionPct||5;
   var grandCurrent=0;
   (claim.entries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
   (claim.varEntries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
   var netAfterRet=grandCurrent*(1-retPct/100);
-
-  // Group by trade/vendor
-  var byTrade={};var tradeOrder=[];
-  invoices.forEach(function(inv){
-    var trade=inv.vendor||inv.trade||'Other';
-    if(!byTrade[trade]){byTrade[trade]=[];tradeOrder.push(trade);}
-    byTrade[trade].push(inv);
-  });
-  var totalCosts=invoices.reduce(function(s,i){return s+num(i.amount);},0);
   var marginPct=totalCosts>0?((netAfterRet-totalCosts)/totalCosts*100):0;
   var marginColor=marginPct>=10?'var(--green)':marginPct>=0?'var(--warn)':'var(--danger)';
 
+  // Group by vendor
+  var byVendor={};var vendorOrder=[];
+  allRecords.forEach(function(r){
+    var v=r.vendor||'Other';
+    if(!byVendor[v]){byVendor[v]=[];vendorOrder.push(v);}
+    byVendor[v].push(r);
+  });
+
   var html='';
-  // Summary bar
-  html+='<div style="background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;gap:24px;flex-wrap:wrap;align-items:center">'
+
+  // ── Summary bar ──
+  html+='<div style="background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;gap:28px;flex-wrap:wrap;align-items:center">'
     +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">This Claim <strong style="color:var(--accent);font-size:13px">'+fmt(grandCurrent)+'</strong></div>'
     +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Net After Retention <strong style="color:var(--text);font-size:13px">'+fmt(netAfterRet)+'</strong></div>'
-    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Total Costs <strong style="color:var(--danger);font-size:13px">'+fmt(totalCosts)+'</strong></div>'
-    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Margin on Costs <strong style="color:'+marginColor+';font-size:13px">'+marginPct.toFixed(1)+'%</strong></div>'
+    +'<div style="border-left:1px solid var(--border);padding-left:24px;font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Total Costs <strong style="color:var(--danger);font-size:13px">'+fmt(totalCosts)+'</strong></div>'
+    +'<div style="border-left:1px solid var(--border);padding-left:24px;font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Margin <strong style="color:'+marginColor+';font-size:13px">'+marginPct.toFixed(1)+'%</strong></div>'
     +'</div>';
 
-  // Trade breakdown
+  // ── Vendor breakdown ──
   html+='<div style="padding:16px 24px">';
-  tradeOrder.forEach(function(trade){
-    var invs=byTrade[trade];
-    var tradeTotal=invs.reduce(function(s,i){return s+num(i.amount);},0);
-    html+='<div style="margin-bottom:20px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:2px solid var(--border);margin-bottom:6px">'
-      +'<span style="font-family:\'Syne\',sans-serif;font-size:13px;font-weight:700;color:var(--text)">'+escH(trade)+'</span>'
-      +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--text2)">'+fmt(tradeTotal)+' ex GST</span>'
+  vendorOrder.forEach(function(vendor){
+    var recs=byVendor[vendor];
+    var vendorTotal=recs.reduce(function(s,r){return s+getAmt(r);},0);
+
+    html+='<div style="margin-bottom:24px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:2px solid var(--border);margin-bottom:4px">'
+      +'<span style="font-family:\'Syne\',sans-serif;font-size:13px;font-weight:700;color:var(--text)">'+escH(vendor)+'</span>'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--text2)">'+fmt(vendorTotal)+' ex GST</span>'
       +'</div>'
       +'<table style="width:100%;border-collapse:collapse;font-size:12px">'
-      +'<thead><tr>'
-      +'<th style="text-align:left;padding:5px 8px;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px">Invoice / Ref</th>'
-      +'<th style="text-align:left;padding:5px 8px;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px">Description</th>'
-      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px">Ex GST</th>'
-      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px">GST</th>'
-      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px">Incl GST</th>'
+      +'<thead><tr style="border-bottom:1px solid var(--border)">'
+      +'<th style="text-align:left;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">Type</th>'
+      +'<th style="text-align:left;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">Ref / Invoice No</th>'
+      +'<th style="text-align:left;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">PO / Description</th>'
+      +'<th style="text-align:center;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">Status</th>'
+      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">Ex GST</th>'
+      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">GST</th>'
+      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">Incl GST</th>'
       +'</tr></thead><tbody>';
-    invs.forEach(function(inv){
-      var exGST=num(inv.amount);
+
+    recs.forEach(function(r){
+      var exGST=getAmt(r);
       html+='<tr style="border-bottom:1px solid var(--border)">'
-        +'<td style="padding:7px 8px;color:var(--accent);font-family:\'DM Mono\',monospace">'+escH(inv.invoiceNum||inv.ref||'—')+'</td>'
-        +'<td style="padding:7px 8px;color:var(--text2)">'+escH(inv.desc||inv.description||'—')+'</td>'
+        +'<td style="padding:7px 8px;color:var(--muted);font-size:11px">'+escH(getType(r))+'</td>'
+        +'<td style="padding:7px 8px;color:var(--accent);font-family:\'DM Mono\',monospace">'+escH(getRef(r))+'</td>'
+        +'<td style="padding:7px 8px;color:var(--text2)">'+escH(getDesc(r))+'</td>'
+        +'<td style="padding:7px 8px;text-align:center">'
+          +'<span style="font-size:10px;font-family:\'DM Mono\',monospace;padding:2px 7px;border-radius:4px;background:rgba(0,0,0,.2);color:'+statusColor(r.status)+'">'+escH(r.status||'—')+'</span>'
+        +'</td>'
         +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace">'+fmt(exGST)+'</td>'
-        +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text2)">'+fmt(exGST*0.1)+'</td>'
-        +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text)">'+fmt(exGST*1.1)+'</td>'
+        +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--muted)">'+fmt(exGST*0.1)+'</td>'
+        +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace">'+fmt(exGST*1.1)+'</td>'
         +'</tr>';
     });
+
     html+='<tr style="background:var(--surface2)">'
-      +'<td colspan="2" style="padding:7px 8px;font-weight:600;color:var(--text)">'+escH(trade)+' subtotal</td>'
-      +'<td style="padding:7px 8px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace">'+fmt(tradeTotal)+'</td>'
-      +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text2)">'+fmt(tradeTotal*0.1)+'</td>'
-      +'<td style="padding:7px 8px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace">'+fmt(tradeTotal*1.1)+'</td>'
-      +'</tr>'
-      +'</tbody></table></div>';
+      +'<td colspan="4" style="padding:7px 8px;font-weight:600;color:var(--text)">'+escH(vendor)+' subtotal</td>'
+      +'<td style="padding:7px 8px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(vendorTotal)+'</td>'
+      +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--muted)">'+fmt(vendorTotal*0.1)+'</td>'
+      +'<td style="padding:7px 8px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(vendorTotal*1.1)+'</td>'
+      +'</tr></tbody></table></div>';
   });
 
   // Grand total
-  html+='<div style="margin-top:8px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center">'
+  html+='<div style="padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">'
     +'<span style="font-weight:700;font-size:14px;color:var(--text)">Total Costs</span>'
-    +'<div style="display:flex;gap:24px">'
+    +'<div style="display:flex;gap:24px;flex-wrap:wrap">'
     +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Ex GST <strong style="color:var(--danger)">'+fmt(totalCosts)+'</strong></span>'
     +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Incl GST <strong style="color:var(--danger)">'+fmt(totalCosts*1.1)+'</strong></span>'
     +'</div></div>';
