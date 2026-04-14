@@ -717,6 +717,15 @@ function renderClaimLines(){
   var vendor=(document.getElementById('cm-vendor').value||'').trim();
   var vendorPOs=vendor?getPOsForVendor(vendor):[];
   var vendorVars=vendor?getVariationsForVendor(vendor):_allVariations;
+
+  // Check for duplicate base contract lines
+  var baseCount=_claimLines.filter(function(l){return l.type==='base';}).length;
+  var dupWarning=baseCount>1
+    ?'<div style="margin-bottom:10px;padding:10px 14px;background:rgba(255,184,48,.1);border:1px solid #ffb830;border-radius:8px;display:flex;align-items:center;gap:10px;font-size:12px;color:#ffb830">'
+      +'<span style="font-size:16px">⚠</span>'
+      +'<span>A <strong>Base Contract</strong> line item already exists in this claim. Only one base contract line is typically expected per claim.</span>'
+      +'</div>'
+    :'';
   var html=_claimLines.map(function(line,i){
     var isBase=line.type==='base';
     var poOpts='<option value="">-- Select PO --</option>';
@@ -745,7 +754,7 @@ function renderClaimLines(){
       +'<div style="margin-top:8px"><label class="ml">Amount (ex GST) *</label><input class="mi" type="number" value="'+(line.amount||'')+'" placeholder="0.00" data-li="'+i+'" oninput="_claimLines[this.dataset.li*1].amount=parseFloat(this.value)||0;updateClaimTotal()"/></div>'
       +'</div>';
   }).join('');
-  el.innerHTML=html;
+  el.innerHTML=dupWarning+html;
   updateClaimTotal();
 }
 function updateClaimTotal(){var t=_claimLines.reduce(function(a,l){return a+num(l.amount);},0);var el=document.getElementById('cm-total');if(el)el.textContent=fmt(t);}

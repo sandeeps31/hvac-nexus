@@ -151,6 +151,9 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .bud-area-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;transition:color .12s}
 .bud-area-del:hover{color:var(--danger)}
 .bud-add-area{background:none;border:none;color:var(--accent);cursor:pointer;font-size:11.5px;font-family:'DM Sans',sans-serif;padding:2px 0;text-align:left}
+/* COST TAB */
+.ct-hidden{display:none!important}
+
 /* DETAIL TABS */
 .detail-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 24px;background:var(--surface)}
 .dtab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px 16px;margin-bottom:-1px;transition:all .15s}
@@ -1040,115 +1043,162 @@ async function renderCostsTab(){
   var cont=document.getElementById('costsContent');
   cont.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">Loading costs…</div>';
 
-  // Refresh cache if empty
   if(!window._cachedVendorInvoices){await prefetchVendorInvoices();}
-
   var allRecords=loadInvoicesForMonth(claim.month);
+
   if(!allRecords.length){
     cont.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">💰</div>'
       +'<div style="font-weight:600;color:var(--text2)">No invoices or claims found for '+fmtM(claim.month)+'</div>'
-      +'<div style="font-size:12px;margin-top:6px">Vendor invoices for this period will appear here once added.</div></div>';
+      +'<div style="font-size:12px;margin-top:6px">Vendor invoices for this period will appear here.</div></div>';
     return;
   }
 
-  // Status helpers
-  var isApproved=function(r){
-    var s=(r.status||'').toLowerCase();
-    return s.includes('approved');
-  };
+  var getAmt=function(r){return num(r.invoiceAmount||r.totalAmount||r.amount||0);};
+  var getRef=function(r){return r.invoiceNo||r.claimNo||r.ref||'—';};
   var statusColor=function(s){
     var sl=(s||'').toLowerCase();
     if(sl.includes('approved'))return 'var(--green)';
     if(sl.includes('pending'))return 'var(--warn)';
-    if(sl.includes('direct'))return 'var(--purple)';
     return 'var(--muted)';
   };
-  var getAmt=function(r){return num(r.invoiceAmount||r.totalAmount||r.amount||0);};
-  var getRef=function(r){return r.invoiceNo||r.claimNo||r.ref||'—';};
-  var getDesc=function(r){return r.poRef||r.desc||r.description||'';};
-  var getType=function(r){return r.isDirect?'Direct Invoice':'Vendor Claim';};
-
-  // All costs — no approved filter
-  var totalCosts=allRecords.reduce(function(s,r){return s+getAmt(r);},0);
 
   var retPct=claimsData.retentionPct||5;
   var grandCurrent=0;
   (claim.entries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
   (claim.varEntries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
   var netAfterRet=grandCurrent*(1-retPct/100);
-  var marginPct=totalCosts>0?((netAfterRet-totalCosts)/totalCosts*100):0;
-  var marginColor=marginPct>=10?'var(--green)':marginPct>=0?'var(--warn)':'var(--danger)';
 
-  // Group by vendor
-  var byVendor={};var vendorOrder=[];
+  // ── Split lines into Contract vs SV ──
+  // Each record may have multiple lines; split and tag with parent record info
+  var contractLines=[]; // type === 'base' or isDirect (no lines)
+  var svLines=[];       // type !== 'base', has varNum
+
   allRecords.forEach(function(r){
-    var v=r.vendor||'Other';
-    if(!byVendor[v]){byVendor[v]=[];vendorOrder.push(v);}
-    byVendor[v].push(r);
+    var lines=r.lines||[];
+    if(r.isDirect||!lines.length){
+      // Direct invoice — treat whole thing as contract
+      contractLines.push({vendor:r.vendor||'Other',ref:getRef(r),desc:r.desc||r.description||'',
+        status:r.status||'',amt:getAmt(r),varNum:''});
+    } else {
+      lines.forEach(function(l){
+        var amt=num(l.amount||0);
+        if(!amt)return;
+        var row={vendor:r.vendor||'Other',ref:getRef(r)+' / '+escH(l.description||l.varNum||''),
+          desc:l.description||'',status:r.status||'',amt:amt,varNum:l.varNum||''};
+        if(l.type==='base'||!l.varNum){contractLines.push(row);}
+        else{svLines.push(row);}
+      });
+    }
   });
 
-  var html='';
+  // Group by vendor, sort vendors alphabetically
+  var groupByVendor=function(rows){
+    var map={};
+    rows.forEach(function(r){
+      var v=r.vendor||'Other';
+      if(!map[v])map[v]=[];
+      map[v].push(r);
+    });
+    return Object.keys(map).sort().map(function(v){return {vendor:v,rows:map[v]};});
+  };
 
-  // ── Summary bar ──
-  html+='<div style="background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;gap:28px;flex-wrap:wrap;align-items:center">'
+  var contractGroups=groupByVendor(contractLines);
+  var svGroups=groupByVendor(svLines);
+  var contractTotal=contractLines.reduce(function(s,r){return s+r.amt;},0);
+  var svTotal=svLines.reduce(function(s,r){return s+r.amt;},0);
+  var grandTotal=contractTotal+svTotal;
+  var marginPct=grandTotal>0?((netAfterRet-grandTotal)/grandTotal*100):0;
+  var marginColor=marginPct>=10?'var(--green)':marginPct>=0?'var(--warn)':'var(--danger)';
+
+  // ── Top summary bar ──
+  var html='<div style="background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;gap:28px;flex-wrap:wrap;align-items:center">'
     +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">This Claim <strong style="color:var(--accent);font-size:13px">'+fmt(grandCurrent)+'</strong></div>'
     +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Net After Retention <strong style="color:var(--text);font-size:13px">'+fmt(netAfterRet)+'</strong></div>'
-    +'<div style="border-left:1px solid var(--border);padding-left:24px;font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Total Costs <strong style="color:var(--danger);font-size:13px">'+fmt(totalCosts)+'</strong></div>'
+    +'<div style="border-left:1px solid var(--border);padding-left:24px;font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Total Costs <strong style="color:var(--danger);font-size:13px">'+fmt(grandTotal)+'</strong></div>'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Contract <strong style="color:var(--text2);font-size:13px">'+fmt(contractTotal)+'</strong></div>'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">SV <strong style="color:var(--text2);font-size:13px">'+fmt(svTotal)+'</strong></div>'
     +'<div style="border-left:1px solid var(--border);padding-left:24px;font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Margin <strong style="color:'+marginColor+';font-size:13px">'+marginPct.toFixed(1)+'%</strong></div>'
     +'</div>';
 
-  // ── Vendor breakdown ──
-  html+='<div style="padding:16px 24px">';
-  vendorOrder.forEach(function(vendor){
-    var recs=byVendor[vendor];
-    var vendorTotal=recs.reduce(function(s,r){return s+getAmt(r);},0);
+  html+='<div style="padding:16px 24px;display:flex;flex-direction:column;gap:16px">';
 
-    html+='<div style="margin-bottom:24px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:2px solid var(--border);margin-bottom:4px">'
-      +'<span style="font-family:\'Syne\',sans-serif;font-size:13px;font-weight:700;color:var(--text)">'+escH(vendor)+'</span>'
-      +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--text2)">'+fmt(vendorTotal)+' ex GST</span>'
-      +'</div>'
-      +'<table style="width:100%;border-collapse:collapse;font-size:12px">'
-      +'<thead><tr style="border-bottom:1px solid var(--border)">'
-      +'<th style="text-align:left;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">Type</th>'
-      +'<th style="text-align:left;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">Ref / Invoice No</th>'
-      +'<th style="text-align:left;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">PO / Description</th>'
-      +'<th style="text-align:center;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">Status</th>'
-      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">Ex GST</th>'
-      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">GST</th>'
-      +'<th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500">Incl GST</th>'
-      +'</tr></thead><tbody>';
-
-    recs.forEach(function(r){
-      var exGST=getAmt(r);
-      html+='<tr style="border-bottom:1px solid var(--border)">'
-        +'<td style="padding:7px 8px;color:var(--muted);font-size:11px">'+escH(getType(r))+'</td>'
-        +'<td style="padding:7px 8px;color:var(--accent);font-family:\'DM Mono\',monospace">'+escH(getRef(r))+'</td>'
-        +'<td style="padding:7px 8px;color:var(--text2)">'+escH(getDesc(r))+'</td>'
-        +'<td style="padding:7px 8px;text-align:center">'
-          +'<span style="font-size:10px;font-family:\'DM Mono\',monospace;padding:2px 7px;border-radius:4px;background:rgba(0,0,0,.2);color:'+statusColor(r.status)+'">'+escH(r.status||'—')+'</span>'
-        +'</td>'
-        +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace">'+fmt(exGST)+'</td>'
-        +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--muted)">'+fmt(exGST*0.1)+'</td>'
-        +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace">'+fmt(exGST*1.1)+'</td>'
+  // ── Helper: render a card ──
+  var renderCard=function(title,groups,cardTotal,cardId){
+    if(!groups.length)return'';
+    var c='';
+    c+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+    // Card header
+    c+='<div style="background:var(--surface2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none" onclick="this.nextElementSibling.classList.toggle(\'ct-hidden\')">'
+      +'<span style="font-family:\'Syne\',sans-serif;font-size:14px;font-weight:700;color:var(--text)">'+title+'</span>'
+      +'<div style="display:flex;gap:20px;align-items:center">'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--accent);font-weight:600">'+fmt(cardTotal)+' ex GST</span>'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">'+fmt(cardTotal*1.1)+' incl GST</span>'
+      +'<span style="color:var(--muted);font-size:12px">▾</span>'
+      +'</div></div>';
+    // Card body
+    c+='<div>';
+    groups.forEach(function(grp,gi){
+      var vendorTotal=grp.rows.reduce(function(s,r){return s+r.amt;},0);
+      var vendorId=cardId+'-v'+gi;
+      // Vendor row — collapsible
+      c+='<div style="border-top:1px solid var(--border)">';
+      c+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 16px;background:var(--surface3);cursor:pointer;user-select:none" onclick="document.getElementById(\''+vendorId+'\').classList.toggle(\'ct-hidden\')">'
+        +'<span style="font-size:13px;font-weight:600;color:var(--text)">'+escH(grp.vendor)+'</span>'
+        +'<div style="display:flex;gap:16px;align-items:center">'
+        +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--text2)">'+fmt(vendorTotal)+'</span>'
+        +'<span style="color:var(--muted);font-size:11px">▾</span>'
+        +'</div></div>';
+      // Vendor rows
+      c+='<table id="'+vendorId+'" style="width:100%;border-collapse:collapse;font-size:12px">';
+      c+='<thead><tr style="background:var(--surface)">'
+        +'<th style="padding:5px 16px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Ref</th>'
+        +(title.includes('SV')?'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Var</th>':'')
+        +'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Description</th>'
+        +'<th style="padding:5px 8px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Status</th>'
+        +'<th style="padding:5px 16px;text-align:right;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Ex GST</th>'
+        +'<th style="padding:5px 16px;text-align:right;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Incl GST</th>'
+        +'</tr></thead><tbody>';
+      grp.rows.sort(function(a,b){return (a.desc||'').localeCompare(b.desc||'');}).forEach(function(r){
+        c+='<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:7px 16px;color:var(--accent);font-family:\'DM Mono\',monospace;white-space:nowrap">'+escH(r.ref)+'</td>'
+          +(title.includes('SV')?'<td style="padding:7px 8px;color:var(--purple);font-family:\'DM Mono\',monospace;font-size:11px">'+escH(r.varNum)+'</td>':'')
+          +'<td style="padding:7px 8px;color:var(--text2)">'+escH(r.desc)+'</td>'
+          +'<td style="padding:7px 8px;text-align:center"><span style="font-size:10px;font-family:\'DM Mono\',monospace;padding:2px 7px;border-radius:4px;background:rgba(0,0,0,.2);color:'+statusColor(r.status)+'">'+escH(r.status||'—')+'</span></td>'
+          +'<td style="padding:7px 16px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:500">'+fmt(r.amt)+'</td>'
+          +'<td style="padding:7px 16px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text2)">'+fmt(r.amt*1.1)+'</td>'
+          +'</tr>';
+      });
+      // Vendor subtotal
+      c+='<tr style="background:var(--surface2)">'
+        +'<td colspan="'+(title.includes('SV')?'4':'3')+'" style="padding:7px 16px;font-weight:600;color:var(--text)">'+escH(grp.vendor)+' subtotal</td>'
+        +'<td style="padding:7px 16px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(vendorTotal)+'</td>'
+        +'<td style="padding:7px 16px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(vendorTotal*1.1)+'</td>'
         +'</tr>';
+      c+='</tbody></table></div>';
     });
+    // Card footer summary
+    c+='<div style="padding:10px 16px;background:var(--surface2);border-top:2px solid var(--border);display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-size:12px;color:var(--text2);font-weight:600">'+title+' Total</span>'
+      +'<div style="display:flex;gap:20px">'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Ex GST <strong style="color:var(--danger)">'+fmt(cardTotal)+'</strong></span>'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Incl GST <strong style="color:var(--danger)">'+fmt(cardTotal*1.1)+'</strong></span>'
+      +'</div></div>';
+    c+='</div>';
+    return c;
+  };
 
-    html+='<tr style="background:var(--surface2)">'
-      +'<td colspan="4" style="padding:7px 8px;font-weight:600;color:var(--text)">'+escH(vendor)+' subtotal</td>'
-      +'<td style="padding:7px 8px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(vendorTotal)+'</td>'
-      +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--muted)">'+fmt(vendorTotal*0.1)+'</td>'
-      +'<td style="padding:7px 8px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(vendorTotal*1.1)+'</td>'
-      +'</tr></tbody></table></div>';
-  });
+  html+=renderCard('Base Contract',contractGroups,contractTotal,'cw');
+  html+=renderCard('Subcontractor Variations',svGroups,svTotal,'sv');
 
-  // Grand total
+  // Grand total row
   html+='<div style="padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">'
-    +'<span style="font-weight:700;font-size:14px;color:var(--text)">Total Costs</span>'
+    +'<span style="font-weight:700;font-size:14px;color:var(--text)">Grand Total</span>'
     +'<div style="display:flex;gap:24px;flex-wrap:wrap">'
-    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Ex GST <strong style="color:var(--danger)">'+fmt(totalCosts)+'</strong></span>'
-    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Incl GST <strong style="color:var(--danger)">'+fmt(totalCosts*1.1)+'</strong></span>'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Ex GST <strong style="color:var(--danger)">'+fmt(grandTotal)+'</strong></span>'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Incl GST <strong style="color:var(--danger)">'+fmt(grandTotal*1.1)+'</strong></span>'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Margin <strong style="color:'+marginColor+'">'+marginPct.toFixed(1)+'%</strong></span>'
     +'</div></div>';
+
   html+='</div>';
   cont.innerHTML=html;
 }
