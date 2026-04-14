@@ -418,6 +418,7 @@ var _uid=200;
 function nid(){return ++_uid;}
 function num(v){return parseFloat(v)||0;}
 function numRaw(v){return parseFloat(String(v||'').replace(/[$,]/g,''))||0;}
+function fmtClaimNum(n){return 'PC-'+String(n).padStart(2,'0');}
 function fmt(n){var v=num(n);return '$'+v.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtR(n){var v=num(n);return v===0?'—':'$'+Math.round(v).toLocaleString('en-AU');}
 // Attach $ formatting on blur to a number input
@@ -1091,7 +1092,7 @@ var wizContractVal=0,wizRetPct=5;
 async function openNewClaimWizard(){
   wizOpt=0;wizStep=0;
   var nextNum=(claimsData.claims.length?Math.max.apply(null,claimsData.claims.map(function(c){return c.num;}))+1:1);
-  document.getElementById('w-claimnum').value=nextNum;
+  document.getElementById('w-claimnum').value=fmtClaimNum(nextNum);
   document.getElementById('w-month').value=currentMonth();
   // Auto-populate contract value from budget base contract sell price excl GST
   if(claimsData.contractValue>0){
@@ -1132,8 +1133,9 @@ async function wizNext(){
   if(!contract){alert('Contract value is required.');return;}
   wizContractVal=contract;
   wizRetPct=num(document.getElementById('w-retention').value)||5;
-  var isFirst=claimsData.claims.length===0;
-  if(!isFirst){wizFinish();return;}
+  // If line items already set up, just create the claim — no setup needed
+  var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
+  if(hasLineItems){wizFinish();return;}
   if(!wizOpt){alert('Please select a setup option.');return;}
   closeWizard();
   if(wizOpt===1){
@@ -1189,7 +1191,7 @@ function openSetupViewEdit(){
 function openLogClaimView(){
   // Open wizard in log-claim mode (line items already set — just need month + number)
   var nextNum=(claimsData.claims.length?Math.max.apply(null,claimsData.claims.map(function(c){return c.num;}))+1:1);
-  document.getElementById('w-claimnum').value=nextNum;
+  document.getElementById('w-claimnum').value=fmtClaimNum(nextNum);
   document.getElementById('w-month').value=currentMonth();
   document.getElementById('w-contract').value=claimsData.contractValue||'';
   document.getElementById('w-retention').value=claimsData.retentionPct||5;
@@ -1204,7 +1206,7 @@ function openLogClaimView(){
 function saveLogClaim(){
   // Open a small modal to get claim number and month before saving
   var nextNum=(claimsData.claims.length?Math.max.apply(null,claimsData.claims.map(function(c){return c.num;}))+1:1);
-  document.getElementById('w-claimnum').value=nextNum;
+  document.getElementById('w-claimnum').value=fmtClaimNum(nextNum);
   document.getElementById('w-month').value=currentMonth();
   document.getElementById('firstClaimSetup').style.display='none';
   document.getElementById('w-contract-preview').textContent='';
@@ -1213,7 +1215,7 @@ function saveLogClaim(){
   var nextBtn=document.querySelector('#wizStep0 .bp');
   if(nextBtn){nextBtn.textContent='Create Claim →';nextBtn.onclick=function(){
     var month=document.getElementById('w-month').value;
-    var claimNum=parseInt(document.getElementById('w-claimnum').value)||1;
+    var claimNum=parseInt(String(document.getElementById('w-claimnum').value).replace('PC-',''))||1;
     var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[],varApprovedOnly:false};
     claimsData.claims.push(newClaim);
     save();closeWizard();
@@ -1662,11 +1664,11 @@ function renderScratchGrid(){
 
 
 function wizFinish(){
-  var isFirst=claimsData.claims.length===0;
+  var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
   claimsData.contractValue=wizContractVal;
   claimsData.retentionPct=wizRetPct;
 
-  if(isFirst){
+  if(!hasLineItems){
     claimsData.lineItems=[];
     var newItems=[];
     var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
@@ -1699,7 +1701,7 @@ function wizFinish(){
 
   // Log Claim mode — create a new claim record
   var month=document.getElementById('w-month').value;
-  var claimNum=parseInt(document.getElementById('w-claimnum').value)||1;
+  var claimNum=parseInt(String(document.getElementById('w-claimnum').value).replace('PC-',''))||1;
   var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[],varApprovedOnly:false};
   claimsData.claims.push(newClaim);
   save();
