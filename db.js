@@ -174,6 +174,8 @@ async function authGuard() {
 
 // ── Core fetch wrapper ──
 async function sbFetch(path, options = {}) {
+  // Always wait for auth to be ready before any Supabase call
+  await dbReady;
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
   // Use session JWT if logged in, otherwise fall back to anon key
   const token = _authSession ? _authSession.access_token : SUPABASE_ANON_KEY;
@@ -233,7 +235,6 @@ async function dbSet(table, data) {
 // These tables have one row per project_num
 
 async function dbGetProject(table, projectNum) {
-  await dbReady;
   try {
     const rows = await sbFetch(`${table}?select=data&project_num=eq.${encodeURIComponent(projectNum)}&limit=1`);
     return (rows && rows.length) ? rows[0].data : null;
@@ -244,7 +245,6 @@ async function dbGetProject(table, projectNum) {
 }
 
 async function dbSetProject(table, projectNum, data) {
-  await dbReady;
   try {
     const rows = await sbFetch(`${table}?select=id&project_num=eq.${encodeURIComponent(projectNum)}&limit=1`);
     if (rows && rows.length) {
