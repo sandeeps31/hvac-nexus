@@ -1092,7 +1092,8 @@ async function openNewClaimWizard(){
     }
   }
   // Hide first claim setup if not first claim
-  var isFirst=claimsData.lineItems.length===0;
+  // Show first-claim setup if no claims exist (even if stale lineItems data exists)
+  var isFirst=claimsData.claims.length===0;
   document.getElementById('firstClaimSetup').style.display=isFirst?'block':'none';
   document.getElementById('opt1').classList.remove('selected');
   document.getElementById('opt2').classList.remove('selected');
@@ -1116,7 +1117,7 @@ async function wizNext(){
   if(!contract){alert('Contract value is required.');return;}
   wizContractVal=contract;
   wizRetPct=num(document.getElementById('w-retention').value)||5;
-  var isFirst=claimsData.lineItems.length===0;
+  var isFirst=claimsData.claims.length===0;
   if(!isFirst){wizFinish();return;}
   if(!wizOpt){alert('Please select a setup option.');return;}
   document.getElementById('wizStep0').style.display='none';
@@ -1270,11 +1271,12 @@ function renderScratchGrid(){
 
 
 function wizFinish(){
-  var isFirst=claimsData.lineItems.length===0;
+  var isFirst=claimsData.claims.length===0;
   claimsData.contractValue=wizContractVal;
   claimsData.retentionPct=wizRetPct;
 
   if(isFirst){
+    claimsData.lineItems=[]; // clear any stale data
     var newItems=[];
     var areas,rows;
     if(wizOpt===1){
