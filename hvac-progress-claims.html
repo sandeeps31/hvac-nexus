@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- build: 2026-04-14-v2 -->
 <html lang="en">
 <head>
 <link rel="stylesheet" href="theme.css">
@@ -1132,15 +1133,15 @@ async function openSetupView(mode){
   document.getElementById('topBtns').innerHTML='';
   if(mode==='budget'){
     _gridAreas=[{id:'ga'+nid(),name:'General'}];
+    var _firstAreaId=_gridAreas[0].id;
     var budItems=await loadBudgetItems();
-    // Store full structure including section/subheader rows
     _gridItems=budItems.map(function(item){
       if(item.type==='subheader'){
         return {id:'gh'+nid(),type:'subheader',sectionName:item.sectionName,name:item.name,checked:false,prices:{}};
       }
       var prices={};
-      if(_gridAreas.length&&item.budgetVal>0)prices[_gridAreas[0].id]=item.budgetVal;
-      return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,checked:true,prices:{},budgetVal:item.budgetVal,_defaultPrices:{[_gridAreas[0].id]:item.budgetVal}};
+      if(item.budgetVal>0)prices[_firstAreaId]=item.budgetVal;
+      return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,checked:true,prices:prices,budgetVal:item.budgetVal};
     });
   } else {
     _scratchAreas=[{id:'sa'+nid(),name:''}];
@@ -1387,13 +1388,14 @@ var _scratchRows=[]; // [{id, name, prices:{areaId:price}}]
 // ── BUDGET GRID ──
 async function buildBudgetTree(){
   _gridAreas=[{id:'ga'+nid(),name:'General'}];
+  var _firstAreaId=_gridAreas[0].id;
   var budItems=await loadBudgetItems();
   _gridItems=budItems.map(function(item){
     if(item.type==='subheader'){
       return {id:'gh'+nid(),type:'subheader',sectionName:item.sectionName,name:item.name,checked:false,prices:{}};
     }
     var prices={};
-    if(_gridAreas.length&&item.budgetVal>0)prices[_gridAreas[0].id]=item.budgetVal;
+    if(item.budgetVal>0)prices[_firstAreaId]=item.budgetVal;
     return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,checked:true,prices:prices,budgetVal:item.budgetVal};
   });
   if(!_gridItems.length){
