@@ -151,6 +151,14 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .bud-area-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;transition:color .12s}
 .bud-area-del:hover{color:var(--danger)}
 .bud-add-area{background:none;border:none;color:var(--accent);cursor:pointer;font-size:11.5px;font-family:'DM Sans',sans-serif;padding:2px 0;text-align:left}
+/* PO SIDE PANEL */
+.po-panel{position:fixed;top:0;right:-440px;width:420px;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:800;transition:right .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.4)}
+.po-panel.open{right:0}
+.po-panel-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.po-panel-body{flex:1;overflow-y:auto;padding:20px}
+.po-panel-close{background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;font-size:14px;padding:4px 10px;transition:all .15s}
+.po-panel-close:hover{color:var(--text);border-color:var(--text)}
+
 /* COST TAB */
 .ct-hidden{display:none!important}
 
@@ -374,6 +382,20 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 
   <div id="detailContent" style="padding-bottom:60px"></div>
   <div id="costsContent" style="padding-bottom:60px;display:none"></div>
+</div>
+
+<!-- PO SIDE PANEL -->
+<div class="po-panel" id="poPanelCosts">
+  <div class="po-panel-hdr">
+    <div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Purchase Order</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text)" id="poPanelTitle">—</div>
+    </div>
+    <button class="po-panel-close" onclick="closePOPanel()">✕ Close</button>
+  </div>
+  <div class="po-panel-body" id="poPanelBody">
+    <div style="color:var(--muted);text-align:center;padding:40px 0">Loading…</div>
+  </div>
 </div>
 
 <!-- SETUP WIZARD MODAL -->
@@ -752,30 +774,37 @@ function renderDetail(){
     });
   });
 
-  // ── Remaining banner
-  var totalSell=0,totalPrevAll=0,totalCurrAll=0;
-  claimsData.lineItems.forEach(function(li){
-    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
-    areas.forEach(function(ar){
-      totalSell+=num(ar.sellingPrice);
-      var ek=li.id+'__'+ar.areaId;
-      totalPrevAll+=prevClaimed(ek,claim.id);
-      var entry=(claim.entries||[]).find(function(e){return e.lineItemId===ek;});
-      totalCurrAll+=entry?num(entry.currentAmt):0;
-    });
-  });
-  var remainAll=totalSell-totalPrevAll-totalCurrAll;
-  var bannerColor=remainAll<0?'var(--danger)':remainAll===0?'var(--green)':'var(--warn)';
-  var bannerBg=remainAll<0?'rgba(255,77,109,.1)':remainAll===0?'rgba(0,229,160,.1)':'rgba(255,184,48,.1)';
-  var bannerDiv=document.createElement('div');
-  bannerDiv.style.cssText='margin:14px 24px 0;padding:10px 16px;border-radius:8px;background:'+bannerBg+';border:1px solid '+bannerColor+';display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px';
-  bannerDiv.innerHTML='<div style="display:flex;gap:20px;flex-wrap:wrap">'
-    +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Total Sell Price <strong style="color:var(--text)">'+fmt(totalSell)+'</strong></span>'
-    +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Previously Claimed <strong style="color:var(--text2)">'+fmt(totalPrevAll)+'</strong></span>'
-    +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">This Claim <strong style="color:var(--accent)">'+fmt(totalCurrAll)+'</strong></span>'
-    +'</div>'
-    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;font-weight:700;color:'+bannerColor+'">'+(remainAll<0?'⚠ Over by '+fmt(Math.abs(remainAll)):remainAll===0?'✓ Fully claimed':'Remaining: '+fmt(remainAll))+'</span>';
-  content.appendChild(bannerDiv);
+  // ── Cost banner (replaces yellow remaining banner) — shows if costs loaded
+  var invoicesBanner=loadInvoicesForMonth(claim.month);
+  var totalCostsBanner=0;
+  invoicesBanner.forEach(function(inv){totalCostsBanner+=num(inv.invoiceAmount||inv.totalAmount||inv.amount||0);});
+  if(totalCostsBanner>0&&!_dismissedCostBanner[claim.id]){
+    var retPctB=claimsData.retentionPct||5;
+    var totalCurrForBanner=0;
+    (claim.entries||[]).forEach(function(e){totalCurrForBanner+=num(e.currentAmt);});
+    (claim.varEntries||[]).forEach(function(e){totalCurrForBanner+=num(e.currentAmt);});
+    var netForBanner=totalCurrForBanner*(1-retPctB/100);
+    var marginForBanner=totalCostsBanner>0?((netForBanner-totalCostsBanner)/totalCostsBanner*100):0;
+    var bType=totalCurrForBanner<totalCostsBanner?'danger':marginForBanner<10?'warn':'green';
+    var bColors={danger:['rgba(255,77,109,.12)','#ff4d6d'],warn:['rgba(255,184,48,.12)','#ffb830'],green:['rgba(0,229,160,.1)','#00e5a0']};
+    var bc=bColors[bType];
+    var bIcon=bType==='danger'?'🔴':bType==='warn'?'🟡':'🟢';
+    var bMsg=bType==='danger'
+      ?'Claim ('+fmt(totalCurrForBanner)+') is below costs ('+fmt(totalCostsBanner)+') — potential loss of '+fmt(totalCostsBanner-totalCurrForBanner)
+      :bType==='warn'
+      ?'Costs covered but margin after retention is '+marginForBanner.toFixed(1)+'% — below 10% target'
+      :'Margin after retention is '+marginForBanner.toFixed(1)+'% — looking healthy';
+    var costBannerEl=document.createElement('div');
+    costBannerEl.className='cost-banner no-print';
+    costBannerEl.style.cssText='margin:14px 24px 0;padding:10px 14px;border-radius:8px;border:1px solid '+bc[1]+';background:'+bc[0]+';display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+    costBannerEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap">'
+      +'<span>'+bIcon+'</span>'
+      +'<span style="font-size:13px;color:var(--text);font-weight:500">'+bMsg+'</span>'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Vendor costs: <strong style="color:'+bc[1]+'">'+fmt(totalCostsBanner)+'</strong> ex GST · Switch to <strong>Costs tab</strong> for full breakdown</span>'
+      +'</div>'
+      +'<button class="cost-banner-dismiss" onclick="dismissCostBanner(\''+claim.id+'\')" title="Dismiss">✕</button>';
+    content.appendChild(costBannerEl);
+  }
 
   // ── Render each area as collapsible section
   var totalCurrentAmt=0,totalPrevAmt=0,totalContractVal=0;
@@ -793,9 +822,10 @@ function renderDetail(){
       totalCurrentAmt+=curr;totalPrevAmt+=prev;totalContractVal+=num(row.area.sellingPrice);
     });
 
+    var areaSlug=areaName.replace(/[^a-zA-Z0-9]/g,'_');
     var secHdr=document.createElement('div');secHdr.className='sec-hdr';
     secHdr.innerHTML='<span class="sec-title">'+escH(areaName)+'</span>'
-      +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text2);margin-left:auto;margin-right:12px">'+fmt(areaCurrentTotal)+' this claim</span>'
+      +'<span id="sechdr-curr-'+areaSlug+'" style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text2);margin-left:auto;margin-right:12px">'+fmt(areaCurrentTotal)+' this claim</span>'
       +'<span class="sec-chev">▾</span>';
     secHdr.addEventListener('click',function(){secCard.classList.toggle('collapsed');});
 
@@ -845,13 +875,14 @@ function renderDetail(){
       tbody.appendChild(tr);
     });
 
-    // Area subtotal row
-    var subTr=document.createElement('tr');subTr.className='subtot-row';
+    // Area subtotal row — live ID for dynamic updates
+    var areaSlug=areaName.replace(/[^a-zA-Z0-9]/g,'_');
+    var subTr=document.createElement('tr');subTr.className='subtot-row';subTr.id='subtot-'+areaSlug;
     subTr.innerHTML='<td>'+escH(areaName)+' subtotal</td>'
       +'<td class="r">'+fmt(areaContractTotal)+'</td>'
       +'<td class="r">'+fmt(areaPrevTotal)+'</td>'
-      +'<td class="r" style="color:var(--accent)">'+fmt(areaCurrentTotal)+'</td>'
-      +'<td class="r">'+fmt(Math.max(0,areaContractTotal-areaPrevTotal-areaCurrentTotal))+'</td>';
+      +'<td class="r" id="subtot-curr-'+areaSlug+'" style="color:var(--accent)">'+fmt(areaCurrentTotal)+'</td>'
+      +'<td class="r" id="subtot-rem-'+areaSlug+'">'+fmt(Math.max(0,areaContractTotal-areaPrevTotal-areaCurrentTotal))+'</td>';
     tbody.appendChild(subTr);
 
     tbl.appendChild(tbody);secBody.appendChild(tbl);secCard.appendChild(secHdr);secCard.appendChild(secBody);
@@ -977,52 +1008,72 @@ function renderDetail(){
       '<div style="font-family:Syne,sans-serif;font-size:16px;font-weight:700;color:'+t.c+'">'+t.v+'</div></div>';
   });
   content.appendChild(gtDiv);
-
-  // ── COST BANNER (Claim tab) ──
-  var invoices=loadInvoicesForMonth(claim.month);
-  var totalCosts=0;
-  var costByTrade={};
-  invoices.filter(function(r){return (r.status||'').toLowerCase().includes('approved');}).forEach(function(inv){
-    var exGST=num(inv.invoiceAmount||inv.totalAmount||inv.amount||0);
-    totalCosts+=exGST;
-    var trade=inv.vendor||'Other';
-    if(!costByTrade[trade])costByTrade[trade]=0;
-    costByTrade[trade]+=exGST;
-  });
-
-  if(totalCosts>0&&!_dismissedCostBanner[claim.id]){
-    var retPctB=claimsData.retentionPct||5;
-    var targetWithMarginAndRet=totalCosts+(totalCosts*0.05)-(grandCurrent*(retPctB/100))+(totalCosts*0.10);
-    // 🔴 loss: costs > claim
-    // 🟡 margin risk: claim > costs but net after retention < 10% margin
-    // 🟢 healthy: net - costs >= 10% of costs
-    var netAfterRet=grandCurrent*(1-retPctB/100);
-    var marginPct=totalCosts>0?((netAfterRet-totalCosts)/totalCosts*100):0;
-    var bannerType=grandCurrent<totalCosts?'danger':marginPct<10?'warn':'green';
-    var bannerColors={danger:['rgba(255,77,109,.12)','#ff4d6d'],warn:['rgba(255,184,48,.12)','#ffb830'],green:['rgba(0,229,160,.1)','#00e5a0']};
-    var bc=bannerColors[bannerType];
-    var bannerIcon=bannerType==='danger'?'🔴':bannerType==='warn'?'🟡':'🟢';
-    var bannerMsg=bannerType==='danger'
-      ?'Claim ('+fmt(grandCurrent)+') is below costs ('+fmt(totalCosts)+') — potential loss of '+fmt(totalCosts-grandCurrent)
-      :bannerType==='warn'
-      ?'Costs covered but margin after retention is '+marginPct.toFixed(1)+'% — below 10% target'
-      :'Margin after retention is '+marginPct.toFixed(1)+'% — looking healthy';
-    var costBanner=document.createElement('div');costBanner.className='cost-banner no-print';
-    costBanner.style.cssText='margin:14px 24px 0;padding:12px 16px;border-radius:8px;border:1px solid '+bc[1]+';background:'+bc[0]+';display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
-    costBanner.innerHTML='<div style="display:flex;align-items:center;gap:10px;flex:1;flex-wrap:wrap">'
-      +'<span style="font-size:16px">'+bannerIcon+'</span>'
-      +'<span style="font-size:13px;color:var(--text);font-weight:500">'+bannerMsg+'</span>'
-      +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Vendor costs: <strong style="color:var(--text2)">'+fmt(totalCosts)+'</strong> ex GST · Switch to <strong>Costs tab</strong> for full breakdown</span>'
-      +'</div>'
-      +'<button class="cost-banner-dismiss" onclick="dismissCostBanner(\''+claim.id+'\')" title="Dismiss">✕</button>';
-    content.appendChild(costBanner);
-  }
 }
 
 var _dismissedCostBanner={};
 function dismissCostBanner(claimId){
   _dismissedCostBanner[claimId]=true;
   renderDetail();
+}
+
+function openPOPanel(poId){
+  var panel=document.getElementById('poPanelCosts');
+  var title=document.getElementById('poPanelTitle');
+  var body=document.getElementById('poPanelBody');
+  if(!panel)return;
+  title.textContent=poId||'—';
+  body.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px 0">Loading PO data…</div>';
+  panel.classList.add('open');
+  // Load PO data from procurement
+  dbGetProcurement(_pcPNum).then(function(data){
+    if(!data||!data.groups){body.innerHTML='<div style="color:var(--muted);padding:20px">No PO data found.</div>';return;}
+    var po=null;
+    (data.groups||[]).forEach(function(g){(g.pos||[]).forEach(function(p){if(p.id===poId||p.poNum===poId)po=p;});});
+    if(!po){body.innerHTML='<div style="color:var(--muted);padding:20px">PO not found: '+escH(poId)+'</div>';return;}
+    var html='';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">';
+    var fields=[
+      {l:'PO Number',v:po.poNum||po.id},
+      {l:'Vendor',v:po.vendor||'—'},
+      {l:'Category',v:po.cat||'—'},
+      {l:'Status',v:po.status||'—'},
+      {l:'PO Value',v:fmt(num(po.value||po.amount||0))},
+      {l:'Period',v:po.period||'—'},
+    ];
+    fields.forEach(function(f){
+      html+='<div style="background:var(--surface2);border-radius:8px;padding:10px 14px">'
+        +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px">'+f.l+'</div>'
+        +'<div style="font-family:\'DM Mono\',monospace;font-size:13px;color:var(--text)">'+escH(String(f.v))+'</div>'
+        +'</div>';
+    });
+    html+='</div>';
+    // Line items
+    if(po.lineItems&&po.lineItems.length){
+      html+='<div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Line Items</div>';
+      html+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+      html+='<thead><tr style="border-bottom:1px solid var(--border)">'
+        +'<th style="padding:6px 8px;text-align:left;color:var(--muted);font-size:10px;font-weight:500">Description</th>'
+        +'<th style="padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:500">Qty</th>'
+        +'<th style="padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:500">Price</th>'
+        +'<th style="padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:500">Total</th>'
+        +'</tr></thead><tbody>';
+      po.lineItems.forEach(function(li){
+        html+='<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:7px 8px;color:var(--text2)">'+escH(li.desc||li.description||'—')+'</td>'
+          +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace">'+escH(String(li.qty||'—'))+'</td>'
+          +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace">'+fmt(num(li.price||0))+'</td>'
+          +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--accent)">'+fmt(num(li.qty||1)*num(li.price||0))+'</td>'
+          +'</tr>';
+      });
+      html+='</tbody></table>';
+    }
+    body.innerHTML=html;
+  }).catch(function(){body.innerHTML='<div style="color:var(--muted);padding:20px">Failed to load PO data.</div>';});
+}
+
+function closePOPanel(){
+  var panel=document.getElementById('poPanelCosts');
+  if(panel)panel.classList.remove('open');
 }
 
 // ── TAB SWITCHING ──
@@ -1076,14 +1127,13 @@ async function renderCostsTab(){
   allRecords.forEach(function(r){
     var lines=r.lines||[];
     if(r.isDirect||!lines.length){
-      // Direct invoice — treat whole thing as contract
-      contractLines.push({vendor:r.vendor||'Other',ref:getRef(r),desc:r.desc||r.description||'',
+      contractLines.push({vendor:r.vendor||'Other',ref:getRef(r),poId:r.poId||r.poRef||'',
         status:r.status||'',amt:getAmt(r),varNum:''});
     } else {
       lines.forEach(function(l){
         var amt=num(l.amount||0);
         if(!amt)return;
-        var row={vendor:r.vendor||'Other',ref:getRef(r)+' / '+escH(l.description||l.varNum||''),
+        var row={vendor:r.vendor||'Other',ref:getRef(r),poId:l.poId||l.poRef||r.poId||'',
           desc:l.description||'',status:r.status||'',amt:amt,varNum:l.varNum||''};
         if(l.type==='base'||!l.varNum){contractLines.push(row);}
         else{svLines.push(row);}
@@ -1122,12 +1172,20 @@ async function renderCostsTab(){
 
   html+='<div style="padding:16px 24px;display:flex;flex-direction:column;gap:16px">';
 
-  // ── Helper: render a card ──
-  var renderCard=function(title,groups,cardTotal,cardId){
+  // ── Helper: render a card (flat rows, single total) ──
+  var isSub=function(title){return title.includes('Sub');};
+  var renderCard=function(title,groups,cardTotal){
     if(!groups.length)return'';
-    var c='';
-    c+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-    // Card header
+    // Flatten all rows from all vendor groups, sort by vendor then ref
+    var allRows=[];
+    groups.forEach(function(grp){grp.rows.forEach(function(r){allRows.push(r);});});
+    allRows.sort(function(a,b){
+      var v=(a.vendor||'').localeCompare(b.vendor||'');
+      return v!==0?v:(a.ref||'').localeCompare(b.ref||'');
+    });
+    var colSpan=isSub(title)?6:5;
+    var c='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+    // Card header — collapsible
     c+='<div style="background:var(--surface2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none" onclick="this.nextElementSibling.classList.toggle(\'ct-hidden\')">'
       +'<span style="font-family:\'Syne\',sans-serif;font-size:14px;font-weight:700;color:var(--text)">'+title+'</span>'
       +'<div style="display:flex;gap:20px;align-items:center">'
@@ -1135,60 +1193,43 @@ async function renderCostsTab(){
       +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">'+fmt(cardTotal*1.1)+' incl GST</span>'
       +'<span style="color:var(--muted);font-size:12px">▾</span>'
       +'</div></div>';
-    // Card body
-    c+='<div>';
-    groups.forEach(function(grp,gi){
-      var vendorTotal=grp.rows.reduce(function(s,r){return s+r.amt;},0);
-      var vendorId=cardId+'-v'+gi;
-      // Vendor row — collapsible
-      c+='<div style="border-top:1px solid var(--border)">';
-      c+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 16px;background:var(--surface3);cursor:pointer;user-select:none" onclick="document.getElementById(\''+vendorId+'\').classList.toggle(\'ct-hidden\')">'
-        +'<span style="font-size:13px;font-weight:600;color:var(--text)">'+escH(grp.vendor)+'</span>'
-        +'<div style="display:flex;gap:16px;align-items:center">'
-        +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--text2)">'+fmt(vendorTotal)+'</span>'
-        +'<span style="color:var(--muted);font-size:11px">▾</span>'
-        +'</div></div>';
-      // Vendor rows
-      c+='<table id="'+vendorId+'" style="width:100%;border-collapse:collapse;font-size:12px">';
-      c+='<thead><tr style="background:var(--surface)">'
-        +'<th style="padding:5px 16px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Ref</th>'
-        +(title.includes('SV')?'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Var</th>':'')
-        +'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Description</th>'
-        +'<th style="padding:5px 8px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Status</th>'
-        +'<th style="padding:5px 16px;text-align:right;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Ex GST</th>'
-        +'<th style="padding:5px 16px;text-align:right;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Incl GST</th>'
-        +'</tr></thead><tbody>';
-      grp.rows.sort(function(a,b){return (a.desc||'').localeCompare(b.desc||'');}).forEach(function(r){
-        c+='<tr style="border-bottom:1px solid var(--border)">'
-          +'<td style="padding:7px 16px;color:var(--accent);font-family:\'DM Mono\',monospace;white-space:nowrap">'+escH(r.ref)+'</td>'
-          +(title.includes('SV')?'<td style="padding:7px 8px;color:var(--purple);font-family:\'DM Mono\',monospace;font-size:11px">'+escH(r.varNum)+'</td>':'')
-          +'<td style="padding:7px 8px;color:var(--text2)">'+escH(r.desc)+'</td>'
-          +'<td style="padding:7px 8px;text-align:center"><span style="font-size:10px;font-family:\'DM Mono\',monospace;padding:2px 7px;border-radius:4px;background:rgba(0,0,0,.2);color:'+statusColor(r.status)+'">'+escH(r.status||'—')+'</span></td>'
-          +'<td style="padding:7px 16px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:500">'+fmt(r.amt)+'</td>'
-          +'<td style="padding:7px 16px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text2)">'+fmt(r.amt*1.1)+'</td>'
-          +'</tr>';
-      });
-      // Vendor subtotal
-      c+='<tr style="background:var(--surface2)">'
-        +'<td colspan="'+(title.includes('SV')?'4':'3')+'" style="padding:7px 16px;font-weight:600;color:var(--text)">'+escH(grp.vendor)+' subtotal</td>'
-        +'<td style="padding:7px 16px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(vendorTotal)+'</td>'
-        +'<td style="padding:7px 16px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(vendorTotal*1.1)+'</td>'
+    // Table — flat, no vendor grouping
+    c+='<div><table style="width:100%;border-collapse:collapse;font-size:12px">';
+    c+='<thead><tr style="background:var(--surface)">'
+      +'<th style="padding:5px 16px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Trade / Vendor</th>'
+      +'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Ref</th>'
+      +(isSub(title)?'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Variation</th>':'')
+      +'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">PO No</th>'
+      +'<th style="padding:5px 8px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Status</th>'
+      +'<th style="padding:5px 16px;text-align:right;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Ex GST</th>'
+      +'<th style="padding:5px 16px;text-align:right;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Incl GST</th>'
+      +'</tr></thead><tbody>';
+    allRows.forEach(function(r){
+      var poLink=r.poId
+        ?'<a href="#" onclick="event.preventDefault();openPOPanel(\''+escH(r.poId)+'\')" style="color:var(--accent);font-family:\'DM Mono\',monospace;font-size:11px;text-decoration:underline;cursor:pointer">'+escH(r.poId)+'</a>'
+        :'<span style="color:var(--muted);font-size:11px">—</span>';
+      c+='<tr style="border-bottom:1px solid var(--border)">'
+        +'<td style="padding:7px 16px;color:var(--text2);font-size:12px">'+escH(r.vendor)+'</td>'
+        +'<td style="padding:7px 8px;color:var(--accent);font-family:\'DM Mono\',monospace;white-space:nowrap">'+escH(r.ref)+'</td>'
+        +(isSub(title)?'<td style="padding:7px 8px;color:var(--purple);font-family:\'DM Mono\',monospace;font-size:11px">'+escH(r.varNum)+'</td>':'')
+        +'<td style="padding:7px 8px">'+poLink+'</td>'
+        +'<td style="padding:7px 8px;text-align:center"><span style="font-size:10px;font-family:\'DM Mono\',monospace;padding:2px 7px;border-radius:4px;background:rgba(0,0,0,.2);color:'+statusColor(r.status)+'">'+escH(r.status||'—')+'</span></td>'
+        +'<td style="padding:7px 16px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:500">'+fmt(r.amt)+'</td>'
+        +'<td style="padding:7px 16px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text2)">'+fmt(r.amt*1.1)+'</td>'
         +'</tr>';
-      c+='</tbody></table></div>';
     });
-    // Card footer summary
-    c+='<div style="padding:10px 16px;background:var(--surface2);border-top:2px solid var(--border);display:flex;justify-content:space-between;align-items:center">'
-      +'<span style="font-size:12px;color:var(--text2);font-weight:600">'+title+' Total</span>'
-      +'<div style="display:flex;gap:20px">'
-      +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Ex GST <strong style="color:var(--danger)">'+fmt(cardTotal)+'</strong></span>'
-      +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Incl GST <strong style="color:var(--danger)">'+fmt(cardTotal*1.1)+'</strong></span>'
-      +'</div></div>';
-    c+='</div>';
+    // Single total row
+    c+='<tr style="background:var(--surface2)">'
+      +'<td colspan="'+(isSub(title)?5:4)+'" style="padding:8px 16px;font-weight:700;color:var(--text)">'+title+' Total</td>'
+      +'<td style="padding:8px 16px;text-align:right;font-weight:700;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(cardTotal)+'</td>'
+      +'<td style="padding:8px 16px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(cardTotal*1.1)+'</td>'
+      +'</tr>';
+    c+='</tbody></table></div></div>';
     return c;
   };
 
-  html+=renderCard('Base Contract',contractGroups,contractTotal,'cw');
-  html+=renderCard('Subcontractor Variations',svGroups,svTotal,'sv');
+  html+=renderCard('Base Contract',contractGroups,contractTotal);
+  html+=renderCard('Subcontractor Variations',svGroups,svTotal);
 
   // Grand total row
   html+='<div style="padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">'
@@ -1217,18 +1258,51 @@ function syncClaimPct(inp,ek,claimId,sellPrice,prevAmt){
   var amt=Math.round(sellPrice*(pct/100)*100)/100;
   amt=Math.max(0,Math.min(sellPrice-prevAmt,amt));
   var e=getClaimEntry(ek,claimId);if(e){e.currentAmt=amt;}
-  // Update sibling $ input
   var dual=inp.closest?inp.closest('.claim-dual'):inp.parentElement;
   if(dual){var amtInp=dual.querySelector('.claim-amt-inp');if(amtInp)amtInp.value=amt||'';}
-  save();updateDetailSummary();
+  save();updateDetailSummary();updateAreaSubtotal(ek,claimId);
 }
 function syncClaimAmt(inp,ek,claimId,sellPrice,prevAmt){
   var amt=Math.max(0,Math.min(sellPrice-prevAmt,num(inp.value)));
   var e=getClaimEntry(ek,claimId);if(e){e.currentAmt=amt;}
-  // Update sibling % input
   var dual=inp.closest?inp.closest('.claim-dual'):inp.parentElement;
   if(dual){var pctInp=dual.querySelector('.claim-pct-inp');if(pctInp)pctInp.value=sellPrice>0?Math.round(amt/sellPrice*1000)/10:'';}
-  save();updateDetailSummary();
+  save();updateDetailSummary();updateAreaSubtotal(ek,claimId);
+}
+
+// Update area subtotal row live when an entry changes
+function updateAreaSubtotal(changedEk,claimId){
+  var claim=claimsData.claims.find(function(c){return c.id===claimId;});
+  if(!claim)return;
+  // Find which area this ek belongs to
+  claimsData.lineItems.forEach(function(li){
+    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+    areas.forEach(function(ar){
+      var ek=li.id+'__'+ar.areaId;
+      if(ek!==changedEk)return;
+      var areaName=ar.areaName||'General';
+      var areaSlug=areaName.replace(/[^a-zA-Z0-9]/g,'_');
+      // Sum all entries in this area
+      var areaTotal=0;var areaContract=0;var areaPrev=0;
+      claimsData.lineItems.forEach(function(li2){
+        var a2=li2.areas||[{areaId:li2.id,areaName:li2.area||'General',sellingPrice:num(li2.sellingPrice||0)}];
+        a2.forEach(function(ar2){
+          if((ar2.areaName||'General')!==areaName)return;
+          var ek2=li2.id+'__'+ar2.areaId;
+          var entry=(claim.entries||[]).find(function(e){return e.lineItemId===ek2;});
+          areaTotal+=entry?num(entry.currentAmt):0;
+          areaContract+=num(ar2.sellingPrice);
+          areaPrev+=prevClaimed(ek2,claimId);
+        });
+      });
+      var currEl=document.getElementById('subtot-curr-'+areaSlug);
+      var remEl=document.getElementById('subtot-rem-'+areaSlug);
+      var hdrEl=document.getElementById('sechdr-curr-'+areaSlug);
+      if(currEl)currEl.textContent=fmt(areaTotal);
+      if(remEl)remEl.textContent=fmt(Math.max(0,areaContract-areaPrev-areaTotal));
+      if(hdrEl)hdrEl.textContent=fmt(areaTotal)+' this claim';
+    });
+  });
 }
 function syncVarPct(inp,varId,claimId,varVal,prevAmt){
   var pct=num(inp.value);
