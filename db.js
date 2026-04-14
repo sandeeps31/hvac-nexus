@@ -174,7 +174,6 @@ async function authGuard() {
 
 // ── Core fetch wrapper ──
 async function sbFetch(path, options = {}) {
-  // Always wait for auth to be ready before any Supabase call
   await dbReady;
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
   // Use session JWT if logged in, otherwise fall back to anon key
@@ -218,10 +217,9 @@ async function dbSet(table, data) {
         body: JSON.stringify({ data, updated_at: new Date().toISOString() })
       });
     } else {
-      const companyId = localStorage.getItem('hvacnexus_company_id');
       await sbFetch(table, {
         method: 'POST',
-        body: JSON.stringify({ data, company_id: companyId })
+        body: JSON.stringify({ data })
       });
     }
     return true;
@@ -253,10 +251,9 @@ async function dbSetProject(table, projectNum, data) {
         body: JSON.stringify({ data, updated_at: new Date().toISOString() })
       });
     } else {
-      const companyId = localStorage.getItem('hvacnexus_company_id');
       await sbFetch(table, {
         method: 'POST',
-        body: JSON.stringify({ project_num: projectNum, data, company_id: companyId })
+        body: JSON.stringify({ project_num: projectNum, data })
       });
     }
     return true;
