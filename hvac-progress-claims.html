@@ -775,6 +775,7 @@ function renderDetail(){
   claimsData.lineItems.forEach(function(li){
     var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
     areas.forEach(function(ar){
+      if(num(ar.sellingPrice)<=0)return; // skip zero-value areas
       var aName=ar.areaName||'General';
       if(!areaMap[aName])areaMap[aName]=[];
       var entryKey=li.id+'__'+ar.areaId;
@@ -969,10 +970,11 @@ function renderDetail(){
   document.getElementById('ds-cumul').textContent=fmt(cumulClaimed);
   document.getElementById('ds-remain').textContent=fmt(Math.max(0,claimsData.contractValue-cumulClaimed));
 
-  // Cost banner — rendered here where grandCurrent is known
+  // Cost banner — placed at top of content
   var invoicesBanner=loadInvoicesForMonth(claim.month);
   var totalCostsBanner=0;
-  invoicesBanner.forEach(function(inv){totalCostsBanner+=num(inv.invoiceAmount||inv.totalAmount||inv.amount||0);});
+  // Use totalAmount (claim amount) preferring over invoiceAmount to avoid double-counting
+  invoicesBanner.forEach(function(inv){totalCostsBanner+=num(inv.totalAmount||inv.invoiceAmount||inv.amount||0);});
   if(totalCostsBanner>0&&!_dismissedCostBanner[claim.id]){
     var marginForBanner=totalCostsBanner>0?((netPayable-totalCostsBanner)/totalCostsBanner*100):0;
     var bType=grandCurrent<totalCostsBanner?'danger':marginForBanner<10?'warn':'green';
@@ -986,14 +988,14 @@ function renderDetail(){
       :'Margin on costs is '+marginForBanner.toFixed(1)+'% — looking healthy';
     var costBannerEl=document.createElement('div');
     costBannerEl.className='cost-banner no-print';
-    costBannerEl.style.cssText='margin:14px 0 0;padding:10px 14px;border-radius:8px;border:1px solid '+bc[1]+';background:'+bc[0]+';display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+    costBannerEl.style.cssText='margin:0 0 14px;padding:10px 14px;border-radius:8px;border:1px solid '+bc[1]+';background:'+bc[0]+';display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
     costBannerEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap">'
       +'<span>'+bIcon+'</span>'
       +'<span style="font-size:13px;color:var(--text);font-weight:500">'+bMsg+'</span>'
       +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Vendor costs: <strong style="color:'+bc[1]+'">'+fmt(totalCostsBanner)+'</strong> ex GST · Switch to <strong>Costs tab</strong> for full breakdown</span>'
       +'</div>'
       +'<button class="cost-banner-dismiss" onclick="dismissCostBanner(\''+claim.id+'\')" title="Dismiss">✕</button>';
-    content.appendChild(costBannerEl);
+    content.insertBefore(costBannerEl,content.firstChild);
   }
 }
 
