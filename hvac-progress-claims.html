@@ -150,15 +150,30 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .bud-area-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;transition:color .12s}
 .bud-area-del:hover{color:var(--danger)}
 .bud-add-area{background:none;border:none;color:var(--accent);cursor:pointer;font-size:11.5px;font-family:'DM Sans',sans-serif;padding:2px 0;text-align:left}
+/* SELL PRICE GRID */
+.sp-grid{width:100%;border-collapse:collapse;min-width:400px}
+.sp-grid th{padding:8px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
+.sp-grid th:first-child{text-align:left;min-width:160px}
+.sp-grid th:last-child{border-right:none}
+.sp-grid td{padding:6px 8px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:middle}
+.sp-grid td:first-child{font-size:13px;color:var(--text2);border-right:2px solid var(--border)}
+.sp-grid td:last-child{border-right:none}
+.sp-grid tr:last-child td{border-bottom:none}
+.sp-grid tr:hover td{background:var(--surface2)}
+.sp-price-inp{background:transparent;border:1px solid transparent;border-radius:5px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:4px 6px;outline:none;width:100%;text-align:right;transition:border-color .15s,background .15s}
+.sp-price-inp:hover{border-color:var(--border)}
+.sp-price-inp:focus{border-color:var(--accent);background:var(--surface2)}
+.sp-price-inp::placeholder{color:var(--muted)}
+.area-col-tag{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:12px}
+.area-col-input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:90px}
+.area-col-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;line-height:1;transition:color .12s}
+.area-col-del:hover{color:var(--danger)}
 /* SCRATCH LINE ITEMS */
 .scratch-item{border-bottom:1px solid var(--border)}
 .scratch-item:last-child{border-bottom:none}
 .scratch-item-hdr{display:flex;align-items:center;gap:8px;padding:10px 12px}
 .scratch-name{flex:1;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 9px;outline:none}
 .scratch-name:focus{border-color:var(--accent)}
-.scratch-areas{padding:0 12px 10px 28px;display:flex;flex-direction:column;gap:5px}
-.scratch-price{width:120px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:6px 9px;outline:none;text-align:right}
-.scratch-price:focus{border-color:var(--accent)}
 /* PRINT */
 @media print{
   .view{display:block!important}
@@ -356,23 +371,34 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
       </div>
     </div>
 
-    <!-- STEP 1a: Budget import -->
+    <!-- STEP 1a: Budget import grid -->
     <div id="wizStep1a" style="display:none">
       <h3>Select Line Items from Budget</h3>
-      <p class="msub">Tick items to include. For each item, add one or more areas with a selling price.</p>
-      <div style="max-height:460px;overflow-y:auto;border:1px solid var(--border);border-radius:8px" id="budgetTree"></div>
+      <p class="msub">Tick the items to include. Define your area columns, then enter sell prices for each.</p>
+      <!-- Area column headers -->
+      <div style="margin-bottom:12px">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Area Columns</div>
+        <div id="gridAreaCols" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
+        <button onclick="addGridArea()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;margin-top:6px">＋ Add Area</button>
+      </div>
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px" id="budgetGrid"></div>
       <div class="mac">
         <button class="bg bsm btn" onclick="wizBack()">← Back</button>
         <button class="bp bsm btn" onclick="wizFinish()">Create Claim →</button>
       </div>
     </div>
 
-    <!-- STEP 1b: Scratch -->
+    <!-- STEP 1b: Scratch grid -->
     <div id="wizStep1b" style="display:none">
       <h3>Build Line Items</h3>
-      <p class="msub">Add your claim line items. For each, add one or more areas with a selling price.</p>
-      <div id="scratchItems" style="border:1px solid var(--border);border-radius:8px;padding:0;max-height:420px;overflow-y:auto"></div>
-      <button onclick="addScratchItem()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12.5px;margin-top:10px;font-family:'DM Sans',sans-serif">＋ Add line item</button>
+      <p class="msub">Add your line items and area columns, then enter the sell price for each.</p>
+      <div style="margin-bottom:12px">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Area Columns</div>
+        <div id="scratchAreaCols" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
+        <button onclick="addScratchArea()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;margin-top:6px">＋ Add Area</button>
+      </div>
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px" id="scratchGrid"></div>
+      <button onclick="addScratchRow()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12.5px;margin-top:10px;font-family:'DM Sans',sans-serif">＋ Add Line Item</button>
       <div class="mac">
         <button class="bg bsm btn" onclick="wizBack()">← Back</button>
         <button class="bp bsm btn" onclick="wizFinish()">Create Claim →</button>
@@ -581,52 +607,69 @@ function closeM(id){document.getElementById(id).classList.remove('open');}
 
 function openEditSellPrices(){
   var body=document.getElementById('sellPricesBody');
-  var html='';
+  if(!claimsData.lineItems||!claimsData.lineItems.length){
+    body.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">No line items set up yet.</div>';
+    document.getElementById('sellPricesModal').classList.add('open');return;
+  }
+  // Collect all unique area names across all line items
+  var allAreas={};
+  claimsData.lineItems.forEach(function(li){
+    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+    areas.forEach(function(ar){if(ar.areaName)allAreas[ar.areaName]=true;});
+  });
+  var areaCols=Object.keys(allAreas);if(!areaCols.length)areaCols=['General'];
+  var tbl=document.createElement('table');tbl.className='sp-grid';
+  var thead=document.createElement('thead');var htr=document.createElement('tr');
+  var th0=document.createElement('th');th0.textContent='Line Item';htr.appendChild(th0);
+  areaCols.forEach(function(aName){var th=document.createElement('th');th.textContent=aName;htr.appendChild(th);});
+  thead.appendChild(htr);tbl.appendChild(thead);
+  var tbody=document.createElement('tbody');
   claimsData.lineItems.forEach(function(li,li_i){
     var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
-    html+='<div style="border-bottom:1px solid var(--border);padding:10px 14px">'
-      +'<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">'+escH(li.name)+'</div>'
-      +'<div id="sp-areas-'+li_i+'" style="display:flex;flex-direction:column;gap:6px">';
-    areas.forEach(function(ar,ai){
-      html+='<div class="bud-area-row" style="gap:10px">'
-        +'<input class="bud-item-area" placeholder="Area name" value="'+escH(ar.areaName||'')+'" data-li="'+li_i+'" data-ai="'+ai+'" id="sp-name-'+li_i+'-'+ai+'"/>'
-        +'<input class="bud-item-price" type="number" placeholder="$ sell price" value="'+(ar.sellingPrice||'')+'" data-li="'+li_i+'" data-ai="'+ai+'" id="sp-price-'+li_i+'-'+ai+'"/>'
-        +'</div>';
+    var tr=document.createElement('tr');
+    var tdName=document.createElement('td');tdName.textContent=li.name;tr.appendChild(tdName);
+    areaCols.forEach(function(aName){
+      var td=document.createElement('td');
+      var existingArea=areas.find(function(a){return a.areaName===aName;});
+      var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
+      inp.placeholder='0.00';inp.value=existingArea&&existingArea.sellingPrice?existingArea.sellingPrice:'';
+      inp.dataset.li=li_i;inp.dataset.area=aName;
+      td.appendChild(inp);tr.appendChild(td);
     });
-    html+='</div>'
-      +'<button class="bud-add-area" style="margin-top:6px" onclick="spAddArea('+li_i+')">＋ Add Area</button>'
-      +'</div>';
+    tbody.appendChild(tr);
   });
-  body.innerHTML=html||'<div style="padding:24px;text-align:center;color:var(--muted)">No line items set up yet.</div>';
+  tbl.appendChild(tbody);
+  var addAreaDiv=document.createElement('div');
+  addAreaDiv.style.cssText='padding:10px 12px;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border)';
+  addAreaDiv.innerHTML='<input id="sp-new-area" class="mi" placeholder="New area column name…" style="flex:1;padding:6px 10px;font-size:12px"/>'
+    +'<button class="btn bp bsm" onclick="spAddAreaCol()">+ Add Area Column</button>';
+  body.innerHTML='';body.appendChild(tbl);body.appendChild(addAreaDiv);
   document.getElementById('sellPricesModal').classList.add('open');
 }
 
-function spAddArea(li_i){
-  var li=claimsData.lineItems[li_i];
-  if(!li)return;
-  if(!li.areas)li.areas=[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
-  li.areas.push({areaId:'a'+nid(),areaName:'',sellingPrice:0});
-  openEditSellPrices(); // re-render
+function spAddAreaCol(){
+  var newArea=(document.getElementById('sp-new-area').value||'').trim();
+  if(!newArea){alert('Enter an area name.');return;}
+  claimsData.lineItems.forEach(function(li){
+    if(!li.areas)li.areas=[{areaId:'a'+nid(),areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+    var exists=li.areas.find(function(a){return a.areaName===newArea;});
+    if(!exists)li.areas.push({areaId:'a'+nid(),areaName:newArea,sellingPrice:0});
+  });
+  openEditSellPrices();
 }
 
 function saveSellPrices(){
-  claimsData.lineItems.forEach(function(li,li_i){
-    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
-    var updated=[];
-    areas.forEach(function(ar,ai){
-      var nameEl=document.getElementById('sp-name-'+li_i+'-'+ai);
-      var priceEl=document.getElementById('sp-price-'+li_i+'-'+ai);
-      if(!nameEl||!priceEl)return;
-      var aName=nameEl.value.trim();
-      var aPrice=num(priceEl.value);
-      if(aName||aPrice>0)updated.push({areaId:ar.areaId,areaName:aName,sellingPrice:aPrice});
-    });
-    if(updated.length)li.areas=updated;
+  var inputs=document.getElementById('sellPricesBody').querySelectorAll('input[data-li]');
+  inputs.forEach(function(inp){
+    var li_i=parseInt(inp.dataset.li);var areaName=inp.dataset.area;var price=num(inp.value);
+    var li=claimsData.lineItems[li_i];if(!li)return;
+    if(!li.areas)li.areas=[{areaId:'a'+nid(),areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+    var ar=li.areas.find(function(a){return a.areaName===areaName;});
+    if(ar){ar.sellingPrice=price;}else if(price>0){li.areas.push({areaId:'a'+nid(),areaName:areaName,sellingPrice:price});}
   });
-  save();
-  closeM('sellPricesModal');
-  renderDetail();
+  save();closeM('sellPricesModal');renderDetail();
 }
+
 
 function deleteDraftClaim(id){
   var c=claimsData.claims.find(function(x){return x.id===id;});
@@ -1061,8 +1104,7 @@ async function wizNext(){
     await buildBudgetTree();
     document.getElementById('wizStep1a').style.display='block';
   } else {
-    scratchItems=[{id:'s'+nid(),name:'',areas:[{areaId:'a'+nid(),areaName:'',sellingPrice:0}]}];
-    renderScratchItems();
+    initScratchGrid();
     document.getElementById('wizStep1b').style.display='block';
   }
   wizStep=1;
@@ -1074,102 +1116,138 @@ function wizBack(){
   wizStep=0;
 }
 
+
+// ── GRID STATE ──
+var _gridAreas=[]; // [{id, name}] — shared column definitions
+var _gridItems=[]; // [{id, name, checked, prices:{areaId:price}}]
+var _scratchAreas=[];
+var _scratchRows=[]; // [{id, name, prices:{areaId:price}}]
+
+// ── BUDGET GRID ──
 async function buildBudgetTree(){
-  var tree=document.getElementById('budgetTree');
-  tree.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">Loading budget…</div>';
+  _gridAreas=[{id:'ga'+nid(),name:'General'}];
   var budItems=await loadBudgetItems();
-  if(!budItems.length){tree.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">No budget data found. Use Option 2 instead.</div>';return;}
-  var sections={};
-  budItems.forEach(function(item){
-    var sec=item.sectionName.replace(/^\d+\.\s*/,'');
-    if(!sections[sec])sections[sec]=[];
-    sections[sec].push(item);
+  _gridItems=budItems.map(function(item){return {id:'gi'+nid(),name:item.name,checked:true,prices:{}};});
+  if(!_gridItems.length){
+    document.getElementById('budgetGrid').innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">No budget data found. Use Option 2 instead.</div>';
+    renderGridAreaCols();return;
+  }
+  renderGridAreaCols();
+  renderBudgetGrid();
+}
+
+function renderGridAreaCols(){
+  var cont=document.getElementById('gridAreaCols');if(!cont)return;
+  cont.innerHTML='';
+  _gridAreas.forEach(function(ar,i){
+    var tag=document.createElement('div');tag.className='area-col-tag';
+    var inp=document.createElement('input');inp.className='area-col-input';inp.placeholder='Area name';inp.value=ar.name||'';
+    (function(idx){inp.addEventListener('input',function(){_gridAreas[idx].name=this.value;renderBudgetGrid();});})(i);
+    var del=document.createElement('button');del.className='area-col-del';del.textContent='×';del.title='Remove';
+    (function(idx){del.addEventListener('click',function(){if(_gridAreas.length>1){_gridAreas.splice(idx,1);renderGridAreaCols();renderBudgetGrid();}});})(i);
+    tag.appendChild(inp);tag.appendChild(del);cont.appendChild(tag);
   });
-  var container=document.createElement('div');
-  Object.keys(sections).forEach(function(sec){
-    var secDiv=document.createElement('div');secDiv.className='bud-section';
-    secDiv.innerHTML='<div class="bud-sec-hdr" onclick="this.parentElement.classList.toggle(\'col\')">'
-      +'<input type="checkbox" style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0" onclick="event.stopPropagation();toggleSecCheck(this)" checked/>'
-      +'<span class="bud-sec-name">'+escH(sec)+'</span><span class="bud-sec-chev">▾</span></div>';
-    var itemsDiv=document.createElement('div');itemsDiv.className='bud-items';
-    sections[sec].forEach(function(item){
-      itemsDiv.appendChild(makeBudItemEl(item.name));
+}
+
+function addGridArea(){
+  _gridAreas.push({id:'ga'+nid(),name:''});
+  renderGridAreaCols();renderBudgetGrid();
+  var inputs=document.getElementById('gridAreaCols').querySelectorAll('.area-col-input');
+  if(inputs.length)inputs[inputs.length-1].focus();
+}
+
+function renderBudgetGrid(){
+  var cont=document.getElementById('budgetGrid');if(!cont)return;
+  var tbl=document.createElement('table');tbl.className='sp-grid';
+  var thead=document.createElement('thead');var htr=document.createElement('tr');
+  var th0=document.createElement('th');th0.textContent='Line Item';htr.appendChild(th0);
+  var thCb=document.createElement('th');thCb.style.cssText='width:32px;text-align:center';thCb.textContent='✓';htr.appendChild(thCb);
+  _gridAreas.forEach(function(ar){var th=document.createElement('th');th.textContent=ar.name||'(Area)';htr.appendChild(th);});
+  thead.appendChild(htr);tbl.appendChild(thead);
+  var tbody=document.createElement('tbody');
+  _gridItems.forEach(function(item,ri){
+    var tr=document.createElement('tr');
+    var tdName=document.createElement('td');tdName.textContent=item.name;tr.appendChild(tdName);
+    var tdCb=document.createElement('td');tdCb.style.textAlign='center';
+    var cb=document.createElement('input');cb.type='checkbox';cb.checked=item.checked!==false;
+    cb.style.cssText='width:14px;height:14px;accent-color:var(--accent);cursor:pointer';
+    (function(idx){cb.addEventListener('change',function(){_gridItems[idx].checked=this.checked;});})(ri);
+    tdCb.appendChild(cb);tr.appendChild(tdCb);
+    _gridAreas.forEach(function(ar){
+      var td=document.createElement('td');if(!item.prices)item.prices={};
+      var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
+      inp.placeholder='0.00';inp.value=item.prices[ar.id]||'';
+      (function(rIdx,aId){inp.addEventListener('input',function(){if(!_gridItems[rIdx].prices)_gridItems[rIdx].prices={};_gridItems[rIdx].prices[aId]=num(this.value);});})(ri,ar.id);
+      td.appendChild(inp);tr.appendChild(td);
     });
-    secDiv.appendChild(itemsDiv);
-    container.appendChild(secDiv);
+    tbody.appendChild(tr);
   });
-  tree.innerHTML='';tree.appendChild(container);
+  tbl.appendChild(tbody);cont.innerHTML='';cont.appendChild(tbl);
 }
 
-function makeBudItemEl(name){
-  var itemDiv=document.createElement('div');itemDiv.className='bud-item';
-  var uid='bi-'+Math.random().toString(36).slice(2,7);
-  itemDiv.innerHTML='<div class="bud-item-hdr">'
-    +'<input type="checkbox" class="bud-item-cb" id="'+uid+'" checked/>'
-    +'<label for="'+uid+'" class="bud-item-name">'+escH(name)+'</label>'
-    +'</div>'
-    +'<div class="bud-item-areas"></div>'
-    +'<div style="padding:0 12px 8px 44px">'
-    +'<button class="bud-add-area" onclick="addBudArea(this)">＋ Add Area</button>'
-    +'</div>';
-  // Add one area row by default
-  addBudArea(itemDiv.querySelector('.bud-add-area'));
-  return itemDiv;
+// ── SCRATCH GRID ──
+function initScratchGrid(){
+  _scratchAreas=[{id:'sa'+nid(),name:'General'}];
+  _scratchRows=[{id:'sr'+nid(),name:'',prices:{}}];
+  renderScratchAreaCols();renderScratchGrid();
 }
 
-function addBudArea(btn){
-  var areasDiv=btn.closest('.bud-item').querySelector('.bud-item-areas');
-  var row=document.createElement('div');row.className='bud-area-row';
-  row.innerHTML='<input class="bud-item-area" placeholder="Area name (e.g. Level 1)"/>'
-    +'<input class="bud-item-price" type="number" placeholder="$ sell price"/>'
-    +'<button class="bud-area-del" onclick="this.closest(\'.bud-area-row\').remove()" title="Remove area">✕</button>';
-  areasDiv.appendChild(row);
-  row.querySelector('.bud-item-area').focus();
-}
-function toggleSecCheck(cb){
-  var sec=cb.closest('.bud-section');
-  sec.querySelectorAll('.bud-item-cb').forEach(function(c){c.checked=cb.checked;});
+function renderScratchAreaCols(){
+  var cont=document.getElementById('scratchAreaCols');if(!cont)return;cont.innerHTML='';
+  _scratchAreas.forEach(function(ar,i){
+    var tag=document.createElement('div');tag.className='area-col-tag';
+    var inp=document.createElement('input');inp.className='area-col-input';inp.placeholder='Area name';inp.value=ar.name||'';
+    (function(idx){inp.addEventListener('input',function(){_scratchAreas[idx].name=this.value;renderScratchGrid();});})(i);
+    var del=document.createElement('button');del.className='area-col-del';del.textContent='×';
+    (function(idx){del.addEventListener('click',function(){if(_scratchAreas.length>1){_scratchAreas.splice(idx,1);renderScratchAreaCols();renderScratchGrid();}});})(i);
+    tag.appendChild(inp);tag.appendChild(del);cont.appendChild(tag);
+  });
 }
 
-function addScratchItem(){
-  scratchItems.push({id:'s'+nid(),name:'',areas:[{areaId:'a'+nid(),areaName:'',sellingPrice:0}]});
-  renderScratchItems();
+function addScratchArea(){
+  _scratchAreas.push({id:'sa'+nid(),name:''});
+  renderScratchAreaCols();renderScratchGrid();
+  var inputs=document.getElementById('scratchAreaCols').querySelectorAll('.area-col-input');
+  if(inputs.length)inputs[inputs.length-1].focus();
 }
-function renderScratchItems(){
-  var cont=document.getElementById('scratchItems');cont.innerHTML='';
-  scratchItems.forEach(function(item,i){
-    var div=document.createElement('div');div.className='scratch-item';
-    // Header row with name + delete item
-    var hdr=document.createElement('div');hdr.className='scratch-item-hdr';
-    var nameInp=document.createElement('input');nameInp.type='text';nameInp.className='scratch-name';
-    nameInp.placeholder='Line item description';nameInp.value=item.name||'';
-    (function(idx){nameInp.addEventListener('input',function(){scratchItems[idx].name=this.value;});})(i);
-    var del=document.createElement('button');del.textContent='✕';
-    del.style.cssText='background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;flex-shrink:0';
-    (function(idx){del.addEventListener('click',function(){scratchItems.splice(idx,1);renderScratchItems();});})(i);
-    hdr.appendChild(nameInp);hdr.appendChild(del);div.appendChild(hdr);
-    // Areas
-    var areasDiv=document.createElement('div');areasDiv.className='scratch-areas';
-    item.areas.forEach(function(ar,ai){
-      var row=document.createElement('div');row.className='bud-area-row';
-      var areaInp=document.createElement('input');areaInp.type='text';areaInp.className='bud-item-area';
-      areaInp.placeholder='Area name (e.g. Level 1)';areaInp.value=ar.areaName||'';
-      (function(ii,jj){areaInp.addEventListener('input',function(){scratchItems[ii].areas[jj].areaName=this.value;});})(i,ai);
-      var priceInp=document.createElement('input');priceInp.type='number';priceInp.className='bud-item-price';
-      priceInp.placeholder='$ sell price';priceInp.value=ar.sellingPrice||'';
-      (function(ii,jj){priceInp.addEventListener('input',function(){scratchItems[ii].areas[jj].sellingPrice=num(this.value);});})(i,ai);
-      var delArea=document.createElement('button');delArea.className='bud-area-del';delArea.textContent='✕';
-      (function(ii,jj){delArea.addEventListener('click',function(){if(scratchItems[ii].areas.length>1){scratchItems[ii].areas.splice(jj,1);renderScratchItems();}});})(i,ai);
-      row.appendChild(areaInp);row.appendChild(priceInp);row.appendChild(delArea);areasDiv.appendChild(row);
+
+function addScratchRow(){
+  _scratchRows.push({id:'sr'+nid(),name:'',prices:{}});
+  renderScratchGrid();
+}
+
+function renderScratchGrid(){
+  var cont=document.getElementById('scratchGrid');if(!cont)return;
+  var tbl=document.createElement('table');tbl.className='sp-grid';
+  var thead=document.createElement('thead');var htr=document.createElement('tr');
+  var th0=document.createElement('th');th0.textContent='Line Item';htr.appendChild(th0);
+  _scratchAreas.forEach(function(ar){var th=document.createElement('th');th.textContent=ar.name||'(Area)';htr.appendChild(th);});
+  var thDel=document.createElement('th');thDel.style.width='28px';htr.appendChild(thDel);
+  thead.appendChild(htr);tbl.appendChild(thead);
+  var tbody=document.createElement('tbody');
+  _scratchRows.forEach(function(row,ri){
+    var tr=document.createElement('tr');
+    var tdName=document.createElement('td');
+    var nameInp=document.createElement('input');
+    nameInp.style.cssText='background:transparent;border:none;outline:none;color:var(--text);font-family:\'DM Sans\',sans-serif;font-size:13px;width:100%;padding:2px';
+    nameInp.placeholder='Line item name';nameInp.value=row.name||'';
+    (function(idx){nameInp.addEventListener('input',function(){_scratchRows[idx].name=this.value;});})(ri);
+    tdName.appendChild(nameInp);tr.appendChild(tdName);
+    _scratchAreas.forEach(function(ar){
+      var td=document.createElement('td');if(!row.prices)row.prices={};
+      var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
+      inp.placeholder='0.00';inp.value=row.prices[ar.id]||'';
+      (function(rIdx,aId){inp.addEventListener('input',function(){if(!_scratchRows[rIdx].prices)_scratchRows[rIdx].prices={};_scratchRows[rIdx].prices[aId]=num(this.value);});})(ri,ar.id);
+      td.appendChild(inp);tr.appendChild(td);
     });
-    // Add area button
-    var addAreaBtn=document.createElement('button');addAreaBtn.className='bud-add-area';addAreaBtn.textContent='＋ Add Area';
-    (function(idx){addAreaBtn.addEventListener('click',function(){scratchItems[idx].areas.push({areaId:'a'+nid(),areaName:'',sellingPrice:0});renderScratchItems();});})(i);
-    areasDiv.appendChild(addAreaBtn);
-    div.appendChild(areasDiv);
-    cont.appendChild(div);
+    var tdDel=document.createElement('td');tdDel.style.textAlign='center';
+    var del=document.createElement('button');del.style.cssText='background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px';del.textContent='×';
+    (function(idx){del.addEventListener('click',function(){if(_scratchRows.length>1){_scratchRows.splice(idx,1);renderScratchGrid();}});})(ri);
+    tdDel.appendChild(del);tr.appendChild(tdDel);tbody.appendChild(tr);
   });
+  tbl.appendChild(tbody);cont.innerHTML='';cont.appendChild(tbl);
 }
+
 
 function wizFinish(){
   var isFirst=claimsData.lineItems.length===0;
@@ -1178,29 +1256,37 @@ function wizFinish(){
 
   if(isFirst){
     var newItems=[];
+    var areas,rows;
     if(wizOpt===1){
-      // From budget tree — new model: {id, name, areas:[{areaId,areaName,sellingPrice}]}
-      document.querySelectorAll('.bud-item').forEach(function(itemEl){
-        var cb=itemEl.querySelector('.bud-item-cb');
-        if(!cb||!cb.checked)return;
-        var name=itemEl.querySelector('.bud-item-name').textContent.trim();
-        if(!name)return;
-        var areas=[];
-        itemEl.querySelectorAll('.bud-area-row').forEach(function(row){
-          var areaName=(row.querySelector('.bud-item-area').value||'').trim();
-          var price=num(row.querySelector('.bud-item-price').value);
-          if(areaName&&price>0)areas.push({areaId:'a'+nid(),areaName:areaName,sellingPrice:price});
+      // From budget grid — _gridAreas are the columns, _gridItems are the rows
+      areas=_gridAreas;
+      _gridItems.forEach(function(item){
+        if(!item.checked)return;
+        var itemAreas=[];
+        areas.forEach(function(ar){
+          var price=num((item.prices||{})[ar.id]||0);
+          if(price>0)itemAreas.push({areaId:ar.id,areaName:ar.name||'General',sellingPrice:price});
         });
-        if(areas.length)newItems.push({id:'li'+nid(),name:name,areas:areas});
+        if(itemAreas.length)newItems.push({id:'li'+nid(),name:item.name,areas:itemAreas});
+        else if(item.name){
+          // Include with zero area so it still shows in sell prices editor
+          newItems.push({id:'li'+nid(),name:item.name,areas:[{areaId:areas[0].id,areaName:areas[0].name||'General',sellingPrice:0}]});
+        }
       });
     } else {
-      scratchItems.forEach(function(item){
-        if(!item.name.trim())return;
-        var areas=item.areas.filter(function(a){return a.areaName&&a.sellingPrice>0;});
-        if(areas.length)newItems.push({id:'li'+nid(),name:item.name.trim(),areas:areas});
+      // From scratch grid
+      areas=_scratchAreas;
+      _scratchRows.forEach(function(row){
+        if(!row.name.trim())return;
+        var itemAreas=[];
+        areas.forEach(function(ar){
+          var price=num((row.prices||{})[ar.id]||0);
+          if(price>0)itemAreas.push({areaId:ar.id,areaName:ar.name||'General',sellingPrice:price});
+        });
+        if(itemAreas.length)newItems.push({id:'li'+nid(),name:row.name.trim(),areas:itemAreas});
       });
     }
-    if(!newItems.length){alert('Please add at least one line item with an area and selling price.');return;}
+    if(!newItems.length){alert('Please add at least one line item with a sell price.');return;}
     claimsData.lineItems=newItems;
   }
 
