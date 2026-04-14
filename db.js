@@ -216,9 +216,10 @@ async function dbSet(table, data) {
         body: JSON.stringify({ data, updated_at: new Date().toISOString() })
       });
     } else {
+      const companyId = localStorage.getItem('hvacnexus_company_id');
       await sbFetch(table, {
         method: 'POST',
-        body: JSON.stringify({ data })
+        body: JSON.stringify({ data, company_id: companyId })
       });
     }
     return true;
@@ -250,9 +251,10 @@ async function dbSetProject(table, projectNum, data) {
         body: JSON.stringify({ data, updated_at: new Date().toISOString() })
       });
     } else {
+      const companyId = localStorage.getItem('hvacnexus_company_id');
       await sbFetch(table, {
         method: 'POST',
-        body: JSON.stringify({ project_num: projectNum, data })
+        body: JSON.stringify({ project_num: projectNum, data, company_id: companyId })
       });
     }
     return true;
