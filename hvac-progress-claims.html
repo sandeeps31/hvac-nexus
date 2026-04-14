@@ -208,14 +208,23 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .scratch-name:focus{border-color:var(--accent)}
 /* PRINT */
 @media print{
-  .view{display:block!important}
-  #view-list{display:none!important}
+  /* Hide everything except detail content */
+  .sb,.topbar,.no-print,.detail-topbar,.detail-tabs,.detail-sum,.cost-banner,
+  #view-list,#view-setup,#sidebar,#app-sidebar,#poPanelCosts{display:none!important}
+  /* Show detail view cleanly */
+  .view{display:none!important}
   #view-detail{display:block!important}
-  body{background:#fff;color:#000}
-  .section-card{border:1px solid #ddd;page-break-inside:avoid}
-  .claim-tbl th{background:#f5f5f5;color:#555}
-  .claim-tbl td{color:#111}
+  .main{margin-left:0!important;padding:0!important}
+  body{background:#fff;color:#000;margin:0;padding:0}
+  /* Detail content */
+  #detailContent{padding:0!important}
+  .section-card{border:1px solid #ddd;page-break-inside:avoid;margin-bottom:8px}
+  .claim-tbl th{background:#f5f5f5!important;color:#555!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .claim-tbl td{color:#111!important}
+  .subtot-row td{background:#f0f0f0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .letterhead{display:flex!important}
+  /* Reset colors for print */
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 .letterhead{display:none;align-items:flex-start;justify-content:space-between;padding:24px 24px 16px;border-bottom:2px solid #1a3a6a;margin-bottom:16px}
 .lh-co{font-size:20px;font-weight:700;color:#1a3a6a}
@@ -723,10 +732,7 @@ function deleteDraftClaim(id){
   claimsData.claims=claimsData.claims.filter(function(x){return x.id!==id;});
   if(currentClaimId===id)currentClaimId=null;
   save();
-  // Force immediate DOM removal of the deleted card
-  var listEl=document.getElementById('claimList');
-  if(listEl)listEl.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">Updating…</div>';
-  setTimeout(function(){renderList();},50);
+  renderList();
 }
 
 function goList(){
