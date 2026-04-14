@@ -1214,9 +1214,33 @@ function openLogClaimView(){
   document.getElementById('sv-contract').textContent=fmt(claimsData.contractValue||0);
   document.getElementById('topBtns').innerHTML='';
   document.getElementById('setupFinishBtn').textContent='Save Claim →';
-  document.getElementById('setupFinishBtn').onclick=wizFinish;
+  document.getElementById('setupFinishBtn').onclick=saveLogClaim;
   document.getElementById('setupAddAreaBtn').style.display='none'; // no adding areas in log mode
   renderSetupAreaCols();renderSetupGrid();
+}
+
+function saveLogClaim(){
+  // Open a small modal to get claim number and month before saving
+  var nextNum=(claimsData.claims.length?Math.max.apply(null,claimsData.claims.map(function(c){return c.num;}))+1:1);
+  document.getElementById('w-claimnum').value=nextNum;
+  document.getElementById('w-month').value=currentMonth();
+  document.getElementById('firstClaimSetup').style.display='none';
+  document.getElementById('w-contract-preview').textContent='';
+  document.getElementById('wizStep0').style.display='block';
+  // Temporarily swap the wizard Next button to finalise
+  var nextBtn=document.querySelector('#wizStep0 .bp');
+  if(nextBtn){nextBtn.textContent='Create Claim →';nextBtn.onclick=function(){
+    var month=document.getElementById('w-month').value;
+    var claimNum=parseInt(document.getElementById('w-claimnum').value)||1;
+    var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[],varApprovedOnly:false};
+    claimsData.claims.push(newClaim);
+    save();closeWizard();
+    document.getElementById('view-setup').classList.remove('active');
+    renderList();openClaim(newClaim.id);
+    // Restore button
+    nextBtn.textContent='Next →';nextBtn.onclick=wizNext;
+  };}
+  document.getElementById('wizardModal').classList.add('open');
 }
 
 function saveClaimSheetEdit(){
@@ -1669,38 +1693,36 @@ function wizFinish(){
       if(row.type==='subheader')return;
       if(_setupMode==='budget'&&row.checked===false)return;
       var name=row.name;if(!name||!name.trim())return;
-      var totalSell=num(row.totalSell||0);
+      var totalSell=numRaw(row.totalSell||0);
       var itemAreas=[];
       areas.forEach(function(ar){
-        var price=num((row.prices||{})[ar.id]||0);
+        var price=numRaw((row.prices||{})[ar.id]||0);
         var aName=(ar.name||'').trim()||'Area';
-        // Include area if it has a price OR if it's the only area
         if(price>0)itemAreas.push({areaId:ar.id,areaName:aName,sellingPrice:price});
       });
-      // If no areas have prices, store totalSell under first area
       if(!itemAreas.length){
         var aName=(areas[0]&&areas[0].name)||'General';
         itemAreas=[{areaId:(areas[0]&&areas[0].id)||'a'+nid(),areaName:aName,sellingPrice:totalSell}];
       }
-      newItems.push({id:'li'+nid(),name:name.trim(),totalSell:totalSell,areas:itemAreas});
+      newItems.push({id:'li'+nid(),name:name.trim(),totalSell:totalSell,areas:itemAreas,sectionName:row.sectionName||''});
     });
     if(!newItems.length){alert('Please add at least one line item with a sell price.');return;}
     claimsData.lineItems=newItems;
-  }
-
-  // Close setup view if open
-  if(document.getElementById('view-setup').classList.contains('active')){
+    save();
+    // Close setup view and return to list — user will Log Claim separately
     document.getElementById('view-setup').classList.remove('active');
+    renderList();
+    return;
   }
 
+  // Log Claim mode — create a new claim record
   var month=document.getElementById('w-month').value;
   var claimNum=parseInt(document.getElementById('w-claimnum').value)||1;
   var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[],varApprovedOnly:false};
   claimsData.claims.push(newClaim);
   save();
-  document.getElementById('view-list').classList.remove('active');
   document.getElementById('view-setup').classList.remove('active');
-  document.getElementById('topBtns').innerHTML='';
+  document.getElementById('view-list').classList.remove('active');
   renderList();openClaim(newClaim.id);
 }
 
