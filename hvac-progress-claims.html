@@ -208,31 +208,37 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
 .scratch-name:focus{border-color:var(--accent)}
 /* PRINT */
 @media print{
-  /* Hide everything except detail content */
-  .sb,.topbar,.no-print,.detail-topbar,.detail-tabs,.detail-sum,.cost-banner,
+  /* Hide navigation and UI chrome */
+  .sb,.topbar,.no-print,.detail-topbar,.detail-tabs,.cost-banner,
   #view-list,#view-setup,#sidebar,#app-sidebar,#poPanelCosts{display:none!important}
-  /* Show detail view cleanly */
+  /* Show detail view only */
   .view{display:none!important}
   #view-detail{display:block!important}
   .main{margin-left:0!important;padding:0!important}
-  /* Force white background and black text everywhere */
-  *{background:white!important;color:#111!important;border-color:#ddd!important;
-     -webkit-print-color-adjust:exact;print-color-adjust:exact}
-  body{background:#fff!important;color:#111!important;margin:0;padding:0}
-  /* Hide edit mode inputs — show as text instead */
+  body{margin:0;padding:0}
+  /* Hide edit inputs, show formatted text */
   .claim-dual{display:none!important}
-  /* Detail content */
-  #detailContent{padding:0!important}
-  .section-card{border:1px solid #ccc!important;page-break-inside:avoid;margin-bottom:8px}
+  /* White theme */
+  body,#view-detail,#detailContent,#detailSum,.detail-sum,
+  .section-card,.claim-tbl,.claim-tbl th,.claim-tbl td,
+  .sec-hdr,.sec-body,.subtot-row td{
+    background:#fff!important;color:#111!important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* Summary bar — show it */
+  .detail-sum{display:flex!important;background:#f5f5f5!important;border-bottom:1px solid #ccc!important;padding:10px 20px!important;gap:20px!important;flex-wrap:wrap!important}
+  .ds-lbl{color:#555!important;font-size:10px!important}
+  .ds-val{color:#111!important;font-size:14px!important;font-weight:700!important}
+  /* Table styling */
+  .section-card{border:1px solid #ccc!important;margin-bottom:8px!important;page-break-inside:avoid}
   .sec-hdr{background:#f0f0f0!important;border-bottom:1px solid #ccc!important}
   .sec-title{color:#111!important;font-weight:700!important}
-  .claim-tbl th{background:#f0f0f0!important;color:#555!important;border-bottom:1px solid #ccc!important}
-  .claim-tbl td{color:#111!important;border-bottom:1px solid #eee!important}
-  .subtot-row td{background:#e8e8e8!important;font-weight:700!important}
-  /* Override CSS vars */
-  :root{--text:#111;--text2:#333;--muted:#666;--accent:#1a3a6a;--border:#ddd;
-        --surface:#fff;--surface2:#f5f5f5;--surface3:#efefef}
-  .letterhead{display:flex!important}
+  .claim-tbl{width:100%!important;border-collapse:collapse!important}
+  .claim-tbl th{background:#f0f0f0!important;color:#555!important;border-bottom:2px solid #ccc!important;padding:6px 8px!important;font-size:10px!important}
+  .claim-tbl td{color:#111!important;border-bottom:1px solid #eee!important;padding:6px 8px!important}
+  .subtot-row td{background:#e8e8e8!important;font-weight:700!important;color:#111!important}
+  /* Letterhead */
+  .letterhead{display:flex!important;border-bottom:2px solid #1a3a6a!important}
+  .lh-co{color:#1a3a6a!important}
 }
 .letterhead{display:none;align-items:flex-start;justify-content:space-between;padding:24px 24px 16px;border-bottom:2px solid #1a3a6a;margin-bottom:16px}
 .lh-co{font-size:20px;font-weight:700;color:#1a3a6a}
@@ -387,7 +393,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;
     <button class="dtab" id="dtab-costs" onclick="switchDetailTab('costs')">💰 Costs</button>
   </div>
 
-  <div class="detail-sum no-print" id="detailSum">
+  <div class="detail-sum" id="detailSum">
     <div class="ds-item"><div class="ds-lbl">This claim (ex GST)</div><div class="ds-val" id="ds-current" style="color:var(--accent)">—</div></div>
     <div class="ds-item"><div class="ds-lbl">GST</div><div class="ds-val" id="ds-gst" style="color:var(--text2);font-size:13px">—</div></div>
     <div class="ds-item"><div class="ds-lbl">This claim (incl GST)</div><div class="ds-val" id="ds-incl" style="color:var(--accent)">—</div></div>
@@ -1023,19 +1029,21 @@ function openPOPanel(poId){
   panel.classList.add('open');
   // Load PO data from procurement
   dbGetProcurement(_pcPNum).then(function(data){
-    if(!data||!data.groups){body.innerHTML='<div style="color:var(--muted);padding:20px">No PO data found.</div>';return;}
-    var po=null;
-    (data.groups||[]).forEach(function(g){(g.pos||[]).forEach(function(p){if(p.id===poId||p.poNum===poId)po=p;});});
+    if(!data||!data.sections){body.innerHTML='<div style="color:var(--muted);padding:20px">No PO data found.</div>';return;}
+    var po=null,poGrp=null;
+    (data.sections||[]).forEach(function(sec){
+      (sec.groups||[]).forEach(function(grp){
+        (grp.pos||[]).forEach(function(p){if(p.id===poId){po=p;poGrp=grp;}});
+      });
+    });
     if(!po){body.innerHTML='<div style="color:var(--muted);padding:20px">PO not found: '+escH(poId)+'</div>';return;}
     var html='';
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">';
     var fields=[
-      {l:'PO Number',v:po.poNum||po.id},
-      {l:'Vendor',v:po.vendor||'—'},
-      {l:'Category',v:po.cat||'—'},
-      {l:'Status',v:po.status||'—'},
-      {l:'PO Value',v:fmt(num(po.value||po.amount||0))},
-      {l:'Period',v:po.period||'—'},
+      {l:'PO Number',v:po.id||'—'},
+      {l:'Supplier',v:po.supplier||'—'},
+      {l:'Category',v:po.cat||(poGrp&&poGrp.parent)||'—'},
+      {l:'PO Value',v:fmt(num(po.value||(po.lineItems||[]).reduce(function(s,li){return s+num(li.qty||1)*num(li.price||0);},0)))},
     ];
     fields.forEach(function(f){
       html+='<div style="background:var(--surface2);border-radius:8px;padding:10px 14px">'
