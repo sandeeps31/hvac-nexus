@@ -888,83 +888,106 @@ function renderDetail(){
     content.appendChild(secCard);
   });
 
+
   // VARIATIONS SECTION
   var varSection=document.createElement('div');varSection.className='claim-section';
   var varCard=document.createElement('div');varCard.className='section-card';
   var varHdr=document.createElement('div');varHdr.className='sec-hdr';
+  var isSubmitted=claim.status!=='Draft';
 
-  var approvedOnlyToggle='<label class="toggle-track no-print" style="margin-left:auto" title="Show approved variations only">'+
-    '<input type="checkbox" id="varApprovedToggle" '+(claim.varApprovedOnly?'checked':'')+' onchange="toggleVarApproved(\''+claim.id+'\',this.checked)" onclick="event.stopPropagation()">'+
-    '<span class="toggle-knob"></span></label>'+
-    '<span class="no-print" style="font-size:11px;color:var(--text2);margin-left:6px">Approved only</span>';
-  varHdr.innerHTML='<span class="sec-title">Variations</span>'+approvedOnlyToggle+'<span class="sec-chev" style="margin-left:10px">▾</span>';
-  varHdr.addEventListener('click',function(e){if(e.target.tagName!=='INPUT'&&e.target.tagName!=='SPAN'&&e.target.tagName!=='LABEL')varCard.classList.toggle('collapsed');});
+  varHdr.innerHTML='<span class="sec-title">Variations</span>'
+    +(isSubmitted?'<span class="no-print" style="font-size:11px;color:var(--muted);margin-left:auto;font-family:DM Mono,monospace">LOCKED — submitted</span>':'')
+    +'<span class="sec-chev" style="margin-left:10px">▾</span>';
+  varHdr.addEventListener('click',function(){varCard.classList.toggle('collapsed');});
 
   var varBody=document.createElement('div');varBody.className='sec-body';
-  var vars=loadVariations(claim.varApprovedOnly);
   var varTbl=document.createElement('table');varTbl.className='claim-tbl';
-  varTbl.innerHTML='<thead><tr><th>Variation</th><th>Description</th><th class="r">Value (ex GST)</th><th class="r">Previous claims</th><th class="r" style="min-width:160px">This claim</th><th class="r">Remaining</th></tr></thead>';
+  varTbl.innerHTML='<thead><tr><th>Variation</th><th>Description</th><th class="r">Approved Value (ex GST)</th><th class="r">Previous Claims</th><th class="r" style="min-width:160px">This Claim</th><th class="r">Remaining</th></tr></thead>';
   var varTbody=document.createElement('tbody');
-
   var totalVarCurrentAmt=0;
 
-  if(!vars.length){
-    var noVarTr=document.createElement('tr');
-    noVarTr.innerHTML='<td colspan="6" style="text-align:center;padding:20px;color:var(--muted);font-size:12px">'+(claim.varApprovedOnly?'No approved variations.':'No variations found.')+'</td>';
-    varTbody.appendChild(noVarTr);
-  } else {
-    vars.forEach(function(v){
-      var varVal=num(v.approvedValue)||0;
-      if(!varVal){
-        // calc from line items
-        var sub=(v.lineItems||[]).reduce(function(a,li){
-          if(li.type==='vendor'){return a+(li.vcMode==='link'?num(li.svValue)/1.1:num(li.vendorAmt));}
-          return a+num(li.qty)*num(li.rate);
-        },0);
-        var mp=num(v.margin)/100;
-        varVal=sub*(1+mp);
-      }
-      var varEntry=(claim.varEntries||[]).find(function(e){return e.varId===v.id;});
-      if(!varEntry){varEntry={varId:v.id,currentAmt:0,mode:'pct'};if(!claim.varEntries)claim.varEntries=[];claim.varEntries.push(varEntry);}
-      var prevVarAmt=0;
-      claimsData.claims.forEach(function(c){
-        if(c.id===claim.id) return;
-        var thisClaim=claimsData.claims.find(function(x){return x.id===currentClaimId;});
-        if(c.num>=thisClaim.num) return;
-        (c.varEntries||[]).forEach(function(e){if(e.varId===v.id)prevVarAmt+=num(e.currentAmt);});
+  // Load approved variations async then render
+  loadVariations(true).then(function(vars){
+    // Merge any new approved variations into this claim's varEntries
+    if(!isSubmitted){
+      vars.forEach(function(v){
+        if(!claim.varEntries)claim.varEntries=[];
+        if(!claim.varEntries.find(function(e){return e.varId===v.id;})){
+          claim.varEntries.push({varId:v.id,currentAmt:0,mode:'pct'});
+        }
       });
-      var currentVarAmt=num(varEntry.currentAmt);
-      var remainingVar=Math.max(0,varVal-prevVarAmt-currentVarAmt);
-      totalVarCurrentAmt+=currentVarAmt;
+    }
 
-      var claimCellV='';
-      if(editMode){
-        var pctValV=varVal>0?Math.round(currentVarAmt/varVal*1000)/10:0;
-        claimCellV='<div class="claim-dual">'
-          +'<input class="claim-pct-inp" type="number" min="0" max="100" step="0.1" placeholder="%" value="'+(pctValV||'')+'" '
-          +'oninput="syncVarPct(this,\''+v.id+'\',\''+claim.id+'\','+varVal+','+prevVarAmt+')" />'
-          +'<span class="claim-inp-sep">%&thinsp;/</span>'
-          +'<input class="claim-amt-inp" type="number" min="0" placeholder="$" value="'+(currentVarAmt||'')+'" '
-          +'oninput="syncVarAmt(this,\''+v.id+'\',\''+claim.id+'\','+varVal+','+prevVarAmt+')" />'
-          +'</div>';
-      } else {
-        claimCellV=fmt(currentVarAmt);
-      }
+    if(!vars.length){
+      var noVarTr=document.createElement('tr');
+      noVarTr.innerHTML='<td colspan="6" style="text-align:center;padding:20px;color:var(--muted);font-size:12px">No approved variations found.</td>';
+      varTbody.appendChild(noVarTr);
+    } else {
+      vars.forEach(function(v){
+        // Always use approved value
+        var varVal=num(v.approvedValue)||0;
+        if(!varVal){
+          var sub=(v.lineItems||[]).reduce(function(a,li){
+            if(li.type==='vendor'){return a+(li.vcMode==='link'?num(li.svValue)/1.1:num(li.vendorAmt));}
+            return a+num(li.qty)*num(li.rate);
+          },0);
+          varVal=sub*(1+num(v.margin)/100);
+        }
 
-      var varTr=document.createElement('tr');
-      varTr.innerHTML='<td class="sv-num" style="font-family:DM Mono,monospace;font-size:12px;color:var(--purple)">'+escH(v.num)+'</td>'+
-        '<td>'+escH(v.shortDesc||v.desc||'—')+'</td>'+
-        '<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(varVal)+'</td>'+
-        '<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmt(prevVarAmt)+'</td>'+
-        '<td class="r">'+claimCellV+'</td>'+
-        '<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(remainingVar)+'</td>';
-      varTbody.appendChild(varTr);
-    });
-  }
-  varTbl.appendChild(varTbody);varBody.appendChild(varTbl);varCard.appendChild(varHdr);varCard.appendChild(varBody);varSection.appendChild(varCard);
+        var varEntry=(claim.varEntries||[]).find(function(e){return e.varId===v.id;});
+        if(!varEntry){varEntry={varId:v.id,currentAmt:0,mode:'pct'};if(!claim.varEntries)claim.varEntries=[];claim.varEntries.push(varEntry);}
+
+        // Sum all PREVIOUS (earlier) submitted claims for this variation
+        var prevVarAmt=0;
+        var thisClaim=claimsData.claims.find(function(x){return x.id===currentClaimId;});
+        claimsData.claims.forEach(function(c){
+          if(c.id===claim.id)return;
+          if(c.num>=thisClaim.num)return;
+          (c.varEntries||[]).forEach(function(e){if(e.varId===v.id)prevVarAmt+=num(e.currentAmt);});
+        });
+
+        var currentVarAmt=num(varEntry.currentAmt);
+        var remainingVar=varVal-prevVarAmt-currentVarAmt;
+        totalVarCurrentAmt+=currentVarAmt;
+
+        // This claim cell — locked if submitted
+        var claimCellV='';
+        if(editMode&&!isSubmitted){
+          var pctValV=varVal>0?Math.round(currentVarAmt/varVal*1000)/10:0;
+          claimCellV='<div class="claim-dual">'
+            +'<input class="claim-pct-inp" type="number" min="0" max="100" step="0.1" placeholder="%" value="'+(pctValV||'')+'" '
+            +'oninput="syncVarPct(this,\''+v.id+'\',\''+claim.id+'\','+varVal+','+prevVarAmt+')" />'
+            +'<span class="claim-inp-sep">%&thinsp;/</span>'
+            +'<input class="claim-amt-inp" type="number" min="0" placeholder="$" value="'+(currentVarAmt||'')+'" '
+            +'oninput="syncVarAmt(this,\''+v.id+'\',\''+claim.id+'\','+varVal+','+prevVarAmt+')" />'
+            +'</div>';
+        } else {
+          var displayAmt=currentVarAmt>0?fmt(currentVarAmt):'<span style="color:var(--muted)">$—</span>';
+          claimCellV=displayAmt+(isSubmitted?' <span style="font-size:10px;color:var(--muted)">🔒</span>':'');
+        }
+
+        // Remaining colour
+        var remStyle='font-family:DM Mono,monospace;font-size:12px;'
+          +(remainingVar<0?'color:#ff4d6d':remainingVar===0?'color:var(--green)':'');
+
+        var varTr=document.createElement('tr');
+        varTr.innerHTML='<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--purple)">'+escH(v.num)+'</td>'
+          +'<td>'+escH(v.shortDesc||v.desc||'—')+'</td>'
+          +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(varVal)+'</td>'
+          +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmt(prevVarAmt)+'</td>'
+          +'<td class="r">'+claimCellV+'</td>'
+          +'<td class="r" style="'+remStyle+'">'+(remainingVar<0?'⚠ '+fmt(Math.abs(remainingVar))+' over':remainingVar===0?'✓ Fully claimed':fmt(remainingVar))+'</td>';
+        varTbody.appendChild(varTr);
+      });
+    }
+    varTbl.appendChild(varTbody);
+  });
+
+  varBody.appendChild(varTbl);varCard.appendChild(varHdr);varCard.appendChild(varBody);varSection.appendChild(varCard);
   content.appendChild(varSection);
 
-  // GRAND TOTALS
+  // GRAND TOTALS — use saved varEntries for immediate sync calculation
+  var totalVarCurrentAmt=(claim.varEntries||[]).reduce(function(s,e){return s+num(e.currentAmt);},0);
   var grandCurrent=totalCurrentAmt+totalVarCurrentAmt;
   var retPct=claimsData.retentionPct||5;
   var retAmt=grandCurrent*(retPct/100);
@@ -1392,9 +1415,7 @@ function updateDetailSummary(){
     }
   }
 }
-function toggleVarApproved(claimId,val){
-  var c=claimsData.claims.find(function(x){return x.id===claimId;});if(c){c.varApprovedOnly=val;save();renderDetail();}
-}
+
 function saveClaim(){save();toggleEditMode(false);}
 
 // WIZARD
@@ -1525,7 +1546,7 @@ function saveLogClaim(){
   if(nextBtn){nextBtn.textContent='Create Claim →';nextBtn.onclick=function(){
     var month=document.getElementById('w-month').value;
     var claimNum=parseInt(String(document.getElementById('w-claimnum').value).replace('PC-',''))||1;
-    var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[],varApprovedOnly:false};
+    var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[]};
     claimsData.claims.push(newClaim);
     save();closeWizard();
     renderList();openClaim(newClaim.id);
@@ -2009,7 +2030,7 @@ function wizFinish(){
   // Log Claim mode — create a new claim record
   var month=document.getElementById('w-month').value;
   var claimNum=parseInt(String(document.getElementById('w-claimnum').value).replace('PC-',''))||1;
-  var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[],varApprovedOnly:false};
+  var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[]};
   claimsData.claims.push(newClaim);
   save();
   closeWizard();
