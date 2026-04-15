@@ -313,6 +313,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
     <button id="viewBtnSummary" onclick="setView('summary')" style="padding:5px 12px;border:none;cursor:pointer;background:transparent;color:var(--muted);font-family:inherit;font-size:11px;transition:all .13s">⊞ Summary</button>
   </div>
   <button id="editModeBtn" onclick="toggleEditMode()" style="padding:5px 14px;border:1.5px solid var(--border);border-radius:7px;background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .13s">✏️ Edit</button>
+  <button id="clearAllFiltersBtn" onclick="clearAllFilters()" style="display:none;background:none;border:1px solid rgba(255,77,109,.4);border-radius:6px;color:var(--danger);cursor:pointer;font-size:11px;padding:4px 10px;font-family:'DM Mono',monospace;white-space:nowrap">✕ Clear all filters</button>
   <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="rowCount"></span>
 </div>
 
@@ -625,6 +626,28 @@ function toggleFilterDropdown(filterId){
   if(d)d.style.display=d.style.display==='none'?'block':'none';
 }
 
+function clearAllFilters(){
+  // Clear search
+  document.getElementById('searchInput').value='';
+  // Clear status
+  document.querySelectorAll('#stFilterDropdown input[type=checkbox]').forEach(function(c){c.checked=false;});
+  updateStatusFilter();
+  // Clear all checklist filters
+  ['type','building','loc','subloc'].forEach(function(id){
+    var list=document.getElementById(id+'FilterList');
+    if(list)list.querySelectorAll('input[type=checkbox]').forEach(function(c){c.checked=false;});
+    updateFilterLabel(id);
+  });
+  renderTable();
+}
+
+function hasActiveFilters(){
+  if((document.getElementById('searchInput').value||'').trim())return true;
+  if(getSelectedStatuses().length)return true;
+  if(['type','building','loc','subloc'].some(function(id){return getCheckedValues(id).length;}))return true;
+  return false;
+}
+
 function selectAllFilter(filterId){
   if(filterId==='st'){
     document.querySelectorAll('#stFilterDropdown input[type=checkbox]').forEach(function(c){c.checked=true;});
@@ -655,19 +678,37 @@ function updateFilterLabel(filterId){
 }
 
 function populateFilters(){
-  var types=new Set(),buildings=new Set(),locs=new Set(),sublocs=new Set();
-  items.forEach(function(i){
-    if(i.equipType)types.add(i.equipType);
-    if(i.building)buildings.add(i.building);
-    if(i.location)locs.add(i.location);
-    if(i.sublocation)sublocs.add(i.sublocation);
-  });
+  // For each filter, compute available values based on items filtered by ALL OTHER filters
+  // This way selected options stay visible, but empty ones disappear
 
-  function buildList(filterId, values){
+  function getItemsExcluding(excludeFilter){
+    var q=(document.getElementById('searchInput').value||'').toLowerCase();
+    var selStatuses=getSelectedStatuses();
+    var selTypes=getCheckedValues('type');
+    var selBuildings=getCheckedValues('building');
+    var selLocs=getCheckedValues('loc');
+    var selSublocs=getCheckedValues('subloc');
+    return items.filter(function(i){
+      return(!q||(i.equipId||'').toLowerCase().includes(q)||(i.building||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.sublocation||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
+        &&(excludeFilter==='status'||!selStatuses.length||selStatuses.includes(i.status))
+        &&(excludeFilter==='type'||!selTypes.length||selTypes.includes(i.equipType))
+        &&(excludeFilter==='building'||!selBuildings.length||selBuildings.includes(i.building))
+        &&(excludeFilter==='loc'||!selLocs.length||selLocs.includes(i.location))
+        &&(excludeFilter==='subloc'||!selSublocs.length||selSublocs.includes(i.sublocation));
+    });
+  }
+
+  function buildList(filterId, field){
     var list=document.getElementById(filterId+'FilterList');if(!list)return;
     var prev=getCheckedValues(filterId);
+    // Values available given all other active filters
+    var pool=getItemsExcluding(filterId);
+    var available=new Set();
+    pool.forEach(function(i){if(i[field])available.add(i[field]);});
+    // Always keep currently-checked values visible even if no items match
+    prev.forEach(function(v){available.add(v);});
     list.innerHTML='';
-    Array.from(values).sort().forEach(function(v){
+    Array.from(available).sort().forEach(function(v){
       var lbl=document.createElement('label');lbl.className='st-chk-row';
       var cb=document.createElement('input');cb.type='checkbox';cb.value=v;
       if(prev.includes(v))cb.checked=true;
@@ -678,10 +719,21 @@ function populateFilters(){
     updateFilterLabel(filterId);
   }
 
-  buildList('type',types);
-  buildList('building',buildings);
-  buildList('loc',locs);
-  buildList('subloc',sublocs);
+  // Update status checklist options too
+  var stPool=getItemsExcluding('status');
+  var availableStatuses=new Set();
+  stPool.forEach(function(i){if(i.status)availableStatuses.add(i.status);});
+  var selStatuses=getSelectedStatuses();
+  selStatuses.forEach(function(v){availableStatuses.add(v);});
+  document.querySelectorAll('#stFilterDropdown label.st-chk-row').forEach(function(lbl){
+    var val=lbl.querySelector('input').value;
+    lbl.style.display=availableStatuses.has(val)?'':'none';
+  });
+
+  buildList('type','equipType');
+  buildList('building','building');
+  buildList('loc','location');
+  buildList('subloc','sublocation');
 }
 
 function getFilteredItems(){
@@ -785,6 +837,8 @@ function renderTable(){
   var filtered=getFilteredItems();
   updateSummary(filtered);
   document.getElementById('rowCount').textContent=filtered.length+' item'+(filtered.length!==1?'s':'');
+  var cab=document.getElementById('clearAllFiltersBtn');
+  if(cab)cab.style.display=hasActiveFilters()?'inline-block':'none';
   // Update equipment type pill
   var pill=document.getElementById('equipTypePill');
   if(pill){
