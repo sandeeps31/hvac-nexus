@@ -432,17 +432,16 @@ async function load(){try{var p=await dbGetSubVariations(_svPNum);subVars=p&&Arr
 load();
 
 // LOAD VARIATIONS from variations module
-function loadVariations(){
-  try{var s=null/*migrated*/;if(s){var p=JSON.parse(s);return Array.isArray(p.variations)?p.variations:[];}}catch(e){}
-  return [];
+async function loadVariations(){
+  try{var s=await dbGetVariations(_svPNum);return(s&&Array.isArray(s.variations))?s.variations:[];}catch(e){return[];}
 }
 
 // SAVE a variation back to variations module
-function saveVariation(v){
-  var vars=loadVariations();
+async function saveVariation(v){
+  var vars=await loadVariations();
   var idx=vars.findIndex(function(x){return x.id===v.id;});
-  if(idx>=0) vars[idx]=v; else vars.push(v);
-  try{/*migrated*/void(JSON.stringify({variations:vars}));}catch(e){}
+  if(idx>=0)vars[idx]=v;else vars.push(v);
+  await dbSetVariations(_svPNum,{variations:vars});
 }
 
 // GENERATE SV number
@@ -455,9 +454,9 @@ function genSVNum(){
   return 'SV-'+String(max+1).padStart(3,'0');
 }
 
-// GENERATE VAR number (matching variations.html logic)
-function genVarNum(){
-  var vars=loadVariations();
+// GENERATE VAR number (async — matching variations.html logic)
+async function genVarNum(){
+  var vars=await loadVariations();
   var max=0;
   vars.forEach(function(v){
     var m=(v.num||'').match(/VAR-(\d+)/);
@@ -467,39 +466,33 @@ function genVarNum(){
 }
 
 // UPDATE or INSERT linked variation's vendor cost line item
-function syncValueToVariation(svId, svNum, svSubbie, svValue){
-  var vars=[];
-  try{var raw=null/*migrated*/;if(raw){var p=JSON.parse(raw);vars=Array.isArray(p.variations)?p.variations:[];}}catch(e){}
-  // Find the SV to get its desc and linkedVarId
+async function syncValueToVariation(svId, svNum, svSubbie, svValue){
+  var vars=await loadVariations();
   var svDesc='';var linkedVarId=null;
   var svObj=subVars.find(function(x){return x.id===svId;});
   if(svObj){svDesc=svObj.desc||'';linkedVarId=svObj.linkedVarId;}
+  var changed=false;
   vars.forEach(function(v){
-    // Only operate on the variation this SV is actually linked to
     if(v.id!==linkedVarId) return;
     if(!v.lineItems) v.lineItems=[];
-    // Find existing line item linked to this SV
     var existing=null;
     v.lineItems.forEach(function(li){
       if(li.type==='vendor' && li.vcMode==='link' && li.svId===svId) existing=li;
     });
     if(existing){
-      existing.svValue=svValue;
-      existing.svNum=svNum;
-      existing.svSubbie=svSubbie;
+      existing.svValue=svValue;existing.svNum=svNum;existing.svSubbie=svSubbie;
       existing.desc=svDesc||existing.desc;
     } else {
-      // Insert new vendor cost line item pre-linked to this SV
       var uid='sv'+Date.now()+''+Math.floor(Math.random()*1000);
       v.lineItems.push({
         id:uid,type:'vendor',vcMode:'link',
-        desc:svDesc,
-        svId:svId,svNum:svNum,svSubbie:svSubbie,svValue:svValue,
+        desc:svDesc,svId:svId,svNum:svNum,svSubbie:svSubbie,svValue:svValue,
         vendorAmt:'',qty:'',rate:'',trade:'',overtime:'normal'
       });
     }
+    changed=true;
   });
-  try{/*migrated*/void(JSON.stringify({variations:vars}));}catch(e){}
+  if(changed) await dbSetVariations(_svPNum,{variations:vars});
 }
 
 // SUMMARY
@@ -658,9 +651,11 @@ function deleteSV(){
 }
 
 // VARIATION PICKER
-function openVarPicker(){
-  var vars=loadVariations();
+async function openVarPicker(){
   var list=document.getElementById('varPickList');
+  list.innerHTML='<div class="var-pick-empty">Loading…</div>';
+  document.getElementById('varPickModal').classList.add('open');
+  var vars=await loadVariations();
   if(!vars.length){
     list.innerHTML='<div class="var-pick-empty">No variations found.<br>Use <strong>✦ Create new variation</strong> to create one, or go to Variations first.</div>';
   } else {
@@ -674,7 +669,6 @@ function openVarPicker(){
     });
     list.innerHTML=h;
   }
-  document.getElementById('varPickModal').classList.add('open');
 }
 function closeVarPicker(){document.getElementById('varPickModal').classList.remove('open');}
 function selectVar(id,vnum,title){
@@ -684,9 +678,8 @@ function selectVar(id,vnum,title){
 }
 
 // QUICK CREATE VARIATION
-function openQuickCreateVar(){
-  document.getElementById('qv-num').value=genVarNum();
-  // Pre-fill title from subbie description if available
+async function openQuickCreateVar(){
+  document.getElementById('qv-num').value=await genVarNum();
   var desc=document.getElementById('f-desc').value.trim();
   var subbie=document.getElementById('f-subbie').value.trim();
   document.getElementById('qv-title').value=desc?(subbie?subbie+' — '+desc:desc):'';
@@ -695,12 +688,11 @@ function openQuickCreateVar(){
   setTimeout(function(){document.getElementById('qv-title').focus();},80);
 }
 function closeQuickVar(){document.getElementById('quickVarModal').classList.remove('open');}
-function confirmQuickVar(){
+async function confirmQuickVar(){
   var title=document.getElementById('qv-title').value.trim();
   if(!title){alert('Variation title is required.');return;}
   var vnum=document.getElementById('qv-num').value;
   var sow=document.getElementById('qv-sow').value.trim();
-  // Create a stub variation
   var newVar={
     id:'v'+nid(),
     num:vnum,
@@ -716,13 +708,12 @@ function confirmQuickVar(){
     margin:0,
     fileName:''
   };
-  saveVariation(newVar);
+  await saveVariation(newVar);
   linkedVar={id:newVar.id,num:vnum,title:title};
   renderLinkedVarDisplay();
   closeQuickVar();
-  // Show confirmation with option to open
   if(confirm('Variation '+vnum+' created and linked.\n\nOpen it now in Variations to add line items?')){
-    saveSV(); // save the subbie var first
+    saveSV();
     navTo('hvac-variations.html');
   }
 }
