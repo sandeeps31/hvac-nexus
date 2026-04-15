@@ -90,7 +90,12 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 .proc-tbl tbody tr:hover td{background:var(--surface2)}
 .proc-tbl tbody tr.overdue td{background:rgba(255,77,109,.04)}
 .proc-tbl tbody tr.selected td{background:rgba(0,200,255,.05)!important}
-#batchBar{position:fixed;bottom:0;left:0;right:0;background:var(--surface2);border-top:2px solid var(--accent);padding:12px 24px;display:none;align-items:center;gap:12px;z-index:500;box-shadow:0 -4px 20px rgba(0,0,0,.4)}
+.st-chk-row{display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:12px;color:var(--text2);transition:background .1s}
+.st-chk-row:hover{background:var(--surface3)}
+.st-chk-row input[type=checkbox]{width:13px;height:13px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.st-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
+#toastMsg{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:10px 20px;font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);z-index:9999;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap}
+#toastMsg.show{opacity:1;transform:translateX(-50%) translateY(0)};bottom:0;left:0;right:0;background:var(--surface2);border-top:2px solid var(--accent);padding:12px 24px;display:none;align-items:center;gap:12px;z-index:500;box-shadow:0 -4px 20px rgba(0,0,0,.4)}
 #batchBar.show{display:flex}
 .batch-count{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:700;white-space:nowrap;min-width:100px}
 .batch-sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
@@ -98,6 +103,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 .equip-type{font-size:11px;color:var(--text2)}
 .st-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px;white-space:nowrap}
 .st-delivered{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.st-installed{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.25)}
 .st-ordered{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.2)}
 .st-ready{background:var(--purple-dim);color:var(--purple);border:1px solid rgba(167,139,250,.2)}
 .st-notordered{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
@@ -254,16 +260,26 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 <!-- TOOLBAR -->
 <div class="toolbar">
   <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="searchInput" placeholder="Search asset ID, location, manufacturer…" oninput="renderTable()"></div>
-  <select class="fsel" id="stFilter" onchange="renderTable()">
-    <option value="">All Statuses</option>
-    <option value="Not ordered">Not ordered</option>
-    <option value="Ordered">Ordered</option>
-    <option value="Ready">Ready</option>
-    <option value="Delivered">Delivered</option>
-    <option value="Supplied by others">Supplied by others</option>
-  </select>
+  <!-- Status checklist dropdown -->
+  <div style="position:relative" id="stFilterWrap">
+    <button id="stFilterBtn" onclick="toggleStatusDropdown()" style="background:var(--surface3);border:1px solid var(--border);border-radius:7px;color:var(--text2);font-size:12px;padding:6px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:6px;white-space:nowrap">
+      <span id="stFilterLabel">All Statuses</span><span style="color:var(--muted);font-size:10px">▼</span>
+    </button>
+    <div id="stFilterDropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 0;z-index:300;min-width:180px;box-shadow:0 4px 20px rgba(0,0,0,.4)">
+      <label class="st-chk-row"><input type="checkbox" value="Not ordered" onchange="updateStatusFilter()"><span class="st-dot" style="background:#ff4d6d"></span>Not ordered</label>
+      <label class="st-chk-row"><input type="checkbox" value="Ordered" onchange="updateStatusFilter()"><span class="st-dot" style="background:#00c8ff"></span>Ordered</label>
+      <label class="st-chk-row"><input type="checkbox" value="Ready" onchange="updateStatusFilter()"><span class="st-dot" style="background:#a78bfa"></span>Ready</label>
+      <label class="st-chk-row"><input type="checkbox" value="Delivered" onchange="updateStatusFilter()"><span class="st-dot" style="background:#22c55e"></span>Delivered</label>
+      <label class="st-chk-row"><input type="checkbox" value="Installed" onchange="updateStatusFilter()"><span class="st-dot" style="background:#f59e0b"></span>Installed</label>
+      <label class="st-chk-row"><input type="checkbox" value="Supplied by others" onchange="updateStatusFilter()"><span class="st-dot" style="background:#f59e0b"></span>Supplied by others</label>
+      <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+      <button onclick="clearStatusFilter()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 12px;font-family:'DM Sans',sans-serif;width:100%;text-align:left">Clear all</button>
+    </div>
+  </div>
   <select class="fsel" id="typeFilter" onchange="renderTable()"><option value="">All Equipment Types</option></select>
+  <select class="fsel" id="buildingFilter" onchange="renderTable()"><option value="">All Buildings</option></select>
   <select class="fsel" id="locFilter" onchange="renderTable()"><option value="">All Locations</option></select>
+  <select class="fsel" id="sublocFilter" onchange="renderTable()"><option value="">All Sub-Locations</option></select>
   <!-- View toggle -->
   <div style="display:flex;align-items:center;gap:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;overflow:hidden;margin-left:auto;font-family:'DM Mono',monospace;font-size:11px">
     <button id="viewBtnFull" onclick="setView('full')" style="padding:5px 12px;border:none;cursor:pointer;background:var(--accent);color:#080c12;font-family:inherit;font-size:11px;font-weight:700;transition:all .13s">☰ Full</button>
@@ -330,6 +346,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
           <option value="Ordered">Ordered</option>
           <option value="Ready">Ready</option>
           <option value="Delivered">Delivered</option>
+          <option value="Installed">Installed</option>
           <option value="Supplied by others">Supplied by others</option>
         </select>
       </div>
@@ -360,10 +377,38 @@ var items=[];
 var editingId=null;
 function showToast(msg){
   var t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.4);white-space:nowrap';
+  t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--accent);color:var(--accent);padding:10px 20px;border-radius:8px;font-family:\'DM Mono\',monospace;font-size:12px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.4);white-space:nowrap';
   t.textContent=msg;document.body.appendChild(t);
   setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(function(){t.remove();},300);},2500);
 }
+
+// Status checklist filter
+function toggleStatusDropdown(){
+  var d=document.getElementById('stFilterDropdown');
+  d.style.display=d.style.display==='none'?'block':'none';
+}
+function getSelectedStatuses(){
+  var checks=document.querySelectorAll('#stFilterDropdown input[type=checkbox]:checked');
+  return Array.from(checks).map(function(c){return c.value;});
+}
+function updateStatusFilter(){
+  var sel=getSelectedStatuses();
+  var lbl=document.getElementById('stFilterLabel');
+  lbl.textContent=sel.length===0?'All Statuses':sel.length===1?sel[0]:sel.length+' statuses';
+  renderTable();
+}
+function clearStatusFilter(){
+  document.querySelectorAll('#stFilterDropdown input[type=checkbox]').forEach(function(c){c.checked=false;});
+  updateStatusFilter();
+}
+// Close dropdown when clicking outside
+document.addEventListener('click',function(e){
+  var wrap=document.getElementById('stFilterWrap');
+  if(wrap&&!wrap.contains(e.target)){
+    var d=document.getElementById('stFilterDropdown');
+    if(d)d.style.display='none';
+  }
+});
 function nid(){return 'ps'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
@@ -518,7 +563,7 @@ function dismissSyncBanner(){
 // UPDATE SUMMARY
 function updateSummary(filtered){
   var all=filtered||items;
-  var delivered=all.filter(function(i){return i.status==='Delivered';}).length;
+  var delivered=all.filter(function(i){return i.status==='Delivered'||i.status==='Installed';}).length;
   var ordered=all.filter(function(i){return i.status==='Ordered'||i.status==='Ready';}).length;
   var notOrdered=all.filter(function(i){return i.status==='Not ordered';}).length;
   var td=today();
@@ -533,27 +578,42 @@ function updateSummary(filtered){
 // FILTERS
 function getFilteredItems(){
   var q=(document.getElementById('searchInput').value||'').toLowerCase();
-  var sf=document.getElementById('stFilter').value;
+  var selStatuses=getSelectedStatuses();
   var tf=document.getElementById('typeFilter').value;
+  var bf=document.getElementById('buildingFilter').value;
   var lf=document.getElementById('locFilter').value;
+  var slf=document.getElementById('sublocFilter').value;
   return items.filter(function(i){
-    return(!q||(i.equipId||'').toLowerCase().includes(q)||(i.building||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
-      &&(!sf||i.status===sf)
+    return(!q||(i.equipId||'').toLowerCase().includes(q)||(i.building||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.sublocation||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
+      &&(!selStatuses.length||selStatuses.includes(i.status))
       &&(!tf||i.equipType===tf)
-      &&(!lf||i.location===lf);
+      &&(!bf||i.building===bf)
+      &&(!lf||i.location===lf)
+      &&(!slf||i.sublocation===slf);
   });
 }
 
 // POPULATE FILTER DROPDOWNS
 function populateFilters(){
-  var types=new Set(),locs=new Set();
-  items.forEach(function(i){if(i.equipType)types.add(i.equipType);if(i.location)locs.add(i.location);});
+  var types=new Set(),buildings=new Set(),locs=new Set(),sublocs=new Set();
+  items.forEach(function(i){
+    if(i.equipType)types.add(i.equipType);
+    if(i.building)buildings.add(i.building);
+    if(i.location)locs.add(i.location);
+    if(i.sublocation)sublocs.add(i.sublocation);
+  });
   var tSel=document.getElementById('typeFilter'),tv=tSel.value;
   tSel.innerHTML='<option value="">All Equipment Types</option>';
   Array.from(types).sort().forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;if(t===tv)o.selected=true;tSel.appendChild(o);});
+  var bSel=document.getElementById('buildingFilter'),bv=bSel.value;
+  bSel.innerHTML='<option value="">All Buildings</option>';
+  Array.from(buildings).sort().forEach(function(b){var o=document.createElement('option');o.value=b;o.textContent=b;if(b===bv)o.selected=true;bSel.appendChild(o);});
   var lSel=document.getElementById('locFilter'),lv=lSel.value;
   lSel.innerHTML='<option value="">All Locations</option>';
   Array.from(locs).sort().forEach(function(l){var o=document.createElement('option');o.value=l;o.textContent=l;if(l===lv)o.selected=true;lSel.appendChild(o);});
+  var slSel=document.getElementById('sublocFilter'),slv=slSel.value;
+  slSel.innerHTML='<option value="">All Sub-Locations</option>';
+  Array.from(sublocs).sort().forEach(function(s){var o=document.createElement('option');o.value=s;o.textContent=s;if(s===slv)o.selected=true;slSel.appendChild(o);});
 }
 
 // RENDER TABLE
@@ -680,7 +740,7 @@ function renderTable(){
   var td=today();
   var stMap={
     'Delivered':'st-delivered','Ordered':'st-ordered','Ready':'st-ready',
-    'Not ordered':'st-notordered','Supplied by others':'st-byfire'
+    'Not ordered':'st-notordered','Installed':'st-installed','Supplied by others':'st-byfire'
   };
   // Reset thead dynamic cols each render
   var thead=document.getElementById('procThead');if(thead){while(thead.children.length>2)thead.removeChild(thead.lastChild);}
@@ -707,7 +767,7 @@ function renderTable(){
     var stHex=item.status==='Not ordered'?'#ff4d6d':'#ddeeff';
     var lw=item.leadWeeks?parseInt(item.leadWeeks):null;
     var statusCell=_editMode
-      ?'<select class="proc-edit" onchange="inlineUpdate(\''+item.id+'\',\'status\',this.value)" style="color:'+stHex+'">'+['Not ordered','Ordered','Ready','Delivered','Supplied by others'].map(function(s){return'<option value="'+s+'"'+(item.status===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'
+      ?'<select class="proc-edit" onchange="inlineUpdate(\''+item.id+'\',\'status\',this.value)" style="color:'+stHex+'">'+['Not ordered','Ordered','Ready','Delivered','Installed','Supplied by others'].map(function(s){return'<option value="'+s+'"'+(item.status===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'
       :'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+stHex+'">'+escH(item.status||'—')+'</span>';
     var dateCell=_editMode
       ?'<input type="date" class="proc-edit" value="'+(item.orderDate||'')+'" onchange="inlineUpdate(\''+item.id+'\',\'orderDate\',this.value)" style="min-width:130px"/>'
@@ -743,6 +803,7 @@ function renderTable(){
       equipId:'<td class="equip-id">'+escH(item.equipId||'—')+'</td>',
       building:'<td style="color:var(--text2)">'+escH(item.building||'—')+'</td>',
       location:'<td style="color:var(--muted);font-size:12px">'+escH(item.location||'—')+'</td>',
+      sublocation:'<td style="color:var(--muted);font-size:12px">'+escH(item.sublocation||'—')+'</td>',
       manufacturer:'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>',
       model:'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(item.model||'—')+'</td>',
       equipType:'<td class="equip-type">'+escH(item.equipType||'—')+'</td>',
@@ -887,7 +948,7 @@ function toggleSelectAll(checked){
   updateBatchBar();
   renderTable();
 }
-function clearSelection(){_selectedIds.clear();updateBatchBar();renderTable();}
+function clearSelection(){_selectedIds.clear();_batchStaged={};updateBatchBar();renderTable();}
 function updateBatchBar(){
   var bar=document.getElementById('batchBar');
   var cnt=document.getElementById('batchCount');
@@ -896,40 +957,78 @@ function updateBatchBar(){
     cnt.textContent=_selectedIds.size+' selected';
   } else {
     bar.classList.remove('show');
+    _batchStaged={};
     // Reset batch inputs
     var bs=document.getElementById('batchStatus');
     var bod=document.getElementById('batchOrderDate');
     var blw=document.getElementById('batchLeadWeeks');
-    if(bs)bs.value='';if(bod)bod.value='';if(blw)blw.value='';
+    var bc=document.getElementById('batchComments');
+    if(bs)bs.value='';if(bod)bod.value='';if(blw)blw.value='';if(bc)bc.value='';
+    updateBatchApplyBtn();
   }
   // Sync select-all checkbox
   var allChk=document.getElementById('selectAllChk');
   if(allChk){var filtered=getFilteredItems();allChk.checked=filtered.length>0&&filtered.every(function(i){return _selectedIds.has(i.id);});}
 }
-function applyBatchField(field,value){
-  if(!value||_selectedIds.size===0)return;
-  if(field==='leadWeeks')value=parseInt(value)||'';
+// ── BATCH EDIT — staged changes ──
+var _batchStaged={}; // {field: value}
+
+function stageBatchField(field,value){
+  if(!value)return;
+  if(field==='leadWeeks')value=parseInt(value)||value;
+  _batchStaged[field]=value;
+  updateBatchApplyBtn();
+}
+
+function stageBatchComments(){
+  var val=(document.getElementById('batchComments').value||'').trim();
+  if(val){_batchStaged.comments=val;updateBatchApplyBtn();}
+}
+
+function updateBatchApplyBtn(){
+  var btn=document.getElementById('batchApplyBtn');
+  var count=Object.keys(_batchStaged).length;
+  if(btn){
+    btn.disabled=count===0;
+    btn.style.opacity=count===0?'0.4':'1';
+    btn.textContent=count>0?'Apply ('+count+' change'+(count>1?'s':'')+')':'Apply';
+  }
+}
+
+function applyBatch(){
+  if(!_selectedIds.size||!Object.keys(_batchStaged).length)return;
   _selectedIds.forEach(function(id){
     var item=items.find(function(i){return i.id===id;});
     if(!item)return;
-    item[field]=value;
-    if(field==='status'&&value==='Delivered'&&!item.deliveryDate)item.deliveryDate=today();
-    item.eta=(item.orderDate&&item.leadWeeks)?calcETA(item.orderDate,item.leadWeeks):'';
+    Object.keys(_batchStaged).forEach(function(field){
+      var value=_batchStaged[field];
+      if(field==='comments'){
+        item.comments=item.comments?(item.comments+'\n'+value):value;
+      } else {
+        item[field]=value;
+        if(field==='status'&&value==='Delivered'&&!item.deliveryDate)item.deliveryDate=today();
+      }
+      item.eta=(item.orderDate&&item.leadWeeks)?calcETA(item.orderDate,item.leadWeeks):'';
+    });
   });
+  var n=_selectedIds.size;
+  var fields=Object.keys(_batchStaged).join(', ');
+  _batchStaged={};
+  // Reset inputs
+  var bs=document.getElementById('batchStatus');var bod=document.getElementById('batchOrderDate');
+  var blw=document.getElementById('batchLeadWeeks');var bc=document.getElementById('batchComments');
+  if(bs)bs.value='';if(bod)bod.value='';if(blw)blw.value='';if(bc)bc.value='';
+  updateBatchApplyBtn();
   save();renderTable();updateSummary();
-  showToast('✓ Updated '+_selectedIds.size+' items');
+  showToast('✓ Changes applied to '+n+' item'+(n>1?'s':''));
+}
+
+function applyBatchField(field,value){
+  // Legacy — now just stages
+  stageBatchField(field,value);
 }
 function applyBatchComments(){
-  var val=document.getElementById('batchComments').value.trim();
-  if(!val||_selectedIds.size===0)return;
-  _selectedIds.forEach(function(id){
-    var item=items.find(function(i){return i.id===id;});
-    if(!item)return;
-    item.comments=item.comments?(item.comments+'\n'+val):val;
-  });
-  document.getElementById('batchComments').value='';
-  save();renderTable();updateSummary();
-  showToast('✓ Comments appended to '+_selectedIds.size+' items');
+  stageBatchComments();
 }
 
 // ── COLUMN SETTINGS ──
@@ -937,6 +1036,7 @@ var PROC_COLS = [
   {id:'equipId',    label:'Equipment ID',       default:true,  locked:true},
   {id:'building',   label:'Building',            default:true},
   {id:'location',   label:'Location',            default:true},
+  {id:'sublocation',label:'Sub-Location',        default:true},
   {id:'manufacturer',label:'Manufacturer',       default:true},
   {id:'model',      label:'Model',               default:true},
   {id:'equipType',  label:'Equipment Type',      default:true},
@@ -1120,7 +1220,7 @@ function renderSummary(){
   gOrder.sort();
 
   var td=today();
-  var STATUS_COLORS={'Delivered':'var(--green)','Ordered':'var(--accent)','Ready':'var(--purple)','Not ordered':'var(--danger)','Supplied by others':'var(--muted)'};
+  var STATUS_COLORS={'Delivered':'var(--green)','Ordered':'var(--accent)','Ready':'var(--purple)','Not ordered':'var(--danger)','Installed':'#f59e0b','Supplied by others':'var(--muted)'};
 
   var html='';
   gOrder.forEach(function(grpName,gi){
@@ -1238,18 +1338,19 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   <button onclick="toggleSelectAll(false)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 10px;font-family:'DM Mono',monospace">Deselect all</button>
   <div class="batch-sep"></div>
   <span style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">BATCH UPDATE:</span>
-  <select id="batchStatus" onchange="applyBatchField('status',this.value);this.value=''" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;cursor:pointer">
+  <select id="batchStatus" onchange="stageBatchField('status',this.value)" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;cursor:pointer">
     <option value="">— Status —</option>
     <option value="Not ordered">Not ordered</option>
     <option value="Ordered">Ordered</option>
     <option value="Ready">Ready</option>
     <option value="Delivered">Delivered</option>
+    <option value="Installed">Installed</option>
     <option value="Supplied by others">Supplied by others</option>
   </select>
-  <input type="date" id="batchOrderDate" placeholder="Order date" onchange="applyBatchField('orderDate',this.value)" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none"/>
-  <input type="number" id="batchLeadWeeks" placeholder="Lead weeks" min="1" max="999" step="1" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onchange="applyBatchField('leadWeeks',this.value)" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;width:100px"/>
-  <input type="text" id="batchComments" placeholder="Append comments…" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;flex:1;min-width:160px" onkeydown="if(event.key==='Enter')applyBatchComments()"/>
-  <button onclick="applyBatchComments()" style="background:var(--accent);border:none;border-radius:6px;color:#080c12;font-size:12px;font-weight:700;padding:5px 14px;cursor:pointer;font-family:'DM Sans',sans-serif">Apply</button>
+  <input type="date" id="batchOrderDate" onchange="stageBatchField('orderDate',this.value)" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none"/>
+  <input type="number" id="batchLeadWeeks" placeholder="Lead weeks" min="1" max="999" step="1" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onchange="stageBatchField('leadWeeks',this.value)" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;width:100px"/>
+  <input type="text" id="batchComments" placeholder="Append comments…" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;flex:1;min-width:160px" onchange="stageBatchComments()"/>
+  <button id="batchApplyBtn" onclick="applyBatch()" disabled style="background:var(--accent);border:none;border-radius:6px;color:#080c12;font-size:12px;font-weight:700;padding:5px 18px;cursor:pointer;font-family:'DM Sans',sans-serif;opacity:0.4">Apply</button>
   <button onclick="clearSelection()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px;line-height:1" title="Dismiss">✕</button>
 </div>
 </body>
