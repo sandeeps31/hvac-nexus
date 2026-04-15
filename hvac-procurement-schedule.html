@@ -487,12 +487,13 @@ async function checkEquipSync(){
       var ex=items.find(function(i){return i.equipId===id;});
       if(!ex){newItems.push(id);return;}
       // Check for field changes
-      var building=getRowField(row,tab,['location','Location']);
-      var loc=getRowField(row,tab,['sublocation','subLocation','sub_location','Sub Location','Sub location']);
+      var building=getRowField(row,tab,['building','Building']);
+      var loc=getRowField(row,tab,['location','Location']);
+      var subloc=getRowField(row,tab,['sublocation','subLocation','sub_location','Sub Location','Sub location']);
       var mfr=getRowField(row,tab,['manufacturer','make','maker','Manufacturer','Make']);
       var mod=getRowField(row,tab,['model','Model']);
       var eqt=typeLabel;
-      if(ex.building!==building||ex.location!==loc||ex.manufacturer!==mfr||ex.model!==mod||ex.equipType!==eqt){
+      if(ex.building!==building||ex.location!==loc||ex.sublocation!==subloc||ex.manufacturer!==mfr||ex.model!==mod||ex.equipType!==eqt){
         changes.push(id);
       }
     });
@@ -523,18 +524,19 @@ async function runSync(){
     tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
       var id=(row.tag||row.equipment_id||'').trim();
       if(!id)return;
-      var building=getRowField(row,tab,['location','Location']);
-      var loc=getRowField(row,tab,['sublocation','subLocation','sub_location','Sub Location','Sub location']);
+      var building=getRowField(row,tab,['building','Building']);
+      var loc=getRowField(row,tab,['location','Location']);
+      var subloc=getRowField(row,tab,['sublocation','subLocation','sub_location','Sub Location','Sub location']);
       var mfr=getRowField(row,tab,['manufacturer','make','maker','Manufacturer','Make']);
       var mod=getRowField(row,tab,['model','Model']);
       var ex=items.find(function(i){return i.equipId===id;});
       if(ex){
-        ex.building=building;ex.location=loc;ex.manufacturer=mfr;ex.model=mod;ex.equipType=typeLabel;
+        ex.building=building;ex.location=loc;ex.sublocation=subloc;ex.manufacturer=mfr;ex.model=mod;ex.equipType=typeLabel;
         updated++;
       } else {
         items.push({
           id:'ps'+nid(),equipId:id,
-          building:building,location:loc,
+          building:building,location:loc,sublocation:subloc,
           manufacturer:mfr,model:mod,equipType:typeLabel,
           subApproval:'',status:'Not ordered',orderDate:'',leadWeeks:'',
           qty:1,qtyDelivered:0,eta:'',comments:''
