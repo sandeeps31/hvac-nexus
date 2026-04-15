@@ -277,15 +277,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
     <span class="bcc">Budget</span>
   </div>
   <div style="display:flex;gap:10px;align-items:center">
-    <button class="bg bsm btn" onclick="navTo('hvac-procurement-pos.html')">📦 Procurement →</button>
     <button class="bg bsm btn" onclick="expandAll()">Expand All</button>
     <button class="bg bsm btn" onclick="collapseAll()">Collapse All</button>
-    <button class="bg bsm btn" id="editBudgetBtn" onclick="enterBudgetEdit()" style="display:none;color:var(--warn);border-color:rgba(255,184,48,.3)">✏️ Edit Budget</button>
+    <button class="bg bsm btn" id="editBudgetBtn" onclick="enterBudgetEdit()" style="color:var(--warn);border-color:rgba(255,184,48,.3)">✏️ Edit Budget</button>
     <button class="bp bsm btn" id="saveBudgetBtn" onclick="saveBudgetEdit()" style="display:none">💾 Save Budget</button>
     <button class="bg bsm btn" id="cancelBudgetBtn" onclick="cancelBudgetEdit()" style="display:none">✕ Cancel</button>
-    <button class="bg bsm btn" onclick="openUploadTemplate()" style="color:var(--accent);border-color:rgba(0,200,255,.3)">📂 Upload Template</button>
-    <input type="file" id="templateFileInput" accept=".xlsx" style="display:none" onchange="handleTemplateUpload(this)">
-    <button class="bp bsm btn" onclick="openAddSection()">＋ Add Category</button>
   </div>
 </div>
 
@@ -293,7 +289,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
   <div class="sc cb"><div class="sc-lbl">Budget</div><div class="sc-val" id="sum-budget">—</div><div class="sc-sub">Tender estimate</div></div>
   <div class="sc cw"><div class="sc-lbl">Committed</div><div class="sc-val" id="sum-committed">—</div><div class="sc-sub">Ex GST</div></div>
   <div class="sc"><div class="sc-lbl">Actuals</div><div class="sc-val" id="sum-actual">—</div><div class="sc-sub">Approved invoices</div></div>
-  <div class="sc"><div class="sc-lbl">Actual (Invoiced)</div><div class="sc-val" id="sum-actual">—</div><div class="sc-sub">Ex GST</div></div>
+  <div class="sc"><div class="sc-lbl">Actual (Invoiced)</div><div class="sc-val" id="sum-actual-inv">—</div><div class="sc-sub">Ex GST</div></div>
   <div class="sc"><div class="sc-lbl">Variance</div><div class="sc-val" id="sum-var">—</div><div class="sc-sub" id="sum-var-sub">vs budget</div></div>
   <div class="sc"><div class="sc-lbl">Margin %</div><div class="sc-val" id="sum-margin">—</div><div class="sc-sub" id="sum-margin-sub">—</div></div>
 </div>
@@ -524,7 +520,7 @@ function setViewMode(mode){
 }
 let uidN = 0;
 const uid = () => ++uidN;
-var showApprovedOnly=false;
+var showApprovedOnly=true;
 
 const fmt = n => { const v=parseFloat(n)||0; return v===0?'--':'$'+Math.round(v).toLocaleString('en-AU'); };
 const fmtV = n => { if(!n||n===0)return '--'; return (n>0?'+':'-')+' $'+Math.round(Math.abs(n)).toLocaleString('en-AU'); };
@@ -675,6 +671,7 @@ function updateSummary(){
   var sumActEl=document.getElementById('sum-actual');if(sumActEl)sumActEl.textContent=fmt(grandActual());
   var _actual=grandActual();
   var actEl=document.getElementById('sum-actual');if(actEl)actEl.textContent=fmt(_actual);
+  var actInvEl=document.getElementById('sum-actual-inv');if(actInvEl)actInvEl.textContent=fmt(_actual);
   document.getElementById('sum-var').textContent=fmtV(v);
   document.getElementById('sum-var').style.color=v>0?'var(--green)':v<0?'var(--danger)':'var(--text2)';
   document.getElementById('sum-var-sub').textContent=v>0?'under budget':v<0?'over budget':'--';
@@ -819,8 +816,7 @@ function renderAll(){
           flushL2();
           return html;
         })()}
-        <div class="add-item-wrap"><button class="add-item-btn" onclick="addGrp('${sec.id}')">+ Add Line Item</button></div>
-        <div class="subtotal-row">
+        ${_budgetEditMode?`<div class="add-item-wrap"><button class="add-item-btn" onclick="addGrp('${sec.id}')">+ Add Line Item</button></div>`:''}        <div class="subtotal-row">
           <span class="subtotal-lbl" style="padding-left:0">Subtotal — ${namePart}</span>
           <span class="subtotal-num" data-col="budget" style="width:110px;color:var(--accent)">${fmt(sb)}</span>
           <span class="subtotal-num" data-col="committed" style="width:110px;color:var(--warn)">${fmt(sc2)}</span>
@@ -861,12 +857,6 @@ function renderAll(){
     +   '<span id="varRegCount" style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted);background:var(--surface3);border:1px solid var(--border);padding:2px 9px;border-radius:20px"></span>'
     + '</div>'
     + '<div style="display:flex;align-items:center;gap:12px">'
-    +   '<span style="font-size:12.5px;color:var(--text2)">Approved only</span>'
-    +   '<label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer">'
-    +     '<input type="checkbox" id="approvedOnlyToggle" onchange="toggleApprovedFilter(this)" '+(showApprovedOnly?' checked':'')+' style="opacity:0;width:0;height:0;position:absolute">'
-    +     '<span style="position:absolute;inset:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:20px;transition:all .2s"></span>'
-    +     '<span style="position:absolute;left:2px;top:2px;width:14px;height:14px;background:var(--muted);border-radius:50%;transition:all .2s"></span>'
-    +   '</label>'
     +   '<a href="hvac-variations.html" onclick="event.stopPropagation()" style="font-size:12px;color:var(--accent);text-decoration:none;padding:4px 12px;border:1px solid rgba(0,200,255,.3);border-radius:6px;background:var(--accent-dim)">Open Variations &#8594;</a>'
     + '</div>'
     + '</div>'
@@ -1180,7 +1170,7 @@ function showTemplateToast(msg){
   var banner=document.getElementById('budgetRoleBanner');
   if(banner)banner.style.display=_canEditBudget?'flex':'none';
   var editBtn=document.getElementById('editBudgetBtn');
-  if(editBtn)editBtn.style.display=_canEditBudget?'':'none';
+  if(editBtn)editBtn.style.display='';
   var saved = await loadData();
   if(saved?.margin) margin = saved.margin;
   if(saved?.sections && saved.sections.length){
