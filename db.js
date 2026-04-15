@@ -174,7 +174,6 @@ async function authGuard() {
 
 // ── Core fetch wrapper ──
 async function sbFetch(path, options = {}) {
-  await dbReady;
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
   // Use session JWT if logged in, otherwise fall back to anon key
   const token = _authSession ? _authSession.access_token : SUPABASE_ANON_KEY;
@@ -253,7 +252,7 @@ async function dbSetProject(table, projectNum, data) {
     } else {
       await sbFetch(table, {
         method: 'POST',
-        body: JSON.stringify({ project_num: projectNum, data })
+        body: JSON.stringify({ project_num: projectNum, data, company_id: localStorage.getItem('hvacnexus_company_id') })
       });
     }
     return true;
