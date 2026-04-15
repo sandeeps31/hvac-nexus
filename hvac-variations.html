@@ -213,7 +213,7 @@ function saveData(){
   var el=document.getElementById('saveInd');
   if(el){el.classList.add('show');setTimeout(function(){el.classList.remove('show');},2000);}
 }
-var _d=loadData();if(_d&&_d.variations)variations=_d.variations;
+var _d=loadData();if(_d&&_d.variations)variations=_d.variations; // overwritten by async init below
 function genVarNum(){var m=0;for(var i=0;i<variations.length;i++){var match=(variations[i].num||'').match(/VAR-(\d+)/);if(match){var n=parseInt(match[1]);if(n>m)m=n;}}return'VAR-'+String(m+1).padStart(3,'0');}
 function liSub(items){var t=0;for(var i=0;i<items.length;i++){var li=items[i];if(li.type==='vendor'||li.type==='sub'){if(li.vcMode==='link'&&li.svValue)t+=num(li.svValue);else if(num(li.vendorAmt))t+=num(li.vendorAmt);else if(li.svValue)t+=num(li.svValue);}else t+=num(li.qty)*num(li.rate);}return t;}
 function varTWM(items,mp){var s=liSub(items),ma=s*(num(mp)/100),ex=s+ma;return ex+ex*.1;}
@@ -226,9 +226,9 @@ function renderList(){var q=(document.getElementById('srch').value||'').toLowerC
 function setVarView(vn,ex){showView('var');document.getElementById('bcCurr').textContent=vn||'New Variation';document.getElementById('backBtn').style.display='';document.getElementById('topCreateBtn').style.display='none';document.getElementById('pdfBtn').style.display=ex?'':'none';document.getElementById('emailBtn').style.display=ex?'':'none';document.getElementById('deleteVarBtn').style.display=ex?'':'none';document.getElementById('ratesBanner').style.display=ratesAreSet()?'none':'flex';}
 function newLI(){return{id:nid(),desc:'',qty:'',rate:'',type:'labour',trade:'',overtime:'normal',vcMode:'manual',vendorAmt:'',svId:'',svNum:'',svSubbie:'',svValue:''};}
 function openNewVar(){editingVar=null;lineItems=[newLI()];var vn=genVarNum();document.getElementById('var-num').value=vn;document.getElementById('var-page-num').textContent=vn;document.getElementById('var-page-title').textContent='New Variation';document.getElementById('var-rev').value='0';document.getElementById('var-issue-date').value=new Date().toISOString().split('T')[0];document.getElementById('var-approve-date').value='';document.getElementById('var-lead-time').value='';document.getElementById('var-status').value='Pending';document.getElementById('var-desc').value='';document.getElementById('var-short-desc').value='';document.getElementById('titleCharCount').textContent='0 / 80';document.getElementById('var-approved-value').value='';document.getElementById('var-reason').value='';document.getElementById('var-comments').value='';document.getElementById('var-file-lbl').textContent='Attach PDF, drawings or photos...';document.getElementById('marginPct').value='0';renderLI();setVarView(vn,false);updateApprovedDisplay();setTimeout(function(){document.getElementById('var-desc').focus();},100);}
-function openVar(id){
+async function openVar(id){
   // Always reload from storage first so synced subbie line items appear immediately
-  var fresh=loadData();if(fresh&&fresh.variations)variations=fresh.variations;
+  var fresh=await loadData();if(fresh&&fresh.variations)variations=fresh.variations;
   var v=null;for(var i=0;i<variations.length;i++){if(variations[i].id===id){v=variations[i];break;}}if(!v)return;editingVar=id;var ri=v.lineItems&&v.lineItems.length?v.lineItems:[newLI()];lineItems=JSON.parse(JSON.stringify(ri));for(var j=0;j<lineItems.length;j++){if(lineItems[j].type==='normal')lineItems[j].type='labour';if(lineItems[j].type==='sub')lineItems[j].type='vendor';if(!lineItems[j].trade)lineItems[j].trade='duct';if(!lineItems[j].overtime)lineItems[j].overtime='normal';if(!lineItems[j].vcMode)lineItems[j].vcMode=lineItems[j].svNum?'link':'manual';}document.getElementById('var-num').value=v.num;document.getElementById('var-page-num').textContent=v.num;document.getElementById('var-page-title').textContent=v.desc||'Variation';document.getElementById('var-rev').value=v.rev||0;document.getElementById('var-issue-date').value=v.issueDate||'';document.getElementById('var-approve-date').value=v.approveDate||'';document.getElementById('var-lead-time').value=v.leadTime||'';document.getElementById('var-status').value=v.status||'Pending';document.getElementById('var-desc').value=v.desc||'';document.getElementById('var-short-desc').value=v.shortDesc||'';document.getElementById('titleCharCount').textContent=((v.shortDesc||'').length)+' / 80';document.getElementById('var-approved-value').value=v.approvedValue||'';document.getElementById('var-reason').value=v.reason||'';document.getElementById('var-comments').value=v.comments||'';document.getElementById('var-file-lbl').textContent=v.fileName||'Attach PDF, drawings or photos...';document.getElementById('marginPct').value=v.margin||0;renderLI();setVarView(v.num,true);updateApprovedDisplay();}
 function autoResize(ta){ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';}
 function setLIType(i,t){lineItems[i].type=t;if(t!=='vendor'){lineItems[i].svId='';lineItems[i].svNum='';lineItems[i].svSubbie='';lineItems[i].svValue='';lineItems[i].vendorAmt='';}renderLI();}
@@ -338,8 +338,19 @@ function delVar(id){if(!confirm('Delete?'))return;var arr=[];for(var i=0;i<varia
 function handleFiles(input){if(input.files&&input.files.length){var names=[];for(var i=0;i<input.files.length;i++)names.push(input.files[i].name);document.getElementById('var-file-lbl').textContent=names.join(', ');}}
 document.getElementById('subPickModal').addEventListener('click',function(e){if(e.target===this)closeSubPicker();});
 document.getElementById('ratesModal').addEventListener('click',function(e){if(e.target===this)closeRatesModal();});
-loadRates().then(function(){renderList();});
-document.addEventListener('visibilitychange',function(){if(!document.hidden){var fresh=loadData();if(fresh&&fresh.variations)variations=fresh.variations;renderList();}});
+loadRates().then(async function(){
+  if(typeof dbReady!=='undefined')await dbReady;
+  var fresh=await loadData();
+  if(fresh&&fresh.variations)variations=fresh.variations;
+  renderList();
+});
+document.addEventListener('visibilitychange',async function(){
+  if(!document.hidden){
+    var fresh=await loadData();
+    if(fresh&&fresh.variations)variations=fresh.variations;
+    renderList();
+  }
+});
 
 
 
