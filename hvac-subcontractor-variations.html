@@ -613,7 +613,7 @@ function renderLinkedVarDisplay(){
 }
 function unlinkVar(){linkedVar=null;renderLinkedVarDisplay();}
 
-function saveSV(){
+async function saveSV(){
   var num_v=document.getElementById('f-num').value.trim();
   var subbie=document.getElementById('f-subbie').value.trim();
   var desc=document.getElementById('f-desc').value.trim();
@@ -639,7 +639,7 @@ function saveSV(){
   }
   // Sync value to linked variation's vendor cost line item
   if(sv.linkedVarId){
-    syncValueToVariation(sv.id, sv.num, sv.subbie, sv.value);
+    await syncValueToVariation(sv.id, sv.num, sv.subbie, sv.value);
   }
   save();closeAddModal();renderList();
 }
@@ -693,6 +693,9 @@ async function confirmQuickVar(){
   if(!title){alert('Variation title is required.');return;}
   var vnum=document.getElementById('qv-num').value;
   var sow=document.getElementById('qv-sow').value.trim();
+  // Show loading state
+  var btn=document.querySelector('#quickVarModal .bp');
+  if(btn){btn.disabled=true;btn.textContent='Creating…';}
   var newVar={
     id:'v'+nid(),
     num:vnum,
@@ -712,10 +715,9 @@ async function confirmQuickVar(){
   linkedVar={id:newVar.id,num:vnum,title:title};
   renderLinkedVarDisplay();
   closeQuickVar();
-  if(confirm('Variation '+vnum+' created and linked.\n\nOpen it now in Variations to add line items?')){
-    saveSV();
-    navTo('hvac-variations.html');
-  }
+  // Save the SV with the link, then open the variation
+  await saveSV();
+  navTo('hvac-variations.html');
 }
 
 (async function(){if(typeof dbReady!=='undefined')await dbReady;await load();renderList();})();
