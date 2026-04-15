@@ -191,21 +191,24 @@ var _editingId=null;
 function nid(){return 'p'+(++_uid)+Date.now();}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function save(){
-  return dbSetProject('projects','__projects__',projects).catch(function(e){console.error('saveProjects:',e);});
+  // Save each project as its own row — never overwrites other projects
+  return Promise.all(projects.map(p => dbSetProject_single(p))).catch(function(e){console.error('saveProjects:',e);});
 }
 async function load(){
   try{
-    // Try new path first (project_num-aware)
-    var s=await dbGetProject('projects','__projects__');
-    if(s&&Array.isArray(s)){projects=s;return;}
-    if(s===null){
-      // Try legacy path (single-row dbGet)
-      var s2=await dbGetProjects();
-      if(s2&&Array.isArray(s2)&&s2.length){projects=s2;return;}
-      _neverSet=true;
+    var ps = await dbGetProjects();
+    if(ps && ps.length){ projects = ps; return; }
+    // Legacy fallback: try old __projects__ single-row format
+    var legacy = await dbGetProject('projects','__projects__');
+    if(legacy && Array.isArray(legacy) && legacy.length){
+      projects = legacy;
+      // Migrate: save each as its own row
+      await Promise.all(projects.map(p => dbSetProject_single(p)));
+      console.log('Migrated', projects.length, 'projects to individual rows');
+      return;
     }
-  }catch(e){}
-  projects=[];
+  }catch(e){ console.warn('load error:', e); }
+  projects = [];
 }
 
 var _neverSet=false;
@@ -336,22 +339,22 @@ function saveProject(){
   if(_editingId){
     var p=projects.find(function(x){return x.id===_editingId;});
     if(p)Object.assign(p,data);
+    dbSetProject_single(p).catch(function(e){console.error('saveProject:',e);});
   } else {
     data.id=nid();data.created=today;
     projects.push(data);
+    dbSetProject_single(data).catch(function(e){console.error('saveProject:',e);});
   }
-  var r=save();
-  if(r&&r.then){r.then(function(){renderProjects();}).catch(function(){renderProjects();});}
-  else{renderProjects();}
+  renderProjects();
   closeModal();
 }
 function deleteProject(id){
   var p=projects.find(function(x){return x.id===id;});if(!p)return;
   if(!confirm('Delete "'+p.name+'"? This cannot be undone.'))return;
   projects=projects.filter(function(x){return x.id!==id;});
-  var rd=save();
-  if(rd&&rd.then){rd.then(function(){renderProjects();}).catch(function(){renderProjects();});}
-  else{renderProjects();}
+  // Delete the individual row from Supabase
+  dbDeleteProject(id).catch(function(e){console.error('deleteProject:',e);});
+  renderProjects();
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
 

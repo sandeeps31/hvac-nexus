@@ -401,13 +401,13 @@ function saveAll() {
     claimDay:v('p-claim-day')||'25', claimEmail:v('p-claim-email'),
     claimTemplate:document.getElementById('p-claim-template')?document.getElementById('p-claim-template').value:''
   };
-  // Guard — never save if projects failed to load (would wipe other projects)
-  if(!projects.length){console.warn('saveAll: projects not loaded, skipping dbSetProjects');dbSetProject('proj_settings', projectId, data).catch(e=>console.error(e));showToast('Settings saved');return;}
-  // Update in projects list too
+  // Update in projects list and save only this project's row
   var idx = projects.findIndex(function(p){ return p.id === projectId; });
   if(idx >= 0) Object.assign(projects[idx], data);
   else projects.push(Object.assign({id: projectId}, data));
-  dbSetProjects(projects).catch(e=>console.error(e));
+  // Save only this project — never touches other projects
+  dbSetProject_single(projects[idx >= 0 ? idx : projects.length-1]).catch(e=>console.error(e));
+  dbSetProject('proj_settings', projectId, data).catch(e=>console.error(e));
   dbSetProject('proj_settings', projectId, data).catch(e=>console.error(e));
   showToast('Settings saved');
 }
