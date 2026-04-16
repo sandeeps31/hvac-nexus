@@ -1196,14 +1196,26 @@ var _hiddenCols = new Set();
 
 function loadColSettings(){
   var COL_SETTINGS_KEY='hvacnexus_proc_cols_'+(_psPNum||'default');
+  var ORDER_KEY='hvacnexus_proc_col_order_'+(_psPNum||'default');
+  var currentIds=PROC_COLS.map(function(c){return c.id;});
   try{
-    var stored = localStorage.getItem(COL_SETTINGS_KEY);
+    var stored=localStorage.getItem(COL_SETTINGS_KEY);
+    var storedOrder=localStorage.getItem(ORDER_KEY);
+    // Check if stored order is missing any current columns — if so, reset both
+    if(storedOrder){
+      var orderArr=JSON.parse(storedOrder);
+      var missingCols=currentIds.filter(function(id){return orderArr.indexOf(id)<0;});
+      if(missingCols.length){
+        // New columns added — clear cache so they appear with defaults
+        localStorage.removeItem(COL_SETTINGS_KEY);
+        localStorage.removeItem(ORDER_KEY);
+        stored=null;
+      }
+    }
     if(stored){
-      var hidden = JSON.parse(stored);
-      _hiddenCols = new Set(hidden);
+      _hiddenCols=new Set(JSON.parse(stored));
     } else {
-      // Default - show all default cols
-      _hiddenCols = new Set(PROC_COLS.filter(function(c){return !c.default;}).map(function(c){return c.id;}));
+      _hiddenCols=new Set(PROC_COLS.filter(function(c){return !c.default;}).map(function(c){return c.id;}));
     }
   }catch(e){_hiddenCols=new Set();}
 }
@@ -1223,7 +1235,14 @@ function getColOrder(){
   try{
     var key='hvacnexus_proc_col_order_'+(_psPNum||'default');
     var stored=localStorage.getItem(key);
-    if(stored)_colOrder=JSON.parse(stored);
+    if(stored){
+      var saved=JSON.parse(stored);
+      // Merge: add any new columns that aren't in the saved order
+      var currentIds=PROC_COLS.map(function(c){return c.id;});
+      var merged=saved.filter(function(id){return currentIds.indexOf(id)>=0;}); // remove deleted cols
+      currentIds.forEach(function(id){if(merged.indexOf(id)<0)merged.push(id);}); // add new cols
+      _colOrder=merged;
+    }
   }catch(e){}
   if(!_colOrder)_colOrder=PROC_COLS.map(function(c){return c.id;});
   return _colOrder;
