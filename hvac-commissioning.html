@@ -776,14 +776,14 @@ async function openSyncModal(){
     var raw=await dbGetEquipment(_cxPNum);
     if(!raw){showTrackerToast('No equipment schedule data found.');return;}
     var data=(typeof raw==='string')?JSON.parse(raw):raw;
-    var tabs=(data.tabs||[]).filter(function(t){return t.type!=='mssb';});
-    // Build type list with counts
+    var tabs=(data.tabs||[]);
+    // Build type list with counts — use tab.name as display label
     _syncModal_types=[];
     tabs.forEach(function(tab){
       var count=(tab.rows||[]).filter(function(r){return r.tag||r.id_tag;}).length;
       if(count>0){
-        var typeName=EQUIP_TYPE_NAMES[tab.type]||tab.name||tab.type||'Unknown';
-        _syncModal_types.push({type:tab.type,name:typeName,count:count,tabId:tab.id});
+        var typeName=tab.name||EQUIP_TYPE_NAMES[tab.type]||tab.type||'Unknown';
+        _syncModal_types.push({type:tab.type,name:typeName,count:count});
       }
     });
     if(!_syncModal_types.length){showTrackerToast('No equipment found in schedule.');return;}
@@ -829,9 +829,10 @@ async function confirmSync(){
     var imported=0;
 
     tabs.forEach(function(tab){
-      if(tab.type==='mssb') return;
+      // Skip if type not selected
       if(!_syncModal_selected.has(tab.type)) return;
-      var typeName=EQUIP_TYPE_NAMES[tab.type]||tab.name||tab.type||'';
+      // Use tab.name as the display type label
+      var typeName=tab.name||EQUIP_TYPE_NAMES[tab.type]||tab.type||'';
       (tab.rows||[]).forEach(function(r){
         var tag=r.tag||r.id_tag||'';
         if(!tag) return;
@@ -842,18 +843,12 @@ async function confirmSync(){
         else if(r.supply) design=parseFloat(r.supply)||null;
         else if(r.flow) design=parseFloat(r.flow)||null;
         else if(r.max) design=parseFloat(r.max)||null;
-        var autoMssb='';var autoMssbLoc='';
-        var mssbTab2=(data.tabs||[]).find(function(t){return t.type==='mssb';});
-        if(mssbTab2){
-          var mssbRow2=(mssbTab2.rows||[]).find(function(mr){return(mr.equip||'').trim()===tag;});
-          if(mssbRow2){autoMssb=mssbRow2.tag||'';autoMssbLoc=mssbRow2.location||'';}
-        }
         trackerItems.push({
           id:'tr'+uid(),tag:tag,
           name:(r.desc||r.name||typeName+' '+tag).trim(),
           type:typeName,location:(r.location||''),subloc:(r.sublocation||r.subloc||''),
           locServing:(r.locServing||r.area_served||''),design:design,actual:null,
-          precxAuto:'',precxManual:'',mssb:autoMssb,boardLoc:autoMssbLoc,mssbPowered:'',
+          precxAuto:'',precxManual:'',mssb:'',boardLoc:'',mssbPowered:'',
           airflowVerif:'',localFuncCx:'',itcSubmitted:'',witnessed:'',intBmsCx:'',
           startCx:'',duration:'',finish:'',bmsReadyBy:'',mssbPowerDate:'',powerPlus8:'',
           deps:'',defect:'',responsibility:'',subby:'',cxStatus:''
