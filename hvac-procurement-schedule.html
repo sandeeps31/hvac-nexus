@@ -528,7 +528,9 @@ async function checkEquipSync(){
       var mfr=getRowField(row,tab,['manufacturer','make','maker','Manufacturer','Make']);
       var mod=getRowField(row,tab,['model','Model']);
       var eqt=typeLabel;
-      if(ex.building!==building||ex.location!==loc||ex.sublocation!==subloc||ex.manufacturer!==mfr||ex.model!==mod||ex.equipType!==eqt){
+      // Normalise: treat undefined/null/'' as equivalent
+      function norm(v){return(v||'').trim();}
+      if(norm(ex.building)!==norm(building)||norm(ex.location)!==norm(loc)||norm(ex.sublocation)!==norm(subloc)||norm(ex.manufacturer)!==norm(mfr)||norm(ex.model)!==norm(mod)||norm(ex.equipType)!==norm(eqt)){
         changes.push(id);
       }
     });
@@ -544,6 +546,8 @@ async function checkEquipSync(){
       if(detail)detail.textContent=parts.join(' · ');
       banner.style.display='flex';
     }
+  } else {
+    dismissSyncBanner();
   }
 }
 
@@ -551,8 +555,27 @@ async function runSync(){
   var raw=null;
   try{raw=await dbGetEquipment(_psPNum);}catch(e){}
   if(!raw||!raw.tabs||!raw.tabs.length){showToast('No equipment schedule data found.');return;}
-  var added=0,updated=0;
+  var added=0,updated=0,removed=0;
   var existing=new Set(items.map(function(i){return i.equipId;}));
+
+  // Build set of all valid equipment IDs from equipment schedule
+  var validIds=new Set();
+  raw.tabs.forEach(function(tab){
+    if(!Array.isArray(tab.rows))return;
+    tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
+      var id=(row.tag||row.equipment_id||'').trim();
+      if(id)validIds.add(id);
+    });
+  });
+
+  // Remove procurement items that no longer exist in equipment schedule
+  var before=items.length;
+  items=items.filter(function(i){
+    if(!i.equipId)return true; // keep manually added items with no equipId
+    return validIds.has(i.equipId);
+  });
+  removed=before-items.length;
+
   raw.tabs.forEach(function(tab){
     if(!Array.isArray(tab.rows))return;
     var typeLabel=getTypeLabel(tab);
@@ -583,12 +606,13 @@ async function runSync(){
   });
   save();
   dismissSyncBanner();
-  loadColSettings();// Migrate legacy assetId → equipId
-items.forEach(function(i){if(!i.equipId&&i.assetId)i.equipId=i.assetId;});
-renderTable();updateSummary();checkEquipSync();
+  loadColSettings();
+  items.forEach(function(i){if(!i.equipId&&i.assetId)i.equipId=i.assetId;});
+  renderTable();updateSummary();checkEquipSync();
   var msg=[];
   if(updated)msg.push(updated+' item'+(updated>1?'s':'')+' updated');
   if(added)msg.push(added+' new item'+(added>1?'s':'')+' added');
+  if(removed)msg.push(removed+' item'+(removed>1?'s':'')+' removed');
   showToast('✓ Sync complete — '+(msg.join(', ')||'No changes'));
 }
 
