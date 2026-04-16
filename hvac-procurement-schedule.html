@@ -464,8 +464,12 @@ function isPast(ds){if(!ds)return false;return ds<today();}
 
 
 // DATA
-function save(){dbSetProcurement(_psPNum,items).catch(e=>console.error(e));}
-async function load(){try{var p=await dbGetProcurement(_psPNum);items=Array.isArray(p)?p:[];}catch(e){items=[];}}
+function save(){
+  if(!items.length&&!_dataLoaded)return; // never save before data is loaded
+  dbSetProcurement(_psPNum,items).catch(e=>console.error(e));
+}
+var _dataLoaded=false;
+async function load(){try{var p=await dbGetProcurement(_psPNum);items=Array.isArray(p)?p:[];}catch(e){items=[];}finally{_dataLoaded=true;}}
 // ETA RECALC
 function calcETA(orderDate,leadWeeks){return addWeeks(orderDate,leadWeeks);}
 function recalcETA(){
@@ -1053,9 +1057,10 @@ function exportCSV(){
 }
 
 (async function(){
-  await load();
   if(typeof dbReady !== 'undefined') await dbReady;
+  await load();
   renderTable();
+  updateSummary();
   checkEquipSync();
 })();
 </script>
