@@ -798,24 +798,29 @@ async function openSyncModal(){
 function renderSyncModal(){
   var body=document.getElementById('syncModalBody');
   if(!body)return;
-  body.innerHTML=_syncModal_types.map(function(t){
+  body.innerHTML=_syncModal_types.map(function(t,i){
     var checked=_syncModal_selected.has(t.type);
     var inTracker=trackerItems.filter(function(i){return i.type===t.name;}).length;
-    return '<label style="display:flex;align-items:center;gap:12px;padding:10px 14px;border:1.5px solid '+(checked?'var(--accent)':'var(--border)')+';border-radius:8px;cursor:pointer;background:'+(checked?'var(--accent-dim)':'var(--surface2)')+';transition:all .15s">'
-      +'<input type="checkbox" '+(checked?'checked':'')+' data-type="'+t.type.replace(/"/g,'&quot;')+'" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;flex-shrink:0">'
+    return '<label id="syncopt_'+i+'" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border:1.5px solid '+(checked?'var(--accent)':'var(--border)')+';border-radius:8px;cursor:pointer;background:'+(checked?'rgba(0,200,255,.08)':'var(--surface2)')+'">'
+      +'<input type="checkbox" '+(checked?'checked':'')+' id="syncchk_'+i+'" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;flex-shrink:0">'
       +'<div style="flex:1">'
       +'<div style="font-weight:600;color:var(--text);font-size:13px">'+t.name+'</div>'
       +'<div style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace;margin-top:2px">'+t.count+' items in schedule'+(inTracker?' · '+inTracker+' already synced':'')+'</div>'
-      +'</div>'
-      +'</label>';
+      +'</div></label>';
   }).join('');
-  // Attach change listeners after rendering
-  body.querySelectorAll('input[type=checkbox]').forEach(function(cb){
+  // Attach listeners — update Set and visual only, no re-render
+  _syncModal_types.forEach(function(t,i){
+    var cb=document.getElementById('syncchk_'+i);
+    var lbl=document.getElementById('syncopt_'+i);
+    if(!cb)return;
     cb.addEventListener('change',function(){
-      var type=this.getAttribute('data-type');
-      if(this.checked)_syncModal_selected.add(type);
-      else _syncModal_selected.delete(type);
-      renderSyncModal();
+      if(this.checked){
+        _syncModal_selected.add(t.type);
+        if(lbl){lbl.style.borderColor='var(--accent)';lbl.style.background='rgba(0,200,255,.08)';}
+      } else {
+        _syncModal_selected.delete(t.type);
+        if(lbl){lbl.style.borderColor='var(--border)';lbl.style.background='var(--surface2)';}
+      }
     });
   });
 }
