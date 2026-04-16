@@ -139,7 +139,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .search-box{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;width:220px}
 .search-box input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%}
 .search-box input::placeholder{color:var(--muted)}
-.tracker-table-wrap{overflow-x:auto}
+.doc-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;transition:border-color .15s}
+.doc-card:hover{border-color:var(--accent)}
+.doc-card-type{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.doc-card-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px}
+.doc-card-rev{display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:11px;padding:3px 10px;border-radius:20px;margin-bottom:12px}
+.doc-card-rev.draft{background:rgba(255,184,48,.12);color:var(--warn);border:1px solid rgba(255,184,48,.25)}
+.doc-card-rev.published{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.doc-card-actions{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.doc-card-actions button{flex:1;background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;font-size:12px;padding:6px;font-family:'DM Sans',sans-serif;transition:all .13s}
+.doc-card-actions button:hover{border-color:var(--accent);color:var(--accent)}
+.doc-card-actions button.del:hover{border-color:var(--danger);color:var(--danger)}
+.rev-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.rev-row:last-child{border-bottom:none}
+.rev-row:hover{background:var(--surface2)}
 .tracker-table{width:100%;border-collapse:collapse;font-size:12.5px;white-space:nowrap}
 .tracker-table thead tr{background:var(--surface2)}
 .tracker-table th{padding:9px 13px;text-align:left;font-family:'DM Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500}
@@ -515,13 +528,73 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
         </div>
         <div class="mod-card-footer"><span class="mod-card-footer-lbl">Open Tracker</span><span class="mod-card-arrow">→</span></div>
       </div>
+      <div class="mod-card" style="border-color:rgba(168,139,250,.3)" onclick="openView('docs')">
+        <div class="mod-card-top">
+          <div class="mod-card-icon">📁</div>
+          <div class="mod-card-num">Module 04</div>
+          <div class="mod-card-title">Cx Documents</div>
+          <div class="mod-card-desc">Commissioning Plan and Flushing Manual with revision history and publish workflow.</div>
+          <div class="mod-card-stats" id="docs-card-stats"><span class="mod-stat" id="docs-card-stat">0 documents</span></div>
+        </div>
+        <div class="mod-card-footer"><span class="mod-card-footer-lbl">Open Documents</span><span class="mod-card-arrow">→</span></div>
+      </div>
 
     </div>
   </div>
 </div>
 
-<!-- PLAN -->
-<div class="view" id="view-plan">
+<!-- CX DOCUMENTS -->
+<div class="view" id="view-docs">
+  <div class="detail-page">
+    <div class="detail-header">
+      <div><div class="detail-label">Module 04</div><div class="detail-title">📁 Cx Documents</div><div class="detail-subtitle">Commissioning Plan and Flushing Manual with revision history.</div></div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" onclick="goHome()">← Back</button>
+        <button class="btn btn-green btn-sm" onclick="openAddDocModal()">＋ Add Document</button>
+      </div>
+    </div>
+    <div id="cxDocsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;padding:8px 0"></div>
+    <div id="cxDocsEmpty" style="display:none;padding:60px;text-align:center;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:16px">📁</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text2);margin-bottom:8px">No documents yet</div>
+      <div style="font-size:13px;margin-bottom:20px">Click <strong>＋ Add Document</strong> to create a Commissioning Plan or Flushing Manual.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD DOC MODAL -->
+<div class="mo" id="addDocModal" onclick="if(event.target===this)closeAddDocModal()">
+  <div class="modal" style="width:440px">
+    <h3>Add Document</h3>
+    <p class="msub">Select the document type to create.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:16px 0">
+      <div id="addDocOpt1" onclick="selectDocType('cx_plan')" style="border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s">
+        <div style="font-weight:600;color:var(--text);margin-bottom:4px">📋 Commissioning Plan</div>
+        <div style="font-size:12px;color:var(--muted)">Project scope, timeline, responsible parties and systems list.</div>
+      </div>
+      <div id="addDocOpt2" onclick="selectDocType('flushing')" style="border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s">
+        <div style="font-weight:600;color:var(--text);margin-bottom:4px">💧 Flushing Manual</div>
+        <div style="font-size:12px;color:var(--muted)">Pipework flushing and cleaning procedures.</div>
+      </div>
+    </div>
+    <div class="mac">
+      <button class="bg bsm btn" onclick="closeAddDocModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="createDoc()">Create Document</button>
+    </div>
+  </div>
+</div>
+
+<!-- REV HISTORY MODAL -->
+<div class="mo" id="revHistModal" onclick="if(event.target===this)closeRevHistModal()">
+  <div class="modal" style="width:560px">
+    <h3 id="revHistTitle">Revision History</h3>
+    <div id="revHistBody" style="max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"></div>
+    <div class="mac" style="margin-top:12px">
+      <button class="bg bsm btn" onclick="closeRevHistModal()">Close</button>
+      <button class="bp bsm btn" id="publishRevBtn" onclick="publishRevision()">↑ Publish Revision</button>
+    </div>
+  </div>
+</div>
   <div class="detail-page">
     <div class="detail-header">
       <div><div class="detail-label">Module 01</div><div class="detail-title">📋 Commissioning Plan</div><div class="detail-subtitle">Define the project scope, timeline, responsible parties and systems to be commissioned.</div></div>
@@ -752,7 +825,8 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
 <script>
 function showView(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById('view-'+id).classList.add('active')}
 function openView(id){
-  const titles={plan:'Commissioning Plan',precx:'Pre-Commissioning',tracker:'Commissioning Tracker'};
+  if(id==='docs') renderCxDocs();
+  const titles={plan:'Commissioning Plan',precx:'Pre-Commissioning',tracker:'Commissioning Tracker',docs:'Cx Documents'};
   if(document.getElementById('breadcrumb'))document.getElementById('breadcrumb').innerHTML=`<span class="bc-link">My Projects</span><span class="bc-sep">›</span><span class="bc-link">Greenfield Commercial Tower</span><span class="bc-sep">›</span><span class="bc-link" onclick="goHome()">Commissioning</span><span class="bc-sep">›</span><span class="bc-curr">${titles[id]||id}</span>`;
   showView(id);
   if(id==='tracker'){renderTracker();loadMssbFromSchedule();renderMssb();}
@@ -1380,6 +1454,168 @@ function addWitness(){const s=prompt('System / test:');if(!s)return;witnessTests
 function handleReportUpload(e){const f=e.target.files[0];if(!f)return;reportFiles.push({name:f.name,size:(f.size/1024/1024).toFixed(1)+' MB',date:new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})});renderReports();e.target.value=''}
 function renderReports(){if(!document.getElementById('reportFileList'))return;document.getElementById('reportFileList').innerHTML=reportFiles.map((f,i)=>`<div class="file-item"><div class="file-icon">📄</div><div class="file-info"><div class="file-name">${f.name}</div><div class="file-meta">${f.size} · ${f.date}</div></div><button class="file-del" onclick="reportFiles.splice(${i},1);renderReports()">✕</button></div>`).join('')}
 
+
+// ── CX DOCUMENTS ──
+var cxDocs = []; // [{id, type, title, revisions:[{rev, status, date, note}]}]
+var _addDocType = null;
+var _revHistDocId = null;
+
+async function loadCxDocs(){
+  try{
+    var s = await dbGetProject('cx_docs', _cxPNum);
+    if(s && Array.isArray(s)) cxDocs = s;
+    else cxDocs = [];
+  }catch(e){ cxDocs=[]; }
+}
+
+function saveCxDocs(){
+  dbSetProject('cx_docs', _cxPNum, cxDocs).catch(e=>console.error(e));
+}
+
+function renderCxDocs(){
+  var grid = document.getElementById('cxDocsGrid');
+  var empty = document.getElementById('cxDocsEmpty');
+  var stat = document.getElementById('docs-card-stat');
+  if(!grid) return;
+  // Update home card stat
+  if(stat) stat.textContent = cxDocs.length + ' document' + (cxDocs.length!==1?'s':'');
+  if(!cxDocs.length){
+    grid.innerHTML='';
+    if(empty) empty.style.display='block';
+    return;
+  }
+  if(empty) empty.style.display='none';
+  grid.innerHTML = cxDocs.map(function(doc){
+    var lastRev = doc.revisions && doc.revisions.length ? doc.revisions[doc.revisions.length-1] : null;
+    var isDraft = !lastRev || lastRev.status === 'draft';
+    var revLabel = lastRev ? (isDraft ? 'Draft Rev ' + lastRev.rev : 'Rev ' + lastRev.rev + ' — Published') : 'No revisions';
+    var revCls = isDraft ? 'draft' : 'published';
+    var icon = doc.type === 'cx_plan' ? '📋' : '💧';
+    return '<div class="doc-card">'
+      + '<div class="doc-card-type">' + (doc.type==='cx_plan'?'Commissioning Plan':'Flushing Manual') + '</div>'
+      + '<div class="doc-card-title">' + icon + ' ' + escCx(doc.title) + '</div>'
+      + '<div class="doc-card-rev ' + revCls + '"><span>' + revLabel + '</span></div>'
+      + (lastRev ? '<div style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace">' + lastRev.date + '</div>' : '')
+      + '<div class="doc-card-actions">'
+      + '<button onclick="editDocRevision(\'' + doc.id + '\')">✏ Edit</button>'
+      + '<button onclick="openRevHistModal(\'' + doc.id + '\')">📜 Revisions</button>'
+      + '<button class="del" onclick="deleteDoc(\'' + doc.id + '\')">🗑</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function escCx(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function openAddDocModal(){
+  _addDocType = null;
+  document.getElementById('addDocOpt1').style.borderColor='var(--border)';
+  document.getElementById('addDocOpt2').style.borderColor='var(--border)';
+  document.getElementById('addDocModal').classList.add('open');
+}
+function closeAddDocModal(){ document.getElementById('addDocModal').classList.remove('open'); }
+
+function selectDocType(type){
+  _addDocType = type;
+  document.getElementById('addDocOpt1').style.borderColor = type==='cx_plan'?'var(--accent)':'var(--border)';
+  document.getElementById('addDocOpt2').style.borderColor = type==='flushing'?'var(--accent)':'var(--border)';
+}
+
+function createDoc(){
+  if(!_addDocType){ alert('Select a document type.'); return; }
+  // Only one of each type per project
+  if(cxDocs.find(function(d){return d.type===_addDocType;})){
+    alert('A ' + (_addDocType==='cx_plan'?'Commissioning Plan':'Flushing Manual') + ' already exists for this project.');
+    return;
+  }
+  var title = _addDocType==='cx_plan' ? 'Commissioning Plan' : 'Flushing Manual';
+  var today = new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+  var doc = {
+    id: 'cxd'+Date.now(),
+    type: _addDocType,
+    title: title,
+    revisions: [{rev:1, status:'draft', date:today, note:'Initial draft'}]
+  };
+  cxDocs.push(doc);
+  saveCxDocs();
+  closeAddDocModal();
+  renderCxDocs();
+}
+
+function deleteDoc(id){
+  var doc = cxDocs.find(function(d){return d.id===id;});
+  if(!doc||!confirm('Delete "'+doc.title+'"? This cannot be undone.')) return;
+  cxDocs = cxDocs.filter(function(d){return d.id!==id;});
+  saveCxDocs();
+  renderCxDocs();
+}
+
+function editDocRevision(id){
+  var doc = cxDocs.find(function(d){return d.id===id;});
+  if(!doc) return;
+  // Navigate to the existing plan view for cx_plan, or show placeholder for flushing
+  if(doc.type === 'cx_plan'){
+    openView('plan');
+  } else {
+    showToastCx('Flushing Manual editor coming soon.');
+  }
+}
+
+function openRevHistModal(id){
+  _revHistDocId = id;
+  var doc = cxDocs.find(function(d){return d.id===id;});
+  if(!doc) return;
+  document.getElementById('revHistTitle').textContent = doc.title + ' — Revision History';
+  var body = document.getElementById('revHistBody');
+  if(!doc.revisions||!doc.revisions.length){
+    body.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">No revisions yet.</div>';
+  } else {
+    body.innerHTML = doc.revisions.slice().reverse().map(function(r){
+      var isPublished = r.status==='published';
+      return '<div class="rev-row">'
+        +'<div style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent);width:60px;flex-shrink:0">Rev '+r.rev+'</div>'
+        +'<div style="flex:1"><div style="font-size:13px;color:var(--text)">'+(r.note||'No note')+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace;margin-top:2px">'+r.date+'</div></div>'
+        +'<span style="font-family:DM Mono,monospace;font-size:10px;padding:2px 8px;border-radius:20px;'
+        +(isPublished?'background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)':'background:rgba(255,184,48,.12);color:var(--warn);border:1px solid rgba(255,184,48,.25)')
+        +'">'+(isPublished?'Published':'Draft')+'</span>'
+        +'</div>';
+    }).join('');
+  }
+  // Show publish button only if latest rev is draft
+  var lastRev = doc.revisions[doc.revisions.length-1];
+  var publishBtn = document.getElementById('publishRevBtn');
+  if(publishBtn) publishBtn.style.display = lastRev&&lastRev.status==='draft'?'':'none';
+  document.getElementById('revHistModal').classList.add('open');
+}
+
+function closeRevHistModal(){ document.getElementById('revHistModal').classList.remove('open'); }
+
+function publishRevision(){
+  var doc = cxDocs.find(function(d){return d.id===_revHistDocId;});
+  if(!doc) return;
+  var lastRev = doc.revisions[doc.revisions.length-1];
+  if(!lastRev||lastRev.status!=='draft') return;
+  if(!confirm('Publish Rev '+lastRev.rev+'? This revision will be locked.')) return;
+  var today = new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+  lastRev.status = 'published';
+  lastRev.date = today;
+  // Auto-create new draft revision
+  doc.revisions.push({rev: lastRev.rev+1, status:'draft', date:today, note:'New draft'});
+  saveCxDocs();
+  openRevHistModal(_revHistDocId); // re-render
+  renderCxDocs();
+}
+
+function showToastCx(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.4);white-space:nowrap';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(function(){t.remove();},300);},2500);
+}
+
+// Load cx docs on init
+loadCxDocs().then(renderCxDocs);
 
 var PRECX_TEMPLATE_DATA={"sections": [{"title": "General / Documentation", "items": ["Approved HVAC shop drawings available (latest revision)", "Equipment submittals approved", "Control sequences approved", "Latest P&IDs and duct schematics available", "Equipment schedules verified", "All system changes marked on as-built drawings"]}, {"title": "Mechanical Completion - Air Side - AHUs", "items": ["AHUs installed and aligned", "Access doors operational", "Filters installed (clean)", "Coils clean and undamaged", "Drain traps installed & primed", "Fan belts aligned and tensioned", "VFD installed, powered, and tested", "Fan rotation checked"]}, {"title": "Mechanical Completion - Air Side - Ductwork", "items": ["Duct installation complete", "Grilles installed and spigot dampers open", "Fire / smoke dampers installed and open", "Duct insulation complete", "No visible air leaks"]}, {"title": "Mechanical Completion - Water Side - Pumps & Piping", "items": ["System flushed and chemically cleaned", "System filled and vented", "All valves tagged and identified", "Balancing valves installed and left open", "Control valves installed correctly (flow direction verified)", "Actuators powered and stroked"]}, {"title": "Electrical & Controls", "items": ["All equipment permanently powered", "VSD parameters programmed", "BMS operational", "All sensors calibrated", "Control valves / dampers stroked via BMS", "Safeties tested"]}, {"title": "Operational Readiness - Plant & Site", "items": ["Chilled water plant operational", "Stable water temperatures available", "Ceiling tiles installed", "Construction dust removed", "Spaces secure and accessible", "Safe access to mechanical rooms"]}], "fileName": "precommissioning.html", "savedAt": "2026-03-27", "stats": {"sections": 6, "items": 37}};
 
