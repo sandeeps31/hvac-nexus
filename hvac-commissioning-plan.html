@@ -288,14 +288,22 @@ var proj=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');
 var pKey=proj.num||'GCT001';
 // DK replaced by Supabase
 var docs=[];
-async function load(){try{var p=await dbGetProject('precx_data',pKey+'_cxplan');docs=Array.isArray(p)?p:[];}catch(e){docs=[];}}
-function save(){dbSetProject('precx_data',pKey+'_cxplan',docs).catch(e=>console.error(e));}
+var _dataLoaded=false;
+async function load(){
+  if(typeof dbReady!=='undefined')await dbReady;
+  try{var p=await dbGetProject('precx_data',pKey+'_cxplan');docs=Array.isArray(p)?p:[];}
+  catch(e){docs=[];}
+  finally{_dataLoaded=true;}
+}
+function save(){
+  if(!_dataLoaded)return;
+  dbSetProject('precx_data',pKey+'_cxplan',docs).catch(e=>console.error(e));
+}
 function nid(){return Date.now()+'_'+Math.random().toString(36).slice(2,7);}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-(async function(){if(typeof dbReady!=="undefined")await dbReady;await load();renderStats();renderTable();})();
-
 // ── INIT ──
-(function(){
+(async function(){
+  await load();
   if(proj.name){document.getElementById('sb-proj-name').textContent=proj.name;document.getElementById('bc-proj').textContent=proj.name;}
   if(proj.number){document.getElementById('sb-proj-num').textContent=proj.number;}
   applySB(localStorage.getItem(SBK)==='1');
