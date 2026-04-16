@@ -398,14 +398,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
   <div class="modal" style="width:400px">
     <div class="mh3">Export Revision</div>
     <div class="msub" id="exportRevSubtitle"></div>
-    <div style="margin:14px 0 4px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <div>
-        <div style="font-size:12.5px;font-weight:600;color:var(--text)">Track Changes</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">Highlight added / removed / changed rows</div>
-      </div>
-      <button id="trackChangesToggle" onclick="toggleTrackChanges()" style="min-width:52px;padding:4px 10px;border-radius:20px;border:1.5px solid var(--accent);background:var(--accent-dim);color:var(--accent);font-family:'DM Mono',monospace;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s">ON</button>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0">
+    <div style="display:flex;flex-direction:column;gap:8px;margin:16px 0">
       <button class="btn bp" onclick="exportRevPDF()" style="justify-content:center">📄 Export as PDF</button>
       <button class="btn bsm" style="background:var(--green);color:#080c12;justify-content:center;padding:6px 14px;font-size:13px" onclick="exportRevXLSX()">📊 Export as Excel</button>
     </div>
@@ -414,7 +407,7 @@ body.sb-sm{padding-left:var(--sb-sm)}
 </div>
 <div class="abar" id="abar" style="display:none">
   <div class="sbox" style="flex:1;min-width:0"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search equipment ID, description, location…" oninput="renderTable();updateHeaderMeta()"/></div>
-  <select class="fsel" id="stfil" onchange="renderTable()">
+  <select class="fsel" id="stfil" onchange="renderTable();updateHeaderMeta()">
     <option value="">All Statuses</option>
     <option>Not Started</option><option>Procurement</option><option>Delivered</option>
     <option>Installation In Progress</option><option>Installed</option>
@@ -441,6 +434,13 @@ body.sb-sm{padding-left:var(--sb-sm)}
 <div id="scheduleHeader" style="display:none;padding:10px 18px 6px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:baseline;gap:10px">
   <span id="scheduleHeaderType" style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text)"></span>
   <span id="scheduleHeaderMeta" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)"></span>
+</div>
+<div id="dupIdBanner" style="display:none;margin:0 18px 6px;padding:10px 16px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.4);border-radius:8px;display:none;align-items:center;gap:10px">
+  <span style="font-size:16px">⚠️</span>
+  <div style="flex:1">
+    <div style="font-size:13px;font-weight:600;color:var(--danger)">Duplicate Equipment IDs detected</div>
+    <div id="dupIdDetail" style="font-size:12px;color:var(--text2);margin-top:2px"></div>
+  </div>
 </div>
 <div id="main"></div>
 
@@ -693,7 +693,27 @@ return;}
   updateLayoutToggle();updateTplBtnVisibility();
 }
 
+function checkDuplicateIds(){
+  var t=aTab();
+  var banner=document.getElementById('dupIdBanner');
+  var detail=document.getElementById('dupIdDetail');
+  if(!t||!banner){return;}
+  var rows=t.rows.filter(function(r){return!r._deleted;});
+  var ids=rows.map(function(r){return(r.tag||r.equipment_id||'').trim();}).filter(Boolean);
+  var seen={};var dupes=[];
+  ids.forEach(function(id){
+    if(seen[id]&&dupes.indexOf(id)<0)dupes.push(id);
+    seen[id]=true;
+  });
+  if(dupes.length){
+    if(detail)detail.textContent=dupes.length+' duplicate ID'+(dupes.length>1?'s':'')+': '+dupes.slice(0,5).join(', ')+(dupes.length>5?'… (+'+(dupes.length-5)+' more)':'');
+    banner.style.display='flex';
+  } else {
+    banner.style.display='none';
+  }
+}
 function updSum(){
+  checkDuplicateIds();
   var t=aTab();if(!t)return;
   var r=t.rows;
   // Rebuild location filter
@@ -703,9 +723,11 @@ function updSum(){
   // Update header stats based on current filter
   var q=(document.getElementById('srch')||{}).value||'';
   var locF=cv||'';
-  var filtered=r.filter(function(row){
-    if(row._deleted)return false;
+  var stF=(document.getElementById('stfil')||{}).value||'';
+  var allRows=r.filter(function(row){return!row._deleted;});
+  var filtered=allRows.filter(function(row){
     if(locF&&row.location!==locF)return false;
+    if(stF&&row.status!==stF)return false;
     if(q){
       var qs=q.toLowerCase();
       var matches=false;
@@ -715,9 +737,10 @@ function updSum(){
     }
     return true;
   });
+  var isFiltered=locF||stF||q;
   var total=filtered.length;
   var el=document.getElementById('hdr-row-count');
-  if(el)el.textContent=total+' item'+(total!==1?'s':'')+(locF?' · '+locF:'');
+  if(el)el.textContent=total+(isFiltered?' of '+allRows.length:'')+' item'+(allRows.length!==1?'s':'')+(locF?' · '+locF:'')+(stF?' · '+stF:'');
 }
 
 function renderEmpty(){
@@ -1224,10 +1247,12 @@ function updateHeaderMeta(){
   var shMeta=document.getElementById('scheduleHeaderMeta');
   if(!t||!shMeta)return;
   var locF=(document.getElementById('locfil')||{}).value||'';
+  var stF=(document.getElementById('stfil')||{}).value||'';
   var q=(document.getElementById('srch')||{}).value||'';
   var allRows=t.rows?t.rows.filter(function(r){return!r._deleted;}):[];
   var filteredRows=allRows.filter(function(row){
     if(locF&&row.location!==locF)return false;
+    if(stF&&row.status!==stF)return false;
     if(q){
       var qs=q.toLowerCase();var m=false;
       getCols(t).forEach(function(c){if((row[c.k]||'').toString().toLowerCase().includes(qs))m=true;});
@@ -1237,8 +1262,10 @@ function updateHeaderMeta(){
   });
   var parts=[];
   if(t.companyTemplateTplNo)parts.push(t.companyTemplateTplNo);
-  var countStr=filteredRows.length+(locF||q?' of '+allRows.length:'')+' item'+(allRows.length!==1?'s':'');
+  var isFiltered=locF||stF||q;
+  var countStr=filteredRows.length+(isFiltered?' of '+allRows.length:'')+' item'+(allRows.length!==1?'s':'');
   if(locF)countStr+=' · '+locF;
+  if(stF)countStr+=' · '+stF;
   parts.push(countStr);
   shMeta.textContent=parts.join(' · ');
 }
@@ -1904,18 +1931,6 @@ var LOCK_SK='HVAC Nexusus_equip_lock_'+_eqPNum;
 var viewingRevIdx=null;
 var revData={};
 var exportingRevIdx=null;
-var trackChangesEnabled=true;
-
-function toggleTrackChanges(){
-  trackChangesEnabled=!trackChangesEnabled;
-  var btn=document.getElementById('trackChangesToggle');
-  if(btn){
-    btn.textContent=trackChangesEnabled?'ON':'OFF';
-    btn.style.background=trackChangesEnabled?'var(--accent-dim)':'var(--surface3)';
-    btn.style.borderColor=trackChangesEnabled?'var(--accent)':'var(--border)';
-    btn.style.color=trackChangesEnabled?'var(--accent)':'var(--muted)';
-  }
-}
 
 function saveRevData(){
   dbSetEquipmentRevisions(_eqPNum,revData).catch(function(e){console.error('saveRevData error:',e);});
@@ -2287,18 +2302,12 @@ function openExportModal(){
   var rv=exportingRevIdx>=0?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
   var label=exportingRevIdx===-1?'Draft (current changes)':rv?rv.rev:'current';
   document.getElementById('exportRevSubtitle').textContent='Exporting: '+label;
-  trackChangesEnabled=true;
-  var btn=document.getElementById('trackChangesToggle');
-  if(btn){btn.textContent='ON';btn.style.background='var(--accent-dim)';btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
   document.getElementById('exportRevModal').classList.add('open');
 }
 function exportRevAtIdx(idx){
   closeM('revHistModal');exportingRevIdx=idx;
   var tr=getTabRev(activeId);var rv=tr.revisions[idx];
   document.getElementById('exportRevSubtitle').textContent='Exporting: '+(rv?rv.rev:'revision');
-  trackChangesEnabled=true;
-  var btn=document.getElementById('trackChangesToggle');
-  if(btn){btn.textContent='ON';btn.style.background='var(--accent-dim)';btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
   document.getElementById('exportRevModal').classList.add('open');
 }
 function getExportRows(){
@@ -2352,7 +2361,7 @@ function exportRevPDF(){
   var projName=proj?proj.name:'[Project Name]';
   var projNum=proj?proj.num:'';
   var tabName=tab?tab.name||tab.type:'Equipment';
-  var hasDiff=trackChangesEnabled&&baseRows.length>0;
+  var hasDiff=baseRows.length>0;
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'    +'<title>'+tabName+' — '+revLabel+'</title>'    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:9px;color:#1a1a1a;background:#fff}'    +'@page{size:A3 landscape;margin:12mm}'    +'.co-hdr{background:#f4f4f4;border:1px solid #ddd;border-bottom:none;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}'    +'.co-name{font-size:13px;font-weight:bold}.co-logo{width:110px;height:34px;border:1px dashed #bbb;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:7.5px;border-radius:2px}'    +'.proj-block{display:grid;grid-template-columns:1fr 1fr 1fr 150px;border:1px solid #ddd;margin-bottom:10px}'    +'.pb{padding:7px 12px;border-right:1px solid #ddd}.pb:last-child{border-right:none}'    +'.pb-lbl{font-size:7px;text-transform:uppercase;letter-spacing:.8px;color:#999;margin-bottom:2px}'    +'.pb-val{font-size:10px;font-weight:bold}'    +'.legend{display:flex;gap:14px;margin-bottom:7px;padding:4px 0;border-bottom:1px solid #eee;font-size:8px;color:#555}'    +'.ls{display:flex;align-items:center;gap:4px}.lsw{width:10px;height:10px;border-radius:2px;border:1px solid}'    +'table{width:100%;border-collapse:collapse}'    +'th{background:#0e1520;color:#fff;padding:5px 7px;text-align:left;font-size:7.5px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-right:1px solid #1e3050}'    +'td{padding:4px 7px;border-bottom:1px solid #ebebeb;border-right:1px solid #f4f4f4;vertical-align:middle}'    +'tr.r-added td{background-color:#c8f7c5!important}tr.r-deleted td{background-color:#ffcccc!important;text-decoration:line-through;color:#cc0000!important}td.c-chg{background-color:#fff176!important}'    +'tr:nth-child(even):not(.r-added):not(.r-deleted) td{filter:brightness(.975)}</style></head><body>';
   html+='<div class="co-hdr"><div><div class="co-name">[Company Name]</div><div style="font-size:8px;color:#888;margin-top:2px">[Address · Phone · Email]</div></div><div class="co-logo">COMPANY LOGO</div></div>';
   html+='<div class="proj-block">'    +'<div class="pb"><div class="pb-lbl">Project</div><div class="pb-val">'+projName+'</div></div>'    +'<div class="pb"><div class="pb-lbl">Project No.</div><div class="pb-val">'+projNum+'</div></div>'    +'<div class="pb"><div class="pb-lbl">Schedule</div><div class="pb-val">'+tabName+' Equipment Schedule</div></div>'    +'<div class="pb" style="background:#f9f9f9"><div class="pb-lbl">Revision</div><div class="pb-val" style="font-size:13px;color:#0e1520">'+revLabel+'</div>'    +'<div style="font-size:7px;color:#999;margin-top:2px">'+revDate+(hasDiff&&prevRevLabel!=='—'?' · Prev: '+prevRevLabel:'')+'</div></div></div>';
@@ -2440,7 +2449,7 @@ function exportRevXLSX(){
     snapRows=tr.revisions.length?tr.revisions[tr.revisions.length-1].snapshot||[]:[];
   }
   var diff=computeDiff(baseRows,snapRows);
-  var hasDiff=trackChangesEnabled&&baseRows.length>0;
+  var hasDiff=baseRows.length>0;
   // For draft exports: only show live rows (no deleted from base)
   // For published revision exports: include rows deleted since previous revision
   var rows=snapRows.slice();
@@ -2498,7 +2507,7 @@ function exportRevXLSX(){
       // Patch sheet XML to add s= attributes to cells
       var sheetKey=null;
       zip.forEach(function(path,file){if(/xl[\/\\]worksheets[\/\\]sheet\d+\.xml$/i.test(path)&&!sheetKey)sheetKey=path;});
-
+      console.log('sheetKey found:',sheetKey);
       if(!sheetKey){
         // Try alternate path format
         zip.forEach(function(path){if(path.indexOf('sheet1.xml')>=0&&!sheetKey)sheetKey=path;});
