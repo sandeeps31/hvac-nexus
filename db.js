@@ -243,6 +243,7 @@ async function dbGetProject(table, projectNum) {
 
 async function dbSetProject(table, projectNum, data) {
   try {
+    const company_id = localStorage.getItem('hvacnexus_company_id');
     const rows = await sbFetch(`${table}?select=id&project_num=eq.${encodeURIComponent(projectNum)}&limit=1`);
     if (rows && rows.length) {
       await sbFetch(`${table}?id=eq.${rows[0].id}`, {
@@ -252,7 +253,7 @@ async function dbSetProject(table, projectNum, data) {
     } else {
       await sbFetch(table, {
         method: 'POST',
-        body: JSON.stringify({ project_num: projectNum, data })
+        body: JSON.stringify({ project_num: projectNum, data, company_id })
       });
     }
     return true;
@@ -267,66 +268,12 @@ async function dbSetProject(table, projectNum, data) {
 // Each function maps 1:1 to a former localStorage key
 // ═══════════════════════════════════════════════════
 
-// ── Projects — one row per project in the projects table ──
+// ── Projects ──
 async function dbGetProjects() {
-  try {
-    const company_id = localStorage.getItem('hvacnexus_company_id');
-    // Fetch all project rows except the legacy __projects__ array row
-    let url = `projects?select=data&project_num=neq.__projects__&order=created_at.asc`;
-    if (company_id) url += `&company_id=eq.${company_id}`;
-    const rows = await sbFetch(url);
-    if (!rows || !rows.length) return [];
-    return rows.map(r => r.data).filter(Boolean);
-  } catch(e) {
-    console.warn('dbGetProjects failed:', e.message);
-    return [];
-  }
+  return await dbGet('projects') || [];
 }
-
-async function dbSetProject_single(project) {
-  // Save one project as its own row keyed by project.id
-  if (!project || !project.id) return false;
-  try {
-    const company_id = localStorage.getItem('hvacnexus_company_id');
-    const rows = await sbFetch(`projects?select=id&project_num=eq.${encodeURIComponent(project.id)}&limit=1`);
-    if (rows && rows.length) {
-      await sbFetch(`projects?id=eq.${rows[0].id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ data: project, updated_at: new Date().toISOString() })
-      });
-    } else {
-      await sbFetch('projects', {
-        method: 'POST',
-        body: JSON.stringify({ project_num: project.id, data: project, company_id })
-      });
-    }
-    return true;
-  } catch(e) {
-    console.warn('dbSetProject_single failed:', e.message);
-    return false;
-  }
-}
-
-async function dbSetProjects(projectsArray) {
-  // Write each project as its own row
-  if (!Array.isArray(projectsArray)) return false;
-  try {
-    await Promise.all(projectsArray.map(p => dbSetProject_single(p)));
-    return true;
-  } catch(e) {
-    console.warn('dbSetProjects failed:', e.message);
-    return false;
-  }
-}
-
-async function dbDeleteProject(projectId) {
-  try {
-    await sbFetch(`projects?project_num=eq.${encodeURIComponent(projectId)}`, { method: 'DELETE' });
-    return true;
-  } catch(e) {
-    console.warn('dbDeleteProject failed:', e.message);
-    return false;
-  }
+async function dbSetProjects(data) {
+  return await dbSet('projects', data);
 }
 
 // ── Current project (still localStorage — it's a session value) ──
