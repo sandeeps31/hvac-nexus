@@ -520,15 +520,15 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
 
     <!-- TAB BAR -->
     <div class="cx-tab-bar">
-      <div class="cx-tab active" id="cxtab-commissionable" onclick="switchCxTab('commissionable')">📋 Commissionable List</div>
-      <div class="cx-tab" id="cxtab-summary" onclick="switchCxTab('summary')">📊 Summary</div>
-      <div class="cx-tab" id="cxtab-mssb" onclick="switchCxTab('mssb')">⚡ MSSB & DCP</div>
-      <div class="cx-tab" id="cxtab-fire" onclick="switchCxTab('fire')">🔥 Fire Testing</div>
-      <div class="cx-tab" id="cxtab-stair" onclick="switchCxTab('stair')">🪜 Stair Press</div>
-      <div class="cx-tab" id="cxtab-forecast" onclick="switchCxTab('forecast')">📅 Scheduling Forecast</div>
-      <div class="cx-tab" id="cxtab-witness" onclick="switchCxTab('witness')">👁 Witness Testing</div>
-      <div class="cx-tab" id="cxtab-defects" onclick="switchCxTab('defects')">⚠️ Defects</div>
-      <div class="cx-tab" id="cxtab-reports" onclick="switchCxTab('reports')">📁 Reports</div>
+      <div class="cx-tab active" id="cxtab-commissionable" onclick="switchCxTab('commissionable')">Commissionable List</div>
+      <div class="cx-tab" id="cxtab-summary" onclick="switchCxTab('summary')">Summary</div>
+      <div class="cx-tab" id="cxtab-mssb" onclick="switchCxTab('mssb')">MSSB & DCP</div>
+      <div class="cx-tab" id="cxtab-fire" onclick="switchCxTab('fire')">Fire Testing</div>
+      <div class="cx-tab" id="cxtab-stair" onclick="switchCxTab('stair')">Stair Press</div>
+      <div class="cx-tab" id="cxtab-forecast" onclick="switchCxTab('forecast')">Scheduling Forecast</div>
+      <div class="cx-tab" id="cxtab-witness" onclick="switchCxTab('witness')">Witness Testing</div>
+      <div class="cx-tab" id="cxtab-defects" onclick="switchCxTab('defects')">Defects</div>
+      <div class="cx-tab" id="cxtab-reports" onclick="switchCxTab('reports')">Reports</div>
     </div>
 
     <!-- TAB CONTENT PANELS -->
@@ -556,6 +556,7 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
           <button class="btn btn-ghost btn-sm" onclick="addTrackerRow()">＋ Add Equipment</button>
           <button class="btn btn-ghost btn-sm" onclick="openColSettings()">⚙ Columns</button>
           <button class="btn btn-green btn-sm">⬇ Export</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="if(confirm('Clear all commissionable items? This cannot be undone.')){trackerItems=[];saveTracker();renderTracker();}">🗑 Clear All</button>
         </div>
       </div>
       <div id="cxBodyWrap" style="overflow-x:auto;overflow-y:auto;height:calc(100vh - 220px);width:100%;display:block">
@@ -763,36 +764,80 @@ var EQUIP_TYPE_NAMES={
   'reheat':'Reheat','hepa':'HEPA','edh':'EDH','grilles':'Grille','dampers':'Damper'
 };
 
-async function syncTrackerFromSchedule(){
+var _syncModal_types = []; // available types from equip schedule
+var _syncModal_selected = new Set();
+
+async function openSyncModal(){
   try{
     var raw=await dbGetEquipment(_cxPNum);
-    if(!raw){
-      showTrackerToast('No equipment schedule data found. Open Equipment Schedule first.');
-      return;
-    }
+    if(!raw){showTrackerToast('No equipment schedule data found.');return;}
+    var data=(typeof raw==='string')?JSON.parse(raw):raw;
+    var tabs=(data.tabs||[]).filter(function(t){return t.type!=='mssb';});
+    // Build type list with counts
+    _syncModal_types=[];
+    tabs.forEach(function(tab){
+      var count=(tab.rows||[]).filter(function(r){return r.tag||r.id_tag;}).length;
+      if(count>0){
+        var typeName=EQUIP_TYPE_NAMES[tab.type]||tab.name||tab.type||'Unknown';
+        _syncModal_types.push({type:tab.type,name:typeName,count:count,tabId:tab.id});
+      }
+    });
+    if(!_syncModal_types.length){showTrackerToast('No equipment found in schedule.');return;}
+    // Pre-select types not already in tracker
+    var inTracker=new Set(trackerItems.map(function(i){return i.type;}));
+    _syncModal_selected=new Set(_syncModal_types.map(function(t){return t.type;})); // select all by default
+    renderSyncModal();
+    document.getElementById('syncModal').classList.add('open');
+  }catch(e){showTrackerToast('Error: '+e.message);}
+}
+
+function renderSyncModal(){
+  var body=document.getElementById('syncModalBody');
+  if(!body)return;
+  body.innerHTML=_syncModal_types.map(function(t){
+    var checked=_syncModal_selected.has(t.type);
+    var inTracker=trackerItems.filter(function(i){return i.type===t.name;}).length;
+    return '<label style="display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .15s;background:'+(checked?'var(--accent-dim)':'var(--surface2)')+';border-color:'+(checked?'var(--accent)':'var(--border)')+'">'
+      +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleSyncType(\''+t.type+'\',this.checked)" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;flex-shrink:0">'
+      +'<div style="flex:1">'
+      +'<div style="font-weight:600;color:var(--text);font-size:13px">'+t.name+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace;margin-top:2px">'+t.count+' items in schedule'+(inTracker?' · '+inTracker+' already synced':'')+'</div>'
+      +'</div>'
+      +'</label>';
+  }).join('');
+}
+
+function toggleSyncType(type,checked){
+  if(checked)_syncModal_selected.add(type);
+  else _syncModal_selected.delete(type);
+  renderSyncModal();
+}
+
+function closeSyncModal(){document.getElementById('syncModal').classList.remove('open');}
+
+async function confirmSync(){
+  closeSyncModal();
+  try{
+    var raw=await dbGetEquipment(_cxPNum);
+    if(!raw){showTrackerToast('No equipment schedule data found.');return;}
     var data=(typeof raw==='string')?JSON.parse(raw):raw;
     var tabs=data.tabs||[];
     var imported=0;
 
-    // Exclude MSSB and DCP — those go into the MSSB & DCP card only
-    var EXCLUDE_FROM_TRACKER=['mssb','dcp','dampers','grilles'];
     tabs.forEach(function(tab){
-      if(EXCLUDE_FROM_TRACKER.indexOf(tab.type)>=0) return;
-      var typeName=EQUIP_TYPE_NAMES[tab.type]||tab.type||'';
+      if(tab.type==='mssb') return;
+      if(!_syncModal_selected.has(tab.type)) return;
+      var typeName=EQUIP_TYPE_NAMES[tab.type]||tab.name||tab.type||'';
       (tab.rows||[]).forEach(function(r){
         var tag=r.tag||r.id_tag||'';
         if(!tag) return;
-        // Skip if already exists
         var exists=trackerItems.find(function(x){return x.tag===tag;});
         if(exists) return;
-        // Get design value — airflow for air equip, flow for pumps/water
         var design=null;
         if(r.airflow) design=parseFloat(r.airflow)||null;
         else if(r.supply) design=parseFloat(r.supply)||null;
         else if(r.flow) design=parseFloat(r.flow)||null;
         else if(r.max) design=parseFloat(r.max)||null;
-
-        // Auto-lookup MSSB from MSSB schedule tab by equipment tag
         var autoMssb='';var autoMssbLoc='';
         var mssbTab2=(data.tabs||[]).find(function(t){return t.type==='mssb';});
         if(mssbTab2){
@@ -800,26 +845,18 @@ async function syncTrackerFromSchedule(){
           if(mssbRow2){autoMssb=mssbRow2.tag||'';autoMssbLoc=mssbRow2.location||'';}
         }
         trackerItems.push({
-          id:'tr'+uid(),
-          tag:tag,
+          id:'tr'+uid(),tag:tag,
           name:(r.desc||r.name||typeName+' '+tag).trim(),
-          type:typeName,
-          location:(r.location||''),
-          subloc:(r.sublocation||r.subloc||''),
-          locServing:(r.locServing||r.area_served||''),
-          design:design,
-          actual:null,
-          precxAuto:'',precxManual:'',
-          mssb:autoMssb,boardLoc:autoMssbLoc,mssbPowered:'',
+          type:typeName,location:(r.location||''),subloc:(r.sublocation||r.subloc||''),
+          locServing:(r.locServing||r.area_served||''),design:design,actual:null,
+          precxAuto:'',precxManual:'',mssb:autoMssb,boardLoc:autoMssbLoc,mssbPowered:'',
           airflowVerif:'',localFuncCx:'',itcSubmitted:'',witnessed:'',intBmsCx:'',
           startCx:'',duration:'',finish:'',bmsReadyBy:'',mssbPowerDate:'',powerPlus8:'',
-          deps:'',defect:'',responsibility:'',subby:'',
-          cxStatus:''
+          deps:'',defect:'',responsibility:'',subby:'',cxStatus:''
         });
         imported++;
       });
     });
-
     saveTracker();
     renderTracker();
     showTrackerToast('✓ Synced '+imported+' item'+(imported!==1?'s':'')+' from Equipment Schedule'+(imported===0?' — all items already in tracker':''));
@@ -828,6 +865,8 @@ async function syncTrackerFromSchedule(){
     console.error(err);
   }
 }
+
+async function syncTrackerFromSchedule(){openSyncModal();}
 
 
 function navigateToTag(tag, status){
@@ -1014,6 +1053,31 @@ async function renderTracker(){
   }
   function col(key,html){return visibleCols[key]?'<td>'+html+'</td>':'';}
   function colS(key,style,html){return visibleCols[key]?'<td style="'+style+'">'+html+'</td>':'';}
+
+  // Empty state
+  if(!trackerItems.length){
+    document.getElementById('trackerBody').innerHTML='';
+    var thead=document.getElementById('cxTrackerThead');
+    if(thead)thead.innerHTML='';
+    var wrap=document.getElementById('cxBodyWrap');
+    if(wrap)wrap.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;color:var(--muted);text-align:center;padding:60px">'
+      +'<div style="font-size:42px">📋</div>'
+      +'<div style="font-size:15px;font-weight:600;color:var(--text2)">No commissionable items yet</div>'
+      +'<div style="font-size:13px;color:var(--muted);margin-bottom:4px">Sync from Equipment Schedule to populate the list</div>'
+      +'<button onclick="openSyncModal()" style="background:var(--accent);color:#080c12;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif">⟳ Sync from Schedule</button>'
+      +'</div>';
+    return;
+  }
+
+  // Restore table if coming back from empty state
+  var wrap=document.getElementById('cxBodyWrap');
+  if(wrap&&!wrap.querySelector('table')){
+    wrap.innerHTML='<table class="tracker-table" style="border-collapse:collapse;min-width:100%">'
+      +'<thead id="cxTrackerThead" style="position:sticky;top:0;z-index:10;background:var(--surface2)"></thead>'
+      +'<thead id="cxTrackerTheadGhost" style="display:none"></thead>'
+      +'<tbody id="trackerBody"></tbody>'
+      +'</table>';
+  }
 
   // Only show rows with a tag, filtered
   var f=trackerItems.filter(function(t){
@@ -2396,6 +2460,21 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 })();
 
 </script>
+
+<!-- SYNC MODAL -->
+<div class="mo" id="syncModal" onclick="if(event.target===this)closeSyncModal()">
+  <div class="modal" style="width:480px;max-height:80vh">
+    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text)">Sync from Equipment Schedule</h3>
+      <p style="font-size:12px;color:var(--text2);margin-top:3px">Select which equipment types to import into the Commissionable List.</p>
+    </div>
+    <div id="syncModalBody" style="overflow-y:auto;flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:8px"></div>
+    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
+      <button class="bg bsm btn" onclick="closeSyncModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="confirmSync()">⟳ Sync Selected</button>
+    </div>
+  </div>
+</div>
 
 <!-- AREA MODAL -->
 <div class="mo" id="areaModal" onclick="if(event.target===this)closeAreaModal()">
