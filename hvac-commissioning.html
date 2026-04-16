@@ -722,22 +722,26 @@ function savePlan(){const b=document.querySelector('.btn-green');b.textContent='
 let trackerItems=[];
 var _cxProj=dbGetCurrentProject();var _cxPNum=_cxProj.num||_cxProj.number||'GCT001';
 var TRACKER_KEY='hvacnexus_tracker_'+_cxPNum;
-function saveTracker(){dbSetCommissioning(_cxPNum,trackerItems).catch(e=>console.error(e));}
+var _trackerDataLoaded=false;
+function saveTracker(){
+  if(!_trackerDataLoaded)return;
+  dbSetCommissioning(_cxPNum,trackerItems).catch(e=>console.error(e));
+}
 async function loadTracker(){
+  if(typeof dbReady!=='undefined')await dbReady;
   try{
     var s=await dbGetCommissioning(_cxPNum);
     if(s){
       trackerItems=JSON.parse(s);
-      // Strip any MSSB/DCP rows that were synced before the exclusion was added
       var before=trackerItems.length;
       trackerItems=trackerItems.filter(function(x){
         return x.type!=='MSSB'&&x.type!=='DCP'&&x.type!=='mssb'&&x.type!=='dcp';
       });
-      if(trackerItems.length!==before) saveTracker(); // persist the cleaned list
-      return true;
+      if(trackerItems.length!==before) saveTracker();
     }
   }catch(e){}
-  return false;
+  _trackerDataLoaded=true;
+  return true;
 }
 
 let defects=[
