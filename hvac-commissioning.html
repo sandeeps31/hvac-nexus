@@ -1055,28 +1055,27 @@ async function renderTracker(){
   function colS(key,style,html){return visibleCols[key]?'<td style="'+style+'">'+html+'</td>':'';}
 
   // Empty state
+  var emptyEl=document.getElementById('cxEmptyState');
   if(!trackerItems.length){
+    if(!emptyEl){
+      var wrap=document.getElementById('cxBodyWrap');
+      if(wrap){
+        var es=document.createElement('div');
+        es.id='cxEmptyState';
+        es.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--muted);text-align:center;padding:60px;background:var(--bg)';
+        es.innerHTML='<div style="font-size:42px">📋</div>'
+          +'<div style="font-size:15px;font-weight:600;color:var(--text2)">No commissionable items yet</div>'
+          +'<div style="font-size:13px;color:var(--muted);margin-bottom:4px">Sync from Equipment Schedule to populate the list</div>'
+          +'<button onclick="openSyncModal()" style="background:var(--accent);color:#080c12;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif">⟳ Sync from Schedule</button>';
+        wrap.style.position='relative';
+        wrap.appendChild(es);
+      }
+    }
     document.getElementById('trackerBody').innerHTML='';
-    var thead=document.getElementById('cxTrackerThead');
-    if(thead)thead.innerHTML='';
-    var wrap=document.getElementById('cxBodyWrap');
-    if(wrap)wrap.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;color:var(--muted);text-align:center;padding:60px">'
-      +'<div style="font-size:42px">📋</div>'
-      +'<div style="font-size:15px;font-weight:600;color:var(--text2)">No commissionable items yet</div>'
-      +'<div style="font-size:13px;color:var(--muted);margin-bottom:4px">Sync from Equipment Schedule to populate the list</div>'
-      +'<button onclick="openSyncModal()" style="background:var(--accent);color:#080c12;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif">⟳ Sync from Schedule</button>'
-      +'</div>';
+    var thead=document.getElementById('cxTrackerThead');if(thead)thead.innerHTML='';
     return;
-  }
-
-  // Restore table if coming back from empty state
-  var wrap=document.getElementById('cxBodyWrap');
-  if(wrap&&!wrap.querySelector('table')){
-    wrap.innerHTML='<table class="tracker-table" style="border-collapse:collapse;min-width:100%">'
-      +'<thead id="cxTrackerThead" style="position:sticky;top:0;z-index:10;background:var(--surface2)"></thead>'
-      +'<thead id="cxTrackerTheadGhost" style="display:none"></thead>'
-      +'<tbody id="trackerBody"></tbody>'
-      +'</table>';
+  } else {
+    if(emptyEl)emptyEl.remove();
   }
 
   // Only show rows with a tag, filtered
@@ -2463,7 +2462,7 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 
 <!-- SYNC MODAL -->
 <div class="mo" id="syncModal" onclick="if(event.target===this)closeSyncModal()">
-  <div class="modal" style="width:480px;max-height:80vh">
+  <div class="mo-box" style="width:480px;max-height:80vh;display:flex;flex-direction:column;padding:0">
     <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
       <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text)">Sync from Equipment Schedule</h3>
       <p style="font-size:12px;color:var(--text2);margin-top:3px">Select which equipment types to import into the Commissionable List.</p>
