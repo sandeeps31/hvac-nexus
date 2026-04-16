@@ -732,14 +732,18 @@ async function loadTracker(){
   try{
     var s=await dbGetCommissioning(_cxPNum);
     if(s){
-      trackerItems=JSON.parse(s);
-      var before=trackerItems.length;
-      trackerItems=trackerItems.filter(function(x){
-        return x.type!=='MSSB'&&x.type!=='DCP'&&x.type!=='mssb'&&x.type!=='dcp';
-      });
-      if(trackerItems.length!==before) saveTracker();
+      // dbGetCommissioning returns already-parsed data — no JSON.parse needed
+      var parsed=Array.isArray(s)?s:(typeof s==='string'?JSON.parse(s):null);
+      if(parsed){
+        trackerItems=parsed;
+        var before=trackerItems.length;
+        trackerItems=trackerItems.filter(function(x){
+          return x.type!=='MSSB'&&x.type!=='DCP'&&x.type!=='mssb'&&x.type!=='dcp';
+        });
+        if(trackerItems.length!==before) saveTracker();
+      }
     }
-  }catch(e){}
+  }catch(e){console.error('loadTracker error:',e);}
   _trackerDataLoaded=true;
   return true;
 }
