@@ -187,6 +187,14 @@ async function sbFetch(path, options = {}) {
   const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
     const err = await res.text();
+    if (res.status === 401) {
+      // JWT expired — clear session and redirect to login
+      localStorage.removeItem('hvacnexus_session');
+      localStorage.removeItem('hvacnexus_current_user');
+      if (!window.location.href.includes('hvac-login.html')) {
+        window.location.href = 'hvac-login.html';
+      }
+    }
     throw new Error(`Supabase error ${res.status}: ${err}`);
   }
   const text = await res.text();
