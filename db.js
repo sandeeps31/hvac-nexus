@@ -42,6 +42,7 @@ async function authSignIn(email, password) {
   _authSession = data;
   _authUser = data.user;
   localStorage.setItem('hvacnexus_session', JSON.stringify(data));
+  localStorage.setItem('hvacnexus_login_time', Date.now().toString());
   await authLoadCompany();
   return data;
 }
@@ -57,6 +58,7 @@ async function authSignOut() {
   _authUser = null;
   _authCompanyId = null;
   localStorage.removeItem('hvacnexus_session');
+  localStorage.removeItem('hvacnexus_login_time');
   window.location.href = 'hvac-login.html';
 }
 
@@ -132,6 +134,14 @@ const dbReady = new Promise(function(resolve){ _dbReadyResolve = resolve; });
   if(!stored){ _dbReadyResolve(false); return; }
   try{
     const sess = JSON.parse(stored);
+    // Force re-login if session is older than 24 hours
+    const loginTime = parseInt(localStorage.getItem('hvacnexus_login_time')||'0');
+    if(loginTime && (Date.now() - loginTime) > 24 * 60 * 60 * 1000){
+      localStorage.removeItem('hvacnexus_session');
+      localStorage.removeItem('hvacnexus_login_time');
+      _dbReadyResolve(false);
+      return;
+    }
     const expiresAt = sess.expires_at || 0;
     if(Date.now()/1000 < expiresAt - 60){
       _authSession = sess;
@@ -162,6 +172,26 @@ const dbReady = new Promise(function(resolve){ _dbReadyResolve = resolve; });
   }
 })();
 
+// ── Periodic token refresh — every 45 minutes to prevent JWT expiry ──
+setInterval(async function(){
+  if(!_authSession) return;
+  try{
+    const sess = JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');
+    if(!sess.refresh_token) return;
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:sess.refresh_token})
+    });
+    if(res.ok){
+      const data = await res.json();
+      _authSession = data;
+      _authUser = data.user;
+      localStorage.setItem('hvacnexus_session', JSON.stringify(data));
+    }
+  }catch(e){ console.warn('Token refresh failed:', e); }
+}, 45 * 60 * 1000); // 45 minutes
+
 // Auth guard — call on every protected page
 async function authGuard() {
   const ok = await authRefreshSession();
@@ -187,6 +217,14 @@ async function sbFetch(path, options = {}) {
   const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
     const err = await res.text();
+    if (res.status === 401) {
+      // JWT expired — clear session and redirect to login
+      localStorage.removeItem('hvacnexus_session');
+      localStorage.removeItem('hvacnexus_current_user');
+      if (!window.location.href.includes('hvac-login.html')) {
+        window.location.href = 'hvac-login.html';
+      }
+    }
     throw new Error(`Supabase error ${res.status}: ${err}`);
   }
   const text = await res.text();

@@ -520,8 +520,8 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
 
     <!-- TAB BAR -->
     <div class="cx-tab-bar">
-      <div class="cx-tab active" id="cxtab-commissionable" onclick="switchCxTab('commissionable')">Commissionable List</div>
-      <div class="cx-tab" id="cxtab-summary" onclick="switchCxTab('summary')">Summary</div>
+      <div class="cx-tab active" id="cxtab-summary" onclick="switchCxTab('summary')">Summary</div>
+      <div class="cx-tab" id="cxtab-commissionable" onclick="switchCxTab('commissionable')">Commissionable List</div>
       <div class="cx-tab" id="cxtab-mssb" onclick="switchCxTab('mssb')">MSSB & DCP</div>
       <div class="cx-tab" id="cxtab-fire" onclick="switchCxTab('fire')">Fire Testing</div>
       <div class="cx-tab" id="cxtab-stair" onclick="switchCxTab('stair')">Stair Press</div>
@@ -1105,9 +1105,26 @@ async function renderTracker(){
     var mssbPow=t.mssbPowered||mssbRecord.mssbPowered||'';
     var precxData=getSectionPct(t.tag,'precx');
     var autoSt=calcAutoStatus(t,mssbPow,precxData.auto);
-    return(!sf||autoSt===sf)&&(!tf||t.type===tf)&&
-      (!q||t.tag.toLowerCase().includes(q)||(t.name||'').toLowerCase().includes(q));
+    if(sf&&autoSt!==sf)return false;
+    if(tf&&t.type!==tf)return false;
+    if(q&&!t.tag.toLowerCase().includes(q)&&!(t.name||'').toLowerCase().includes(q))return false;
+    // Column filters
+    for(var ck in cxColFilters){
+      var fs=cxColFilters[ck];
+      if(!fs||!fs.size)continue;
+      var cv=String(t[ck]||'');
+      if(!fs.has(cv))return false;
+    }
+    return true;
   });
+
+  // Sort
+  if(cxSortK){
+    f=f.slice().sort(function(a,b){
+      var av=String(a[cxSortK]||'');var bv=String(b[cxSortK]||'');
+      return av.localeCompare(bv,undefined,{numeric:true})*cxSortD;
+    });
+  }
 
   document.getElementById('trackerBody').innerHTML=f.map(function(t){
     var idx=trackerItems.indexOf(t);
@@ -1192,6 +1209,7 @@ async function renderTracker(){
       colS('powerPlus8','font-family:DM Mono,monospace;font-size:11px;color:var(--muted)',powerPlus8)+
       col('deps', buildDepsCell(t, idx, depBadgesHtml, warnHtml))+
       col('defect',tx(t.defect,idx,'defect','Defect ref','100px'))+
+      '<td style="min-width:90px"><button onclick="openAddDefectFromTracker('+idx+')" style="background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);color:var(--danger);border-radius:20px;font-size:10px;font-family:DM Mono,monospace;padding:2px 10px;cursor:pointer;white-space:nowrap">+ Defect</button></td>'+
       col('responsibility',tx(t.responsibility,idx,'responsibility','Responsibility','120px'))+col('subby',tx(t.subby,idx,'subby','Subcontractor','120px'))+
       '<td><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;opacity:0;transition:all 0.13s" onmouseover="this.style.opacity=1;this.style.color=\'var(--danger)\'" onmouseout="this.style.opacity=0;this.style.color=\'var(--muted)\'" onclick="trackerItems.splice('+idx+',1);saveTracker();renderTracker()">✕</button></td>';
     return'<tr class="'+rowClass+'">'+cells+'</tr>';
@@ -1234,6 +1252,57 @@ var CX_COL_DEFS=[
   {k:'defect',l:'Defect',def:false},{k:'responsibility',l:'Responsibility',def:true},{k:'subby',l:'Subby Responsible',def:true}
 ];
 var CX_COL_STORE='hvacnexus_cx_cols_'+_cxPNum;
+var cxSortK='';var cxSortD=1;
+var cxColFilters={};
+
+function cxSortBy(k){
+  if(cxSortK===k)cxSortD*=-1;else{cxSortK=k;cxSortD=1;}
+  renderTracker();
+}
+
+function openCxColFilter(k,e){
+  e.stopPropagation();
+  // Build unique values for this column
+  var vals=new Set();
+  trackerItems.forEach(function(t){
+    var v='';
+    if(k==='autoStatus'){
+      // compute auto status
+      v=t.cxStatus||'';
+    } else {
+      v=String(t[k]||'');
+    }
+    if(v)vals.add(v);
+  });
+  var existing=cxColFilters[k]||new Set();
+  var html='<div style="padding:10px;min-width:160px;max-height:260px;overflow-y:auto">'
+    +'<div style="display:flex;gap:6px;margin-bottom:8px">'
+    +'<button onclick="cxColFilters[\''+k+'\']=null;document.getElementById(\'cxCFP\').style.display=\'none\';renderTracker()" style="flex:1;background:var(--surface3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:4px;font-size:11px;cursor:pointer">Clear</button>'
+    +'<button onclick="document.getElementById(\'cxCFP\').style.display=\'none\'" style="flex:1;background:var(--accent);border:none;color:#080c12;border-radius:5px;padding:4px;font-size:11px;cursor:pointer;font-weight:700">Apply</button>'
+    +'</div>';
+  vals.forEach(function(v){
+    var chk=!existing||existing.has(v);
+    html+='<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:12px;color:var(--text)">'
+      +'<input type="checkbox" '+(chk?'checked':'')+' style="accent-color:var(--accent)" onchange="toggleCxColFilter(\''+k+'\',\''+v.replace(/'/g,"\\'")+'\')">'
+      +v+'</label>';
+  });
+  html+='</div>';
+  var cfp=document.getElementById('cxCFP');
+  if(!cfp){cfp=document.createElement('div');cfp.id='cxCFP';cfp.style.cssText='position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:8px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.5)';document.body.appendChild(cfp);}
+  cfp.innerHTML=html;
+  var r=e.target.getBoundingClientRect();
+  cfp.style.display='block';
+  cfp.style.top=(r.bottom+4)+'px';
+  cfp.style.left=Math.min(r.left,window.innerWidth-200)+'px';
+  document.addEventListener('click',function hide(ev){if(!cfp.contains(ev.target)){cfp.style.display='none';document.removeEventListener('click',hide);}});
+}
+
+function toggleCxColFilter(k,v){
+  if(!cxColFilters[k])cxColFilters[k]=new Set();
+  if(cxColFilters[k].has(v))cxColFilters[k].delete(v);
+  else cxColFilters[k].add(v);
+  renderTracker();
+}
 function getCxCols(){
   try{var s=localStorage.getItem(CX_COL_STORE);if(s)return JSON.parse(s);}catch(e){}
   var def={};CX_COL_DEFS.forEach(function(c){def[c.k]=c.def;});return def;
@@ -1243,9 +1312,21 @@ function saveCxCols(v){try{localStorage.setItem(CX_COL_STORE,JSON.stringify(v));
 function buildTrackerHeader(vis){
   var thead=document.getElementById('cxTrackerThead');
   if(!thead)return;
-  var ths='<th style="min-width:110px;white-space:nowrap">Tag</th>';
+  function th(k,l,minW){
+    var isSort=cxSortK===k;
+    var hasFilter=cxColFilters[k]&&cxColFilters[k].size>0;
+    return'<th style="white-space:nowrap;min-width:'+(minW||'110px')+';user-select:none;cursor:pointer" onclick="cxSortBy(\''+k+'\')">'
+      +'<div style="display:flex;align-items:center;gap:4px">'
+      +'<span>'+l+'</span>'
+      +(isSort?'<span style="color:var(--accent);font-size:10px">'+(cxSortD>0?'▲':'▼')+'</span>':'')
+      +'<span onclick="openCxColFilter(\''+k+'\',event)" style="font-size:10px;color:'+(hasFilter?'var(--accent)':'var(--muted)')+';cursor:pointer;padding:1px 3px;border-radius:3px;margin-left:auto" title="Filter">⊟</span>'
+      +'</div></th>';
+  }
+  var ths='<th style="min-width:110px;white-space:nowrap;cursor:pointer" onclick="cxSortBy(\'tag\')">'
+    +'<div style="display:flex;align-items:center;gap:4px">Tag'+(cxSortK==='tag'?'<span style="color:var(--accent);font-size:10px">'+(cxSortD>0?'▲':'▼')+'</span>':'')+'</div></th>';
   CX_COL_DEFS.forEach(function(c){
-    if(vis[c.k])ths+='<th style="white-space:nowrap;min-width:110px">'+c.l+'</th>';
+    if(vis[c.k])ths+=th(c.k,c.l);
+    if(c.k==='defect')ths+='<th style="min-width:90px;white-space:nowrap"></th>';
   });
   ths+='<th style="min-width:36px;width:36px"></th>';
   thead.innerHTML='<tr>'+ths+'</tr>';
@@ -1280,31 +1361,14 @@ async function openItpPrecx(tag){
 }
 
 function manualPrecx(idx){
-  // Build a small dropdown inline instead of a prompt
-  var existing=trackerItems[idx].precxManual||'Yes';
-  var opts=['Yes','No'].map(function(o){
-    return '<option value="'+o+'"'+(existing===o?' selected':'')+'>'+o+'</option>';
-  }).join('');
-  var sel=document.createElement('select');
-  sel.style.cssText='background:var(--surface2);border:1.5px solid var(--accent);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:12px;padding:4px 8px;outline:none;cursor:pointer;margin-top:4px';
-  sel.innerHTML='<option value="">— Select —</option>'+opts;
-  sel.onchange=function(){
-    if(!this.value)return;
-    trackerItems[idx].precxManual=this.value;
-    saveTracker();renderTracker();
-  };
-  // Find the manual override button for this row and replace it temporarily
-  var btns=document.querySelectorAll('#trackerBody button');
-  for(var i=0;i<btns.length;i++){
-    if(btns[i].textContent==='manual override'&&btns[i].getAttribute('data-idx')==String(idx)){
-      btns[i].replaceWith(sel);sel.focus();
-      sel.onblur=function(){renderTracker();};
-      return;
-    }
-  }
-  // Fallback: just prompt
-  var val=prompt('Manual Pre-Cx override:','Yes');
-  if(val){trackerItems[idx].precxManual=val.trim();saveTracker();renderTracker();}
+  var existing=trackerItems[idx].precxManual||'';
+  var val=existing==='Yes'?'No':existing==='No'?'':  'Yes';
+  // Cycle: empty→Yes→No→empty
+  if(!existing) val='Yes';
+  else if(existing==='Yes') val='No';
+  else val='';
+  trackerItems[idx].precxManual=val;
+  saveTracker();renderTracker();
 }
 function addTrackerRow(){trackerItems.push({
   id:'tr'+uid(),tag:'',name:'',type:'',location:'',subloc:'',locServing:'',
@@ -1350,7 +1414,47 @@ function renderDefects(){
     </div>
   </div>`).join('');
 }
-function addDefect(){const desc=prompt('Defect description:');if(!desc)return;const tag=prompt('Equipment tag:')||'';defects.push({id:'df'+uid(),num:'CX-D'+String(defects.length+1).padStart(3,'0'),desc,tag,status:'open'});renderDefects()}
+var _adtIdx=-1;
+function openAddDefectFromTracker(idx){
+  _adtIdx=idx;
+  var t=trackerItems[idx];
+  document.getElementById('adtTag').textContent=t.tag||'';
+  document.getElementById('adtDesc').value='';
+  document.getElementById('adtResp').value=t.responsibility||t.subby||'';
+  document.getElementById('adtPriority').value='medium';
+  document.getElementById('addDefectTrackerModal').classList.add('open');
+  setTimeout(function(){document.getElementById('adtDesc').focus();},100);
+}
+function closeAddDefectTracker(){document.getElementById('addDefectTrackerModal').classList.remove('open');}
+function confirmAddDefectTracker(){
+  var desc=document.getElementById('adtDesc').value.trim();
+  if(!desc){alert('Description is required.');return;}
+  var t=trackerItems[_adtIdx];
+  var num='CX-D'+String(defects.length+1).padStart(3,'0');
+  var defect={
+    id:'df'+uid(),num:num,desc:desc,tag:t.tag,
+    responsibility:document.getElementById('adtResp').value.trim(),
+    priority:document.getElementById('adtPriority').value,
+    status:'open',fromTracker:true,
+    date:new Date().toISOString().split('T')[0]
+  };
+  defects.push(defect);
+  // Also save to the defects module (hvac-defects.html) via Supabase
+  try{dbSetProject('cx_defects',_cxPNum,defects).catch(function(e){console.error(e);});}catch(e){}
+  closeAddDefectTracker();
+  renderDefects();
+  switchCxTab('defects');
+  showTrackerToast('✓ Defect '+num+' added');
+}
+
+function addDefect(){
+  var desc=prompt('Defect description:');if(!desc)return;
+  var tag=prompt('Equipment tag:')||'';
+  var num='CX-D'+String(defects.length+1).padStart(3,'0');
+  defects.push({id:'df'+uid(),num:num,desc:desc,tag:tag,status:'open'});
+  try{dbSetProject('cx_defects',_cxPNum,defects).catch(function(e){console.error(e);});}catch(e){}
+  renderDefects();
+}
 function renderWitness(){
   if(document.getElementById('witnessBody'))document.getElementById('witnessBody').innerHTML=witnessTests.map((w,i)=>`<tr>
     <td style="color:var(--text)">${w.system}</td><td>${w.witness||'—'}</td><td>${w.company||'—'}</td>
@@ -2488,6 +2592,30 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
     <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
       <button class="bg bsm btn" onclick="closeSyncModal()">Cancel</button>
       <button class="bp bsm btn" onclick="confirmSync()">⟳ Sync Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD DEFECT FROM TRACKER MODAL -->
+<div class="mo" id="addDefectTrackerModal" onclick="if(event.target===this)closeAddDefectTracker()">
+  <div class="mo-box" style="width:460px">
+    <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:4px">Add Defect</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Tag: <span id="adtTag" style="font-family:DM Mono,monospace;color:var(--accent)"></span></p>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Description *</label>
+        <textarea id="adtDesc" rows="3" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;outline:none;resize:vertical" placeholder="Describe the defect…"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Responsibility</label>
+          <input id="adtResp" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;outline:none" placeholder="Trade or company…"></div>
+        <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px">Priority</label>
+          <select id="adtPriority" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;outline:none;cursor:pointer">
+            <option value="medium">Medium</option><option value="high">High</option><option value="low">Low</option>
+          </select></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="bg bsm btn" onclick="closeAddDefectTracker()">Cancel</button>
+      <button class="bp bsm btn" onclick="confirmAddDefectTracker()" style="background:var(--danger);color:#fff">+ Add Defect</button>
     </div>
   </div>
 </div>
