@@ -41,7 +41,8 @@ async function authSignIn(email, password) {
   if (!res.ok) throw new Error(data.error_description || data.msg || 'Login failed');
   _authSession = data;
   _authUser = data.user;
-  localStorage.setItem('hvacnexus_session', JSON.stringify(data));
+  sessionStorage.setItem('hvacnexus_session', JSON.stringify(data));
+  localStorage.removeItem('hvacnexus_session');
   localStorage.setItem('hvacnexus_login_time', Date.now().toString());
   await authLoadCompany();
   return data;
@@ -57,6 +58,7 @@ async function authSignOut() {
   _authSession = null;
   _authUser = null;
   _authCompanyId = null;
+  sessionStorage.removeItem('hvacnexus_session');
   localStorage.removeItem('hvacnexus_session');
   localStorage.removeItem('hvacnexus_login_time');
   window.location.href = 'hvac-login.html';
@@ -85,7 +87,8 @@ async function authRefreshSession() {
     const data = await res.json();
     _authSession = data;
     _authUser = data.user;
-    localStorage.setItem('hvacnexus_session', JSON.stringify(data));
+    sessionStorage.setItem('hvacnexus_session', JSON.stringify(data));
+    localStorage.removeItem('hvacnexus_session');
     await authLoadCompany();
     return true;
   } catch(e) { return false; }
@@ -130,7 +133,10 @@ let _dbReadyResolve;
 const dbReady = new Promise(function(resolve){ _dbReadyResolve = resolve; });
 
 (async function(){
-  const stored = localStorage.getItem('hvacnexus_session');
+  // On page load: move session from localStorage (set during navigation) to sessionStorage
+  const navSession = localStorage.getItem('hvacnexus_session_nav');
+  if(navSession){ sessionStorage.setItem('hvacnexus_session', navSession); localStorage.removeItem('hvacnexus_session_nav'); }
+  const stored = sessionStorage.getItem('hvacnexus_session') || localStorage.getItem('hvacnexus_session');
   if(!stored){ _dbReadyResolve(false); return; }
   try{
     const sess = JSON.parse(stored);
@@ -161,7 +167,8 @@ const dbReady = new Promise(function(resolve){ _dbReadyResolve = resolve; });
       _authSession = data;
       _authUser = data.user;
       _authCompanyId = localStorage.getItem('hvacnexus_company_id');
-      localStorage.setItem('hvacnexus_session', JSON.stringify(data));
+      sessionStorage.setItem('hvacnexus_session', JSON.stringify(data));
+      localStorage.removeItem('hvacnexus_session');
       _dbReadyResolve(true);
     } else {
       _dbReadyResolve(false);
@@ -187,7 +194,7 @@ setInterval(async function(){
       const data = await res.json();
       _authSession = data;
       _authUser = data.user;
-      localStorage.setItem('hvacnexus_session', JSON.stringify(data));
+      sessionStorage.setItem('hvacnexus_session', JSON.stringify(data));
     }
   }catch(e){ console.warn('Token refresh failed:', e); }
 }, 45 * 60 * 1000); // 45 minutes
@@ -637,4 +644,14 @@ async function migrateLocalStorageToSupabase() {
   console.log('Migration complete:', results.filter(r => r.status === 'ok').length, 'succeeded,', results.filter(r => r.status === 'error').length, 'failed');
   console.table(results);
   return results;
+}
+
+// ── navTo: copy session to localStorage before page navigation ──
+// This preserves the session across page loads (sessionStorage clears on navigation)
+// but not across tab/browser closes (localStorage nav key is removed on page load)
+function navTo(url){
+  const sess = sessionStorage.getItem('hvacnexus_session');
+  if(sess) localStorage.setItem('hvacnexus_session_nav', sess);
+  const base = window.location.href.substring(0, window.location.href.lastIndexOf('/')+1);
+  window.location.href = base + url;
 }
