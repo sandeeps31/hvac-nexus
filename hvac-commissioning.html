@@ -1542,13 +1542,55 @@ function renderEqPanel(idx){
       }).join('')
     : '<div style="font-size:12px;color:var(--muted);padding:4px 0">No defects for this equipment</div>';
 
+  function testSheetListHtml(sheets){
+    if(!sheets||!sheets.length) return '';
+    return sheets.map(function(sheet,si){
+      var revs = sheet.revisions||[];
+      var current = revs[revs.length-1];
+      var prevRevs = revs.slice(0,-1).reverse();
+      var resultColor = current.result==='Pass'?'var(--green)':current.result==='Fail'?'var(--danger)':'var(--muted)';
+      var html = '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:8px;overflow:hidden">'
+        // Current version row
+        +'<div style="display:flex;align-items:center;gap:8px;padding:8px 10px">'
+        +'<span style="font-size:14px">📄</span>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH2(sheet.name)+'</div>'
+        +'<div style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace;margin-top:1px">'+current.date+' · '+current.size+'</div>'
+        +'</div>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:2px 7px;border-radius:20px;background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2);flex-shrink:0">Current</span>'
+        // Pass/Fail toggle
+        +'<button onclick="cycleTestResult(\''+t.tag+'\','+si+')" style="font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:20px;border:1px solid rgba(255,255,255,.1);background:transparent;color:'+resultColor+';cursor:pointer;flex-shrink:0">'+(current.result||'Result')+'</button>'
+        +'<button onclick="viewEpFile(\''+t.tag+'\',\'testSheets\','+si+',\'current\')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px;flex-shrink:0">View</button>'
+        +'<button onclick="removeEpFile(\''+t.tag+'\',\'testSheets\','+si+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 4px;flex-shrink:0" onmouseover="this.style.color=\'var(--danger)\'" onmouseout="this.style.color=\'var(--muted)\'">✕</button>'
+        +'</div>';
+      // Previous revisions
+      if(prevRevs.length){
+        html+='<div style="border-top:1px solid var(--border)">'
+          +'<div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'" style="padding:5px 10px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;background:var(--surface3)">▸ Show previous versions ('+prevRevs.length+')</div>'
+          +'<div style="display:none">'
+          +prevRevs.map(function(rev,ri){
+            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid var(--border);opacity:.7">'
+              +'<span style="font-size:12px">📄</span>'
+              +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--text2)">'+escH2(sheet.name)+'</div>'
+              +'<div style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace">'+rev.date+' · '+rev.size+'</div></div>'
+              +(rev.result?'<span style="font-family:DM Mono,monospace;font-size:9px;color:'+(rev.result==='Pass'?'var(--green)':'var(--danger)')+'">'+rev.result+'</span>':'')
+              +'<button onclick="viewEpFileRev(\''+t.tag+'\','+si+','+(prevRevs.length-1-ri)+')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px">View</button>'
+              +'</div>';
+          }).join('')
+          +'</div></div>';
+      }
+      html+='</div>';
+      return html;
+    }).join('');
+  }
+
   function fileListHtml(files, type){
     return (files||[]).map(function(f,fi){
       return '<div class="eq-file-item">'
         +'<span style="font-size:16px">📄</span>'
         +'<div style="flex:1;min-width:0"><div class="eq-file-name">'+escH2(f.name)+'</div>'
         +'<div class="eq-file-size">'+f.size+'</div></div>'
-        +'<button onclick="viewEpFile(\''+t.tag+'\',\''+type+'\','+fi+')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px">View</button>'
+        +'<button onclick="viewEpFile(\''+t.tag+'\',\''+type+'\','+fi+',\'flat\')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px">View</button>'
         +'<button onclick="removeEpFile(\''+t.tag+'\',\''+type+'\','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px" onmouseover="this.style.color=\'var(--danger)\'" onmouseout="this.style.color=\'var(--muted)\'">✕</button>'
         +'</div>';
     }).join('');
@@ -1581,7 +1623,7 @@ function renderEqPanel(idx){
 
     +'<div class="eq-section">'
     +'<div class="eq-section-title">Cx Test Sheets</div>'
-    +'<div id="epTestSheetList">'+fileListHtml(d.testSheets,'testSheets')+'</div>'
+    +'<div id="epTestSheetList">'+testSheetListHtml(d.testSheets)+'</div>'
     +'<div class="eq-drop-zone" ondragover="this.classList.add(\'over\');event.preventDefault()" ondragleave="this.classList.remove(\'over\')" ondrop="handleEpDrop(event,\''+t.tag+'\',\'testSheets\')" onclick="document.getElementById(\'epTSInput\').click()">'
     +'<div style="font-size:20px;margin-bottom:4px">📎</div>'
     +'<div style="font-size:12px;color:var(--text2)">Drop Cx test sheets here or click to browse</div>'
@@ -1628,11 +1670,23 @@ function handleEpFileSelect(e,tag,type){
 }
 function addEpFiles(tag,type,files){
   if(!_epDocs[tag])_epDocs[tag]={testSheets:[],supportDocs:[],notes:''};
+  var today=new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
   var pending=files.length;
   files.forEach(function(f){
     var reader=new FileReader();
     reader.onload=function(ev){
-      _epDocs[tag][type].push({name:f.name,size:fmtFileSize(f.size),data:ev.target.result});
+      if(type==='testSheets'){
+        // Find existing sheet with same name — stack as new revision
+        var existing=_epDocs[tag].testSheets.find(function(s){return s.name===f.name;});
+        var newRev={data:ev.target.result,size:fmtFileSize(f.size),date:today,result:''};
+        if(existing){
+          existing.revisions.push(newRev);
+        } else {
+          _epDocs[tag].testSheets.push({name:f.name,revisions:[newRev]});
+        }
+      } else {
+        _epDocs[tag][type].push({name:f.name,size:fmtFileSize(f.size),data:ev.target.result,date:today});
+      }
       var idx=trackerItems.findIndex(function(t){return t.tag===tag;});
       if(idx>=0){trackerItems[idx].docs=_epDocs[tag];saveTracker();}
       if(--pending===0)renderEqPanel(_epIdx);
@@ -1640,18 +1694,49 @@ function addEpFiles(tag,type,files){
     reader.readAsDataURL(f);
   });
 }
-function removeEpFile(tag,type,fi){
-  if(!_epDocs[tag])return;
-  _epDocs[tag][type].splice(fi,1);
+
+function cycleTestResult(tag,si){
+  var sheet=(_epDocs[tag]||{}).testSheets&&_epDocs[tag].testSheets[si];
+  if(!sheet)return;
+  var cur=sheet.revisions[sheet.revisions.length-1];
+  cur.result=cur.result==='Pass'?'Fail':cur.result==='Fail'?'':  'Pass';
+  if(!cur.result)cur.result='Pass'; // cycle: ''→Pass→Fail→Pass
   var idx=trackerItems.findIndex(function(t){return t.tag===tag;});
   if(idx>=0){trackerItems[idx].docs=_epDocs[tag];saveTracker();}
   renderEqPanel(_epIdx);
 }
-function viewEpFile(tag,type,fi){
-  var f=(_epDocs[tag]||{})[type]&&_epDocs[tag][type][fi];
-  if(!f||!f.data)return;
+
+function viewEpFile(tag,type,fi,mode){
+  var d=_epDocs[tag];if(!d)return;
+  var fileData=null;
+  if(type==='testSheets'){
+    var sheet=d.testSheets[fi];
+    if(!sheet)return;
+    fileData=sheet.revisions[sheet.revisions.length-1].data;
+  } else {
+    fileData=(d[type]&&d[type][fi])?d[type][fi].data:null;
+  }
+  if(!fileData)return;
   var w=window.open('','_blank');
-  w.document.write('<iframe src="'+f.data+'" style="width:100%;height:100%;border:none"></iframe>');
+  w.document.write('<iframe src="'+fileData+'" style="width:100%;height:100%;border:none"></iframe>');
+}
+
+function viewEpFileRev(tag,si,ri){
+  var sheet=(_epDocs[tag]||{}).testSheets&&_epDocs[tag].testSheets[si];
+  if(!sheet||!sheet.revisions[ri])return;
+  var w=window.open('','_blank');
+  w.document.write('<iframe src="'+sheet.revisions[ri].data+'" style="width:100%;height:100%;border:none"></iframe>');
+}
+function removeEpFile(tag,type,fi){
+  if(!_epDocs[tag])return;
+  if(type==='testSheets'){
+    _epDocs[tag].testSheets.splice(fi,1);
+  } else {
+    _epDocs[tag][type].splice(fi,1);
+  }
+  var idx=trackerItems.findIndex(function(t){return t.tag===tag;});
+  if(idx>=0){trackerItems[idx].docs=_epDocs[tag];saveTracker();}
+  renderEqPanel(_epIdx);
 }
 function fmtFileSize(b){
   if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';
