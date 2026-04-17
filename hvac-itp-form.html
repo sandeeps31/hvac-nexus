@@ -308,6 +308,7 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   var params=new URLSearchParams(window.location.search);
   drawingId=params.get('drawingId')||'';
   pinId=params.get('pinId')||'';
+  var itpNoParam=params.get('itpNo')||''; // specific ITP from multi-ITP pin
 
   // Show loading state
   var _meta=document.getElementById('formMeta');
@@ -333,7 +334,22 @@ async function loadSettings(){try{return await dbGetCompanySettings()||{};}catch
   var _allResp=_parallel[1]||{};
   _cachedEquipData=_parallel[2]||null;
 
-  var matched=Array.isArray(_templates)?_templates.find(function(t){return t.itpType===pin.itpTypeLabel||t.itpNo===pin.ref;}):null;
+  var matched=null;
+  if(Array.isArray(_templates)){
+    if(itpNoParam){
+      // Multi-ITP pin — match by specific itpNo
+      matched=_templates.find(function(t){return t.itpNo===itpNoParam;});
+    }
+    if(!matched){
+      // Legacy single-ITP pin — match by itpTypeLabel or ref
+      matched=_templates.find(function(t){return t.itpType===pin.itpTypeLabel||t.itpNo===pin.ref;});
+    }
+    // Also try matching from pin.itps array
+    if(!matched&&pin.itps&&pin.itps.length){
+      var firstItp=pin.itps[0];
+      matched=_templates.find(function(t){return t.itpNo===firstItp.itpNo||t.itpType===firstItp.itpTypeLabel;});
+    }
+  }
   if(matched){
     itpTemplate=matched;
     var rev=matched.revisions[matched.revisions.length-1];
@@ -419,8 +435,9 @@ function renderHeader(){
   var docE=makeEditable('Client Doc No.','docNo','Client / Builder doc no.');
   g1.appendChild(docE.wrap);
   g1.appendChild(makeField('Ref No.', pin.ref||'—', 'mono'));
-  g1.appendChild(makeField('Form No.', itpTemplate?itpTemplate.itpNo:(pin.formNo||'—'), 'mono'));
-  g1.appendChild(makeField('ITP Type', itpTemplate?itpTemplate.itpType:(pin.itpTypeLabel||'—')));
+  g1.appendChild(makeField('Form No.', itpTemplate?itpTemplate.itpNo:(pin.formNo||itpNoParam||'—'), 'mono'));
+  var itpTypeDisplay=itpTemplate?itpTemplate.itpType:(pin.itpTypeLabel||(pin.itps&&pin.itps.length?pin.itps[0].itpTypeLabel:'—')||'—');
+  g1.appendChild(makeField('ITP Type', itpTypeDisplay));
 
   // ── GROUP 2: Equipment ──
   var g2=group();

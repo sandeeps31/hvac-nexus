@@ -114,7 +114,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 .pi-st.act{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
 .pi-st.cl{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
 
-/* ── MODALS ── */
+.pin-itp-count{position:absolute;top:-6px;right:-6px;background:var(--purple);color:#fff;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;border:1.5px solid var(--bg)}
+.itp-chk-group{background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.itp-chk-group-hdr{padding:6px 12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);background:var(--surface3);border-bottom:1px solid var(--border)}
+.itp-chk-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .13s}
+.itp-chk-item:last-child{border-bottom:none}
+.itp-chk-item:hover{background:var(--surface3)}
+.itp-chk-item input{accent-color:var(--purple);width:15px;height:15px;cursor:pointer;flex-shrink:0}
+.itp-chk-label{flex:1;font-size:12px;color:var(--text)}
+.itp-chk-cat{font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:20px;flex-shrink:0}
+.cat-install{background:rgba(0,200,255,.1);color:var(--accent);border:1px solid rgba(0,200,255,.25)}
+.cat-precx{background:rgba(255,184,48,.1);color:var(--warn);border:1px solid rgba(255,184,48,.25)}
+.cat-cx{background:rgba(0,229,160,.1);color:var(--green);border:1px solid rgba(0,229,160,.25)}
+/* Pin ITP expanded popup */
+.pin-itp-popup{position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:200;min-width:220px;max-width:300px;overflow:hidden}
+.pin-itp-popup-hdr{padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:700}
+.pin-itp-popup-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .13s}
+.pin-itp-popup-row:last-child{border-bottom:none}
+.pin-itp-popup-row:hover{background:var(--surface2)}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(2px)}
 .mo.open{display:flex}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
@@ -244,21 +261,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 
 <!-- ITP PIN MODAL (reuses pdf-viewer modal) -->
 <div class="mo" id="itpMo">
-  <div class="modal" style="width:420px">
+  <div class="modal" style="width:460px">
     <div class="modal-hdr"><h3 id="itpMoTitle">New ITP Pin</h3></div>
     <div class="modal-body">
-      <div>
-        <label class="ml">ITP Type *</label>
-        <select class="mi" id="itpType" style="height:38px;appearance:auto;cursor:pointer" onchange="onItpTypeChange()"></select>
-      </div>
       <div id="itpEquipWrap">
         <label class="ml">Equipment ID</label>
         <input class="mi" id="itpEquip" placeholder="e.g. FCU-L02-001" autocomplete="off">
       </div>
-      <div id="fdItpTypeWrap">
-        <label class="ml">ITP Type</label>
-        <input class="mi" id="fdItpType" list="fdItpTypeList" placeholder="Type to search templates…" autocomplete="off">
-        <datalist id="fdItpTypeList"></datalist>
+      <div>
+        <label class="ml">Select ITPs</label>
+        <div id="itpCheckList" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto"></div>
+        <div id="itpNoTemplates" style="display:none;font-size:12px;color:var(--muted);padding:8px 0">No ITP templates found. Create templates in project settings first.</div>
       </div>
       <div>
         <label class="ml">Status</label>
@@ -547,7 +560,10 @@ function renderPins(){
     var inner='';
     if(p.type==='itp'){
       var txt=(p.ref||'').replace('ITP-','');
-      inner='<div class="pin-itp '+stCls+'">'+escH(txt)+'</div>';
+      var itpCount=(p.itps&&p.itps.length>1)?p.itps.length:0;
+      inner='<div class="pin-itp '+stCls+'" style="position:relative">'+escH(txt)
+        +(itpCount?'<span class="pin-itp-count">'+itpCount+'</span>':'')
+        +'</div>';
     } else if(p.type==='defect'){
       var dtxt=(p.ref||'').replace('DEF-','');
       inner='<div class="pin-def '+stCls+'">'+escH(dtxt.slice(-3))+'</div>';
@@ -561,11 +577,64 @@ function renderPins(){
     inner+='<div class="pin-lbl">'+escH(lbl)+(desc?' · '+escH(desc):'')+'</div>';
     el.innerHTML=inner;
     (function(pin){
-      el.addEventListener('click',function(e){e.stopPropagation();if(_movingPinId){commitMove(pin.x,pin.y);return;}openPinModal(pin);});
+      el.addEventListener('click',function(e){
+        e.stopPropagation();
+        if(_movingPinId){commitMove(pin.x,pin.y);return;}
+        // Multi-ITP: show popup first if multiple ITPs
+        if(pin.type==='itp'&&pin.itps&&pin.itps.length>1){
+          showItpPopup(e,pin);
+        } else {
+          openPinModal(pin);
+        }
+      });
       el.addEventListener('contextmenu',function(e){e.preventDefault();e.stopPropagation();showCtx(e,pin.id);});
     })(p);
     layer.appendChild(el);
   });
+}
+
+var _activePopup=null;
+function showItpPopup(e,pin){
+  closeItpPopup();
+  var popup=document.createElement('div');
+  popup.className='pin-itp-popup';
+  popup.id='itpPopup';
+  var CAT_COLORS={'Installation':'var(--accent)','Pre-Commissioning':'var(--warn)','Commissioning':'var(--green)'};
+  var html='<div class="pin-itp-popup-hdr">'+escH(pin.equip||pin.ref)+' · '+pin.itps.length+' ITPs</div>';
+  pin.itps.forEach(function(itp){
+    var col=CAT_COLORS[itp.itpCategory]||'var(--muted)';
+    html+='<div class="pin-itp-popup-row" onclick="openItpForm(\''+pin.id+'\',\''+escH(itp.itpNo||'')+'\');closeItpPopup()">'
+      +'<span style="width:8px;height:8px;border-radius:50%;background:'+col+';flex-shrink:0;display:inline-block"></span>'
+      +'<span style="flex:1;font-size:12px;color:var(--text)">'+escH(itp.itpTypeLabel)+'</span>'
+      +'<span style="font-family:DM Mono,monospace;font-size:9px;color:'+col+'">'+escH(itp.itpCategory||'')+'</span>'
+      +'</div>';
+  });
+  html+='<div class="pin-itp-popup-row" onclick="openPinModal(pins_getById(\''+pin.id+'\'));closeItpPopup()" style="border-top:1px solid var(--border)">'
+    +'<span style="font-size:11px;color:var(--muted);width:100%;text-align:center">✏ Edit Pin</span>'
+    +'</div>';
+  popup.innerHTML=html;
+  // Position near click
+  popup.style.position='fixed';
+  popup.style.left=Math.min(e.clientX+8,window.innerWidth-310)+'px';
+  popup.style.top=Math.min(e.clientY+8,window.innerHeight-200)+'px';
+  document.body.appendChild(popup);
+  _activePopup=popup;
+  setTimeout(function(){document.addEventListener('click',closeItpPopup,{once:true});},10);
+}
+function closeItpPopup(){
+  if(_activePopup){_activePopup.remove();_activePopup=null;}
+}
+function pins_getById(id){
+  if(!curDrawing)return null;
+  return (curDrawing.pins||[]).find(function(p){return p.id===id;})||null;
+}
+function openItpForm(pinId,itpNo){
+  // Navigate to ITP form for this specific ITP
+  var base=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  var pin=pins_getById(pinId);
+  if(!pin)return;
+  var drawingId=curDrawing?curDrawing.id:'';
+  window.open(base+'hvac-itp-form.html?drawingId='+encodeURIComponent(drawingId)+'&pinId='+encodeURIComponent(pinId)+'&itpNo='+encodeURIComponent(itpNo),'_blank');
 }
 
 // Update pin positions after zoom (pins are in canvas %, stage handles transform)
@@ -649,41 +718,98 @@ function nextRef(prefix,field){
 
 // ── ITP PIN MODAL ──
 var _itpPinCache=null;
+var _itpSelectedIds=new Set(); // set of template itpNo values selected
+
 function populateItpTypes(){
-  var sel=document.getElementById('itpType');
-  sel.innerHTML='<option value="">— Select ITP Type —</option>'+(templates||[]).map(function(t){return'<option value="'+escH(t.itpType)+'">'+escH(t.itpType)+'</option>';}).join('');
+  // Build checklist grouped by category
+  var list=document.getElementById('itpCheckList');
+  var noTpl=document.getElementById('itpNoTemplates');
+  if(!list)return;
+  if(!templates||!templates.length){list.innerHTML='';if(noTpl)noTpl.style.display='block';return;}
+  if(noTpl)noTpl.style.display='none';
+  // Group by category
+  var groups={'Installation':[],'Pre-Commissioning':[],'Commissioning':[],'Other':[]};
+  templates.forEach(function(t){
+    var cat=t.itpCategory||'Other';
+    if(!groups[cat])groups[cat]=[];
+    groups[cat].push(t);
+  });
+  var html='';
+  Object.keys(groups).forEach(function(cat){
+    if(!groups[cat].length)return;
+    var catCls=cat==='Installation'?'cat-install':cat==='Pre-Commissioning'?'cat-precx':cat==='Commissioning'?'cat-cx':'';
+    html+='<div class="itp-chk-group"><div class="itp-chk-group-hdr">'+cat+'</div>';
+    groups[cat].forEach(function(t){
+      var checked=_itpSelectedIds.has(t.itpNo);
+      html+='<label class="itp-chk-item">'
+        +'<input type="checkbox" '+(checked?'checked':'')+' data-itpno="'+escH(t.itpNo)+'" data-itptype="'+escH(t.itpType)+'" data-itpcat="'+escH(cat)+'">'
+        +'<span class="itp-chk-label">'+escH(t.itpType)+'</span>'
+        +(catCls?'<span class="itp-chk-cat '+catCls+'">'+cat+'</span>':'')
+        +'</label>';
+    });
+    html+='</div>';
+  });
+  list.innerHTML=html;
 }
+
 function onItpTypeChange(){}
+
 function selectStatus(st){
   _itpStatus=st;
   ['ns','ip','act','cl'].forEach(function(s){document.getElementById('sopt-'+s).classList.remove('primary');});
   var map={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
   if(map[st])document.getElementById('sopt-'+map[st]).classList.add('primary');
 }
+
 function openItpMo(pin){
   _itpPinCache=pin;
   _itpStatus=pin?(responses[pin.id]||{}).status||'not-started':'not-started';
   document.getElementById('itpMoTitle').textContent=pin?'Edit ITP Pin':'New ITP Pin';
-  document.getElementById('itpType').value=pin?(pin.itpTypeLabel||''):'';
   document.getElementById('itpEquip').value=pin?(pin.equip||''):'';
   document.getElementById('itpDelBtn').style.display=pin?'':'none';
+  // Pre-select ITPs from existing pin
+  _itpSelectedIds=new Set();
+  if(pin){
+    if(pin.itps&&pin.itps.length){
+      pin.itps.forEach(function(i){if(i.itpNo)_itpSelectedIds.add(i.itpNo);});
+    } else if(pin.itpTypeLabel){
+      // Legacy single ITP pin
+      var t=templates.find(function(t){return t.itpType===pin.itpTypeLabel;});
+      if(t)_itpSelectedIds.add(t.itpNo);
+    }
+  }
+  populateItpTypes();
   selectStatus(_itpStatus);
   document.getElementById('itpMo').classList.add('open');
 }
+
 function closeItpMo(){document.getElementById('itpMo').classList.remove('open');_itpPinCache=null;}
+
 function saveItpPin(){
-  var type=document.getElementById('itpType').value;
-  if(!type){toast('Select an ITP type');return;}
+  // Collect selected ITPs from checkboxes
+  var selected=[];
+  document.querySelectorAll('#itpCheckList input[type=checkbox]:checked').forEach(function(cb){
+    selected.push({itpNo:cb.dataset.itpno,itpTypeLabel:cb.dataset.itptype,itpCategory:cb.dataset.itpcat});
+  });
+  if(!selected.length){toast('Select at least one ITP');return;}
+  var equip=document.getElementById('itpEquip').value.trim();
   if(!curDrawing.pins)curDrawing.pins=[];
   var u=dbGetCurrentUser();
   if(_itpPinCache){
-    _itpPinCache.itpTypeLabel=type;
-    _itpPinCache.equip=document.getElementById('itpEquip').value.trim();
+    _itpPinCache.itps=selected;
+    _itpPinCache.itpTypeLabel=selected[0].itpTypeLabel; // backwards compat
+    _itpPinCache.equip=equip;
     responses[_itpPinCache.id]=responses[_itpPinCache.id]||{};
     responses[_itpPinCache.id].status=_itpStatus;
   } else {
     var ref=nextRef('ITP');
-    var pin={id:nid(),type:'itp',ref:ref,itpTypeLabel:type,equip:document.getElementById('itpEquip').value.trim(),x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    var pin={id:nid(),type:'itp',ref:ref,
+      itps:selected,
+      itpTypeLabel:selected[0].itpTypeLabel, // backwards compat
+      equip:equip,
+      x:_pendingX,y:_pendingY,
+      createdBy:(u&&(u.name||u.username))||'',createdDate:today()
+    };
     curDrawing.pins.push(pin);
     responses[pin.id]={status:_itpStatus};
   }
@@ -989,7 +1115,13 @@ function renderPanel(){
     var stCls=PIN_STATUS_CLS[st]||'ns';
     var stLbl=PIN_STATUS_LBL[st]||st;
     var desc='';
-    if(p.type==='itp')desc=p.itpTypeLabel||(p.equip||'');
+    if(p.type==='itp'){
+      if(p.itps&&p.itps.length>1){
+        desc=p.equip?p.equip+' · ':''+(p.itps.length+' ITPs');
+      } else {
+        desc=(p.itps&&p.itps[0]?p.itps[0].itpTypeLabel:p.itpTypeLabel)||p.equip||'';
+      }
+    }
     else if(p.type==='defect'){var dr=defects.find(function(d){return d.pinId===p.id;});desc=dr?dr.desc:'';}
     else if(p.type==='fireseal')desc=p.service||'';
     else if(p.type==='firedamper')desc=p.tag||(p.size||'');

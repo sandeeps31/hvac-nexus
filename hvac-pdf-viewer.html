@@ -224,16 +224,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
   <div class="modal">
     <div class="modal-hdr"><h3 id="pinMoTitle">New ITP Pin</h3></div>
     <div class="modal-body">
-      <div>
-        <label class="ml">ITP TYPE *</label>
-        <select class="mi" id="pinItpType" onchange="onPinTypeInput()" style="cursor:pointer;height:38px;appearance:auto"></select>
-      </div>
       <div id="pinEquipField">
         <label class="ml" id="pinEquipLabel">Equipment ID</label>
         <div class="sugg-wrap">
           <input class="mi" id="pinEquipTag" placeholder="e.g. FCU-L02-001" oninput="showEquipSugg()" autocomplete="off">
           <div class="sugg-list" id="equipSugg"></div>
         </div>
+      </div>
+      <div>
+        <label class="ml">Select ITPs</label>
+        <div id="pinItpCheckList" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto"></div>
+        <div id="pinNoTemplates" style="display:none;font-size:12px;color:var(--muted);padding:8px 0">No ITP templates found.</div>
       </div>
       <div>
         <label class="ml">Status</label>
@@ -417,8 +418,11 @@ function renderPins(){
     // Show ITP ref number (last 4 digits) or equip initials as fallback
     var refNum=pin.ref?(pin.ref.replace(/^ITP-/,'')||pin.ref):'';
     var pinText=refNum||(pin.equip?(pin.equip.slice(0,4)):'ITP');
-    el.innerHTML='<div class="pin-dot '+dotCls+'"'+dotStyle+'>'+escH(pinText)+'</div>'
-      +'<div class="pin-label">'+(pin.equip?escH(pin.equip):'—')+(pin.itpTypeLabel?' · '+escH(pin.itpTypeLabel):'')+'</div>';
+    var itpCount=(pin.itps&&pin.itps.length>1)?pin.itps.length:0;
+    el.innerHTML='<div class="pin-dot '+dotCls+'"'+dotStyle+' style="position:relative">'+escH(pinText)
+      +(itpCount?'<span style="position:absolute;top:-6px;right:-6px;background:var(--purple);color:#fff;border-radius:50%;width:14px;height:14px;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:DM Mono,monospace;border:1.5px solid var(--bg)">'+itpCount+'</span>':'')
+      +'</div>'
+      +'<div class="pin-label">'+(pin.equip?escH(pin.equip):'—')+(pin.itps&&pin.itps.length?' · '+pin.itps.length+' ITP'+(pin.itps.length>1?'s':''):pin.itpTypeLabel?' · '+escH(pin.itpTypeLabel):'')+'</div>';
     el.addEventListener('click',function(e){e.stopPropagation();openItpDetail(pin);});
     (function(pid){el.addEventListener('contextmenu',function(e){
       e.preventDefault();e.stopPropagation();
@@ -492,31 +496,35 @@ function cancelPlaceMode(){
 // ── PIN MODAL ──
 function openNewPin(xPct,yPct){
   _editPinId=null;_pendingX=xPct;_pendingY=yPct;_pinStatus='not-started';
+  _pdfSelectedItps=new Set();
   document.getElementById('pinMoTitle').textContent='New ITP Pin';
-  document.getElementById('pinItpType').value='';
-  document.getElementById('pinItpType').removeAttribute('readonly');
   document.getElementById('pinEquipTag').value='';
   document.getElementById('pinRef').value='';
   document.getElementById('pinNotes').value='';
   document.getElementById('deletePinBtn').style.display='none';
   document.getElementById('pinEquipField').style.display='';
   setStatus('not-started');
-  populateTypeSelect('');
+  populatePinItpCheckList([]);
   document.getElementById('pinMo').classList.add('open');
-  setTimeout(function(){document.getElementById('pinItpType').focus();},80);
 }
 function openEditPin(pinId){
   var pin=(curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===pinId;});if(!pin)return;
   _editPinId=pinId;_pinStatus=getPinStatus(pin);
+  _pdfSelectedItps=new Set();
   document.getElementById('pinMoTitle').textContent='Edit ITP Pin';
-  document.getElementById('pinItpType').value=pin.itpTypeLabel||'';
   document.getElementById('pinEquipTag').value=pin.equip||'';
   document.getElementById('pinRef').value=pin.ref||'';
   document.getElementById('pinNotes').value=pin.notes||'';
   document.getElementById('deletePinBtn').style.display='';
-  onPinTypeInput();
   setStatus(_pinStatus);
-  populateTypeSelect(pin.itpTypeLabel||'');
+  // Pre-select existing ITPs
+  var selectedTypes=[];
+  if(pin.itps&&pin.itps.length){
+    pin.itps.forEach(function(i){if(i.itpNo)_pdfSelectedItps.add(i.itpNo);selectedTypes.push(i.itpTypeLabel||'');});
+  } else if(pin.itpTypeLabel){
+    selectedTypes.push(pin.itpTypeLabel);
+  }
+  populatePinItpCheckList(selectedTypes);
   document.getElementById('pinMo').classList.add('open');
 }
 function closePinMo(){document.getElementById('pinMo').classList.remove('open');_editPinId=null;}
@@ -531,13 +539,16 @@ function setStatus(st){
 }
 
 function savePin(){
-  var type=document.getElementById('pinItpType').value.trim();
-  if(!type){alert('Please enter an ITP type');return;}
+  // Collect selected ITPs
+  var selected=[];
+  document.querySelectorAll('#pinItpCheckList input[type=checkbox]:checked').forEach(function(cb){
+    selected.push({itpNo:cb.dataset.itpno,itpTypeLabel:cb.dataset.itptype,itpCategory:cb.dataset.itpcat});
+  });
+  if(!selected.length){alert('Please select at least one ITP');return;}
   var equip=document.getElementById('pinEquipTag').value.trim();
   var ref=document.getElementById('pinRef').value.trim();
   var notes=document.getElementById('pinNotes').value.trim();
   if(!ref){
-    // Auto-generate ITP-XXXX ref — find highest across ALL drawings in project
     var maxSeq=0;
     drawings.forEach(function(d){
       (d.pins||[]).forEach(function(p){
@@ -549,8 +560,11 @@ function savePin(){
   }
   if(_editPinId){
     var pin=(curDrawing.pins||[]).find(function(p){return p.id===_editPinId;});
-    if(pin){pin.itpTypeLabel=type;pin.equip=equip;pin.ref=ref;pin.notes=notes;pin.itpStatus=_pinStatus;}
-    // Update response status
+    if(pin){
+      pin.itps=selected;
+      pin.itpTypeLabel=selected[0].itpTypeLabel; // backwards compat
+      pin.equip=equip;pin.ref=ref;pin.notes=notes;pin.itpStatus=_pinStatus;
+    }
     if(!responses[_editPinId])responses[_editPinId]={rows:{},signoffs:{}};
     responses[_editPinId].status=_pinStatus;
     saveResponses();
@@ -558,10 +572,12 @@ function savePin(){
     var pinId=nid();
     if(!curDrawing.pins)curDrawing.pins=[];
     var u=dbGetCurrentUser();
-    curDrawing.pins.push({id:pinId,type:'itp',itpTypeLabel:type,equip:equip,ref:ref,notes:'',itpStatus:_pinStatus,x:_pendingX,y:_pendingY});
+    curDrawing.pins.push({id:pinId,type:'itp',
+      itps:selected,
+      itpTypeLabel:selected[0].itpTypeLabel, // backwards compat
+      equip:equip,ref:ref,notes:'',itpStatus:_pinStatus,x:_pendingX,y:_pendingY});
     responses[pinId]={status:_pinStatus,rows:{},signoffs:{},equipId:equip,raisedBy:u?(u.name||u.username||'Unknown'):'Unknown',raisedDate:new Date().toISOString().split('T')[0]};
     saveResponses();
-    // Update layer chips
     buildLayerChips();
   }
   saveDrawings();
@@ -604,13 +620,40 @@ function toggleShowDeleted(){
   if(chip){chip.style.color=_showDeleted?'var(--danger)':'var(--muted)';chip.style.borderColor=_showDeleted?'var(--danger)':'var(--border)';}
   renderPins();
 }
+var _pdfSelectedItps=new Set();
 function populateTypeSelect(selectedVal){
-  var sel=document.getElementById('pinItpType');
-  var types=getTemplateTypes();
-  sel.innerHTML='<option value="">— Select ITP Type —</option>'
-    +types.map(function(t){
-      return '<option value="'+escH(t.name)+'"'+(t.name===selectedVal?' selected':'')+'>'+escH(t.name)+(t.itpNo?' ('+escH(t.itpNo)+')':'')+'</option>';
-    }).join('');
+  // Legacy — now uses checklist
+  populatePinItpCheckList(selectedVal?[selectedVal]:[]);
+}
+function populatePinItpCheckList(selectedVals){
+  var list=document.getElementById('pinItpCheckList');
+  var noTpl=document.getElementById('pinNoTemplates');
+  if(!list)return;
+  if(!templates||!templates.length){list.innerHTML='';if(noTpl)noTpl.style.display='block';return;}
+  if(noTpl)noTpl.style.display='none';
+  var groups={'Installation':[],'Pre-Commissioning':[],'Commissioning':[],'Other':[]};
+  templates.forEach(function(t){
+    var cat=t.itpCategory||'Other';
+    if(!groups[cat])groups[cat]=[];
+    groups[cat].push(t);
+  });
+  var html='';
+  var CAT_COLORS={'Installation':'var(--accent)','Pre-Commissioning':'var(--warn)','Commissioning':'var(--green)'};
+  Object.keys(groups).forEach(function(cat){
+    if(!groups[cat].length)return;
+    var col=CAT_COLORS[cat]||'var(--muted)';
+    html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;overflow:hidden">'
+      +'<div style="padding:5px 10px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:'+col+';background:var(--surface3);border-bottom:1px solid var(--border)">'+cat+'</div>';
+    groups[cat].forEach(function(t){
+      var checked=_pdfSelectedItps.has(t.itpNo)||selectedVals.indexOf(t.itpType)>=0;
+      html+='<label style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .13s" onmouseover="this.style.background=\'var(--surface3)\'" onmouseout="this.style.background=\'\'">'
+        +'<input type="checkbox" '+(checked?'checked':'')+' data-itpno="'+escH(t.itpNo)+'" data-itptype="'+escH(t.itpType)+'" data-itpcat="'+escH(cat)+'" style="accent-color:var(--purple);width:14px;height:14px;cursor:pointer;flex-shrink:0">'
+        +'<span style="flex:1;font-size:12px;color:var(--text)">'+escH(t.itpType)+'</span>'
+        +'</label>';
+    });
+    html+='</div>';
+  });
+  list.innerHTML=html;
 }
 function showTypeSugg(){}
 function getTemplateTypes(){
@@ -868,13 +911,59 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 </div>
 
 <script>
+var _pdfActivePopup=null;
 function openItpDetail(pin){
-  document.getElementById('itpDetailTitle').textContent=(pin.itpTypeLabel||'ITP Form');
+  // Multi-ITP: show popup to choose which ITP to open
+  if(pin.itps&&pin.itps.length>1){
+    closePdfItpPopup();
+    var popup=document.createElement('div');
+    popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:600;min-width:220px;max-width:300px;overflow:hidden';
+    var CAT_COLORS={'Installation':'var(--accent)','Pre-Commissioning':'var(--warn)','Commissioning':'var(--green)'};
+    var html='<div style="padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-family:DM Mono,monospace;font-size:11px;color:var(--accent);font-weight:700">'
+      +escH(pin.equip||pin.ref)+' · '+pin.itps.length+' ITPs</div>';
+    pin.itps.forEach(function(itp){
+      var col=CAT_COLORS[itp.itpCategory]||'var(--muted)';
+      html+='<div onclick="openItpDetailSingle(\''+escH(pin.id)+'\',\''+escH(itp.itpNo||'')+'\');closePdfItpPopup()" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .13s" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+        +'<span style="width:8px;height:8px;border-radius:50%;background:'+col+';flex-shrink:0;display:inline-block"></span>'
+        +'<span style="flex:1;font-size:12px;color:var(--text)">'+escH(itp.itpTypeLabel)+'</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;color:'+col+'">'+escH(itp.itpCategory||'')+'</span>'
+        +'</div>';
+    });
+    html+='<div onclick="openEditPin(\''+pin.id+'\');closePdfItpPopup()" style="padding:7px 12px;cursor:pointer;text-align:center;font-size:11px;color:var(--muted)" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">✏ Edit Pin</div>';
+    popup.innerHTML=html;
+    // Position near pin element
+    var pinEl=document.querySelector('[data-pid="'+pin.id+'"]');
+    if(pinEl){
+      var r=pinEl.getBoundingClientRect();
+      popup.style.left=Math.min(r.right+8,window.innerWidth-310)+'px';
+      popup.style.top=Math.min(r.top,window.innerHeight-250)+'px';
+    } else {
+      popup.style.left='50%';popup.style.top='50%';popup.style.transform='translate(-50%,-50%)';
+    }
+    document.body.appendChild(popup);
+    _pdfActivePopup=popup;
+    setTimeout(function(){document.addEventListener('click',closePdfItpPopup,{once:true});},10);
+    return;
+  }
+  // Single ITP — open directly
+  var itpNo=(pin.itps&&pin.itps[0])?pin.itps[0].itpNo:'';
+  openItpDetailSingle(pin.id, itpNo);
+}
+function closePdfItpPopup(){
+  if(_pdfActivePopup){_pdfActivePopup.remove();_pdfActivePopup=null;}
+}
+function openItpDetailSingle(pinId, itpNo){
+  var pin=(curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===pinId;});
+  if(!pin)return;
+  var title=pin.itps&&pin.itps.length
+    ?(itpNo?((pin.itps.find(function(i){return i.itpNo===itpNo;})||{}).itpTypeLabel||'ITP Form'):'ITP Form')
+    :(pin.itpTypeLabel||'ITP Form');
+  document.getElementById('itpDetailTitle').textContent=title;
   document.getElementById('itpDetailSub').textContent=(pin.ref?'Ref: '+pin.ref:'')+(pin.equip?' · '+pin.equip:'');
   var base=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
-  document.getElementById('itpDetailFrame').src=base+'hvac-itp-form.html?drawingId='+encodeURIComponent(drawingId)+'&pinId='+encodeURIComponent(pin.id);
-  var mo=document.getElementById('itpDetailMo');
-  mo.style.display='flex';
+  var url=base+'hvac-itp-form.html?drawingId='+encodeURIComponent(drawingId)+'&pinId='+encodeURIComponent(pinId)+(itpNo?'&itpNo='+encodeURIComponent(itpNo):'');
+  document.getElementById('itpDetailFrame').src=url;
+  document.getElementById('itpDetailMo').style.display='flex';
 }
 function updatePinEquip(pinId, newEquip){
   // Called from itp-form iframe when equipment ID changes

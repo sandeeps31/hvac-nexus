@@ -59,6 +59,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .reg-tbl tbody tr:last-child td{border-bottom:none}
 .reg-tbl tbody tr:hover td{background:var(--surface2)}
 .itp-name{font-weight:600;color:var(--text)}
+.itp-cat-badge{font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:20px;border:1px solid;white-space:nowrap;margin-left:6px}
+.itp-cat-install{background:rgba(0,200,255,.1);color:var(--accent);border-color:rgba(0,200,255,.25)}
+.itp-cat-precx{background:rgba(255,184,48,.1);color:var(--warn);border-color:rgba(255,184,48,.25)}
+.itp-cat-cx{background:rgba(0,229,160,.1);color:var(--green);border-color:rgba(0,229,160,.25)}
 .itp-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent)}
 .itp-ver{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--muted)}
 .itp-ver.current{background:var(--green-dim);border-color:rgba(0,229,160,.2);color:var(--green)}
@@ -333,6 +337,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Ref No.</div><div class="itp-hdr-val mono" id="ed-itpno" style="color:var(--muted);font-style:italic;font-size:11px">Auto generated on creation</div></div>
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Form No.</div><div class="itp-hdr-val mono" id="ed-formno">—</div></div>
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">ITP Type</div><div class="itp-hdr-val" id="ed-itptype">—</div></div>
+        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Category</div><div class="itp-hdr-val" id="ed-itpcat">—</div></div>
       </div>
       <div class="itp-hdr-row cols3">
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Equipment ID</div><div class="itp-hdr-val mono" id="ed-equipid">—</div></div>
@@ -423,7 +428,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <p>Create a new company-level ITP template</p>
     </div>
     <div class="modal-body">
-      <label class="ml">ITP Type Name *</label>
+      <label class="ml">ITP Category *</label>
+      <select class="mi" id="new-itpcat" style="height:38px;appearance:auto;cursor:pointer">
+        <option value="">— Select Category —</option>
+        <option value="Installation">Installation</option>
+        <option value="Pre-Commissioning">Pre-Commissioning</option>
+        <option value="Commissioning">Commissioning</option>
+      </select>
+      <label class="ml" style="margin-top:10px">ITP Type Name *</label>
       <input class="mi" id="new-itptype" placeholder="e.g. FCU — Water Cooled"/>
       <label class="ml">Form No. (auto-generated if blank)</label>
       <input class="mi mono" id="new-itpno" placeholder="e.g. ITP-001"/>
@@ -622,6 +634,11 @@ var _cachedCS={};
 function nid(){return 'itp'+(++_uid)+Date.now();}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function todayStr(){return new Date().toISOString().split('T')[0];}
+function itpCatBadge(cat){
+  if(!cat)return '';
+  var cls=cat==='Installation'?'itp-cat-install':cat==='Pre-Commissioning'?'itp-cat-precx':'itp-cat-cx';
+  return '<span class="itp-cat-badge '+cls+'">'+cat+'</span>';
+}
 function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
 
 // ── STORAGE ──
@@ -772,7 +789,7 @@ function renderRegister(){
     var importedBadge=itp.importedFrom?'<span class="imported-badge">imported</span>':'';
     rows+='<tr style="cursor:pointer" onclick="viewItp(\''+itp.id+'\')">'
       +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
-      +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+importedBadge+'</td>'
+      +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+itpCatBadge(itp.itpCategory)+importedBadge+'</td>'
       +'<td><span class="itp-ver current">v'+pubRev.version+'</span></td>'
       +'<td><span class="status-badge sb-current">Current</span></td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(itp.createdDate)+'</td>'
@@ -806,6 +823,7 @@ function renderEditor(){
   var setEl=function(id,v){var el=document.getElementById(id);if(el)el.textContent=v;};
   setEl('ed-formno',itp.itpNo||'—');
   setEl('ed-itptype',itp.itpType||'—');
+  setEl('ed-itpcat',itp.itpCategory||'—');
   setEl('ed-creator',itp.createdBy||'—');
   setEl('ed-created',fmtDate(itp.createdDate));
   setEl('ed-modified',fmtDate(rev.modifiedDate));
@@ -1410,7 +1428,13 @@ function deleteItp(itpId){
 }
 
 // ── NEW ITP MODAL ──
-function openNewItpModal(){document.getElementById('newItpModal').classList.add('open');}
+function openNewItpModal(){
+  document.getElementById('new-itpcat').value='';
+  document.getElementById('new-itptype').value='';
+  document.getElementById('new-itpno').value='';
+  document.getElementById('newItpModal').classList.add('open');
+  setTimeout(function(){document.getElementById('new-itptype').focus();},100);
+}
 function closeNewItpModal(){document.getElementById('newItpModal').classList.remove('open');}
 function confirmNewItp(){
   var type=(document.getElementById('new-itptype').value||'').trim();
@@ -1418,8 +1442,10 @@ function confirmNewItp(){
   var num=(document.getElementById('new-itpno').value||'').trim()||genItpNum();
   var me='Sandeep';
   try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
+  var cat=(document.getElementById('new-itpcat').value||'').trim();
+  if(!cat){alert('ITP Category is required.');return;}
   var tmpl={
-    id:nid(),itpNo:num,itpType:type,
+    id:nid(),itpNo:num,itpType:type,itpCategory:cat,
     createdBy:me,createdDate:todayStr(),
     revisions:[{version:1,status:'current',sections:[],modifiedDate:todayStr(),modifiedBy:me,note:'Initial',lastUsed:''}]
   };
