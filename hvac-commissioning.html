@@ -510,6 +510,7 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
 })();
 </script>
 </head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <body>
 
 
@@ -592,6 +593,7 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
           <button class="btn btn-ghost btn-sm" onclick="addTrackerRow()">＋ Add Equipment</button>
           <button class="btn btn-ghost btn-sm" onclick="openColSettings()">⚙ Columns</button>
           <button class="btn btn-green btn-sm">⬇ Export</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="openRemoveTypeModal()">🗑 Remove Equipment Type</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="if(confirm('Clear all commissionable items? This cannot be undone.')){trackerItems=[];saveTracker();renderTracker();}">🗑 Clear All</button>
         </div>
       </div>
@@ -1456,6 +1458,33 @@ function renderDefects(){
     </div>
   </div>`).join('');
 }
+function openRemoveTypeModal(){
+  // Build unique types from trackerItems
+  var typeCounts={};
+  trackerItems.forEach(function(i){
+    var t=i.type||'Unknown';
+    typeCounts[t]=(typeCounts[t]||0)+1;
+  });
+  var types=Object.keys(typeCounts);
+  if(!types.length){showTrackerToast('No items in the list.');return;}
+  var html=types.map(function(type){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">'
+      +'<div><div style="font-weight:600;color:var(--text);font-size:13px">'+type+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace;margin-top:2px">'+typeCounts[type]+' item'+(typeCounts[type]!==1?'s':'')+'</div></div>'
+      +'<button onclick="removeTypeFromTracker(\''+type.replace(/'/g,"\\'")+'\')" style="background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);color:var(--danger);border-radius:6px;font-size:12px;padding:5px 12px;cursor:pointer;font-family:DM Sans,sans-serif">Remove</button>'
+      +'</div>';
+  }).join('');
+  document.getElementById('removeTypeList').innerHTML=html;
+  document.getElementById('removeTypeModal').classList.add('open');
+}
+function closeRemoveTypeModal(){document.getElementById('removeTypeModal').classList.remove('open');}
+function removeTypeFromTracker(type){
+  if(!confirm('Remove all '+type+' items from the commissionable list?'))return;
+  trackerItems=trackerItems.filter(function(i){return i.type!==type;});
+  saveTracker();renderTracker();
+  closeRemoveTypeModal();
+  showTrackerToast('✓ '+type+' items removed');
+}
 function clearCxFilters(){
   cxColFilters={};
   cxSortK='';cxSortD=1;
@@ -1495,44 +1524,139 @@ function closeEqPanel(){
   document.getElementById('eqPanelOverlay').classList.remove('open');
 }
 
+// ── RENDER EQUIPMENT DETAIL PANEL ──
 function renderEqPanel(idx){
-  var t = trackerItems[idx];
-  if(!t) return;
-  var d = _epDocs[t.tag] || {testSheets:[], supportDocs:[], notes:''};
-  var WF_STEPS = [
-    {k:'precx',l:'Pre-Cx'},
-    {k:'mssbPowered',l:'MSSB\nPowered'},
-    {k:'airflowVerif',l:'Airflow\nVerif'},
-    {k:'localFuncCx',l:'Local\nFx Cx'},
-    {k:'itcSubmitted',l:'ITC\nSubmit'},
-    {k:'intBmsCx',l:'BMS\nInteg'},
+  var t=trackerItems[idx];
+  if(!t)return;
+  var d=_epDocs[t.tag]||{airBalance:{na:false,revisions:[]},waterBalance:{na:false,revisions:[]},witnessSheet:{result:'',file:null},supportDocs:[],notes:''};
+  if(!d.airBalance)d.airBalance={na:false,revisions:[]};
+  if(!d.waterBalance)d.waterBalance={na:false,revisions:[]};
+  if(!d.witnessSheet)d.witnessSheet={result:'',file:null};
+
+  var WF_STEPS=[
+    {k:'precx',l:'Pre-Cx'},{k:'mssbPowered',l:'MSSB Pwr'},
+    {k:'airflowVerif',l:'Airflow'},{k:'localFuncCx',l:'Local Cx'},
+    {k:'itcSubmitted',l:'ITC'},{k:'intBmsCx',l:'BMS'},
     {k:'witnessed',l:'Witnessed'}
   ];
   var STATUS_LABELS2={'not-ready':'Not Ready','airflow-check':'Ready for Airflow','local-cx':'Ready for Local Cx','itc-submit':'Ready for ITC','itc-submitted':'ITC Submitted','cx-complete':'Cx Complete'};
-  var STATUS_COLORS2={'not-ready':'var(--danger)','airflow-check':'var(--warn)','local-cx':'var(--warn)','itc-submit':'var(--accent)','itc-submitted':'var(--accent)','cx-complete':'var(--green)'};
-  var autoStatus = calcAutoStatus(t, t.mssbPowered||'', t.precxManual||'');
+  var STATUS_COLORS2={'not-ready':'#ff4d6d','airflow-check':'#ffb830','local-cx':'#ffb830','itc-submit':'#00c8ff','itc-submitted':'#00c8ff','cx-complete':'#00e5a0'};
+  var autoStatus=calcAutoStatus(t,t.mssbPowered||'',t.precxManual||'');
+  var stColor=STATUS_COLORS2[autoStatus]||'#888';
 
-  function stepState(k){
-    if(k==='precx') return t.precxManual==='Yes'?'done':t.precxManual==='No'?'blocked':'pending';
-    var v=(t[k]||'').toUpperCase();
-    return v==='YES'||v==='N/A'?'done':v==='NO'?'blocked':'pending';
+  function stepDone(k){
+    if(k==='precx')return t.precxManual==='Yes';
+    var v=(t[k]||'').toUpperCase();return v==='YES'||v==='N/A';
   }
+  function stepBlocked(k){
+    if(k==='precx')return t.precxManual==='No';
+    return (t[k]||'').toUpperCase()==='NO';
+  }
+  var doneCount=WF_STEPS.filter(function(s){return stepDone(s.k);}).length;
+  var pct=Math.round(doneCount/WF_STEPS.length*100);
 
-  var wfHtml='<div class="eq-workflow">';
+  var wfHtml='<div style="display:flex;align-items:flex-start;gap:0;margin-top:8px;overflow-x:auto;padding-bottom:4px">';
   WF_STEPS.forEach(function(s,i){
-    var state=stepState(s.k);
-    var isDone=state==='done', isBlocked=state==='blocked';
-    var icon=isDone?'✓':isBlocked?'✕':(i+1);
-    if(i>0) wfHtml+='<div class="eq-wf-line'+(isDone?' done':'')+'"></div>';
-    wfHtml+='<div class="eq-wf-step">'
-      +'<div class="eq-wf-dot'+(isDone?' done':isBlocked?' blocked':'')+'">'+icon+'</div>'
-      +'<div class="eq-wf-lbl">'+s.l+'</div></div>';
+    var done=stepDone(s.k),blocked=stepBlocked(s.k);
+    var dotBg=done?'var(--green)':blocked?'var(--danger)':'var(--surface3)';
+    var dotColor=done?'#080c12':blocked?'#fff':'var(--muted)';
+    var dotBorder=done?'var(--green)':blocked?'var(--danger)':'var(--border)';
+    var icon=done?'&#10003;':blocked?'&#10007;':(i+1);
+    if(i>0)wfHtml+='<div style="flex:1;height:2px;background:'+(done?'var(--green)':'var(--border)')+';align-self:center;margin-top:-16px;min-width:8px"></div>';
+    wfHtml+='<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:52px">'
+      +'<div style="width:26px;height:26px;border-radius:50%;border:2px solid '+dotBorder+';background:'+dotBg+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:'+dotColor+'">'+icon+'</div>'
+      +'<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--muted);text-align:center;line-height:1.2">'+s.l+'</div>'
+      +'</div>';
   });
   wfHtml+='</div>';
 
+  function balanceCardHtml(type,label,data){
+    var isNA=data.na;
+    var revs=data.revisions||[];
+    var current=revs.length?revs[revs.length-1]:null;
+    var prevRevs=revs.slice(0,-1).reverse();
+    var naToggle='<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);cursor:pointer;user-select:none">'
+      +'<input type="checkbox" '+(isNA?'checked':'')+' onchange="toggleEpNA(''+t.tag+'',''+type+'')" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">'
+      +'<span>N/A</span></label>';
+    var html='<div class="eq-section">'
+      +'<div class="eq-section-title" style="display:flex;align-items:center;justify-content:space-between">'+label+' '+naToggle+'</div>';
+    if(!isNA){
+      if(current){
+        var resColor=current.result==='Pass'?'var(--green)':current.result==='Fail'?'var(--danger)':'var(--muted)';
+        html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;overflow:hidden;margin-bottom:8px">'
+          +'<div style="display:flex;align-items:center;gap:8px;padding:8px 10px">'
+          +'<span style="font-size:14px">&#128196;</span>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH2(current.name)+'</div>'
+          +'<div style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace;margin-top:1px">Rev '+current.rev+' · '+current.date+'</div></div>'
+          +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:2px 7px;border-radius:20px;background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2);flex-shrink:0">Current</span>'
+          +'<button onclick="cycleEpResult(''+t.tag+'',''+type+'')" style="font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:20px;border:1px solid rgba(255,255,255,.15);background:transparent;color:'+resColor+';cursor:pointer;flex-shrink:0">'+(current.result||'Result')+'</button>'
+          +'<button onclick="downloadEpFile(''+t.tag+'',''+type+'','+(revs.length-1)+')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px;flex-shrink:0" title="Download">&#8595;</button>'
+          +'<button onclick="viewEpBalFile(''+t.tag+'',''+type+'','+(revs.length-1)+')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px;flex-shrink:0">View</button>'
+          +'</div>';
+        if(prevRevs.length){
+          html+='<div style="border-top:1px solid var(--border)">'
+            +'<div onclick="toggleRevHistory(this)" style="padding:5px 10px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;background:var(--surface3)">&#9656; Previous revisions ('+prevRevs.length+')</div>'
+            +'<div style="display:none">'
+            +prevRevs.map(function(rev,ri){
+              return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid var(--border);opacity:.75">'
+                +'<span style="font-size:12px">&#128196;</span>'
+                +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH2(rev.name)+'</div>'
+                +'<div style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace">Rev '+rev.rev+' · '+rev.date+'</div></div>'
+                +(rev.result?'<span style="font-family:DM Mono,monospace;font-size:9px;color:'+(rev.result==='Pass'?'var(--green)':'var(--danger)')+'">'+rev.result+'</span>':'')
+                +'<button onclick="downloadEpFile(''+t.tag+'',''+type+'','+(prevRevs.length-1-ri)+')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px" title="Download">&#8595;</button>'
+                +'</div>';
+            }).join('')
+            +'</div></div>';
+        }
+        html+='</div>';
+        html+='<button onclick="openEpSupersede(''+t.tag+'',''+type+'')" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:12px;color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif;transition:all .13s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">&#8593; Supersede with New Revision</button>';
+      } else {
+        html+='<div class="eq-drop-zone" ondragover="this.classList.add('over');event.preventDefault()" ondragleave="this.classList.remove('over')" ondrop="handleEpBalDrop(event,''+t.tag+'',''+type+'')" onclick="document.getElementById('ep'+type+'Input').click()">'
+          +'<div style="font-size:20px;margin-bottom:4px">&#128206;</div>'
+          +'<div style="font-size:12px;color:var(--text2)">Drop '+label+' here or click to browse</div>'
+          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">PDF accepted</div>'
+          +'</div>'
+          +'<input type="file" id="ep'+type+'Input" accept=".pdf" style="display:none" onchange="handleEpBalSelect(event,''+t.tag+'',''+type+'')">';
+      }
+    }
+    html+='</div>';
+    return html;
+  }
+
+  var ws=d.witnessSheet||{};
+  var witnessHtml='';
+  if(ws.file){
+    var wsResColor=ws.result==='Pass'?'var(--green)':ws.result==='Fail'?'var(--danger)':'var(--muted)';
+    witnessHtml='<div class="eq-section">'
+      +'<div class="eq-section-title">Witness Test Sheet</div>'
+      +'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;overflow:hidden;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;gap:8px;padding:8px 10px">'
+      +'<span style="font-size:14px">&#128196;</span>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH2(ws.file.name)+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace;margin-top:1px">'+ws.file.date+'</div></div>'
+      +'<button onclick="cycleWitnessResult(''+t.tag+'')" style="font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:20px;border:1px solid rgba(255,255,255,.15);background:transparent;color:'+wsResColor+';cursor:pointer;flex-shrink:0">'+(ws.result||'Result')+'</button>'
+      +'<button onclick="downloadWitnessFile(''+t.tag+'')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px;flex-shrink:0" title="Download">&#8595;</button>'
+      +'<button onclick="viewWitnessFile(''+t.tag+'')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px;flex-shrink:0">View</button>'
+      +'<button onclick="removeWitnessFile(''+t.tag+'')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 4px" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'">&#10005;</button>'
+      +'</div></div>'
+      +'<button onclick="openEpSupersede(''+t.tag+'','witnessSheet')" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:12px;color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">&#8593; Replace Witness Sheet</button>'
+      +'</div>';
+  } else {
+    witnessHtml='<div class="eq-section">'
+      +'<div class="eq-section-title" style="display:flex;align-items:center;justify-content:space-between">Witness Test Sheet'
+      +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:20px;background:var(--surface3);color:var(--muted);border:1px solid var(--border)">Placeholder</span></div>'
+      +'<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Upload witness test sheet once available.</div>'
+      +'<div class="eq-drop-zone" ondragover="this.classList.add('over');event.preventDefault()" ondragleave="this.classList.remove('over')" ondrop="handleWitnessDrop(event,''+t.tag+'')" onclick="document.getElementById('epWitnessInput').click()">'
+      +'<div style="font-size:20px;margin-bottom:4px">&#128206;</div>'
+      +'<div style="font-size:12px;color:var(--text2)">Drop witness test sheet or click to browse</div>'
+      +'</div>'
+      +'<input type="file" id="epWitnessInput" accept=".pdf" style="display:none" onchange="handleWitnessSelect(event,''+t.tag+'')">'
+      +'</div>';
+  }
+
   var tagDefects=defects.filter(function(d2){return d2.tag===t.tag;});
   var defectsHtml=tagDefects.length
-    ? tagDefects.map(function(d2){
+    ?tagDefects.map(function(d2){
         return '<div class="eq-defect-item">'
           +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--accent);flex-shrink:0">'+d2.num+'</span>'
           +'<div style="flex:1"><div style="font-size:12px;color:var(--text)">'+escH2(d2.desc)+'</div>'
@@ -1540,210 +1664,231 @@ function renderEqPanel(idx){
           +'<span style="font-family:DM Mono,monospace;font-size:10px;padding:2px 8px;border-radius:20px;'+(d2.status==='closed'?'background:var(--green-dim);color:var(--green)':'background:var(--danger-dim);color:var(--danger)')+'">'+d2.status+'</span>'
           +'</div>';
       }).join('')
-    : '<div style="font-size:12px;color:var(--muted);padding:4px 0">No defects for this equipment</div>';
+    :'<div style="font-size:12px;color:var(--muted);padding:4px 0">No defects for this equipment</div>';
 
-  function testSheetListHtml(sheets){
-    if(!sheets||!sheets.length) return '';
-    return sheets.map(function(sheet,si){
-      var revs = sheet.revisions||[];
-      var current = revs[revs.length-1];
-      var prevRevs = revs.slice(0,-1).reverse();
-      var resultColor = current.result==='Pass'?'var(--green)':current.result==='Fail'?'var(--danger)':'var(--muted)';
-      var html = '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:8px;overflow:hidden">'
-        // Current version row
-        +'<div style="display:flex;align-items:center;gap:8px;padding:8px 10px">'
-        +'<span style="font-size:14px">📄</span>'
-        +'<div style="flex:1;min-width:0">'
-        +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH2(sheet.name)+'</div>'
-        +'<div style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace;margin-top:1px">'+current.date+' · '+current.size+'</div>'
-        +'</div>'
-        +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:2px 7px;border-radius:20px;background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2);flex-shrink:0">Current</span>'
-        // Pass/Fail toggle
-        +'<button onclick="cycleTestResult(\''+t.tag+'\','+si+')" style="font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:20px;border:1px solid rgba(255,255,255,.1);background:transparent;color:'+resultColor+';cursor:pointer;flex-shrink:0">'+(current.result||'Result')+'</button>'
-        +'<button onclick="viewEpFile(\''+t.tag+'\',\'testSheets\','+si+',\'current\')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px;flex-shrink:0">View</button>'
-        +'<button onclick="removeEpFile(\''+t.tag+'\',\'testSheets\','+si+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 4px;flex-shrink:0" onmouseover="this.style.color=\'var(--danger)\'" onmouseout="this.style.color=\'var(--muted)\'">✕</button>'
-        +'</div>';
-      // Previous revisions
-      if(prevRevs.length){
-        html+='<div style="border-top:1px solid var(--border)">'
-          +'<div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'" style="padding:5px 10px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;background:var(--surface3)">▸ Show previous versions ('+prevRevs.length+')</div>'
-          +'<div style="display:none">'
-          +prevRevs.map(function(rev,ri){
-            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid var(--border);opacity:.7">'
-              +'<span style="font-size:12px">📄</span>'
-              +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--text2)">'+escH2(sheet.name)+'</div>'
-              +'<div style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace">'+rev.date+' · '+rev.size+'</div></div>'
-              +(rev.result?'<span style="font-family:DM Mono,monospace;font-size:9px;color:'+(rev.result==='Pass'?'var(--green)':'var(--danger)')+'">'+rev.result+'</span>':'')
-              +'<button onclick="viewEpFileRev(\''+t.tag+'\','+si+','+(prevRevs.length-1-ri)+')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px">View</button>'
-              +'</div>';
-          }).join('')
-          +'</div></div>';
-      }
-      html+='</div>';
-      return html;
-    }).join('');
-  }
-
-  function fileListHtml(files, type){
-    return (files||[]).map(function(f,fi){
-      return '<div class="eq-file-item">'
-        +'<span style="font-size:16px">📄</span>'
-        +'<div style="flex:1;min-width:0"><div class="eq-file-name">'+escH2(f.name)+'</div>'
-        +'<div class="eq-file-size">'+f.size+'</div></div>'
-        +'<button onclick="viewEpFile(\''+t.tag+'\',\''+type+'\','+fi+',\'flat\')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px">View</button>'
-        +'<button onclick="removeEpFile(\''+t.tag+'\',\''+type+'\','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px" onmouseover="this.style.color=\'var(--danger)\'" onmouseout="this.style.color=\'var(--muted)\'">✕</button>'
-        +'</div>';
-    }).join('');
-  }
-
-  document.getElementById('eqPanelBody').innerHTML =
-    '<div class="eq-section">'
+  var idx=trackerItems.indexOf(t);
+  document.getElementById('eqPanelBody').innerHTML=
+    '<div style="padding:12px 20px;border-bottom:1px solid var(--border);background:var(--surface2)">'
+    +'<button onclick="exportEqPanelPdf(''+t.tag+'')" style="width:100%;background:var(--accent);border:none;border-radius:7px;padding:9px;font-size:13px;font-weight:700;color:#080c12;cursor:pointer;font-family:Syne,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px">&#8595; Export PDF Report</button>'
+    +'</div>'
+    +'<div class="eq-section">'
     +'<div class="eq-section-title">Equipment Details</div>'
     +'<div class="eq-meta-grid">'
     +'<div class="eq-meta-item"><div class="eq-meta-lbl">Equipment ID</div><div class="eq-meta-val" style="font-family:DM Mono,monospace;color:var(--accent)">'+escH2(t.tag)+'</div></div>'
     +'<div class="eq-meta-item"><div class="eq-meta-lbl">Type</div><div class="eq-meta-val">'+escH2(t.type||'—')+'</div></div>'
     +'<div class="eq-meta-item"><div class="eq-meta-lbl">Location</div><div class="eq-meta-val">'+escH2(t.location||'—')+'</div></div>'
     +'<div class="eq-meta-item"><div class="eq-meta-lbl">Sub-Location</div><div class="eq-meta-val">'+escH2(t.subloc||'—')+'</div></div>'
-    +'<div class="eq-meta-item" style="grid-column:1/-1"><div class="eq-meta-lbl">Name</div><div class="eq-meta-val">'+escH2(t.name||'—')+'</div></div>'
     +'</div></div>'
-
     +'<div class="eq-section">'
-    +'<div class="eq-section-title">Cx Status</div>'
-    +'<div style="margin-bottom:12px"><span style="display:inline-block;padding:4px 12px;border-radius:20px;font-family:DM Mono,monospace;font-size:11px;font-weight:700;background:var(--surface3);color:'+(STATUS_COLORS2[autoStatus]||'var(--muted)')+';border:1px solid '+(STATUS_COLORS2[autoStatus]||'var(--muted)')+'44">'+(STATUS_LABELS2[autoStatus]||autoStatus)+'</span></div>'
+    +'<div class="eq-section-title">Commissioning Status</div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    +'<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-family:DM Mono,monospace;font-size:11px;font-weight:700;background:var(--surface3);color:'+stColor+';border:1px solid '+stColor+'44">'+(STATUS_LABELS2[autoStatus]||autoStatus)+'</span>'
+    +'<span style="font-family:DM Mono,monospace;font-size:13px;font-weight:700;color:'+stColor+'">'+pct+'%</span>'
+    +'</div>'
+    +'<div style="height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-bottom:10px">'
+    +'<div style="height:100%;width:'+pct+'%;background:'+stColor+';border-radius:3px;transition:width .4s ease"></div></div>'
     +wfHtml+'</div>'
-
+    +balanceCardHtml('airBalance','Air Balance Test Sheet',d.airBalance)
+    +balanceCardHtml('waterBalance','Water Balance Test Sheet',d.waterBalance)
+    +witnessHtml
     +'<div class="eq-section">'
-    +'<div class="eq-section-title">Pre-Cx Completion</div>'
-    +'<div style="display:flex;align-items:center;gap:12px">'
-    +'<div style="flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+(t.precxManual==='Yes'?100:0)+'%;background:var(--green);border-radius:4px;transition:width .3s"></div></div>'
-    +'<span style="font-family:DM Mono,monospace;font-size:13px;font-weight:700;color:'+(t.precxManual==='Yes'?'var(--green)':'var(--muted)')+'">'+(t.precxManual==='Yes'?'100%':t.precxManual==='No'?'0%':'—')+'</span>'
-    +'</div>'
-    +'<div style="margin-top:6px;font-size:11px;color:var(--muted)">Override: '+(t.precxManual||'None')+'</div>'
-    +'</div>'
-
-    +'<div class="eq-section">'
-    +'<div class="eq-section-title">Cx Test Sheets</div>'
-    +'<div id="epTestSheetList">'+testSheetListHtml(d.testSheets)+'</div>'
-    +'<div class="eq-drop-zone" ondragover="this.classList.add(\'over\');event.preventDefault()" ondragleave="this.classList.remove(\'over\')" ondrop="handleEpDrop(event,\''+t.tag+'\',\'testSheets\')" onclick="document.getElementById(\'epTSInput\').click()">'
-    +'<div style="font-size:20px;margin-bottom:4px">📎</div>'
-    +'<div style="font-size:12px;color:var(--text2)">Drop Cx test sheets here or click to browse</div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">PDF accepted</div>'
-    +'</div>'
-    +'<input type="file" id="epTSInput" accept=".pdf" multiple style="display:none" onchange="handleEpFileSelect(event,\''+t.tag+'\',\'testSheets\')">'
-    +'</div>'
-
-    +'<div class="eq-section">'
-    +'<div class="eq-section-title">Supporting Documents</div>'
-    +'<div id="epSupportDocList">'+fileListHtml(d.supportDocs,'supportDocs')+'</div>'
-    +'<div class="eq-drop-zone" ondragover="this.classList.add(\'over\');event.preventDefault()" ondragleave="this.classList.remove(\'over\')" ondrop="handleEpDrop(event,\''+t.tag+'\',\'supportDocs\')" onclick="document.getElementById(\'epSDInput\').click()">'
-    +'<div style="font-size:20px;margin-bottom:4px">📎</div>'
-    +'<div style="font-size:12px;color:var(--text2)">Drop supporting docs here or click to browse</div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">PDF, Word, Excel accepted</div>'
-    +'</div>'
-    +'<input type="file" id="epSDInput" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple style="display:none" onchange="handleEpFileSelect(event,\''+t.tag+'\',\'supportDocs\')">'
-    +'</div>'
-
-    +'<div class="eq-section">'
-    +'<div class="eq-section-title" style="display:flex;align-items:center;justify-content:space-between">Defects <button onclick="openAddDefectFromTracker('+idx+')" style="background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);color:var(--danger);border-radius:20px;font-size:10px;font-family:DM Mono,monospace;padding:2px 10px;cursor:pointer">+ Add</button></div>'
+    +'<div class="eq-section-title" style="display:flex;align-items:center;justify-content:space-between">Defects '
+    +'<button onclick="openAddDefectFromTracker('+idx+')" style="background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);color:var(--danger);border-radius:20px;font-size:10px;font-family:DM Mono,monospace;padding:2px 10px;cursor:pointer">+ Add</button></div>'
     +defectsHtml+'</div>'
-
     +'<div class="eq-section">'
     +'<div class="eq-section-title">Notes</div>'
-    +'<textarea id="epNotes" rows="4" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;outline:none;resize:vertical;box-sizing:border-box" placeholder="Add notes…" onblur="saveEpNotes(\''+t.tag+'\')">'+(d.notes||'')+'</textarea>'
-    +'</div>';
+    +'<textarea id="epNotes" rows="4" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;outline:none;resize:vertical;box-sizing:border-box" placeholder="Add notes..." onblur="saveEpNotes(''+t.tag+'')">'+(d.notes||'')+'</textarea>'
+    +'</div>'
+    +'<input type="file" id="epSupersedeInput" accept=".pdf" style="display:none" onchange="handleEpSupersedeFile(event)">';
 }
 
+function toggleEpNA(tag,type){
+  if(!_epDocs[tag])_epDocs[tag]={airBalance:{na:false,revisions:[]},waterBalance:{na:false,revisions:[]},witnessSheet:{result:'',file:null},notes:''};
+  _epDocs[tag][type].na=!_epDocs[tag][type].na;
+  saveEpDocs(tag);renderEqPanel(_epIdx);
+}
+function toggleRevHistory(btn){
+  var next=btn.nextElementSibling;if(!next)return;
+  var open=next.style.display!=='none';
+  next.style.display=open?'none':'block';
+  btn.textContent=(open?'▶':'▼')+btn.textContent.slice(1);
+}
+function cycleEpResult(tag,type){
+  var d=_epDocs[tag];if(!d||!d[type]||!d[type].revisions.length)return;
+  var cur=d[type].revisions[d[type].revisions.length-1];
+  cur.result=cur.result==='Pass'?'Fail':cur.result==='Fail'?'Pass':'Pass';
+  saveEpDocs(tag);renderEqPanel(_epIdx);
+}
+function cycleWitnessResult(tag){
+  var d=_epDocs[tag];if(!d||!d.witnessSheet||!d.witnessSheet.file)return;
+  var ws=d.witnessSheet;
+  ws.result=ws.result==='Pass'?'Fail':ws.result==='Fail'?'Pass':'Pass';
+  saveEpDocs(tag);renderEqPanel(_epIdx);
+}
+var _epSupersedeTag='',_epSupersedeType='';
+function openEpSupersede(tag,type){
+  _epSupersedeTag=tag;_epSupersedeType=type;
+  document.getElementById('epSupersedeInput').click();
+}
+function handleEpSupersedeFile(e){
+  var f=e.target.files[0];if(!f)return;
+  var tag=_epSupersedeTag,type=_epSupersedeType;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    if(!_epDocs[tag])_epDocs[tag]={airBalance:{na:false,revisions:[]},waterBalance:{na:false,revisions:[]},witnessSheet:{result:'',file:null},notes:''};
+    var today=new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+    if(type==='witnessSheet'){
+      _epDocs[tag].witnessSheet={result:'',file:{name:f.name,size:fmtFileSize(f.size),date:today,data:ev.target.result}};
+    } else {
+      var revs=_epDocs[tag][type].revisions;
+      var revNum=String(revs.length+1).padStart(2,'0');
+      revs.push({name:f.name,size:fmtFileSize(f.size),date:today,rev:revNum,result:'',data:ev.target.result});
+    }
+    saveEpDocs(tag);renderEqPanel(_epIdx);
+  };
+  reader.readAsDataURL(f);
+  e.target.value='';
+}
+function handleEpBalDrop(e,tag,type){
+  e.preventDefault();e.currentTarget.classList.remove('over');
+  var f=e.dataTransfer.files[0];if(!f)return;
+  addEpBalFile(tag,type,f);
+}
+function handleEpBalSelect(e,tag,type){
+  var f=e.target.files[0];if(!f)return;
+  addEpBalFile(tag,type,f);e.target.value='';
+}
+function addEpBalFile(tag,type,f){
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    if(!_epDocs[tag])_epDocs[tag]={airBalance:{na:false,revisions:[]},waterBalance:{na:false,revisions:[]},witnessSheet:{result:'',file:null},notes:''};
+    var today=new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+    _epDocs[tag][type].revisions.push({name:f.name,size:fmtFileSize(f.size),date:today,rev:'01',result:'',data:ev.target.result});
+    saveEpDocs(tag);renderEqPanel(_epIdx);
+  };
+  reader.readAsDataURL(f);
+}
+function handleWitnessDrop(e,tag){
+  e.preventDefault();e.currentTarget.classList.remove('over');
+  var f=e.dataTransfer.files[0];if(!f)return;
+  _epSupersedeTag=tag;_epSupersedeType='witnessSheet';
+  handleEpSupersedeFile({target:{files:[f]}});
+}
+function handleWitnessSelect(e,tag){
+  var f=e.target.files[0];if(!f)return;
+  _epSupersedeTag=tag;_epSupersedeType='witnessSheet';
+  handleEpSupersedeFile({target:{files:[f]}});
+  e.target.value='';
+}
+function viewEpBalFile(tag,type,ri){
+  var d=_epDocs[tag];if(!d||!d[type])return;
+  var rev=d[type].revisions[ri];if(!rev||!rev.data)return;
+  var w=window.open('','_blank');
+  w.document.write('<iframe src="'+rev.data+'" style="width:100%;height:100%;border:none;margin:0;padding:0"></iframe>');
+}
+function downloadEpFile(tag,type,ri){
+  var d=_epDocs[tag];if(!d||!d[type])return;
+  var rev=d[type].revisions[ri];if(!rev||!rev.data)return;
+  var a=document.createElement('a');a.href=rev.data;a.download=rev.name;a.click();
+}
+function viewWitnessFile(tag){
+  var f=(_epDocs[tag]||{}).witnessSheet&&_epDocs[tag].witnessSheet.file;
+  if(!f||!f.data)return;
+  var w=window.open('','_blank');
+  w.document.write('<iframe src="'+f.data+'" style="width:100%;height:100%;border:none;margin:0;padding:0"></iframe>');
+}
+function downloadWitnessFile(tag){
+  var f=(_epDocs[tag]||{}).witnessSheet&&_epDocs[tag].witnessSheet.file;
+  if(!f||!f.data)return;
+  var a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();
+}
+function removeWitnessFile(tag){
+  if(!confirm('Remove witness test sheet?'))return;
+  if(_epDocs[tag])_epDocs[tag].witnessSheet={result:'',file:null};
+  saveEpDocs(tag);renderEqPanel(_epIdx);
+}
 function saveEpNotes(tag){
   var ta=document.getElementById('epNotes');if(!ta)return;
-  if(!_epDocs[tag])_epDocs[tag]={testSheets:[],supportDocs:[],notes:''};
+  if(!_epDocs[tag])_epDocs[tag]={airBalance:{na:false,revisions:[]},waterBalance:{na:false,revisions:[]},witnessSheet:{result:'',file:null},notes:''};
   _epDocs[tag].notes=ta.value;
-  var idx=trackerItems.findIndex(function(t){return t.tag===tag;});
-  if(idx>=0){trackerItems[idx].notes=ta.value;saveTracker();}
+  saveEpDocs(tag);
 }
-
-function handleEpDrop(e,tag,type){
-  e.preventDefault();e.currentTarget.classList.remove('over');
-  addEpFiles(tag,type,Array.from(e.dataTransfer.files));
-}
-function handleEpFileSelect(e,tag,type){
-  addEpFiles(tag,type,Array.from(e.target.files));e.target.value='';
-}
-function addEpFiles(tag,type,files){
-  if(!_epDocs[tag])_epDocs[tag]={testSheets:[],supportDocs:[],notes:''};
-  var today=new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
-  var pending=files.length;
-  files.forEach(function(f){
-    var reader=new FileReader();
-    reader.onload=function(ev){
-      if(type==='testSheets'){
-        // Find existing sheet with same name — stack as new revision
-        var existing=_epDocs[tag].testSheets.find(function(s){return s.name===f.name;});
-        var newRev={data:ev.target.result,size:fmtFileSize(f.size),date:today,result:''};
-        if(existing){
-          existing.revisions.push(newRev);
-        } else {
-          _epDocs[tag].testSheets.push({name:f.name,revisions:[newRev]});
-        }
-      } else {
-        _epDocs[tag][type].push({name:f.name,size:fmtFileSize(f.size),data:ev.target.result,date:today});
-      }
-      var idx=trackerItems.findIndex(function(t){return t.tag===tag;});
-      if(idx>=0){trackerItems[idx].docs=_epDocs[tag];saveTracker();}
-      if(--pending===0)renderEqPanel(_epIdx);
-    };
-    reader.readAsDataURL(f);
-  });
-}
-
-function cycleTestResult(tag,si){
-  var sheet=(_epDocs[tag]||{}).testSheets&&_epDocs[tag].testSheets[si];
-  if(!sheet)return;
-  var cur=sheet.revisions[sheet.revisions.length-1];
-  cur.result=cur.result==='Pass'?'Fail':cur.result==='Fail'?'':  'Pass';
-  if(!cur.result)cur.result='Pass'; // cycle: ''→Pass→Fail→Pass
-  var idx=trackerItems.findIndex(function(t){return t.tag===tag;});
-  if(idx>=0){trackerItems[idx].docs=_epDocs[tag];saveTracker();}
-  renderEqPanel(_epIdx);
-}
-
-function viewEpFile(tag,type,fi,mode){
-  var d=_epDocs[tag];if(!d)return;
-  var fileData=null;
-  if(type==='testSheets'){
-    var sheet=d.testSheets[fi];
-    if(!sheet)return;
-    fileData=sheet.revisions[sheet.revisions.length-1].data;
-  } else {
-    fileData=(d[type]&&d[type][fi])?d[type][fi].data:null;
-  }
-  if(!fileData)return;
-  var w=window.open('','_blank');
-  w.document.write('<iframe src="'+fileData+'" style="width:100%;height:100%;border:none"></iframe>');
-}
-
-function viewEpFileRev(tag,si,ri){
-  var sheet=(_epDocs[tag]||{}).testSheets&&_epDocs[tag].testSheets[si];
-  if(!sheet||!sheet.revisions[ri])return;
-  var w=window.open('','_blank');
-  w.document.write('<iframe src="'+sheet.revisions[ri].data+'" style="width:100%;height:100%;border:none"></iframe>');
-}
-function removeEpFile(tag,type,fi){
-  if(!_epDocs[tag])return;
-  if(type==='testSheets'){
-    _epDocs[tag].testSheets.splice(fi,1);
-  } else {
-    _epDocs[tag][type].splice(fi,1);
-  }
-  var idx=trackerItems.findIndex(function(t){return t.tag===tag;});
-  if(idx>=0){trackerItems[idx].docs=_epDocs[tag];saveTracker();}
-  renderEqPanel(_epIdx);
+function saveEpDocs(tag){
+  var i=trackerItems.findIndex(function(t){return t.tag===tag;});
+  if(i>=0){trackerItems[i].docs=_epDocs[tag];saveTracker();}
 }
 function fmtFileSize(b){
   if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';
 }
 function loadEpDocs(){
-  trackerItems.forEach(function(t){if(t.docs)_epDocs[t.tag]=t.docs;});
+  trackerItems.forEach(function(t){
+    if(t.docs){
+      _epDocs[t.tag]=t.docs;
+      var d=_epDocs[t.tag];
+      if(!d.airBalance)d.airBalance={na:false,revisions:[]};
+      if(!d.waterBalance)d.waterBalance={na:false,revisions:[]};
+      if(!d.witnessSheet)d.witnessSheet={file:null,result:''};
+    }
+  });
 }
+
+async function exportEqPanelPdf(tag){
+  var t=trackerItems.find(function(t){return t.tag===tag;});
+  var d=_epDocs[tag]||{};
+  if(typeof PDFLib==='undefined'){alert('PDF-lib not loaded.');return;}
+  showTrackerToast('Building PDF report…');
+  try{
+    var PDFDocument=PDFLib.PDFDocument,rgb=PDFLib.rgb,StandardFonts=PDFLib.StandardFonts;
+    var finalPdf=await PDFDocument.create();
+    var font=await finalPdf.embedFont(StandardFonts.Helvetica);
+    var fontBold=await finalPdf.embedFont(StandardFonts.HelveticaBold);
+    function addSectionPage(title){
+      var page=finalPdf.addPage([595,842]);
+      page.drawRectangle({x:0,y:792,width:595,height:50,color:rgb(0.055,0.075,0.133)});
+      page.drawText(title,{x:30,y:812,size:18,font:fontBold,color:rgb(0,0.898,0.627)});
+      page.drawText(tag+(t?' · '+(t.type||''):''),{x:30,y:795,size:10,font:font,color:rgb(0.7,0.7,0.7)});
+    }
+    // Cover
+    var cover=finalPdf.addPage([595,842]);
+    cover.drawRectangle({x:0,y:0,width:595,height:842,color:rgb(0.055,0.075,0.133)});
+    cover.drawText('Commissioning Report',{x:50,y:720,size:26,font:fontBold,color:rgb(1,1,1)});
+    cover.drawText(tag,{x:50,y:682,size:20,font:fontBold,color:rgb(0,0.898,0.627)});
+    var metas=[];
+    if(t&&t.type)metas.push('Type: '+t.type);
+    if(t&&t.location)metas.push('Location: '+t.location);
+    if(t&&t.subloc)metas.push('Sub-Location: '+t.subloc);
+    metas.forEach(function(m,i){cover.drawText(m,{x:50,y:644-i*22,size:12,font:font,color:rgb(0.7,0.7,0.7)});});
+    cover.drawText('Generated: '+new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}),{x:50,y:560,size:10,font:font,color:rgb(0.5,0.5,0.5)});
+    // Air Balance
+    if(!d.airBalance||!d.airBalance.na){
+      var airRevs=(d.airBalance&&d.airBalance.revisions)||[];
+      if(airRevs.length){
+        addSectionPage('Air Balance Test Sheet');
+        try{var s=await PDFDocument.load(airRevs[airRevs.length-1].data);var pp=await finalPdf.copyPages(s,s.getPageIndices());pp.forEach(function(p){finalPdf.addPage(p);});}catch(e){console.warn(e);}
+      }
+    }
+    // Water Balance
+    if(!d.waterBalance||!d.waterBalance.na){
+      var watRevs=(d.waterBalance&&d.waterBalance.revisions)||[];
+      if(watRevs.length){
+        addSectionPage('Water Balance Test Sheet');
+        try{var sw=await PDFDocument.load(watRevs[watRevs.length-1].data);var ppw=await finalPdf.copyPages(sw,sw.getPageIndices());ppw.forEach(function(p){finalPdf.addPage(p);});}catch(e){console.warn(e);}
+      }
+    }
+    // Witness
+    if(d.witnessSheet&&d.witnessSheet.file&&d.witnessSheet.file.data){
+      addSectionPage('Witness Test Sheet');
+      try{var sv=await PDFDocument.load(d.witnessSheet.file.data);var ppv=await finalPdf.copyPages(sv,sv.getPageIndices());ppv.forEach(function(p){finalPdf.addPage(p);});}catch(e){console.warn(e);}
+    }
+    var bytes=await finalPdf.save();
+    var blob=new Blob([bytes],{type:'application/pdf'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download=tag+'_Cx_Report.pdf';a.click();
+    URL.revokeObjectURL(url);
+    showTrackerToast('✓ PDF exported');
+  }catch(err){console.error(err);showTrackerToast('Export failed: '+err.message);}
+}
+
 
 var _adtIdx=-1;
 function openAddDefectFromTracker(idx){
@@ -2911,6 +3056,18 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 })();
 
 </script>
+
+<!-- REMOVE TYPE MODAL -->
+<div class="mo" id="removeTypeModal" onclick="if(event.target===this)closeRemoveTypeModal()">
+  <div class="mo-box" style="width:420px">
+    <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:4px">Remove Equipment Type</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Select a type to remove all its items from the commissionable list.</p>
+    <div id="removeTypeList" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="bg bsm btn" onclick="closeRemoveTypeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- SYNC MODAL -->
 <div class="mo" id="syncModal" onclick="if(event.target===this)closeSyncModal()">
