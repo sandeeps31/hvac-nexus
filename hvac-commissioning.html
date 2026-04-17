@@ -162,6 +162,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .tracker-table tbody tr:hover{background:var(--surface2)}
 .tracker-table td{padding:9px 13px;vertical-align:middle}
 .tracker-table td.num{text-align:right;font-family:'DM Mono',monospace;font-size:12px}
+.tracker-table td.frozen,.tracker-table th.frozen{position:sticky;left:0;z-index:5;background:var(--surface);box-shadow:2px 0 6px rgba(0,0,0,.18)}
+.tracker-table tbody tr:hover td.frozen{background:var(--surface2)}
+.tracker-table thead th.frozen{z-index:12;background:var(--surface2)}
+.cx-sum-pill{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 10px;border-right:1px solid var(--border);min-width:80px}
+.cx-sum-pill:last-child{border-right:none}
+.cx-sum-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:800}
+.cx-sum-lbl{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:2px}
 .deps-hidden-inp{background:transparent;border-color:transparent;color:transparent;font-size:10px;padding:2px 4px;width:100%;min-width:140px}.deps-hidden-inp:focus{background:var(--surface3);border-color:var(--accent);color:var(--text)}.deps-hidden-inp::placeholder{color:var(--muted);opacity:0}.deps-hidden-inp:placeholder-shown{color:var(--muted)}
 .t-sel-yn{background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:4px 6px;outline:none;cursor:pointer;width:100%}
 .t-sel-yn:focus{border-color:var(--accent)}
@@ -578,8 +585,8 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
             <option value="not-ready">Not Ready</option>
             <option value="airflow-check">Ready for Airflow Check</option>
             <option value="local-cx">Ready for Local Functional Cx</option>
-            <option value="itc-submit">Ready for ITC Submission</option>
-            <option value="itc-submitted">ITC Submitted</option>
+            <option value="itc-submit">Ready for ITP Submission</option>
+            <option value="itc-submitted">ITP Submitted</option>
             <option value="cx-complete">Cx Complete</option>
           </select>
           <select class="filter-sel" id="tracker-filter-type" onchange="renderTracker()">
@@ -597,7 +604,8 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
           <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="if(confirm('Clear all commissionable items? This cannot be undone.')){trackerItems=[];saveTracker();renderTracker();}">🗑 Clear All</button>
         </div>
       </div>
-      <div id="cxBodyWrap" style="overflow-x:auto;overflow-y:auto;height:calc(100vh - 220px);width:100%;display:block;scrollbar-width:thin;scrollbar-color:var(--border) transparent;-webkit-overflow-scrolling:touch">
+      <div id="cxSummaryBar" style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0"></div>
+      <div id="cxBodyWrap" style="overflow-x:auto;overflow-y:auto;height:calc(100vh - 260px);width:100%;display:block;scrollbar-width:thin;scrollbar-color:var(--border) transparent;-webkit-overflow-scrolling:touch">
         <table class="tracker-table" style="border-collapse:collapse;min-width:100%">
           <thead id="cxTrackerThead" style="position:sticky;top:0;z-index:10;background:var(--surface2)"></thead>
           <thead id="cxTrackerTheadGhost" style="display:none"></thead>
@@ -1062,7 +1070,7 @@ async function renderTracker(){
 
   // calcAutoStatus is global — defined below renderTracker
 
-  var STATUS_LABELS={'not-ready':'Not Ready','airflow-check':'Ready for Airflow Check','local-cx':'Ready for Local Functional Cx','itc-submit':'Ready for ITC Submission','itc-submitted':'ITC Submitted','cx-complete':'Cx Complete'};
+  var STATUS_LABELS={'not-ready':'Not Ready','airflow-check':'Ready for Airflow Check','local-cx':'Ready for Local Functional Cx','itc-submit':'Ready for ITP Submission','itc-submitted':'ITP Submitted','cx-complete':'Cx Complete'};
   var STATUS_COLORS={'not-ready':'var(--danger)','airflow-check':'var(--warn)','local-cx':'var(--warn)','itc-submit':'var(--accent)','itc-submitted':'var(--accent)','cx-complete':'var(--green)'};
 
   // Dependency checker (restored with ? for missing)
@@ -1208,10 +1216,10 @@ async function renderTracker(){
     var rowClass=isBlocked?'dep-blocked':'';
 
     var cells=
-      '<td class="tag-cell" style="cursor:pointer;color:var(--accent);font-family:DM Mono,monospace;font-size:12px;font-weight:700" onclick="openEqPanel('+idx+')">'+escH2(t.tag)+'</td>'+
-      col('type',tx(t.type,idx,'type','Type','80px'))+
-      col('location',tx(t.location,idx,'location','Location','100px'))+
-      col('subloc',tx(t.subloc,idx,'subloc','Sub Loc','100px'))+
+      '<td class="tag-cell frozen" style="cursor:pointer;color:var(--accent);font-family:DM Mono,monospace;font-size:12px;font-weight:700;min-width:120px" onclick="openEqPanel('+idx+')">'+escH2(t.tag)+'</td>'+
+      col('type','<span style="font-size:12px;color:var(--text)">'+escH2(t.type||'—')+'</span>')+
+      col('location','<span style="font-size:12px;color:var(--text2)">'+escH2(t.location||'—')+'</span>')+
+      col('subloc','<span style="font-size:12px;color:var(--text2)">'+escH2(t.subloc||'—')+'</span>')+
       col('locServing',tx(t.locServing,idx,'locServing','Area served','130px'))+
       colS('autoStatus','','<span style="display:inline-block;padding:3px 9px;border-radius:20px;font-family:DM Mono,monospace;font-size:9.5px;background:var(--surface3);color:'+stColor+';border:1px solid '+stColor+'44">'+stLabel+'</span>')+
       col('precx',precxCell)+
@@ -1226,7 +1234,7 @@ async function renderTracker(){
       col('airflowVerif',yn(t.airflowVerif,idx,'airflowVerif'))+
       col('localFuncCx',yn(t.localFuncCx,idx,'localFuncCx'))+
       col('itcSubmitted',yn(t.itcSubmitted,idx,'itcSubmitted'))+
-      col('witnessed',yn(t.witnessed,idx,'witnessed'))+
+      col('witnessed',(function(){var wd=_epDocs&&_epDocs[t.tag]&&_epDocs[t.tag].witnessSheet;var wres=wd&&wd.file?wd.witnessSheet&&wd.witnessSheet.result||wd.result||'':'';if(wres==='Pass')return '<span style="font-family:DM Mono,monospace;font-size:10px;padding:2px 9px;border-radius:20px;background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)">Pass</span>';if(wres==='Fail')return '<span style="font-family:DM Mono,monospace;font-size:10px;padding:2px 9px;border-radius:20px;background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)">Fail</span>';return '<span style="font-family:DM Mono,monospace;font-size:10px;padding:2px 9px;border-radius:20px;background:var(--surface3);color:var(--muted);border:1px solid var(--border)">Pending</span>';}()))+
       col('intBmsCx',yn(t.intBmsCx,idx,'intBmsCx'))+
       col('startCx',dt(t.startCx,idx,'startCx'))+
       col('duration','<input class="t-input" type="number" min="1" style="width:60px" value="'+(t.duration||'')+'" placeholder="days" onchange="trackerItems['+idx+'].duration=this.value;recalcDates('+idx+');saveTracker();renderTracker()">');
@@ -1247,6 +1255,7 @@ async function renderTracker(){
   buildTrackerHeader(visibleCols);
   renderDefects();renderWitness();
   updateClearFiltersBtn();
+  renderCxSummaryBar(f);
 }
 
 function escH2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -1280,12 +1289,12 @@ function addWD(dateStr,days){
 
 // ── COLUMN VISIBILITY (Fix 4) ──
 var CX_COL_DEFS=[
-  {k:'type',l:'Type',def:true},{k:'location',l:'Location',def:true},{k:'subloc',l:'Sub Location',def:true},
+  {k:'type',l:'Equipment Type',def:true},{k:'location',l:'Location',def:true},{k:'subloc',l:'Sub Location',def:true},
   {k:'locServing',l:'Location Serving',def:true},{k:'autoStatus',l:'Auto Status',def:true},
   {k:'precx',l:'Pre-Cx Complete',def:true},{k:'mssb',l:'MSSB',def:true},
   {k:'boardLoc',l:'Board Location',def:true},{k:'mssbPowered',l:'MSSB Powered',def:true},
   {k:'airflowVerif',l:'Airflow Verification',def:true},{k:'localFuncCx',l:'Local Functional Cx',def:true},
-  {k:'itcSubmitted',l:'ITC Submitted',def:true},{k:'witnessed',l:'Witnessed',def:true},
+  {k:'itcSubmitted',l:'ITP Submitted',def:true},{k:'witnessed',l:'Witnessed',def:true},
   {k:'intBmsCx',l:'Integrated BMS Cx',def:true},{k:'startCx',l:'Start Cx',def:true},
   {k:'duration',l:'Duration',def:true},{k:'finish',l:'Finish',def:false},
   {k:'bmsReadyBy',l:'BMS Ready By',def:false},{k:'mssbPowerDate',l:'MSSB Power Date',def:false},
@@ -1363,7 +1372,7 @@ function buildTrackerHeader(vis){
       +'<span onclick="openCxColFilter(\''+k+'\',event)" style="font-size:10px;color:'+(hasFilter?'var(--accent)':'var(--muted)')+';cursor:pointer;padding:1px 3px;border-radius:3px;margin-left:auto" title="Filter">⊟</span>'
       +'</div></th>';
   }
-  var ths='<th style="min-width:110px;white-space:nowrap;cursor:pointer" onclick="cxSortBy(\'tag\')">'
+  var ths='<th class="frozen" style="min-width:120px;white-space:nowrap;cursor:pointer;z-index:12" onclick="cxSortBy(\'tag\')">'
     +'<div style="display:flex;align-items:center;gap:4px">Equipment ID'+(cxSortK==='tag'?'<span style="color:var(--accent);font-size:10px">'+(cxSortD>0?'▲':'▼')+'</span>':'')+'</div></th>';
   CX_COL_DEFS.forEach(function(c){
     if(vis[c.k])ths+=th(c.k,c.l);
@@ -1403,13 +1412,19 @@ async function openItpPrecx(tag){
 
 function manualPrecx(idx){
   var existing=trackerItems[idx].precxManual||'';
-  // Find the button in the DOM and replace with inline select
   var btn=document.querySelector('[data-manualidx="'+idx+'"]');
   if(!btn)return;
   var sel=document.createElement('select');
   sel.style.cssText='background:var(--surface2);border:1.5px solid var(--accent);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:12px;padding:4px 8px;outline:none;cursor:pointer';
   sel.innerHTML='<option value="">— Select —</option><option value="Yes"'+(existing==='Yes'?' selected':'')+'>Yes</option><option value="No"'+(existing==='No'?' selected':'')+'>No</option>';
-  sel.onchange=function(){trackerItems[idx].precxManual=this.value;saveTracker();renderTracker();};
+  sel.onchange=function(){
+    trackerItems[idx].precxManual=this.value;
+    // Immediate visual feedback on the button before full re-render
+    this.style.background='var(--green-dim)';
+    this.style.color='var(--green)';
+    saveTracker();
+    requestAnimationFrame(function(){renderTracker();});
+  };
   sel.onblur=function(){renderTracker();};
   btn.replaceWith(sel);
   sel.focus();
@@ -1462,7 +1477,7 @@ function openRemoveTypeModal(){
   // Build unique types from trackerItems
   var typeCounts={};
   trackerItems.forEach(function(i){
-    var t=i.type||'Unknown';
+    var t=(i.type||'').trim()||'(No Type)';
     typeCounts[t]=(typeCounts[t]||0)+1;
   });
   var types=Object.keys(typeCounts);
@@ -1485,7 +1500,26 @@ function removeTypeFromTracker(type){
   closeRemoveTypeModal();
   showTrackerToast('✓ '+type+' items removed');
 }
-function clearCxFilters(){
+function renderCxSummaryBar(filteredItems){
+  var bar=document.getElementById('cxSummaryBar');
+  if(!bar)return;
+  var total=filteredItems.length;
+  var commissioned=filteredItems.filter(function(t){return calcAutoStatus(t,t.mssbPowered||'',t.precxManual||'')==='cx-complete';}).length;
+  var itpSub=filteredItems.filter(function(t){var s=calcAutoStatus(t,t.mssbPowered||'',t.precxManual||'');return s==='itc-submitted'||s==='cx-complete';}).length;
+  var witnessed=filteredItems.filter(function(t){var d=_epDocs&&_epDocs[t.tag];return d&&d.witnessSheet&&d.witnessSheet.file&&(d.witnessSheet.result==='Pass');}).length;
+  var pills=[
+    {l:'Total',v:total,c:'var(--text)'},
+    {l:'Commissioned',v:commissioned,c:'var(--green)'},
+    {l:'ITP Submitted',v:itpSub,c:'var(--accent)'},
+    {l:'Witnessed',v:witnessed,c:'var(--purple)'}
+  ];
+  bar.innerHTML=pills.map(function(p){
+    return '<div class="cx-sum-pill">'
+      +'<div class="cx-sum-val" style="color:'+p.c+'">'+p.v+'</div>'
+      +'<div class="cx-sum-lbl">'+p.l+'</div>'
+      +'</div>';
+  }).join('');
+}
   cxColFilters={};
   cxSortK='';cxSortD=1;
   document.getElementById('tracker-filter-status').value='';
@@ -1542,10 +1576,10 @@ function renderEqPanel(idx){
   var WF_STEPS=[
     {k:'precx',l:'Pre-Cx'},{k:'mssbPowered',l:'MSSB Pwr'},
     {k:'airflowVerif',l:'Airflow'},{k:'localFuncCx',l:'Local Cx'},
-    {k:'itcSubmitted',l:'ITC'},{k:'intBmsCx',l:'BMS'},
+    {k:'itcSubmitted',l:'ITP'},{k:'intBmsCx',l:'BMS'},
     {k:'witnessed',l:'Witnessed'}
   ];
-  var STATUS_LABELS2={'not-ready':'Not Ready','airflow-check':'Ready for Airflow','local-cx':'Ready for Local Cx','itc-submit':'Ready for ITC','itc-submitted':'ITC Submitted','cx-complete':'Cx Complete'};
+  var STATUS_LABELS2={'not-ready':'Not Ready','airflow-check':'Ready for Airflow','local-cx':'Ready for Local Cx','itc-submit':'Ready for ITP','itc-submitted':'ITP Submitted','cx-complete':'Cx Complete'};
   var STATUS_COLORS2={'not-ready':'#ff4d6d','airflow-check':'#ffb830','local-cx':'#ffb830','itc-submit':'#00c8ff','itc-submitted':'#00c8ff','cx-complete':'#00e5a0'};
   var autoStatus=calcAutoStatus(t,t.mssbPowered||'',t.precxManual||'');
   var stColor=STATUS_COLORS2[autoStatus]||'#888';
@@ -1692,7 +1726,7 @@ function renderEqPanel(idx){
     +'<span style="font-family:DM Mono,monospace;font-size:13px;font-weight:700;color:'+stColor+'">'+pct+'%</span>'
     +'</div>'
     +'<div style="height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-bottom:10px">'
-    +'<div style="height:100%;width:'+pct+'%;background:'+stColor+';border-radius:3px;transition:width .4s"></div></div>'
+    +'<div style="height:100%;width:'+pct+'%;background:var(--green);border-radius:3px;transition:width .4s"></div></div>'
     +wfHtml+'</div>'
     +balCard('airBalance','Air Balance Test Sheet')
     +balCard('waterBalance','Water Balance Test Sheet')
