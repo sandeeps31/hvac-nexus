@@ -1133,7 +1133,7 @@ async function renderTracker(){
 
   // Only show rows with a tag, filtered
   var f=trackerItems.filter(function(t){
-    if(!t.tag) return false; // FIX 1: skip blank rows
+    if(!t.tag||!t.tag.trim()) return false; // skip blank/unnamed rows
     // Resolve MSSB info for this item
     var mssbInfo=mssbByEquip[t.tag]||{};
     var autoMssb=t.mssb||mssbInfo.mssbTag||'';
@@ -1143,7 +1143,7 @@ async function renderTracker(){
     var autoSt=calcAutoStatus(t,mssbPow,precxData.auto);
     if(sf&&autoSt!==sf)return false;
     if(tf&&t.type!==tf)return false;
-    if(q&&!t.tag.toLowerCase().includes(q)&&!(t.name||'').toLowerCase().includes(q))return false;
+    if(q&&!t.tag.toLowerCase().includes(q)&&!(t.type||'').toLowerCase().includes(q)&&!(t.location||'').toLowerCase().includes(q))return false;
     // Column filters
     for(var ck in cxColFilters){
       var fs=cxColFilters[ck];
@@ -1520,6 +1520,7 @@ function renderCxSummaryBar(filteredItems){
       +'</div>';
   }).join('');
 }
+function clearCxFilters(){
   cxColFilters={};
   cxSortK='';cxSortD=1;
   document.getElementById('tracker-filter-status').value='';
