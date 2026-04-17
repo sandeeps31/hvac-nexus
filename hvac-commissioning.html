@@ -308,7 +308,37 @@ body.sb-sm .topbar{left:var(--sb-sm)}
 .mo-input::placeholder{color:var(--muted)}
 .mo-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 
-/* CX PAGE LAYOUT */
+/* EQUIPMENT DETAIL PANEL */
+.eq-panel{position:fixed;top:0;right:-520px;width:500px;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:400;display:flex;flex-direction:column;transition:right .25s cubic-bezier(.4,0,.2,1);box-shadow:-8px 0 32px rgba(0,0,0,.4)}
+.eq-panel.open{right:0}
+.eq-panel-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;background:var(--surface2)}
+.eq-panel-tag{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--accent);flex:1}
+.eq-panel-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:4px 8px;border-radius:6px;transition:all .13s}
+.eq-panel-close:hover{color:var(--danger);background:var(--danger-dim)}
+.eq-panel-body{flex:1;overflow-y:auto;padding:0}
+.eq-section{border-bottom:1px solid var(--border);padding:16px 20px}
+.eq-section-title{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.eq-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.eq-meta-item{background:var(--surface2);border-radius:7px;padding:8px 12px}
+.eq-meta-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-bottom:3px}
+.eq-meta-val{font-size:13px;color:var(--text);font-weight:500}
+.eq-workflow{display:flex;align-items:center;gap:0;margin-top:4px;flex-wrap:nowrap;overflow-x:auto}
+.eq-wf-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:70px}
+.eq-wf-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:all .2s}
+.eq-wf-dot.done{background:var(--green);border-color:var(--green);color:#080c12}
+.eq-wf-dot.active{background:var(--accent);border-color:var(--accent);color:#080c12;box-shadow:0 0 12px rgba(0,200,255,.4)}
+.eq-wf-dot.blocked{background:var(--danger-dim);border-color:var(--danger);color:var(--danger)}
+.eq-wf-lbl{font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);text-align:center;line-height:1.3}
+.eq-wf-line{height:2px;flex:0.5;background:var(--border);align-self:center;margin-top:-16px;min-width:10px}
+.eq-wf-line.done{background:var(--green)}
+.eq-drop-zone{border:1.5px dashed var(--border);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all .15s;background:var(--surface2)}
+.eq-drop-zone:hover,.eq-drop-zone.over{border-color:var(--accent);background:var(--accent-dim)}
+.eq-file-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:6px}
+.eq-file-name{flex:1;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eq-file-size{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.eq-defect-item{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:6px}
+.eq-panel-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:399;display:none}
+.eq-panel-overlay.open{display:block}
 .cx-page{display:flex;flex-direction:column;height:calc(100vh - 52px);overflow:hidden}
 .cx-header{padding:14px 22px 10px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .cx-header-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
@@ -1181,7 +1211,7 @@ async function renderTracker(){
     var rowClass=isBlocked?'dep-blocked':'';
 
     var cells=
-      '<td class="tag-cell" style="cursor:pointer" onclick="openItpPrecx(\''+t.tag+'\')">'+escH2(t.tag)+'</td>'+
+      '<td class="tag-cell" style="cursor:pointer;color:var(--accent);font-family:DM Mono,monospace;font-size:12px;font-weight:700" onclick="openEqPanel('+idx+')">'+escH2(t.tag)+'</td>'+
       col('type',tx(t.type,idx,'type','Type','80px'))+
       col('location',tx(t.location,idx,'location','Location','100px'))+
       col('subloc',tx(t.subloc,idx,'subloc','Sub Loc','100px'))+
@@ -1437,6 +1467,193 @@ function updateClearFiltersBtn(){
   var hasColFilter=Object.keys(cxColFilters).some(function(k){return cxColFilters[k]&&cxColFilters[k].size>0;});
   btn.style.display=(sf||tf||q||hasColFilter||cxSortK)?'':'none';
 }
+// ── EQUIPMENT DETAIL PANEL ──
+var _epIdx = -1;
+var _epDocs = {};
+
+function openEqPanel(idx){
+  _epIdx = idx;
+  var t = trackerItems[idx];
+  if(!t) return;
+  if(!_epDocs[t.tag]) _epDocs[t.tag] = t.docs || {testSheets:[], supportDocs:[], notes:t.notes||''};
+  document.getElementById('epTag').textContent = t.tag;
+  document.getElementById('epType').textContent = [t.type, t.location, t.subloc].filter(Boolean).join(' · ');
+  renderEqPanel(idx);
+  document.getElementById('eqPanel').classList.add('open');
+  document.getElementById('eqPanelOverlay').classList.add('open');
+}
+
+function closeEqPanel(){
+  document.getElementById('eqPanel').classList.remove('open');
+  document.getElementById('eqPanelOverlay').classList.remove('open');
+}
+
+function renderEqPanel(idx){
+  var t = trackerItems[idx];
+  if(!t) return;
+  var d = _epDocs[t.tag] || {testSheets:[], supportDocs:[], notes:''};
+  var WF_STEPS = [
+    {k:'precx',l:'Pre-Cx'},
+    {k:'mssbPowered',l:'MSSB\nPowered'},
+    {k:'airflowVerif',l:'Airflow\nVerif'},
+    {k:'localFuncCx',l:'Local\nFx Cx'},
+    {k:'itcSubmitted',l:'ITC\nSubmit'},
+    {k:'intBmsCx',l:'BMS\nInteg'},
+    {k:'witnessed',l:'Witnessed'}
+  ];
+  var STATUS_LABELS2={'not-ready':'Not Ready','airflow-check':'Ready for Airflow','local-cx':'Ready for Local Cx','itc-submit':'Ready for ITC','itc-submitted':'ITC Submitted','cx-complete':'Cx Complete'};
+  var STATUS_COLORS2={'not-ready':'var(--danger)','airflow-check':'var(--warn)','local-cx':'var(--warn)','itc-submit':'var(--accent)','itc-submitted':'var(--accent)','cx-complete':'var(--green)'};
+  var autoStatus = calcAutoStatus(t, t.mssbPowered||'', t.precxManual||'');
+
+  function stepState(k){
+    if(k==='precx') return t.precxManual==='Yes'?'done':t.precxManual==='No'?'blocked':'pending';
+    var v=(t[k]||'').toUpperCase();
+    return v==='YES'||v==='N/A'?'done':v==='NO'?'blocked':'pending';
+  }
+
+  var wfHtml='<div class="eq-workflow">';
+  WF_STEPS.forEach(function(s,i){
+    var state=stepState(s.k);
+    var isDone=state==='done', isBlocked=state==='blocked';
+    var icon=isDone?'✓':isBlocked?'✕':(i+1);
+    if(i>0) wfHtml+='<div class="eq-wf-line'+(isDone?' done':'')+'"></div>';
+    wfHtml+='<div class="eq-wf-step">'
+      +'<div class="eq-wf-dot'+(isDone?' done':isBlocked?' blocked':'')+'">'+icon+'</div>'
+      +'<div class="eq-wf-lbl">'+s.l+'</div></div>';
+  });
+  wfHtml+='</div>';
+
+  var tagDefects=defects.filter(function(d2){return d2.tag===t.tag;});
+  var defectsHtml=tagDefects.length
+    ? tagDefects.map(function(d2){
+        return '<div class="eq-defect-item">'
+          +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--accent);flex-shrink:0">'+d2.num+'</span>'
+          +'<div style="flex:1"><div style="font-size:12px;color:var(--text)">'+escH2(d2.desc)+'</div>'
+          +(d2.responsibility?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+escH2(d2.responsibility)+'</div>':'')+'</div>'
+          +'<span style="font-family:DM Mono,monospace;font-size:10px;padding:2px 8px;border-radius:20px;'+(d2.status==='closed'?'background:var(--green-dim);color:var(--green)':'background:var(--danger-dim);color:var(--danger)')+'">'+d2.status+'</span>'
+          +'</div>';
+      }).join('')
+    : '<div style="font-size:12px;color:var(--muted);padding:4px 0">No defects for this equipment</div>';
+
+  function fileListHtml(files, type){
+    return (files||[]).map(function(f,fi){
+      return '<div class="eq-file-item">'
+        +'<span style="font-size:16px">📄</span>'
+        +'<div style="flex:1;min-width:0"><div class="eq-file-name">'+escH2(f.name)+'</div>'
+        +'<div class="eq-file-size">'+f.size+'</div></div>'
+        +'<button onclick="viewEpFile(\''+t.tag+'\',\''+type+'\','+fi+')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px">View</button>'
+        +'<button onclick="removeEpFile(\''+t.tag+'\',\''+type+'\','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px" onmouseover="this.style.color=\'var(--danger)\'" onmouseout="this.style.color=\'var(--muted)\'">✕</button>'
+        +'</div>';
+    }).join('');
+  }
+
+  document.getElementById('eqPanelBody').innerHTML =
+    '<div class="eq-section">'
+    +'<div class="eq-section-title">Equipment Details</div>'
+    +'<div class="eq-meta-grid">'
+    +'<div class="eq-meta-item"><div class="eq-meta-lbl">Equipment ID</div><div class="eq-meta-val" style="font-family:DM Mono,monospace;color:var(--accent)">'+escH2(t.tag)+'</div></div>'
+    +'<div class="eq-meta-item"><div class="eq-meta-lbl">Type</div><div class="eq-meta-val">'+escH2(t.type||'—')+'</div></div>'
+    +'<div class="eq-meta-item"><div class="eq-meta-lbl">Location</div><div class="eq-meta-val">'+escH2(t.location||'—')+'</div></div>'
+    +'<div class="eq-meta-item"><div class="eq-meta-lbl">Sub-Location</div><div class="eq-meta-val">'+escH2(t.subloc||'—')+'</div></div>'
+    +'<div class="eq-meta-item" style="grid-column:1/-1"><div class="eq-meta-lbl">Name</div><div class="eq-meta-val">'+escH2(t.name||'—')+'</div></div>'
+    +'</div></div>'
+
+    +'<div class="eq-section">'
+    +'<div class="eq-section-title">Cx Status</div>'
+    +'<div style="margin-bottom:12px"><span style="display:inline-block;padding:4px 12px;border-radius:20px;font-family:DM Mono,monospace;font-size:11px;font-weight:700;background:var(--surface3);color:'+(STATUS_COLORS2[autoStatus]||'var(--muted)')+';border:1px solid '+(STATUS_COLORS2[autoStatus]||'var(--muted)')+'44">'+(STATUS_LABELS2[autoStatus]||autoStatus)+'</span></div>'
+    +wfHtml+'</div>'
+
+    +'<div class="eq-section">'
+    +'<div class="eq-section-title">Pre-Cx Completion</div>'
+    +'<div style="display:flex;align-items:center;gap:12px">'
+    +'<div style="flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+(t.precxManual==='Yes'?100:0)+'%;background:var(--green);border-radius:4px;transition:width .3s"></div></div>'
+    +'<span style="font-family:DM Mono,monospace;font-size:13px;font-weight:700;color:'+(t.precxManual==='Yes'?'var(--green)':'var(--muted)')+'">'+(t.precxManual==='Yes'?'100%':t.precxManual==='No'?'0%':'—')+'</span>'
+    +'</div>'
+    +'<div style="margin-top:6px;font-size:11px;color:var(--muted)">Override: '+(t.precxManual||'None')+'</div>'
+    +'</div>'
+
+    +'<div class="eq-section">'
+    +'<div class="eq-section-title">Cx Test Sheets</div>'
+    +'<div id="epTestSheetList">'+fileListHtml(d.testSheets,'testSheets')+'</div>'
+    +'<div class="eq-drop-zone" ondragover="this.classList.add(\'over\');event.preventDefault()" ondragleave="this.classList.remove(\'over\')" ondrop="handleEpDrop(event,\''+t.tag+'\',\'testSheets\')" onclick="document.getElementById(\'epTSInput\').click()">'
+    +'<div style="font-size:20px;margin-bottom:4px">📎</div>'
+    +'<div style="font-size:12px;color:var(--text2)">Drop Cx test sheets here or click to browse</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">PDF accepted</div>'
+    +'</div>'
+    +'<input type="file" id="epTSInput" accept=".pdf" multiple style="display:none" onchange="handleEpFileSelect(event,\''+t.tag+'\',\'testSheets\')">'
+    +'</div>'
+
+    +'<div class="eq-section">'
+    +'<div class="eq-section-title">Supporting Documents</div>'
+    +'<div id="epSupportDocList">'+fileListHtml(d.supportDocs,'supportDocs')+'</div>'
+    +'<div class="eq-drop-zone" ondragover="this.classList.add(\'over\');event.preventDefault()" ondragleave="this.classList.remove(\'over\')" ondrop="handleEpDrop(event,\''+t.tag+'\',\'supportDocs\')" onclick="document.getElementById(\'epSDInput\').click()">'
+    +'<div style="font-size:20px;margin-bottom:4px">📎</div>'
+    +'<div style="font-size:12px;color:var(--text2)">Drop supporting docs here or click to browse</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">PDF, Word, Excel accepted</div>'
+    +'</div>'
+    +'<input type="file" id="epSDInput" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple style="display:none" onchange="handleEpFileSelect(event,\''+t.tag+'\',\'supportDocs\')">'
+    +'</div>'
+
+    +'<div class="eq-section">'
+    +'<div class="eq-section-title" style="display:flex;align-items:center;justify-content:space-between">Defects <button onclick="openAddDefectFromTracker('+idx+')" style="background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);color:var(--danger);border-radius:20px;font-size:10px;font-family:DM Mono,monospace;padding:2px 10px;cursor:pointer">+ Add</button></div>'
+    +defectsHtml+'</div>'
+
+    +'<div class="eq-section">'
+    +'<div class="eq-section-title">Notes</div>'
+    +'<textarea id="epNotes" rows="4" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;outline:none;resize:vertical;box-sizing:border-box" placeholder="Add notes…" onblur="saveEpNotes(\''+t.tag+'\')">'+(d.notes||'')+'</textarea>'
+    +'</div>';
+}
+
+function saveEpNotes(tag){
+  var ta=document.getElementById('epNotes');if(!ta)return;
+  if(!_epDocs[tag])_epDocs[tag]={testSheets:[],supportDocs:[],notes:''};
+  _epDocs[tag].notes=ta.value;
+  var idx=trackerItems.findIndex(function(t){return t.tag===tag;});
+  if(idx>=0){trackerItems[idx].notes=ta.value;saveTracker();}
+}
+
+function handleEpDrop(e,tag,type){
+  e.preventDefault();e.currentTarget.classList.remove('over');
+  addEpFiles(tag,type,Array.from(e.dataTransfer.files));
+}
+function handleEpFileSelect(e,tag,type){
+  addEpFiles(tag,type,Array.from(e.target.files));e.target.value='';
+}
+function addEpFiles(tag,type,files){
+  if(!_epDocs[tag])_epDocs[tag]={testSheets:[],supportDocs:[],notes:''};
+  var pending=files.length;
+  files.forEach(function(f){
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      _epDocs[tag][type].push({name:f.name,size:fmtFileSize(f.size),data:ev.target.result});
+      var idx=trackerItems.findIndex(function(t){return t.tag===tag;});
+      if(idx>=0){trackerItems[idx].docs=_epDocs[tag];saveTracker();}
+      if(--pending===0)renderEqPanel(_epIdx);
+    };
+    reader.readAsDataURL(f);
+  });
+}
+function removeEpFile(tag,type,fi){
+  if(!_epDocs[tag])return;
+  _epDocs[tag][type].splice(fi,1);
+  var idx=trackerItems.findIndex(function(t){return t.tag===tag;});
+  if(idx>=0){trackerItems[idx].docs=_epDocs[tag];saveTracker();}
+  renderEqPanel(_epIdx);
+}
+function viewEpFile(tag,type,fi){
+  var f=(_epDocs[tag]||{})[type]&&_epDocs[tag][type][fi];
+  if(!f||!f.data)return;
+  var w=window.open('','_blank');
+  w.document.write('<iframe src="'+f.data+'" style="width:100%;height:100%;border:none"></iframe>');
+}
+function fmtFileSize(b){
+  if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';
+}
+function loadEpDocs(){
+  trackerItems.forEach(function(t){if(t.docs)_epDocs[t.tag]=t.docs;});
+}
+
+var _adtIdx=-1;
 function openAddDefectFromTracker(idx){
   _adtIdx=idx;
   var t=trackerItems[idx];
@@ -1660,7 +1877,7 @@ var PRECX_TEMPLATE_DATA={"sections": [{"title": "General / Documentation", "item
     dbSetPrecxTemplate(PRECX_TEMPLATE_DATA).catch(e=>console.error(e));
   }catch(e){}
 })();
-loadTracker().then(function(){showView('tracker');switchCxTab('commissionable');});
+loadTracker().then(function(){loadEpDocs();showView('tracker');switchCxTab('commissionable');});
 
 // ── PRE-CX CHECKLIST ──
 var PRECX_KEY='hvacnexus_precx_'+_cxPNum;
@@ -2616,6 +2833,19 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
       <button class="bp bsm btn" onclick="confirmSync()">⟳ Sync Selected</button>
     </div>
   </div>
+</div>
+
+<!-- EQUIPMENT DETAIL PANEL -->
+<div class="eq-panel-overlay" id="eqPanelOverlay" onclick="closeEqPanel()"></div>
+<div class="eq-panel" id="eqPanel">
+  <div class="eq-panel-hdr">
+    <div>
+      <div class="eq-panel-tag" id="epTag">—</div>
+      <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px" id="epType">—</div>
+    </div>
+    <button class="eq-panel-close" onclick="closeEqPanel()">✕</button>
+  </div>
+  <div class="eq-panel-body" id="eqPanelBody"></div>
 </div>
 
 <!-- ADD DEFECT FROM TRACKER MODAL -->
