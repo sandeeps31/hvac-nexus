@@ -246,6 +246,7 @@ async function dbGet(table) {
 
 async function dbSet(table, data) {
   try {
+    const company_id = localStorage.getItem('hvacnexus_company_id');
     // Upsert — if row exists update it, otherwise insert
     const rows = await sbFetch(`${table}?select=id&limit=1`);
     if (rows && rows.length) {
@@ -256,7 +257,7 @@ async function dbSet(table, data) {
     } else {
       await sbFetch(table, {
         method: 'POST',
-        body: JSON.stringify({ data })
+        body: JSON.stringify({ data, company_id })
       });
     }
     return true;
