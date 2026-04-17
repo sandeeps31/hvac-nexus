@@ -549,7 +549,8 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
           <select class="filter-sel" id="tracker-filter-type" onchange="renderTracker()">
             <option value="">All Types</option>
           </select>
-          <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="tracker-search" placeholder="Search tag, area…" oninput="renderTracker()"></div>
+          <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="tracker-search" placeholder="Search Equipment ID, area…" oninput="renderTracker()"></div>
+          <button id="clearFiltersBtn" onclick="clearCxFilters()" style="display:none;background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);color:var(--danger);border-radius:7px;font-size:12px;padding:5px 12px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap">✕ Clear Filters</button>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
           <button class="btn btn-ghost btn-sm" onclick="openSyncModal()" style="color:var(--green);border-color:rgba(0,229,160,.3)">⟳ Sync from Schedule</button>
@@ -1174,7 +1175,7 @@ async function renderTracker(){
     } else {
       precxCell='<span style="color:'+pcolor+';font-size:12px;font-weight:600">'+(precxData.auto||'—')+'</span>';
       if(pi) precxCell+='<button style="display:block;margin-top:2px;font-size:10px;background:none;border:none;color:var(--accent);cursor:pointer" onclick="openItpPrecx(\''+t.tag+'\')">→ Open Pre-Cx</button>';
-      precxCell+='<button style="display:block;margin-top:1px;font-size:10px;background:none;border:none;color:var(--muted);cursor:pointer" data-idx="'+idx+'" onclick="manualPrecx('+idx+')">manual override</button>';
+      precxCell+='<button style="display:block;margin-top:1px;font-size:10px;background:none;border:none;color:var(--muted);cursor:pointer" data-manualidx="'+idx+'" onclick="manualPrecx('+idx+')">manual override</button>';
     }
 
     var rowClass=isBlocked?'dep-blocked':'';
@@ -1218,6 +1219,7 @@ async function renderTracker(){
   // Rebuild header to match visible columns (Fix 3: sticky header)
   buildTrackerHeader(visibleCols);
   renderDefects();renderWitness();
+  updateClearFiltersBtn();
 }
 
 function escH2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -1323,7 +1325,7 @@ function buildTrackerHeader(vis){
       +'</div></th>';
   }
   var ths='<th style="min-width:110px;white-space:nowrap;cursor:pointer" onclick="cxSortBy(\'tag\')">'
-    +'<div style="display:flex;align-items:center;gap:4px">Tag'+(cxSortK==='tag'?'<span style="color:var(--accent);font-size:10px">'+(cxSortD>0?'▲':'▼')+'</span>':'')+'</div></th>';
+    +'<div style="display:flex;align-items:center;gap:4px">Equipment ID'+(cxSortK==='tag'?'<span style="color:var(--accent);font-size:10px">'+(cxSortD>0?'▲':'▼')+'</span>':'')+'</div></th>';
   CX_COL_DEFS.forEach(function(c){
     if(vis[c.k])ths+=th(c.k,c.l);
     if(c.k==='defect')ths+='<th style="min-width:90px;white-space:nowrap"></th>';
@@ -1362,13 +1364,16 @@ async function openItpPrecx(tag){
 
 function manualPrecx(idx){
   var existing=trackerItems[idx].precxManual||'';
-  var val=existing==='Yes'?'No':existing==='No'?'':  'Yes';
-  // Cycle: empty→Yes→No→empty
-  if(!existing) val='Yes';
-  else if(existing==='Yes') val='No';
-  else val='';
-  trackerItems[idx].precxManual=val;
-  saveTracker();renderTracker();
+  // Find the button in the DOM and replace with inline select
+  var btn=document.querySelector('[data-manualidx="'+idx+'"]');
+  if(!btn)return;
+  var sel=document.createElement('select');
+  sel.style.cssText='background:var(--surface2);border:1.5px solid var(--accent);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:12px;padding:4px 8px;outline:none;cursor:pointer';
+  sel.innerHTML='<option value="">— Select —</option><option value="Yes"'+(existing==='Yes'?' selected':'')+'>Yes</option><option value="No"'+(existing==='No'?' selected':'')+'>No</option>';
+  sel.onchange=function(){trackerItems[idx].precxManual=this.value;saveTracker();renderTracker();};
+  sel.onblur=function(){renderTracker();};
+  btn.replaceWith(sel);
+  sel.focus();
 }
 function addTrackerRow(){trackerItems.push({
   id:'tr'+uid(),tag:'',name:'',type:'',location:'',subloc:'',locServing:'',
@@ -1414,7 +1419,24 @@ function renderDefects(){
     </div>
   </div>`).join('');
 }
-var _adtIdx=-1;
+function clearCxFilters(){
+  cxColFilters={};
+  cxSortK='';cxSortD=1;
+  document.getElementById('tracker-filter-status').value='';
+  document.getElementById('tracker-filter-type').value='';
+  document.getElementById('tracker-search').value='';
+  renderTracker();
+}
+
+function updateClearFiltersBtn(){
+  var btn=document.getElementById('clearFiltersBtn');
+  if(!btn)return;
+  var sf=document.getElementById('tracker-filter-status').value;
+  var tf=document.getElementById('tracker-filter-type').value;
+  var q=(document.getElementById('tracker-search').value||'').trim();
+  var hasColFilter=Object.keys(cxColFilters).some(function(k){return cxColFilters[k]&&cxColFilters[k].size>0;});
+  btn.style.display=(sf||tf||q||hasColFilter||cxSortK)?'':'none';
+}
 function openAddDefectFromTracker(idx){
   _adtIdx=idx;
   var t=trackerItems[idx];
