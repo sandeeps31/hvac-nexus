@@ -128,6 +128,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 .det-body{padding:20px 28px;display:flex;flex-direction:column;gap:12px}
 
 /* REV HISTORY STRIP */
+.rev-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.rev-tbl th{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:8px 14px;border-bottom:1px solid var(--border);text-align:left;background:var(--surface2)}
+.rev-tbl td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+.rev-tbl tr:last-child td{border-bottom:none}
+.rev-tbl tr:hover td{background:var(--surface2)}
+.rev-status-curr{font-family:'DM Mono',monospace;font-size:9px;padding:1px 7px;border-radius:10px;background:rgba(0,229,160,.12);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+.rev-status-draft{font-family:'DM Mono',monospace;font-size:9px;padding:1px 7px;border-radius:10px;background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.rev-status-sup{font-family:'DM Mono',monospace;font-size:9px;padding:1px 7px;border-radius:10px;background:rgba(255,77,109,.08);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
 .rev-strip{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;gap:0}
 .rev-strip-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block}
 .rev-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;transition:all .13s}
@@ -691,7 +699,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 
 <!-- REV HISTORY MODAL -->
 <div class="mo" id="revHistModal" onclick="if(event.target===this)closeRevHist()">
-  <div class="modal" style="width:500px">
+  <div class="modal" style="width:640px;max-width:96vw">
     <div class="modal-hdr">
       <h3>Revision History</h3>
       <p id="revHistTitle"></p>
@@ -909,9 +917,58 @@ function deleteSubmission(id){
   save();renderList();showTsToast('Submission deleted');
 }
 function openRevHistory(id){
-  openDetail(id);
-  setTimeout(function(){var pills=document.getElementById('revPills');if(pills)pills.scrollIntoView({behavior:'smooth',block:'center'});},200);
+  var s=submissions.find(function(x){return x.id===id;});if(!s)return;
+  document.getElementById('revHistTitle').textContent=s.num+' — '+s.title;
+
+  var revs=s.revisions.slice().reverse(); // newest first
+  var WF_ICONS={Submitted:'📤',Approved:'✓',Rejected:'✕','Revise & Resubmit':'↩'};
+  var WF_CLS={Submitted:'submitted',Approved:'approved',Rejected:'rejected','Revise & Resubmit':'revise'};
+
+  var html='<table class="rev-tbl"><thead><tr>'
+    +'<th>Revision</th><th>Sub Date</th><th>Status</th><th>Workflow</th>'
+    +'</tr></thead><tbody>';
+
+  if(!revs.length){
+    html+='<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">No revisions yet</td></tr>';
+  }
+
+  revs.forEach(function(rv,ri){
+    var isLatest=ri===0; // reversed, so first = latest
+    var isDraft=!rv.published&&isLatest&&s.status==='Draft';
+    var statusCls=isDraft?'rev-status-draft':isLatest?'rev-status-curr':'rev-status-sup';
+    var statusLbl=isDraft?'DRAFT':isLatest?'CURRENT':'SUPERSEDED';
+
+    // Workflow chips for this revision
+    var history=(s.statusHistory||[]).filter(function(h){
+      return h.rev===rv.rev||(ri===revs.length-1&&!h.rev); // fallback for old data
+    });
+    var wfHtml='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">';
+    history.forEach(function(h,hi){
+      var cls=WF_CLS[h.status]||'submitted';
+      var icon=WF_ICONS[h.status]||'○';
+      if(hi>0)wfHtml+='<span style="color:var(--muted);font-size:10px">→</span>';
+      wfHtml+='<div style="display:flex;flex-direction:column;align-items:center;gap:1px">'
+        +'<div class="wf-chip '+cls+'" style="font-size:10px;padding:2px 8px">'+icon+' '+escH(h.status)+'</div>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--text2)">'+fmtDate(h.date)+'</span>'
+        +(h.comment?'<span style="font-size:9px;color:var(--muted);font-style:italic;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(h.comment)+'">'+escH(h.comment)+'</span>':'')
+        +'</div>';
+    });
+    if(!history.length)wfHtml+='<span style="color:var(--muted);font-size:11px">—</span>';
+    wfHtml+='</div>';
+
+    html+='<tr>'
+      +'<td style="font-family:DM Mono,monospace;font-size:12px;font-weight:700;color:var(--accent)">'+escH(rv.rev)+'</td>'
+      +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+fmtDate(rv.date)+'</td>'
+      +'<td><span class="'+statusCls+'">'+statusLbl+'</span></td>'
+      +'<td>'+wfHtml+'</td>'
+      +'</tr>';
+  });
+
+  html+='</tbody></table>';
+  document.getElementById('revHistList').innerHTML=html;
+  document.getElementById('revHistModal').classList.add('open');
 }
+function closeRevHist(){document.getElementById('revHistModal').classList.remove('open');}
 
 /* SHOW LIST / DETAIL */
 function showList(){
@@ -1630,16 +1687,17 @@ function renderWorkflowTracker(s){
   var latestRevLabel=s.revisions&&s.revisions.length?s.revisions[s.revisions.length-1].rev:'';
   var isEditable=isViewingLatest();
 
-  // Build horizontal groups row
-  var html='<div style="display:flex;flex-wrap:wrap;gap:10px;padding:8px 0;align-items:flex-start">';
+  // Build horizontal groups row — scrollable, never wraps
+  var html='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;overflow-x:auto">'
+    +'<div style="display:flex;flex-wrap:nowrap;gap:0;align-items:flex-start;min-width:max-content">';
 
   groupOrder.forEach(function(revLabel,gi){
     // Insert connecting arrow between groups (not before first)
     if(gi>0){
-      html+='<div style="display:flex;align-items:center;align-self:center;margin-top:-4px">'
-        +'<div style="width:28px;height:2px;background:var(--border)"></div>'
-        +'<div style="color:var(--text2);font-size:14px;margin:0 2px;margin-bottom:2px">→</div>'
-        +'<div style="width:28px;height:2px;background:var(--border)"></div>'
+      html+='<div style="display:flex;align-items:center;align-self:flex-start;margin-top:38px;padding:0 4px">'
+        +'<div style="width:16px;height:2px;background:var(--border)"></div>'
+        +'<span style="color:var(--text2);font-size:13px;line-height:1">→</span>'
+        +'<div style="width:16px;height:2px;background:var(--border)"></div>'
         +'</div>';
     }
     var entries=groups[revLabel];
@@ -1691,7 +1749,7 @@ function renderWorkflowTracker(s){
     html+='</div>'; // group card
   });
 
-  html+='</div>';
+  html+='</div></div>'; // inner flex + outer scroll card
   el.innerHTML=html;
 }
 
