@@ -65,6 +65,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 /* ITP - pill */
 .pin-itp{height:22px;min-width:22px;padding:0 7px;border-radius:11px;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);background:#6d4aff;color:#fff;white-space:nowrap}
 .pin-itp.ns{background:#3d5a7a}.pin-itp.ip{background:#cc8800}.pin-itp.act{background:#cc2244}.pin-itp.cl{background:#00aa70}
+.pin-cluster-badge{position:absolute;top:-6px;right:-6px;background:var(--accent);color:#080c12;border-radius:10px;font-size:9px;font-weight:800;font-family:DM Mono,monospace;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:1.5px solid #080c12;z-index:2}
+.itp-cluster-popup{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:9999;min-width:220px;max-width:300px;overflow:hidden}
+.icp-hdr{padding:8px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-family:DM Mono,monospace;font-size:10px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.icp-item{padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s}
+.icp-item:last-child{border-bottom:none}
+.icp-item:hover{background:var(--surface2)}
+.icp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.icp-dot.ns{background:#3d5a7a}.icp-dot.ip{background:#cc8800}.icp-dot.act{background:#cc2244}.icp-dot.cl{background:#00aa70}
 /* Defect - circle */
 .pin-def{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);background:var(--danger);color:#fff}
 .pin-def.cl{background:#00aa70}
@@ -227,29 +235,25 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 
 <!-- ITP PIN MODAL (reuses pdf-viewer modal) -->
 <div class="mo" id="itpMo">
-  <div class="modal" style="width:420px">
+  <div class="modal" style="width:460px">
     <div class="modal-hdr"><h3 id="itpMoTitle">New ITP Pin</h3></div>
-    <div class="modal-body">
-      <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:7px;padding:8px 12px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="color:var(--accent);font-size:13px">ℹ</span>
-        ITP templates can be added from project settings only
+    <div class="modal-body" style="padding:14px 18px;display:flex;flex-direction:column;gap:12px">
+      <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:7px;padding:7px 12px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px">
+        <span style="color:var(--accent)">ℹ</span>ITP templates can be added from project settings only
       </div>
       <div>
-        <label class="ml">ITP Type *</label>
-        <select class="mi" id="itpType" style="height:38px;appearance:auto;cursor:pointer" onchange="onItpTypeChange()"></select>
-      </div>
-      <div id="itpEquipWrap">
         <label class="ml">Equipment ID</label>
         <input class="mi" id="itpEquip" placeholder="e.g. FCU-L02-001" autocomplete="off">
       </div>
       <div>
-        <label class="ml">Status</label>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="mbtn" id="sopt-ns" onclick="selectStatus('not-started')" style="flex:1;font-size:11px">Not Started</button>
-          <button class="mbtn" id="sopt-ip" onclick="selectStatus('in-progress')" style="flex:1;font-size:11px">In Progress</button>
-          <button class="mbtn" id="sopt-act" onclick="selectStatus('action')" style="flex:1;font-size:11px">Action</button>
-          <button class="mbtn" id="sopt-cl" onclick="selectStatus('closed')" style="flex:1;font-size:11px">Closed</button>
-        </div>
+        <label class="ml">Equipment Type</label>
+        <select class="mi" id="itpEquipTypeFilter" style="height:36px;appearance:auto;cursor:pointer" onchange="filterItpList()">
+          <option value="">— All Types —</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Select ITP Templates <span id="itpSelCount" style="font-family:DM Mono,monospace;font-size:10px;color:var(--accent);margin-left:6px"></span></label>
+        <div id="itpCheckList" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;margin-top:4px"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -568,7 +572,10 @@ function renderPins(){
     var inner='';
     if(p.type==='itp'){
       var txt=(p.ref||'').replace('ITP-','');
-      inner='<div class="pin-itp '+stCls+'">'+escH(txt)+'</div>';
+      var itpCount=(p.itps&&p.itps.length)||1;
+      inner='<div class="pin-itp '+stCls+'" style="position:relative">'+escH(txt)
+        +(itpCount>1?'<span class="pin-cluster-badge">'+itpCount+'</span>':'')
+        +'</div>';
     } else if(p.type==='defect'){
       var dtxt=(p.ref||'').replace('DEF-','');
       inner='<div class="pin-def '+stCls+'">'+escH(dtxt.slice(-3))+'</div>';
@@ -670,45 +677,92 @@ function nextRef(prefix,field){
 
 // ── ITP PIN MODAL ──
 var _itpPinCache=null;
+var _itpSelectedTemplates=[];
+
 function populateItpTypes(){
-  var sel=document.getElementById('itpType');
-  sel.innerHTML='<option value="">— Select ITP Type —</option>'+(templates||[]).map(function(t){return'<option value="'+escH(t.itpType)+'">'+escH(t.itpType)+'</option>';}).join('');
+  var sel=document.getElementById('itpEquipTypeFilter');
+  if(!sel)return;
+  var types=[...new Set((templates||[]).map(function(t){return t.equipType||'';}).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">— All Types —</option>'+types.map(function(t){
+    return '<option value="'+escH(t)+'">'+escH(t)+'</option>';
+  }).join('');
+}
+function filterItpList(){
+  var equipFilter=(document.getElementById('itpEquipTypeFilter')||{}).value||'';
+  var filtered=(templates||[]).filter(function(t){
+    return !equipFilter||(t.equipType||'')===equipFilter;
+  });
+  renderItpCheckList(filtered);
+}
+function renderItpCheckList(list){
+  var el=document.getElementById('itpCheckList');if(!el)return;
+  if(!list||!list.length){
+    el.innerHTML='<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px">No templates — add from project settings</div>';
+    return;
+  }
+  var catOrder=['Installation','Pre-Commissioning','Commissioning'];
+  var groups={};
+  list.forEach(function(t){var cat=t.itpCategory||'Other';if(!groups[cat])groups[cat]=[];groups[cat].push(t);});
+  var catCols={'Installation':'#00e5a0','Pre-Commissioning':'#ffb830','Commissioning':'#c4b5fd','Other':'var(--muted)'};
+  var html='';
+  var allCats=catOrder.concat(Object.keys(groups).filter(function(k){return catOrder.indexOf(k)<0;}));
+  allCats.forEach(function(cat){
+    var items=groups[cat];if(!items||!items.length)return;
+    html+='<div style="padding:5px 12px 3px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:'+(catCols[cat]||'var(--muted)')+';background:var(--surface3);border-bottom:1px solid var(--border)">'+escH(cat)+'</div>';
+    items.forEach(function(t){
+      var checked=_itpSelectedTemplates.some(function(s){return s.itpNo===t.itpNo;});
+      html+='<label style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border)">'
+        +'<input type="checkbox" data-itpno="'+escH(t.itpNo||'')+'" data-itptype="'+escH(t.itpType||'')+'" '+(checked?'checked':'')+' onchange="toggleItpSel(this)" style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0">'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH(t.itpType||t.itpNo||'')+'</div>'
+        +'<div style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">'+escH(t.itpNo||'')+'</div>'
+        +'</div></label>';
+    });
+  });
+  el.innerHTML=html;
+  updateItpSelCount();
+}
+function toggleItpSel(cb){
+  var no=cb.dataset.itpno,type=cb.dataset.itptype;
+  if(cb.checked){if(!_itpSelectedTemplates.some(function(s){return s.itpNo===no;}))_itpSelectedTemplates.push({itpNo:no,itpType:type});}
+  else{_itpSelectedTemplates=_itpSelectedTemplates.filter(function(s){return s.itpNo!==no;});}
+  updateItpSelCount();
+}
+function updateItpSelCount(){
+  var el=document.getElementById('itpSelCount');
+  if(el)el.textContent=_itpSelectedTemplates.length?_itpSelectedTemplates.length+' selected':'';
 }
 function onItpTypeChange(){}
-function selectStatus(st){
-  _itpStatus=st;
-  ['ns','ip','act','cl'].forEach(function(s){document.getElementById('sopt-'+s).classList.remove('primary');});
-  var map={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
-  if(map[st])document.getElementById('sopt-'+map[st]).classList.add('primary');
-}
+function selectStatus(st){_itpStatus=st;}
 function openItpMo(pin){
   _itpPinCache=pin;
-  _itpStatus=pin?(responses[pin.id]||{}).status||'not-started':'not-started';
+  _itpSelectedTemplates=[];
+  if(pin&&pin.itps&&pin.itps.length)_itpSelectedTemplates=pin.itps.slice();
+  else if(pin&&pin.itpTypeLabel)_itpSelectedTemplates=[{itpNo:'',itpType:pin.itpTypeLabel}];
   document.getElementById('itpMoTitle').textContent=pin?'Edit ITP Pin':'New ITP Pin';
-  document.getElementById('itpType').value=pin?(pin.itpTypeLabel||''):'';
   document.getElementById('itpEquip').value=pin?(pin.equip||''):'';
   document.getElementById('itpDelBtn').style.display=pin?'':'none';
-  selectStatus(_itpStatus);
+  var ef=document.getElementById('itpEquipTypeFilter');if(ef)ef.value='';
+  populateItpTypes();filterItpList();
   document.getElementById('itpMo').classList.add('open');
 }
 function closeItpMo(){document.getElementById('itpMo').classList.remove('open');_itpPinCache=null;}
 function saveItpPin(){
-  var type=document.getElementById('itpType').value;
-  if(!type){toast('Select an ITP type');return;}
+  if(!_itpSelectedTemplates.length){toast('Select at least one ITP template');return;}
   if(!curDrawing.pins)curDrawing.pins=[];
-  var u=dbGetCurrentUser();
+  var u=dbGetCurrentUser();var equip=document.getElementById('itpEquip').value.trim();
   if(_itpPinCache){
-    _itpPinCache.itpTypeLabel=type;
-    _itpPinCache.equip=document.getElementById('itpEquip').value.trim();
+    _itpPinCache.itps=_itpSelectedTemplates.slice();
+    _itpPinCache.itpTypeLabel=_itpSelectedTemplates[0].itpType||'';
+    _itpPinCache.equip=equip;
     responses[_itpPinCache.id]=responses[_itpPinCache.id]||{};
-    responses[_itpPinCache.id].status=_itpStatus;
   } else {
     var ref=nextRef('ITP');
-    var pin={id:nid(),type:'itp',ref:ref,itpTypeLabel:type,equip:document.getElementById('itpEquip').value.trim(),x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
-    curDrawing.pins.push(pin);
-    responses[pin.id]={status:_itpStatus};
+    var pin={id:nid(),type:'itp',ref:ref,itps:_itpSelectedTemplates.slice(),itpTypeLabel:_itpSelectedTemplates[0].itpType||'',equip:equip,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    curDrawing.pins.push(pin);responses[pin.id]={status:'not-started'};
   }
-  saveAll();renderPins();renderPanel();closeItpMo();toast('ITP pin saved');
+  saveAll();renderPins();renderPanel();closeItpMo();
+  toast(_itpSelectedTemplates.length>1?_itpSelectedTemplates.length+' ITP templates pinned':'ITP pin saved');
 }
 
 // ── FIRE SEAL MODAL ──
@@ -913,12 +967,18 @@ function saveDefPin(){
 function openPinModal(pin){
   var pNum=(dbGetCurrentProject()||{}).num||pKey||'';
   if(pin.type==='itp'){
-    // Open ITP form in new tab — pass both drawingId and pinId
-    var dwgId=(curDrawing&&curDrawing.id)||'';
-    var url='hvac-itp-form.html?pinId='+encodeURIComponent(pin.id)+'&drawingId='+encodeURIComponent(dwgId)+(pNum?'&p='+encodeURIComponent(pNum):'');
-    window.open(url,'_blank');
+    var itpCount=(pin.itps&&pin.itps.length)||0;
+    if(itpCount>1){
+      // Show cluster popup
+      showItpClusterPopup(pin);
+    } else {
+      // Single ITP — open directly
+      var dwgId=(curDrawing&&curDrawing.id)||'';
+      var itpNo=(pin.itps&&pin.itps[0]&&pin.itps[0].itpNo)||'';
+      var url='hvac-itp-form.html?pinId='+encodeURIComponent(pin.id)+'&drawingId='+encodeURIComponent(dwgId)+(pNum?'&p='+encodeURIComponent(pNum):'')+(itpNo?'&itpNo='+encodeURIComponent(itpNo):'');
+      window.open(url,'_blank');
+    }
   } else if(pin.type==='defect'){
-    // Open defect form in new tab
     var dwgId2=(curDrawing&&curDrawing.id)||'';
     var defUrl='hvac-defect-form.html?pinId='+encodeURIComponent(pin.id)+'&drawingId='+encodeURIComponent(dwgId2)+(pNum?'&p='+encodeURIComponent(pNum):'');
     window.open(defUrl,'_blank');
@@ -927,6 +987,52 @@ function openPinModal(pin){
   } else if(pin.type==='firedamper'){
     openFdMo(pin);
   }
+}
+
+var _clusterPopup=null;
+function showItpClusterPopup(pin){
+  closeItpClusterPopup();
+  var pNum=(dbGetCurrentProject()||{}).num||pKey||'';
+  var dwgId=(curDrawing&&curDrawing.id)||'';
+  var stCls=PIN_STATUS_CLS[(responses[pin.id]||{}).status||'not-started']||'ns';
+  var html='<div class="icp-hdr"><span>'+escH(pin.ref||'')+(pin.equip?' · '+escH(pin.equip):'')+'</span>'
+    +'<button onclick="closeItpClusterPopup()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px">✕</button></div>';
+  (pin.itps||[]).forEach(function(itp){
+    var url='hvac-itp-form.html?pinId='+encodeURIComponent(pin.id)+'&drawingId='+encodeURIComponent(dwgId)+(pNum?'&p='+encodeURIComponent(pNum):'')+(itp.itpNo?'&itpNo='+encodeURIComponent(itp.itpNo):'');
+    html+='<div class="icp-item" onclick="window.open(\''+url+'\',\'_blank\')">'
+      +'<div class="icp-dot '+stCls+'"></div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH(itp.itpType||itp.itpNo||'')+'</div>'
+      +(itp.itpNo?'<div style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">'+escH(itp.itpNo)+'</div>':'')
+      +'</div>'
+      +'<span style="font-size:10px;color:var(--accent)">↗</span>'
+      +'</div>';
+  });
+  html+='<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px">'
+    +'<button class="mbtn" style="flex:1;font-size:11px" onclick="closeItpClusterPopup();openItpMo(arguments[0])" '
+    +'data-pin-id="'+escH(pin.id)+'" onclick="closeItpClusterPopup();openItpMo(_getCurrentPin(\''+escH(pin.id)+'\'))">✏ Edit Pin</button>'
+    +'</div>';
+  var pop=document.createElement('div');
+  pop.className='itp-cluster-popup';
+  pop.innerHTML=html;
+  // Position near the pin element
+  var pinEl=document.querySelector('[data-pin-id="'+pin.id+'"]');
+  if(pinEl){
+    var r=pinEl.getBoundingClientRect();
+    pop.style.left=Math.min(r.right+8,window.innerWidth-310)+'px';
+    pop.style.top=Math.max(r.top-20,8)+'px';
+  } else {
+    pop.style.left='50%';pop.style.top='50%';pop.style.transform='translate(-50%,-50%)';
+  }
+  document.body.appendChild(pop);
+  _clusterPopup=pop;
+  setTimeout(function(){document.addEventListener('click',closeItpClusterPopup,{once:true});},10);
+}
+function closeItpClusterPopup(){
+  if(_clusterPopup){_clusterPopup.remove();_clusterPopup=null;}
+}
+function _getCurrentPin(id){
+  return (curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===id;})||null;
 }
 
 // ── DELETE PIN ──
