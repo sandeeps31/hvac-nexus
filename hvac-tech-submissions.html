@@ -754,25 +754,18 @@ var _CACHE_KEY='hvacnexus_ts_cache_'+(_tsProj.num||_tsProj.number||'GCT001');
 
 // Then fetch fresh data from Supabase in background
 (async function(){
-  var loaded=false;
+  // Always wait for dbReady so _authSession is set before fetching
+  if(typeof dbReady!=='undefined')await dbReady;
   try{
     var s=await dbGetTechSubmissions(_tsPNum);
     if(Array.isArray(s)){
       submissions=s;_dataLoaded=true;
       localStorage.setItem(_CACHE_KEY,JSON.stringify(s));
-      renderList();loaded=true;
+      renderList();
+    } else {
+      _dataLoaded=true;
     }
-  }catch(e){}
-  if(!loaded){
-    if(typeof dbReady!=='undefined')await dbReady;
-    try{
-      var s2=await dbGetTechSubmissions(_tsPNum);
-      submissions=Array.isArray(s2)?s2:[];
-      localStorage.setItem(_CACHE_KEY,JSON.stringify(submissions));
-    }catch(e){submissions=[];}
-    _dataLoaded=true;
-    renderList();
-  }
+  }catch(e){_dataLoaded=true;}
   // Load equipment non-blocking
   dbGetEquipment(_tsPNum).then(function(eq){
     _cachedEquipData=(typeof eq==='string')?JSON.parse(eq):eq;
