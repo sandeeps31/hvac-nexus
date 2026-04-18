@@ -742,34 +742,30 @@ function save(){
   dbSetTechSubmissions(_tsPNum,submissions).catch(function(e){console.error(e);});
 }
 
-var _CACHE_KEY='hvacnexus_ts_cache_'+(_tsProj.num||_tsProj.number||'GCT001');
+var _CACHE_KEY='hvacnexus_ts_cache_'+_tsPNum;
 
-// Show cached data IMMEDIATELY — zero wait
-(function(){
-  try{
-    var cached=localStorage.getItem(_CACHE_KEY);
-    if(cached){submissions=JSON.parse(cached);_dataLoaded=true;renderList();}
-  }catch(e){}
-})();
+// Show cache instantly if available
+try{
+  var _tsCache=localStorage.getItem(_CACHE_KEY);
+  if(_tsCache){submissions=JSON.parse(_tsCache);_dataLoaded=true;renderList();}
+}catch(e){}
 
-// Then fetch fresh data from Supabase in background
+// Always fetch fresh from Supabase after auth ready
 (async function(){
-  // Always wait for dbReady so _authSession is set before fetching
-  if(typeof dbReady!=='undefined')await dbReady;
+  try{if(typeof dbReady!=='undefined')await dbReady;}catch(e){}
   try{
-    var s=await dbGetTechSubmissions(_tsPNum);
-    if(Array.isArray(s)){
-      submissions=s;_dataLoaded=true;
-      localStorage.setItem(_CACHE_KEY,JSON.stringify(s));
-      renderList();
-    } else {
-      _dataLoaded=true;
-    }
-  }catch(e){_dataLoaded=true;}
-  // Load equipment non-blocking
-  dbGetEquipment(_tsPNum).then(function(eq){
+    var fresh=await dbGetTechSubmissions(_tsPNum);
+    submissions=Array.isArray(fresh)?fresh:(fresh||[]);
+    _dataLoaded=true;
+    try{localStorage.setItem(_CACHE_KEY,JSON.stringify(submissions));}catch(e){}
+    renderList();
+  }catch(e){
+    if(!_dataLoaded){submissions=[];_dataLoaded=true;renderList();}
+  }
+  try{
+    var eq=await dbGetEquipment(_tsPNum);
     _cachedEquipData=(typeof eq==='string')?JSON.parse(eq):eq;
-  }).catch(function(){_cachedEquipData=null;});
+  }catch(e){_cachedEquipData=null;}
 })();
 
 /* GEN SUBMISSION NUMBER */
