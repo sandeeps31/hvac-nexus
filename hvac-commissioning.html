@@ -579,6 +579,13 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
     <!-- COMMISSIONABLE LIST -->
     <div class="cx-panel active" id="cxpanel-commissionable">
       <div id="cxSummaryBar" style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0"></div>
+      <!-- BATCH ACTION BAR -->
+      <div id="batchActionBar" style="display:none;align-items:center;gap:10px;padding:8px 16px;background:var(--accent-dim);border-bottom:1px solid rgba(0,200,255,.2);flex-shrink:0">
+        <span id="batchCount" style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);font-weight:700"></span>
+        <button onclick="openBatchModal()" style="background:var(--accent);border:none;color:#080c12;border-radius:7px;font-size:12px;font-weight:700;padding:5px 14px;cursor:pointer;font-family:DM Sans,sans-serif">✏ Batch Edit</button>
+        <button onclick="openExportModal()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:7px;font-size:12px;padding:5px 14px;cursor:pointer;font-family:DM Sans,sans-serif">⬇ Export Selected</button>
+        <button onclick="clearCxSelection()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;margin-left:auto">✕ Clear Selection</button>
+      </div>
       <div class="cx-toolbar">
         <div class="filter-bar" style="flex:1;flex-wrap:wrap">
           <select class="filter-sel" id="tracker-filter-status" onchange="renderTracker()">
@@ -909,6 +916,7 @@ async function confirmSync(){
         else if(r.max) design=parseFloat(r.max)||null;
         trackerItems.push({
           id:'tr'+uid(),tag:tag,
+          clientDocNo:'',cxItpNo:genCxItpNo(),
           name:(r.desc||r.name||typeName+' '+tag).trim(),
           type:typeName,location:(r.location||''),subloc:(r.sublocation||r.subloc||''),
           locServing:(r.locServing||r.area_served||''),design:design,actual:null,
@@ -1215,8 +1223,12 @@ async function renderTracker(){
 
     var rowClass=isBlocked?'dep-blocked':'';
 
+    var isSelected=cxSelectedItems.has(t.tag);
     var cells=
-      '<td class="tag-cell frozen" style="cursor:pointer;color:var(--accent);font-family:DM Mono,monospace;font-size:12px;font-weight:700;min-width:120px" onclick="openEqPanel('+idx+')">'+escH2(t.tag)+'</td>'+
+      '<td style="min-width:36px;width:36px;padding:6px 8px;position:sticky;left:0;z-index:4;background:'+(isSelected?'var(--accent-dim)':'var(--surface)')+';box-shadow:2px 0 6px rgba(0,0,0,.18)"><input type="checkbox" '+(isSelected?'checked':'')+' data-tag="'+escH2(t.tag)+'" onchange="toggleCxSelect(\''+escH2(t.tag)+'\')" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer"></td>'+
+      '<td class="tag-cell frozen" style="cursor:pointer;color:var(--accent);font-family:DM Mono,monospace;font-size:12px;font-weight:700;min-width:120px;left:44px;background:'+(isSelected?'var(--accent-dim)':'')+';" onclick="openEqPanel('+idx+')">'+escH2(t.tag)+'</td>'+
+      col('clientDocNo',tx(t.clientDocNo,idx,'clientDocNo','e.g. ITP-M-001','130px'))+
+      col('cxItpNo','<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--purple)">'+escH2(t.cxItpNo||'—')+'</span>')+
       col('type','<span style="font-size:12px;color:var(--text)">'+escH2(t.type||'—')+'</span>')+
       col('location','<span style="font-size:12px;color:var(--text2)">'+escH2(t.location||'—')+'</span>')+
       col('subloc','<span style="font-size:12px;color:var(--text2)">'+escH2(t.subloc||'—')+'</span>')+
@@ -1256,6 +1268,15 @@ async function renderTracker(){
   renderDefects();renderWitness();
   updateClearFiltersBtn();
   renderCxSummaryBar(f);
+  _lastFilteredItems=f;
+  updateBatchBar();
+  // Update select-all checkbox state
+  var allChk=document.getElementById('selectAllChk');
+  if(allChk&&f.length){
+    var allSel=f.every(function(t){return cxSelectedItems.has(t.tag);});
+    allChk.checked=allSel;
+    allChk.indeterminate=!allSel&&f.some(function(t){return cxSelectedItems.has(t.tag);});
+  }
 }
 
 function escH2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -1289,7 +1310,7 @@ function addWD(dateStr,days){
 
 // ── COLUMN VISIBILITY (Fix 4) ──
 var CX_COL_DEFS=[
-  {k:'type',l:'Equipment Type',def:true},{k:'location',l:'Location',def:true},{k:'subloc',l:'Sub Location',def:true},
+  {k:'clientDocNo',l:'Client Doc No',def:true},{k:'cxItpNo',l:'Cx ITP No',def:true},{k:'type',l:'Equipment Type',def:true},{k:'location',l:'Location',def:true},{k:'subloc',l:'Sub Location',def:true},
   {k:'locServing',l:'Location Serving',def:true},{k:'autoStatus',l:'Auto Status',def:true},
   {k:'precx',l:'Pre-Cx Complete',def:true},{k:'mssb',l:'MSSB',def:true},
   {k:'boardLoc',l:'Board Location',def:true},{k:'mssbPowered',l:'MSSB Powered',def:true},
@@ -1304,6 +1325,66 @@ var CX_COL_DEFS=[
 var CX_COL_STORE='hvacnexus_cx_cols_'+_cxPNum;
 var cxSortK='';var cxSortD=1;
 var cxColFilters={};
+var cxSelectedItems=new Set(); // selected Equipment IDs for batch
+
+function genCxItpNo(){
+  // Find highest existing CX-ITP number across all tracker items
+  var max=0;
+  trackerItems.forEach(function(t){
+    var m=(t.cxItpNo||'').match(/CX-ITP-(\d{4})/);
+    if(m){var n=parseInt(m[1]);if(n>max)max=n;}
+  });
+  return 'CX-ITP-'+String(max+1).padStart(4,'0');
+}
+
+function toggleCxSelect(tag){
+  if(cxSelectedItems.has(tag))cxSelectedItems.delete(tag);
+  else cxSelectedItems.add(tag);
+  updateBatchBar();
+}
+function toggleCxSelectAll(){
+  var allRows=document.querySelectorAll('#trackerBody tr');
+  var visibleTags=[];
+  allRows.forEach(function(row){var cb=row.querySelector('input[type=checkbox]');if(cb)visibleTags.push(cb.dataset.tag);});
+  var allSelected=visibleTags.every(function(t){return cxSelectedItems.has(t);});
+  visibleTags.forEach(function(t){if(allSelected)cxSelectedItems.delete(t);else cxSelectedItems.add(t);});
+  renderTracker();
+}
+function updateBatchBar(){
+  var bar=document.getElementById('batchActionBar');
+  if(!bar)return;
+  var n=cxSelectedItems.size;
+  bar.style.display=n>0?'flex':'none';
+  var lbl=document.getElementById('batchCount');
+  if(lbl)lbl.textContent=n+' item'+(n!==1?'s':'')+' selected';
+}
+function clearCxSelection(){cxSelectedItems.clear();renderTracker();}
+function openBatchModal(){
+  if(!cxSelectedItems.size){showTrackerToast('Select items first');return;}
+  document.getElementById('batchModal').classList.add('open');
+}
+function applyBatch(){
+  var fields={
+    clientDocNo:document.getElementById('bClientDocNo').value,
+    precxManual:document.getElementById('bPrecx').value,
+    airflowVerif:document.getElementById('bAirflow').value,
+    localFuncCx:document.getElementById('bLocalCx').value,
+    itcSubmitted:document.getElementById('bItpSub').value,
+    intBmsCx:document.getElementById('bBmsCx').value,
+    locServing:document.getElementById('bLocServing').value,
+    startCx:document.getElementById('bStartCx').value,
+    duration:document.getElementById('bDuration').value
+  };
+  trackerItems.forEach(function(t){
+    if(!cxSelectedItems.has(t.tag))return;
+    Object.keys(fields).forEach(function(k){if(fields[k]!=='')t[k]=fields[k];});
+    if(fields.startCx||fields.duration)recalcDates(trackerItems.indexOf(t));
+  });
+  saveTracker();
+  document.getElementById('batchModal').classList.remove('open');
+  renderTracker();
+  showTrackerToast('✓ Applied to '+cxSelectedItems.size+' items');
+}
 
 function cxSortBy(k){
   if(cxSortK===k)cxSortD*=-1;else{cxSortK=k;cxSortD=1;}
@@ -1372,7 +1453,8 @@ function buildTrackerHeader(vis){
       +'<span onclick="openCxColFilter(\''+k+'\',event)" style="font-size:10px;color:'+(hasFilter?'var(--accent)':'var(--muted)')+';cursor:pointer;padding:1px 3px;border-radius:3px;margin-left:auto" title="Filter">⊟</span>'
       +'</div></th>';
   }
-  var ths='<th class="frozen" style="min-width:120px;white-space:nowrap;cursor:pointer;z-index:12" onclick="cxSortBy(\'tag\')">'
+  var ths='<th class="frozen" style="min-width:36px;width:36px;z-index:12;background:var(--surface2);padding:6px 8px"><input type="checkbox" id="selectAllChk" onchange="toggleCxSelectAll()" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer"></th>'
+    +'<th class="frozen" style="min-width:120px;white-space:nowrap;cursor:pointer;z-index:12;left:44px" onclick="cxSortBy(\'tag\')">'
     +'<div style="display:flex;align-items:center;gap:4px">Equipment ID'+(cxSortK==='tag'?'<span style="color:var(--accent);font-size:10px">'+(cxSortD>0?'▲':'▼')+'</span>':'')+'</div></th>';
   CX_COL_DEFS.forEach(function(c){
     if(vis[c.k])ths+=th(c.k,c.l);
@@ -1431,6 +1513,7 @@ function manualPrecx(idx){
 }
 function addTrackerRow(){trackerItems.push({
   id:'tr'+uid(),tag:'',name:'',type:'',location:'',subloc:'',locServing:'',
+  clientDocNo:'',cxItpNo:genCxItpNo(),
   design:null,actual:null,
   precxAuto:'',precxManual:'',
   mssb:'',boardLoc:'',mssbPowered:'',
@@ -1473,7 +1556,58 @@ function renderDefects(){
     </div>
   </div>`).join('');
 }
-function openRemoveTypeModal(){
+function openExportModal(){
+  if(!cxSelectedItems.size){showTrackerToast('Select items first');return;}
+  document.getElementById('exportCount').textContent=cxSelectedItems.size;
+  updateExportModal();
+  document.getElementById('exportModal').classList.add('open');
+}
+function updateExportModal(){
+  var isSep=document.querySelector('input[name=exportType]:checked').value==='separate';
+  document.getElementById('filenameSection').style.display=isSep?'block':'none';
+  if(isSep)updateFnExample();
+}
+function updateFnExample(){
+  var struct=document.querySelector('input[name=fnStruct]:checked').value;
+  var sample=Array.from(cxSelectedItems)[0]||'FCU-L3-01';
+  var t=trackerItems.find(function(t){return t.tag===sample;})||{cxItpNo:'CX-ITP-0001',clientDocNo:'ITP-M-001',tag:sample};
+  var ex=struct==='1'
+    ?(t.clientDocNo||'ITP-M-001')+'_'+(t.cxItpNo||'CX-ITP-0001')+'_'+t.tag
+    :(t.cxItpNo||'CX-ITP-0001')+'_'+t.tag;
+  document.getElementById('fnExample').textContent='Example: '+ex+'.pdf';
+  document.querySelectorAll('input[name=fnStruct]').forEach(function(r){r.onchange=updateFnExample;});
+}
+
+async function runCxExport(){
+  if(typeof PDFLib==='undefined'){alert('PDF-lib not loaded.');return;}
+  var isSep=document.querySelector('input[name=exportType]:checked').value==='separate';
+  var struct=(document.querySelector('input[name=fnStruct]:checked')||{}).value||'2';
+  // Get filtered selected items in current filtered order
+  var items=_lastFilteredItems.filter(function(t){return cxSelectedItems.has(t.tag);});
+  if(!items.length){showTrackerToast('No items to export');return;}
+  document.getElementById('exportModal').classList.remove('open');
+  showTrackerToast('Building PDF'+(isSep?'s':'')+'\u2026');
+  if(isSep){
+    for(var i=0;i<items.length;i++){
+      _epTag=items[i].tag;
+      var filename=buildExportFilename(items[i],struct);
+      await exportEqPanelPdfTo(filename);
+    }
+    showTrackerToast('\u2713 Exported '+items.length+' files');
+  } else {
+    await exportCombinedPdf(items);
+  }
+}
+
+function buildExportFilename(t,struct){
+  var parts=struct==='1'
+    ?[t.clientDocNo||'',t.cxItpNo||'',t.tag]
+    :[t.cxItpNo||'',t.tag];
+  return parts.filter(Boolean).join('_')+'.pdf';
+}
+
+// Store last filtered items for export
+var _lastFilteredItems=[];
   // Build unique types from trackerItems
   var typeCounts={};
   trackerItems.forEach(function(i){
@@ -1882,7 +2016,171 @@ function loadEpDocs(){
 }
 
 async function exportEqPanelPdf(){
+  await exportEqPanelPdfTo(_epTag+'_Cx_Report.pdf');
+}
+
+async function exportEqPanelPdfTo(filename){
   var tag=_epTag;
+  var t=trackerItems.find(function(t){return t.tag===tag;});
+  var d=_epDocs[tag]||{};
+  if(typeof PDFLib==='undefined'){alert('PDF-lib not loaded.');return;}
+  try{
+    var pdf=await buildEquipPdf(tag,t,d);
+    var bytes=await pdf.save();
+    var blob=new Blob([bytes],{type:'application/pdf'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download=filename||tag+'_Cx_Report.pdf';a.click();
+    URL.revokeObjectURL(url);
+  }catch(err){console.error(err);showTrackerToast('Export failed: '+err.message);}
+}
+
+async function exportCombinedPdf(items){
+  if(typeof PDFLib==='undefined'){alert('PDF-lib not loaded.');return;}
+  try{
+    var PDFDocument=PDFLib.PDFDocument,rgb=PDFLib.rgb,StandardFonts=PDFLib.StandardFonts;
+    var master=await PDFDocument.create();
+    var font=await master.embedFont(StandardFonts.Helvetica);
+    var bold=await master.embedFont(StandardFonts.HelveticaBold);
+    var proj=dbGetCurrentProject()||{};
+    var projName=proj.name||proj.projectName||'Project';
+    var projNum=proj.num||proj.number||proj.projectNumber||'';
+    var W=595,H=842;
+
+    // ── CONTENTS PAGE ──
+    var contPage=master.addPage([W,H]);
+    contPage.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
+    contPage.drawRectangle({x:0,y:H-60,width:W,height:60,color:rgb(0.039,0.071,0.118)});
+    contPage.drawText('Commissioning Report — Equipment List',{x:20,y:H-35,size:15,font:bold,color:rgb(0,0.898,0.627)});
+    contPage.drawText(projName+(projNum?' | '+projNum:''),{x:20,y:H-52,size:9,font:font,color:rgb(0.6,0.7,0.7)});
+    // Table header
+    var tY=H-80;
+    var colXs=[20,130,250,370];
+    var hdrs=['Client Doc No','Cx ITP No','Equipment ID','Equipment Type'];
+    hdrs.forEach(function(h,i){
+      contPage.drawText(h,{x:colXs[i],y:tY,size:8,font:bold,color:rgb(0.3,0.3,0.3)});
+    });
+    contPage.drawRectangle({x:20,y:tY-4,width:W-40,height:1,color:rgb(0.8,0.8,0.8)});
+    items.forEach(function(t,i){
+      var ry=tY-16-i*18;
+      if(ry<30)return; // overflow guard
+      var bg=i%2===0?rgb(0.97,0.97,0.97):rgb(1,1,1);
+      contPage.drawRectangle({x:18,y:ry-4,width:W-36,height:16,color:bg});
+      [t.clientDocNo||'—',t.cxItpNo||'—',t.tag,t.type||'—'].forEach(function(v,ci){
+        contPage.drawText(String(v).substring(0,22),{x:colXs[ci],y:ry,size:9,font:i===0?bold:font,color:rgb(0.1,0.1,0.1)});
+      });
+    });
+    contPage.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
+    contPage.drawText(projName,{x:20,y:8,size:8,font:font,color:rgb(0.4,0.5,0.5)});
+    contPage.drawText(new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}),{x:W-160,y:8,size:8,font:font,color:rgb(0.4,0.5,0.5)});
+
+    // ── APPEND EACH EQUIPMENT ──
+    for(var i=0;i<items.length;i++){
+      var equipPdf=await buildEquipPdf(items[i].tag,items[i],_epDocs[items[i].tag]||{});
+      var pages=await master.copyPages(equipPdf,equipPdf.getPageIndices());
+      pages.forEach(function(p){master.addPage(p);});
+    }
+
+    var bytes=await master.save();
+    var blob=new Blob([bytes],{type:'application/pdf'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download=projName.replace(/\s+/g,'_')+'_Cx_Report_Combined.pdf';a.click();
+    URL.revokeObjectURL(url);
+    showTrackerToast('\u2713 Combined PDF exported');
+  }catch(err){console.error(err);showTrackerToast('Export failed: '+err.message);}
+}
+
+async function buildEquipPdf(tag,t,d){
+  var PDFDocument=PDFLib.PDFDocument,rgb=PDFLib.rgb,StandardFonts=PDFLib.StandardFonts;
+  var pdf=await PDFDocument.create();
+  var font=await pdf.embedFont(StandardFonts.Helvetica);
+  var bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+  var proj=dbGetCurrentProject()||{};
+  var projName=proj.name||proj.projectName||'Project';
+  var projNum=proj.num||proj.number||proj.projectNumber||'';
+  var W=595,H=842;
+  var pageCounter=0;
+
+  // ── COVER PAGE ──
+  var cover=pdf.addPage([W,H]);
+  cover.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
+  // Top bar
+  cover.drawRectangle({x:0,y:H-80,width:W,height:80,color:rgb(0.039,0.071,0.118)});
+  // Company logo placeholder
+  cover.drawRectangle({x:20,y:H-72,width:100,height:56,color:rgb(0.08,0.12,0.2),borderColor:rgb(0,0.78,0.55),borderWidth:1});
+  cover.drawText('COMPANY',{x:28,y:H-44,size:7,font:bold,color:rgb(0,0.898,0.627)});
+  cover.drawText('LOGO',{x:36,y:H-56,size:7,font:bold,color:rgb(0,0.898,0.627)});
+  // HVAC Nexus logo placeholder
+  cover.drawRectangle({x:W-120,y:H-72,width:100,height:56,color:rgb(0.08,0.12,0.2),borderColor:rgb(0,0.78,0.55),borderWidth:1});
+  cover.drawText('HVAC NEXUS',{x:W-113,y:H-48,size:7,font:bold,color:rgb(0,0.898,0.627)});
+  // Cyan rule
+  cover.drawRectangle({x:20,y:H-90,width:W-40,height:2,color:rgb(0,0.898,0.627)});
+  // Title
+  cover.drawText('COMMISSIONING REPORT',{x:20,y:H-130,size:20,font:bold,color:rgb(0.039,0.071,0.118)});
+  // Equipment block
+  cover.drawRectangle({x:20,y:H-195,width:W-40,height:50,color:rgb(0.039,0.071,0.118)});
+  cover.drawText(tag,{x:32,y:H-170,size:18,font:bold,color:rgb(0,0.898,0.627)});
+  if(t&&t.type)cover.drawText(t.type,{x:32,y:H-186,size:10,font:font,color:rgb(0.6,0.75,0.85)});
+  // Details
+  var detY=H-220,detRows=[];
+  if(t&&t.location)detRows.push(['Location',t.location]);
+  if(t&&t.subloc)detRows.push(['Sub-Location',t.subloc]);
+  if(t&&t.type)detRows.push(['Equipment Type',t.type]);
+  if(t&&t.clientDocNo)detRows.push(['Client Doc No',t.clientDocNo]);
+  if(t&&t.cxItpNo)detRows.push(['Cx ITP No',t.cxItpNo]);
+  detRows.forEach(function(r,i){
+    cover.drawText(r[0]+':',{x:20,y:detY-i*20,size:10,font:bold,color:rgb(0.35,0.35,0.35)});
+    cover.drawText(String(r[1]),{x:160,y:detY-i*20,size:10,font:font,color:rgb(0.1,0.1,0.1)});
+  });
+  // Divider
+  var divY=H-330;
+  cover.drawRectangle({x:20,y:divY,width:W-40,height:1,color:rgb(0.85,0.85,0.85)});
+  // Project
+  cover.drawText('PROJECT',{x:20,y:divY-18,size:7,font:bold,color:rgb(0.5,0.5,0.5)});
+  cover.drawText(projName,{x:20,y:divY-34,size:13,font:bold,color:rgb(0.039,0.071,0.118)});
+  if(projNum)cover.drawText('Project No: '+projNum,{x:20,y:divY-52,size:10,font:font,color:rgb(0.4,0.4,0.4)});
+  cover.drawText('Date Generated',{x:W-180,y:divY-18,size:7,font:bold,color:rgb(0.5,0.5,0.5)});
+  cover.drawText(new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}),{x:W-180,y:divY-34,size:10,font:font,color:rgb(0.1,0.1,0.1)});
+  // Bottom bar
+  cover.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
+  cover.drawText('Generated by HVAC Nexus',{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
+
+  function sectionPage(title){
+    var p=pdf.addPage([W,H]);pageCounter++;
+    p.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
+    p.drawRectangle({x:0,y:H-50,width:W,height:50,color:rgb(0.039,0.071,0.118)});
+    p.drawText(title,{x:20,y:H-28,size:14,font:bold,color:rgb(0,0.898,0.627)});
+    p.drawText(tag+(t?' \u00B7 '+(t.type||''):''),{x:20,y:H-42,size:9,font:font,color:rgb(0.6,0.7,0.7)});
+    p.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
+    p.drawText(projName+(projNum?' \u00B7 '+projNum:''),{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
+    p.drawText('Page '+pageCounter,{x:W-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
+    return p;
+  }
+  async function appendPdf(data){
+    try{
+      var s=await PDFDocument.load(data);
+      var pp=await pdf.copyPages(s,s.getPageIndices());
+      pp.forEach(function(srcPage){
+        pageCounter++;
+        var p=pdf.addPage([W,H]);
+        p.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
+        var sz=srcPage.getSize();
+        var avW=W,avH=H-74;
+        var sc=Math.min(avW/sz.width,avH/sz.height);
+        var sw=sz.width*sc,sh=sz.height*sc;
+        p.drawPage(srcPage,{x:(W-sw)/2,y:24+(avH-sh)/2,width:sw,height:sh});
+        p.drawRectangle({x:0,y:H-50,width:W,height:50,color:rgb(0.039,0.071,0.118)});
+        p.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
+        p.drawText(projName+(projNum?' \u00B7 '+projNum:''),{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
+        p.drawText('Page '+pageCounter,{x:W-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
+        pdf.addPage(p);
+      });
+    }catch(e){console.warn('appendPdf failed:',e);}
+  }
+  if(!d.airBalance||!d.airBalance.na){var ar=(d.airBalance&&d.airBalance.revisions)||[];if(ar.length){sectionPage('Air Balance Test Sheet');await appendPdf(ar[ar.length-1].data);}}
+  if(!d.waterBalance||!d.waterBalance.na){var wr=(d.waterBalance&&d.waterBalance.revisions)||[];if(wr.length){sectionPage('Water Balance Test Sheet');await appendPdf(wr[wr.length-1].data);}}
+  if(d.witnessSheet&&d.witnessSheet.file&&d.witnessSheet.file.data){sectionPage('Witness Test Sheet');await appendPdf(d.witnessSheet.file.data);}
+  return pdf;
+}
   var t=trackerItems.find(function(t){return t.tag===tag;});
   var d=_epDocs[tag]||{};
   if(typeof PDFLib==='undefined'){alert('PDF-lib not loaded.');return;}
@@ -1990,9 +2288,23 @@ async function exportEqPanelPdf(){
       try{
         var s=await PDFDocument.load(data);
         var pp=await pdf.copyPages(s,s.getPageIndices());
-        pp.forEach(function(p){
+        pp.forEach(function(srcPage){
           pageCounter++;
-          // Draw footer over appended page
+          // Always add as A4 portrait, scale source content to fit
+          var p=pdf.addPage([W,H]);
+          var srcSize=srcPage.getSize();
+          var srcW=srcSize.width,srcH=srcSize.height;
+          // Available area: below header (H-50) and above footer (24)
+          var availW=W,availH=H-74;
+          var scale=Math.min(availW/srcW,availH/srcH);
+          var scaledW=srcW*scale,scaledH=srcH*scale;
+          var offsetX=(W-scaledW)/2;
+          var offsetY=24+(availH-scaledH)/2;
+          // Embed the source page and draw it scaled
+          p.drawPage(srcPage,{x:offsetX,y:offsetY,width:scaledW,height:scaledH});
+          // Header bar
+          p.drawRectangle({x:0,y:H-50,width:W,height:50,color:rgb(0.039,0.071,0.118)});
+          // Footer
           p.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
           p.drawText(projName+(projNum?' \u00B7 '+projNum:''),{x:20,y:8,size:8,font:font,color:rgb(0.4,0.5,0.5)});
           p.drawText('Page '+pageCounter,{x:W-60,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
@@ -3190,6 +3502,77 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 })();
 
 </script>
+
+<!-- BATCH EDIT MODAL -->
+<div class="mo" id="batchModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="mo-box" style="width:500px">
+    <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:4px">Batch Edit</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Only filled fields will be applied. Blank fields are ignored.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Client Doc No</label>
+        <input id="bClientDocNo" class="mo-input" placeholder="e.g. ITP-M-001"></div>
+      <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Area Served</label>
+        <input id="bLocServing" class="mo-input" placeholder="e.g. Level 3"></div>
+      <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Pre-Cx Complete</label>
+        <select id="bPrecx" class="mo-input" style="height:36px;appearance:auto;cursor:pointer"><option value="">— No change —</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
+      <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Airflow Verification</label>
+        <select id="bAirflow" class="mo-input" style="height:36px;appearance:auto;cursor:pointer"><option value="">— No change —</option><option value="Yes">Yes</option><option value="No">No</option><option value="N/A">N/A</option></select></div>
+      <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Local Functional Test</label>
+        <select id="bLocalCx" class="mo-input" style="height:36px;appearance:auto;cursor:pointer"><option value="">— No change —</option><option value="Yes">Yes</option><option value="No">No</option><option value="N/A">N/A</option></select></div>
+      <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">ITP Submitted</label>
+        <select id="bItpSub" class="mo-input" style="height:36px;appearance:auto;cursor:pointer"><option value="">— No change —</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
+      <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Integrated BMS Cx</label>
+        <select id="bBmsCx" class="mo-input" style="height:36px;appearance:auto;cursor:pointer"><option value="">— No change —</option><option value="Yes">Yes</option><option value="No">No</option><option value="N/A">N/A</option></select></div>
+      <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Start Cx Date</label>
+        <input id="bStartCx" type="date" class="mo-input"></div>
+      <div><label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Duration (days)</label>
+        <input id="bDuration" type="number" min="1" class="mo-input" placeholder="e.g. 5"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="bg bsm btn" onclick="document.getElementById('batchModal').classList.remove('open')">Cancel</button>
+      <button class="bp bsm btn" onclick="applyBatch()">Apply to Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="mo" id="exportModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="mo-box" style="width:480px">
+    <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:4px">Export PDF</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Exporting <span id="exportCount" style="color:var(--accent);font-weight:700"></span> equipment item(s)</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;cursor:pointer" id="exportOptA">
+        <input type="radio" name="exportType" value="combined" checked onchange="updateExportModal()" style="accent-color:var(--accent);margin-top:2px;flex-shrink:0">
+        <div><div style="font-weight:600;font-size:13px;color:var(--text)">Single combined file</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">All equipment in one PDF with a contents page</div></div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;cursor:pointer" id="exportOptB">
+        <input type="radio" name="exportType" value="separate" onchange="updateExportModal()" style="accent-color:var(--accent);margin-top:2px;flex-shrink:0">
+        <div><div style="font-weight:600;font-size:13px;color:var(--text)">Separate file per equipment</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Each equipment exported as its own PDF</div></div>
+      </label>
+    </div>
+    <!-- Filename structure (separate only) -->
+    <div id="filenameSection" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
+      <div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">File Name Structure</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer">
+          <input type="radio" name="fnStruct" value="1" checked style="accent-color:var(--accent)">
+          <span>Client Doc No _ Cx ITP No _ Equipment ID</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer">
+          <input type="radio" name="fnStruct" value="2" style="accent-color:var(--accent)">
+          <span>Cx ITP No _ Equipment ID</span>
+        </label>
+      </div>
+      <div style="margin-top:10px;padding:8px 10px;background:var(--surface3);border-radius:6px;font-family:DM Mono,monospace;font-size:10px;color:var(--accent)" id="fnExample"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="bg bsm btn" onclick="document.getElementById('exportModal').classList.remove('open')">Cancel</button>
+      <button class="bp bsm btn" onclick="runCxExport()" style="background:var(--accent);color:#080c12">⬇ Export</button>
+    </div>
+  </div>
+</div>
 
 <!-- REMOVE TYPE MODAL -->
 <div class="mo" id="removeTypeModal" onclick="if(event.target===this)closeRemoveTypeModal()">
