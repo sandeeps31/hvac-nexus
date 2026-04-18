@@ -143,25 +143,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 </style>
 <script>
 // ── HVAC Nexus Auth Guard ──
-(async function(){
-  if(typeof dbReady !== 'undefined') await dbReady;
-  var DEV_BYPASS=false;
-  if(DEV_BYPASS)return;
-  var stored=localStorage.getItem('hvacnexus_session');
-  if(!stored){window.location.href='hvac-login.html';return;}
-  try{
-    var sess=JSON.parse(stored);
-    if(Date.now()/1000<(sess.expires_at||0)-60){
-      // Set _authSession if db.js loaded
-      if(typeof _authSession!=='undefined')_authSession=sess;
-      return;
-    }
-    var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
-    var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
-    var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
-    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
-    else{localStorage.removeItem('hvacnexus_session');window.location.href='hvac-login.html';}
-  }catch(e){window.location.href='hvac-login.html';}
+(function(){
+  if(!localStorage.getItem('hvacnexus_session')){window.location.href='hvac-login.html';}
 })();
 </script>
 </head>
@@ -431,29 +414,41 @@ function saveDefects(){
 // ── INIT ──
 (async function(){
   await loadData();
+  console.log('[DV] drawingId:',drawingId,'drawings count:',drawings.length);
+  console.log('[DV] curDrawing:',curDrawing?curDrawing.num:'NULL');
   if(!drawingId){showError('No drawing ID');return;}
-  if(!curDrawing){showError('Drawing not found');return;}
+  if(!curDrawing){showError('Drawing not found (id='+drawingId+')');return;}
   document.title=(curDrawing.num||'Drawing')+' — HVAC NEXUS';
   document.getElementById('topNum').textContent=curDrawing.num||'—';
   document.getElementById('topName').textContent=curDrawing.name||'';
   populateItpTypes();
+  console.log('[DV] pdfUrl:',curDrawing.pdfUrl,'hasPdfData:',!!(curDrawing.pdfData));
   if(curDrawing.pdfUrl){loadFromUrl(curDrawing.pdfUrl);}
   else if(curDrawing.pdfData){loadFromData(curDrawing.pdfData);}
   else{showNoPdf();}
-  // highlightDefect param
   var hd=params.get('highlightDefect');
   if(hd){setTimeout(function(){highlightPin(hd);},1000);}
 })();
 
 // ── PDF RENDER ──
 function loadFromUrl(url){
-  // Fetch PDF with auth headers first — avoids CORS restrictions with pdf.js direct URL loading
+  console.log('[DV] loadFromUrl:', url);
   var headers={'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA'};
   try{var s=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(s.access_token)headers['Authorization']='Bearer '+s.access_token;}catch(e){}
   fetch(url,{headers:headers})
-    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();})
-    .then(function(buf){pdfjsLib.getDocument({data:buf}).promise.then(renderPdf).catch(function(e){showError('PDF render error: '+e.message);});})
-    .catch(function(e){showError('Could not load PDF: '+e.message);});
+    .then(function(r){
+      console.log('[DV] fetch response status:',r.status,'ok:',r.ok);
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.arrayBuffer();
+    })
+    .then(function(buf){
+      console.log('[DV] PDF buffer size:',buf.byteLength);
+      pdfjsLib.getDocument({data:buf}).promise.then(renderPdf).catch(function(e){showError('PDF render error: '+e.message);});
+    })
+    .catch(function(e){
+      console.error('[DV] fetch failed:',e);
+      showError('Could not load PDF: '+e.message);
+    });
 }
 function loadFromData(dataUrl){
   var bin=atob(dataUrl.split(',')[1]||dataUrl);
@@ -484,10 +479,15 @@ function renderPdf(pdf){
     var ctx=canvas.getContext('2d');
     page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
       document.getElementById('loading').style.display='none';
-      fitToScreen();
-      renderPins();
-      renderPanel();
-    }).catch(function(){});
+      requestAnimationFrame(function(){
+        var v=document.getElementById('viewer');
+        console.log('viewer dims:',v.clientWidth,v.clientHeight,'canvasW:',_canvasW,'canvasH:',_canvasH,'dpr:',window.devicePixelRatio);
+        fitToScreen();
+        console.log('scale:',_scale,'offsetX:',_offsetX,'offsetY:',_offsetY);
+        renderPins();
+        renderPanel();
+      });
+    }).catch(function(e){console.error('render error',e);});
   });
 }
 
