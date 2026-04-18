@@ -407,6 +407,12 @@ body.sb-sm{padding-left:var(--sb-sm)}
 </div>
 <div class="abar" id="abar" style="display:none">
   <div class="sbox" style="flex:1;min-width:0"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search equipment ID, description, location…" oninput="renderTable();updateHeaderMeta()"/></div>
+  <select class="fsel" id="stfil" onchange="renderTable()">
+    <option value="">All Statuses</option>
+    <option>Not Started</option><option>Procurement</option><option>Delivered</option>
+    <option>Installation In Progress</option><option>Installed</option>
+    <option>Commissioned</option><option>Complete</option>
+  </select>
   <select class="fsel" id="locfil" onchange="renderTable();updateHeaderMeta()"><option value="">All Locations</option></select>
   <div class="abtns">
     <div style="display:flex;align-items:center;gap:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;overflow:hidden;font-family:'DM Mono',monospace;font-size:11px" id="layoutToggle">
@@ -428,13 +434,6 @@ body.sb-sm{padding-left:var(--sb-sm)}
 <div id="scheduleHeader" style="display:none;padding:10px 18px 6px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:baseline;gap:10px">
   <span id="scheduleHeaderType" style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text)"></span>
   <span id="scheduleHeaderMeta" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)"></span>
-</div>
-<div id="dupIdBanner" style="display:none;margin:0 18px 6px;padding:10px 16px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.4);border-radius:8px;display:none;align-items:center;gap:10px">
-  <span style="font-size:16px">⚠️</span>
-  <div style="flex:1">
-    <div style="font-size:13px;font-weight:600;color:var(--danger)">Duplicate Equipment IDs detected</div>
-    <div id="dupIdDetail" style="font-size:12px;color:var(--text2);margin-top:2px"></div>
-  </div>
 </div>
 <div id="main"></div>
 
@@ -687,27 +686,7 @@ return;}
   updateLayoutToggle();updateTplBtnVisibility();
 }
 
-function checkDuplicateIds(){
-  var t=aTab();
-  var banner=document.getElementById('dupIdBanner');
-  var detail=document.getElementById('dupIdDetail');
-  if(!t||!banner){return;}
-  var rows=t.rows.filter(function(r){return!r._deleted;});
-  var ids=rows.map(function(r){return(r.tag||r.equipment_id||'').trim();}).filter(Boolean);
-  var seen={};var dupes=[];
-  ids.forEach(function(id){
-    if(seen[id]&&dupes.indexOf(id)<0)dupes.push(id);
-    seen[id]=true;
-  });
-  if(dupes.length){
-    if(detail)detail.textContent=dupes.length+' duplicate ID'+(dupes.length>1?'s':'')+': '+dupes.slice(0,5).join(', ')+(dupes.length>5?'… (+'+(dupes.length-5)+' more)':'');
-    banner.style.display='flex';
-  } else {
-    banner.style.display='none';
-  }
-}
 function updSum(){
-  checkDuplicateIds();
   var t=aTab();if(!t)return;
   var r=t.rows;
   // Rebuild location filter
@@ -717,8 +696,8 @@ function updSum(){
   // Update header stats based on current filter
   var q=(document.getElementById('srch')||{}).value||'';
   var locF=cv||'';
-  var allRows=r.filter(function(row){return!row._deleted;});
-  var filtered=allRows.filter(function(row){
+  var filtered=r.filter(function(row){
+    if(row._deleted)return false;
     if(locF&&row.location!==locF)return false;
     if(q){
       var qs=q.toLowerCase();
@@ -729,10 +708,9 @@ function updSum(){
     }
     return true;
   });
-  var isFiltered=locF||q||Object.keys(colFilters).some(function(k){return colFilters[k]&&colFilters[k].size>0;});
   var total=filtered.length;
   var el=document.getElementById('hdr-row-count');
-  if(el)el.textContent=total+(isFiltered?' of '+allRows.length:'')+' item'+(allRows.length!==1?'s':'')+(locF?' · '+locF:'');
+  if(el)el.textContent=total+' item'+(total!==1?'s':'')+(locF?' · '+locF:'');
 }
 
 function renderEmpty(){
@@ -772,16 +750,18 @@ function renderTable(){
   var t=aTab(); if(!t)return;
   showGroupByBtn();
   var q=(document.getElementById('srch')||{}).value||'';
+  var sf=(document.getElementById('stfil')||{}).value||'';
   var lf=(document.getElementById('locfil')||{}).value||'';
   var rows=t.rows.filter(function(r){
     var qOk=!q||(r.tag||'').toLowerCase().includes(q.toLowerCase())||(r.desc||'').toLowerCase().includes(q.toLowerCase())||(r.location||'').toLowerCase().includes(q.toLowerCase())||(r.equip||'').toLowerCase().includes(q.toLowerCase());
+    var sfOk=!sf||r.status===sf;
     var lfOk=!lf||r.location===lf;
     // Per-column filters (Set-based like Excel)
     var cfOk=Object.keys(colFilters).every(function(k){
       var fset=colFilters[k];if(!fset||fset.size===0)return true;
       return fset.has(String(r[k]||'').trim());
     });
-    return qOk&&lfOk&&cfOk;
+    return qOk&&sfOk&&lfOk&&cfOk;
   });
 
   // ── GROUP BY BOARD VIEW (MSSB only) ──
@@ -1070,8 +1050,8 @@ function renderBoardGroups(t, rows){
   main.innerHTML=''; main.appendChild(wrap);
 }
 function srtBy(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=1;}var t=aTab();if(!t)return;t.rows.sort(function(a,b){return String(a[k]||'').localeCompare(String(b[k]||''),undefined,{numeric:true})*sortD;});renderTable();}
-function setColFilter(k,v){colFilters[k]=v;renderTable();updateHeaderMeta();}
-function clearColFilters(){colFilters={};renderTable();updateHeaderMeta();}
+function setColFilter(k,v){colFilters[k]=v;renderTable();}
+function clearColFilters(){colFilters={};renderTable();}
 
 // colFilters: {colKey: Set of selected values} — empty Set or missing = show all
 var _cfpKey=null,_cfpPending=null;
@@ -1246,21 +1226,12 @@ function updateHeaderMeta(){
       getCols(t).forEach(function(c){if((row[c.k]||'').toString().toLowerCase().includes(qs))m=true;});
       if(!m)return false;
     }
-    // Also apply column filters
-    var cfOk=Object.keys(colFilters).every(function(k){
-      var fset=colFilters[k];if(!fset||fset.size===0)return true;
-      return fset.has(String(row[k]||''));
-    });
-    if(!cfOk)return false;
     return true;
   });
   var parts=[];
   if(t.companyTemplateTplNo)parts.push(t.companyTemplateTplNo);
-  var hasColFilter=Object.keys(colFilters).some(function(k){return colFilters[k]&&colFilters[k].size>0;});
-  var isFiltered=locF||q||hasColFilter;
-  var countStr=filteredRows.length+(isFiltered?' of '+allRows.length:'')+' item'+(allRows.length!==1?'s':'');
+  var countStr=filteredRows.length+(locF||q?' of '+allRows.length:'')+' item'+(allRows.length!==1?'s':'');
   if(locF)countStr+=' · '+locF;
-  if(hasColFilter)countStr+=' · filtered';
   parts.push(countStr);
   shMeta.textContent=parts.join(' · ');
 }
@@ -2494,8 +2465,6 @@ function exportRevXLSX(){
         +'</cellXfs>'
         +'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
         +'</styleSheet>';
-        '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
-        '</styleSheet>';
 
       zip.file('xl/styles.xml', stylesXml);
 
