@@ -358,7 +358,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Client Doc No.</div><div class="itp-hdr-val" id="ed-clientdoc2" style="color:var(--muted);font-style:italic;font-size:11px">—</div></div>
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Ref No.</div><div class="itp-hdr-val mono" id="ed-itpno" style="color:var(--muted);font-style:italic;font-size:11px">Auto generated on creation</div></div>
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Form No.</div><div class="itp-hdr-val mono" id="ed-formno">—</div></div>
-        <div class="itp-hdr-cell"><div class="itp-hdr-lbl">ITP Type</div><div class="itp-hdr-val" id="ed-itptype">—</div></div>
       </div>
       <!-- Editable meta row -->
       <div class="itp-hdr-row" id="ed-meta-row" style="background:var(--surface2);border-top:1px solid var(--border)">
@@ -368,7 +367,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
         </div>
         <div class="itp-hdr-cell">
           <div class="itp-hdr-lbl">Equipment Type <span style="color:var(--accent);font-size:9px">✏ editable</span></div>
-          <input id="ed-equiptype-input" class="mi" style="font-size:12px;padding:4px 8px;margin-top:2px" placeholder="e.g. FCU" onblur="saveItpMeta()"/>
+          <div class="searchable-wrap" style="margin-top:2px">
+            <input id="ed-equiptype-input" class="searchable-input" style="font-size:12px;padding:4px 8px" placeholder="e.g. FCU" autocomplete="off"
+              oninput="filterEdEquipDropdown()" onfocus="openEdEquipDropdown()" onblur="setTimeout(function(){closeEdEquipDropdown();saveItpMeta();},150)"/>
+            <div class="searchable-dropdown" id="edEquipDropdown"></div>
+          </div>
         </div>
         <div class="itp-hdr-cell">
           <div class="itp-hdr-lbl">ITP Category <span style="color:var(--accent);font-size:9px">✏ editable</span></div>
@@ -881,13 +884,50 @@ function saveItpMeta(){
   var newEquip=(document.getElementById('ed-equiptype-input').value||'').trim();
   var newCat=document.getElementById('ed-itpcat-input').value||'';
   if(newType)itp.itpType=newType;
-  if(newEquip!==undefined)itp.equipType=newEquip;
+  itp.equipType=newEquip;
   if(newCat!==undefined)itp.itpCategory=newCat;
-  // Update displayed ITP type in header
-  var el=document.getElementById('ed-itptype');if(el)el.textContent=itp.itpType||'—';
   // Update breadcrumb
   var bc=document.getElementById('bcCurr');if(bc)bc.textContent=itp.itpNo+' — '+itp.itpType;
   save();
+}
+
+function renderEdEquipDropdown(q){
+  var types=getEquipTypes();
+  var filtered=q?types.filter(function(t){return t.toLowerCase().includes(q.toLowerCase());}):types;
+  var dd=document.getElementById('edEquipDropdown');if(!dd)return;
+  var html='';
+  filtered.forEach(function(t){
+    html+='<div class="sd-option" onmousedown="selectEdEquipType(\''+escH(t)+'\')">'+escH(t)+'</div>';
+  });
+  if(q&&!types.find(function(t){return t.toLowerCase()===q.toLowerCase();})){
+    html+='<div class="sd-option sd-add" onmousedown="selectEdEquipType(\''+escH(q)+'\',true)">＋ Add "'+escH(q)+'"</div>';
+  }
+  if(!html)html='<div style="padding:10px 14px;color:var(--muted);font-size:12px">Type to search or create</div>';
+  dd.innerHTML=html;
+}
+function filterEdEquipDropdown(){
+  var q=document.getElementById('ed-equiptype-input').value||'';
+  renderEdEquipDropdown(q);
+  openEdEquipDropdown();
+}
+function openEdEquipDropdown(){
+  renderEdEquipDropdown(document.getElementById('ed-equiptype-input').value||'');
+  var dd=document.getElementById('edEquipDropdown');if(dd)dd.classList.add('open');
+}
+function closeEdEquipDropdown(){
+  var dd=document.getElementById('edEquipDropdown');if(dd)dd.classList.remove('open');
+}
+function selectEdEquipType(val,isNew){
+  var inp=document.getElementById('ed-equiptype-input');if(inp)inp.value=val;
+  closeEdEquipDropdown();
+  if(isNew){
+    // Save new type to standalone list
+    var key='hvacnexus_equip_types';
+    var stored=[];
+    try{stored=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}
+    if(!stored.includes(val)){stored.push(val);localStorage.setItem(key,JSON.stringify(stored));}
+  }
+  saveItpMeta();
 }
 
 // ── EDITOR ──
