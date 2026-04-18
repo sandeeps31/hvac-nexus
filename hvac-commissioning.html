@@ -1820,7 +1820,10 @@ function renderEqPanel(idx){
           h+='</div></div>';
         }
         h+='</div>'
-          +'<button data-type="'+type+'" onclick="epSupersede(this)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:12px;color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif">&#8593; Supersede with New Revision</button>';
+          +'<div style="display:flex;gap:6px;margin-top:6px">'
+          +'<button data-type="'+type+'" onclick="epSupersede(this)" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:12px;color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif">&#8593; Supersede with New Revision</button>'
+          +'<button data-type="'+type+'" onclick="epDeleteBalDocs(this)" style="background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);color:var(--danger);border-radius:7px;padding:8px 12px;font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif" title="Delete all revisions">&#128465;</button>'
+          +'</div>';
       } else {
         h+='<div class="eq-drop-zone" ondragover="this.classList.add(\'over\');event.preventDefault()" ondragleave="this.classList.remove(\'over\')" data-type="'+type+'" ondrop="epBalDrop(event,this)" onclick="epBalBrowse(this)">'
           +'<div style="font-size:20px;margin-bottom:4px">&#128206;</div>'
@@ -1850,7 +1853,10 @@ function renderEqPanel(idx){
       +'<button onclick="epWitnessView()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:2px 6px">View</button>'
       +'<button onclick="epWitnessRemove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 4px" onmouseover="this.style.color=\'var(--danger)\'" onmouseout="this.style.color=\'var(--muted)\'">&#10005;</button>'
       +'</div></div>'
-      +'<button onclick="epWitnessSupersede()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:12px;color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif">&#8593; Replace Witness Sheet</button>'
+      +'<div style="display:flex;gap:6px">'
+      +'<button onclick="epWitnessSupersede()" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:12px;color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif">&#8593; Replace Witness Sheet</button>'
+      +'<button onclick="epWitnessRemove()" style="background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);color:var(--danger);border-radius:7px;padding:8px 12px;font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif" title="Delete witness sheet">&#128465;</button>'
+      +'</div>'
       +'</div>';
   } else {
     wHtml='<div class="eq-section">'
@@ -2024,8 +2030,16 @@ function epWitnessDownload(){
   if(!f||!f.data)return;
   var a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();
 }
+function epDeleteBalDocs(btn){
+  var type=btn.dataset.type;
+  var label=type==='airBalance'?'Air Balance':'Water Balance';
+  if(!confirm('Delete all '+label+' Test Sheet revisions?\n\nThis cannot be undone.'))return;
+  epEnsure();
+  _epDocs[_epTag][type].revisions=[];
+  epSave();renderEqPanel(_epIdx);
+}
 function epWitnessRemove(){
-  if(!confirm('Remove witness test sheet?'))return;
+  if(!confirm('Delete the Witness Test Sheet?\n\nThis cannot be undone.'))return;
   epEnsure();_epDocs[_epTag].witnessSheet={result:'',file:null};
   epSave();renderEqPanel(_epIdx);
 }
@@ -2202,7 +2216,7 @@ async function buildEquipPdf(tag,t,d){
         var sw=sz.width*sc,sh=sz.height*sc;
         var p=pdf.addPage([W,H]);
         p.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
-        p.drawEmbeddedPage(embedded,{x:(W-sw)/2,y:24+(avH-sh)/2,width:sw,height:sh});
+        p.drawPage(embedded,{x:(W-sw)/2,y:24+(avH-sh)/2,width:sw,height:sh});
         p.drawRectangle({x:0,y:H-50,width:W,height:50,color:rgb(0.039,0.071,0.118)});
         p.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
         p.drawText(projName+(projNum?' \u00B7 '+projNum:''),{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
