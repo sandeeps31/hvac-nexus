@@ -884,11 +884,11 @@ function renderList(){
       +'<td>'+docChips(curRev)+'</td>'
       +'<td><span class="status-badge '+stClass(s.status)+'">'+escH(s.status)+'</span></td>'
       +'<td style="color:var(--text2);font-family:DM Mono,monospace;font-size:11px">'+(s.approvedDate?fmtDate(s.approvedDate):'—')+'</td>'
-      +'<td onclick="event.stopPropagation()" style="white-space:nowrap;position:relative;overflow:visible">'
-      +'<button class="act-btn" onclick="openDetail(\''+s.id+'\')"><span class="tip">Edit</span>✏</button> '
-      +'<button class="act-btn" onclick="openRevHistory(\''+s.id+'\')"><span class="tip">History</span>🕐</button> '
-      +'<button class="act-btn" onclick="duplicateSubmission(\''+s.id+'\')"><span class="tip">Copy</span>📋</button> '
-      +'<button class="act-btn danger" onclick="deleteSubmission(\''+s.id+'\')"><span class="tip">Delete</span>🗑</button>'
+      +'<td onclick="event.stopPropagation()" style="white-space:nowrap">'
+      +'<button class="act-btn" onclick="openDetail(\''+s.id+'\')" onmouseenter="showTip(event,\'Edit\')" onmouseleave="hideTip()">✏</button> '
+      +'<button class="act-btn" onclick="openRevHistory(\''+s.id+'\')" onmouseenter="showTip(event,\'History\')" onmouseleave="hideTip()">🕐</button> '
+      +'<button class="act-btn" onclick="duplicateSubmission(\''+s.id+'\')" onmouseenter="showTip(event,\'Copy\')" onmouseleave="hideTip()">📋</button> '
+      +'<button class="act-btn danger" onclick="deleteSubmission(\''+s.id+'\')" onmouseenter="showTip(event,\'Delete\')" onmouseleave="hideTip()">🗑</button>'
       +'</td>'
       +'</tr>';
   });
@@ -1441,6 +1441,27 @@ async function exportTsPdf(){
     URL.revokeObjectURL(url);
     showTsToast('\u2713 PDF exported');
   }catch(err){console.error(err);showTsToast('Export failed: '+err.message);}
+}
+
+/* FIXED TOOLTIP */
+(function(){
+  var tip=document.createElement('div');
+  tip.id='_tsTip';
+  tip.style.cssText='position:fixed;background:var(--surface2);color:var(--text);font-size:11px;font-family:DM Sans,sans-serif;padding:3px 9px;border-radius:5px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s;z-index:9999';
+  document.body.appendChild(tip);
+})();
+function showTip(e,label){
+  var tip=document.getElementById('_tsTip');
+  if(!tip)return;
+  tip.textContent=label;
+  tip.style.opacity='1';
+  var r=e.target.getBoundingClientRect();
+  tip.style.left=Math.round(r.left+r.width/2-tip.offsetWidth/2)+'px';
+  tip.style.top=Math.round(r.top-tip.offsetHeight-6)+'px';
+}
+function hideTip(){
+  var tip=document.getElementById('_tsTip');
+  if(tip)tip.style.opacity='0';
 }
 
 function showTsToast(msg){
