@@ -1157,7 +1157,7 @@ function renderEquipSection(rev){
   var tbl=document.createElement('table');tbl.className='equip-tbl';
   var thead=document.createElement('thead');
   var htr=document.createElement('tr');
-  ['Tag','Location','Make','Model'].forEach(function(h){
+  ['Equipment ID','Location','Manufacturer','Model'].forEach(function(h){
     var th=document.createElement('th');th.textContent=h;htr.appendChild(th);
   });
   thead.appendChild(htr);tbl.appendChild(thead);
@@ -1166,9 +1166,9 @@ function renderEquipSection(rev){
   filtered.forEach(function(r){
     var tr=document.createElement('tr');
     function addTd(val,cls){var td=document.createElement('td');if(cls)td.className=cls;td.textContent=val||'—';tr.appendChild(td);}
-    addTd(r.tag||r.equipId||r.id,'equip-tag');
+    addTd(r.equipId||r.tag||r.id,'equip-tag');
     addTd(r.location||r.loc);
-    addTd(r.make||r.manufacturer);
+    addTd(r.manufacturer||r.make);
     addTd(r.model);
     tbody.appendChild(tr);
   });
@@ -1365,9 +1365,9 @@ async function exportTsPdf(){
       if(equipRows.length){
         // Determine if table is wide (>4 cols from template) → landscape
         var equipCols=[
-          {k:'tag',l:'Equipment ID'},
+          {k:'equipId',l:'Equipment ID'},
           {k:'location',l:'Location'},
-          {k:'make',l:'Manufacturer'},
+          {k:'manufacturer',l:'Manufacturer'},
           {k:'model',l:'Model'}
         ];
         // Add extra cols from template fields
@@ -1398,7 +1398,7 @@ async function exportTsPdf(){
           if(curY<30)return;
           if(ri%2===0)pg.drawRectangle({x:tblX,y:curY,width:pw-40,height:rowH,color:rgb(0.96,0.97,0.98)});
           equipCols.slice(0,8).forEach(function(col,ci){
-            var val=String(row[col.k]||row.tag||'—').substring(0,16);
+            var val=String(row[col.k]||(col.k==='equipId'?row.tag:'')||(col.k==='manufacturer'?row.make:'')||'—').substring(0,16);
             pg.drawText(val,{x:tblX+ci*colW+4,y:curY+4,size:7,font:font,color:rgb(0.1,0.1,0.1)});
           });
           curY-=rowH;
@@ -1427,7 +1427,7 @@ async function exportTsPdf(){
             var row=equipRows[ri2];
             if(ri2%2===0)pgR.drawRectangle({x:tblX,y:rY,width:pw-40,height:rowH,color:rgb(0.96,0.97,0.98)});
             equipCols.slice(0,8).forEach(function(col,ci){
-              var val=String(row[col.k]||row.tag||'—').substring(0,16);
+              var val=String(row[col.k]||(col.k==='equipId'?row.tag:'')||(col.k==='manufacturer'?row.make:'')||'—').substring(0,16);
               pgR.drawText(val,{x:tblX+ci*colW+4,y:rY+4,size:7,font:font,color:rgb(0.1,0.1,0.1)});
             });
             rY-=rowH;
