@@ -360,6 +360,26 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Form No.</div><div class="itp-hdr-val mono" id="ed-formno">—</div></div>
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">ITP Type</div><div class="itp-hdr-val" id="ed-itptype">—</div></div>
       </div>
+      <!-- Editable meta row -->
+      <div class="itp-hdr-row" id="ed-meta-row" style="background:var(--surface2);border-top:1px solid var(--border)">
+        <div class="itp-hdr-cell" style="flex:2">
+          <div class="itp-hdr-lbl">ITP Type Name <span style="color:var(--accent);font-size:9px">✏ editable</span></div>
+          <input id="ed-itptype-input" class="mi" style="font-size:12px;padding:4px 8px;margin-top:2px" placeholder="e.g. FCU — Installation ITP" onblur="saveItpMeta()"/>
+        </div>
+        <div class="itp-hdr-cell">
+          <div class="itp-hdr-lbl">Equipment Type <span style="color:var(--accent);font-size:9px">✏ editable</span></div>
+          <input id="ed-equiptype-input" class="mi" style="font-size:12px;padding:4px 8px;margin-top:2px" placeholder="e.g. FCU" onblur="saveItpMeta()"/>
+        </div>
+        <div class="itp-hdr-cell">
+          <div class="itp-hdr-lbl">ITP Category <span style="color:var(--accent);font-size:9px">✏ editable</span></div>
+          <select id="ed-itpcat-input" class="mi" style="font-size:12px;padding:4px 8px;margin-top:2px;height:32px;appearance:auto;cursor:pointer" onchange="saveItpMeta()">
+            <option value="">— Select —</option>
+            <option value="Installation">Installation</option>
+            <option value="Pre-Commissioning">Pre-Commissioning</option>
+            <option value="Commissioning">Commissioning</option>
+          </select>
+        </div>
+      </div>
       <div class="itp-hdr-row cols3">
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Equipment ID</div><div class="itp-hdr-val mono" id="ed-equipid">—</div></div>
         <div class="itp-hdr-cell"><div class="itp-hdr-lbl">Manufacturer</div><div class="itp-hdr-val mono" id="ed-mfr">—</div></div>
@@ -462,8 +482,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       </div>
       <label class="ml">ITP Type Name *</label>
       <input class="mi" id="new-itptype" placeholder="e.g. FCU — Water Cooled Installation" style="margin-bottom:10px"/>
-      <label class="ml">Form No. <span style="color:var(--muted);font-weight:400">(auto-generated if blank)</span></label>
-      <input class="mi mono" id="new-itpno" placeholder="e.g. ITP-001"/>
     </div>
     <div class="modal-footer">
       <button class="bg bsm btn" onclick="closeNewItpModal()">Cancel</button>
@@ -857,6 +875,21 @@ function renderRegister(){
   document.getElementById('regBody').innerHTML=rows||'<tr><td colspan="9" class="empty"><div class="empty-icon">&#128196;</div><div>No templates yet</div></td></tr>';
 }
 
+function saveItpMeta(){
+  var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
+  var newType=(document.getElementById('ed-itptype-input').value||'').trim();
+  var newEquip=(document.getElementById('ed-equiptype-input').value||'').trim();
+  var newCat=document.getElementById('ed-itpcat-input').value||'';
+  if(newType)itp.itpType=newType;
+  if(newEquip!==undefined)itp.equipType=newEquip;
+  if(newCat!==undefined)itp.itpCategory=newCat;
+  // Update displayed ITP type in header
+  var el=document.getElementById('ed-itptype');if(el)el.textContent=itp.itpType||'—';
+  // Update breadcrumb
+  var bc=document.getElementById('bcCurr');if(bc)bc.textContent=itp.itpNo+' — '+itp.itpType;
+  save();
+}
+
 // ── EDITOR ──
 function renderEditor(){
   var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
@@ -874,6 +907,10 @@ function renderEditor(){
   setEl('ed-creator',itp.createdBy||'—');
   setEl('ed-created',fmtDate(itp.createdDate));
   setEl('ed-modified',fmtDate(rev.modifiedDate));
+  // Populate editable meta fields
+  var inp=document.getElementById('ed-itptype-input');if(inp)inp.value=itp.itpType||'';
+  var eqInp=document.getElementById('ed-equiptype-input');if(eqInp)eqInp.value=itp.equipType||'';
+  var catSel=document.getElementById('ed-itpcat-input');if(catSel)catSel.value=itp.itpCategory||'';
 
   // Editor topbar badge
   var badge=document.getElementById('editorStatusBadge');
@@ -1481,7 +1518,6 @@ function openNewItpModal(){
   _newItpCat='';
   document.getElementById('new-equiptype').value='';
   document.getElementById('new-itptype').value='';
-  document.getElementById('new-itpno').value='';
   ['install','precx','cx'].forEach(function(k){
     var b=document.getElementById('catbtn-'+k);if(b)b.className='cat-btn';
   });
@@ -1557,7 +1593,7 @@ function confirmNewItp(){
   if(!equipType){alert('Equipment Type is required.');document.getElementById('new-equiptype').focus();return;}
   if(!_newItpCat){alert('Please select an ITP Category.');return;}
   if(!type){alert('ITP Type Name is required.');document.getElementById('new-itptype').focus();return;}
-  var num=(document.getElementById('new-itpno').value||'').trim()||genItpNum();
+  var num=genItpNum();
   var me='Sandeep';
   try{var cs=_cachedCS||{};me=(cs.userName||cs.contactName||'Sandeep').split(' ')[0];}catch(e){}
   var tmpl={
