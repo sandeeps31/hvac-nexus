@@ -491,6 +491,76 @@ function renderHeader(){
   var modelD=makeField('Model',(eq&&eq.model)||'—','mono');
   modelD.querySelector('.fmf-val').id='hdr-model';g2.appendChild(modelD);
 
+  // ── GROUP 2b: Serial No — always required, Enter SN or N/A ──
+  var gSN=group();
+  gSN.id='sn-group';
+  var snWrap=document.createElement('div');
+  snWrap.className='fmf';snWrap.style.cssText='flex:1;min-width:260px';
+  var snLbl=document.createElement('div');snLbl.className='fmf-lbl';snLbl.textContent='Serial No';
+  var snVal=responses.serialNo||'';
+  var snResolved=snVal&&snVal!=='';
+  // Amber warning bar if not yet filled
+  var snWarnBar=document.createElement('div');
+  snWarnBar.id='sn-warn-bar';
+  snWarnBar.style.cssText='display:'+(snResolved?'none':'flex')+';align-items:center;gap:6px;background:rgba(255,184,48,.12);border:1px solid rgba(255,184,48,.35);border-radius:6px;padding:6px 10px;margin-top:4px;font-size:11px;color:#ffb830';
+  snWarnBar.innerHTML='<span style="font-size:13px">⚠</span><span>Serial No required — enter below or mark N/A</span>';
+  var snInputRow=document.createElement('div');
+  snInputRow.style.cssText='display:flex;gap:6px;align-items:center;margin-top:6px';
+  var snInp=document.createElement('input');
+  snInp.type='text';snInp.className='doc-input mono';
+  snInp.placeholder='Enter serial number…';
+  snInp.value=snResolved&&snVal!=='N/A'?snVal:'';
+  snInp.style.cssText='flex:1;font-size:12px';
+  snInp.id='sn-input';
+  var snNaBtn=document.createElement('button');
+  snNaBtn.textContent='N/A';
+  snNaBtn.className='btn bg bsm';
+  snNaBtn.style.cssText='flex-shrink:0;font-size:11px;padding:5px 12px;'+(snVal==='N/A'?'border-color:#6b7280;color:#6b7280;background:rgba(107,114,128,.1)':'');
+  snNaBtn.id='sn-na-btn';
+  var snDisplayVal=document.createElement('div');
+  snDisplayVal.id='sn-display';
+  snDisplayVal.style.cssText='display:'+(snResolved?'flex':'none')+';align-items:center;gap:8px;margin-top:4px';
+  var snDispSpan=document.createElement('span');
+  snDispSpan.style.cssText='font-family:DM Mono,monospace;font-size:12px;color:'+(snVal==='N/A'?'var(--muted)':'var(--accent)');
+  snDispSpan.id='sn-disp-val';
+  snDispSpan.textContent=snVal||'';
+  var snEditBtn=document.createElement('button');
+  snEditBtn.textContent='✏';snEditBtn.className='btn bg bsm';
+  snEditBtn.style.cssText='font-size:10px;padding:2px 7px';
+  snDisplayVal.appendChild(snDispSpan);snDisplayVal.appendChild(snEditBtn);
+  snInp.onchange=function(){
+    var v=this.value.trim();
+    if(!v)return;
+    responses.serialNo=v;
+    snDispSpan.textContent=v;snDispSpan.style.color='var(--accent)';
+    snWarnBar.style.display='none';
+    snInputRow.style.display='none';
+    snDisplayVal.style.display='flex';
+    autosave();
+  };
+  snNaBtn.onclick=function(){
+    responses.serialNo='N/A';
+    snDispSpan.textContent='N/A';snDispSpan.style.color='var(--muted)';
+    snWarnBar.style.display='none';
+    snInputRow.style.display='none';
+    snDisplayVal.style.display='flex';
+    autosave();
+  };
+  snEditBtn.onclick=function(){
+    responses.serialNo='';
+    snInp.value='';
+    snWarnBar.style.display='flex';
+    snInputRow.style.display='flex';
+    snDisplayVal.style.display='none';
+    snInp.focus();
+    autosave();
+  };
+  snInputRow.appendChild(snInp);snInputRow.appendChild(snNaBtn);
+  snWrap.appendChild(snLbl);snWrap.appendChild(snWarnBar);snWrap.appendChild(snInputRow);snWrap.appendChild(snDisplayVal);
+  if(snResolved){snInputRow.style.display='none';}else{snInputRow.style.display='flex';}
+  gSN.appendChild(snWrap);
+  meta.appendChild(gSN);
+
   // ── GROUP 3: Location — pre-fill from equipment schedule ──
   var g3=group();
   var eqBuilding=(eq&&(eq.building||eq.floor||eq.level||''))||'';
@@ -1018,6 +1088,12 @@ function exportToPdf(){
     try{return Array.from(ss.cssRules).map(function(r){return r.cssText;}).join('\n');}catch(e){return '';}
   }).join('\n');
   var body=document.querySelector('.form-header').outerHTML+document.getElementById('formPage').outerHTML;
+  // Strip SN group from PDF if N/A
+  if(responses.serialNo==='N/A'){
+    var tmp=document.createElement('div');tmp.innerHTML=body;
+    var snG=tmp.querySelector('#sn-group');if(snG)snG.remove();
+    body=tmp.innerHTML;
+  }
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+title+'</title>'
     +'<style>'+styles+'body{background:#fff;color:#000;font-family:sans-serif;padding:20px}'
     +'.form-header{border:1px solid #ccc;border-radius:6px;margin-bottom:16px}'
