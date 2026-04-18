@@ -1512,7 +1512,10 @@ function autoFillItpName(){
 
 // ── SEARCHABLE EQUIP TYPE DROPDOWN ──
 function getEquipTypes(){
-  return [...new Set(companyTemplates.map(function(t){return t.equipType||'';}).filter(Boolean))].sort();
+  var fromTemplates=companyTemplates.map(function(t){return t.equipType||'';}).filter(Boolean);
+  var standalone=[];
+  try{standalone=JSON.parse(localStorage.getItem('hvacnexus_equip_types')||'[]');}catch(e){}
+  return [...new Set([...standalone,...fromTemplates])].sort();
 }
 
 function renderEquipDropdown(q){
@@ -1571,33 +1574,66 @@ function confirmNewItp(){
 function openManageTypes(){
   renderManageTypes();
   document.getElementById('manageTypesModal').classList.add('open');
+  setTimeout(function(){var inp=document.getElementById('newTypeInput');if(inp){inp.value='';inp.focus();}},80);
 }
 function closeManageTypes(){document.getElementById('manageTypesModal').classList.remove('open');}
+
+function addEquipType(){
+  var val=(document.getElementById('newTypeInput').value||'').trim();
+  if(!val)return;
+  if(getEquipTypes().find(function(t){return t.toLowerCase()===val.toLowerCase();})){
+    alert('"'+val+'" already exists.');return;
+  }
+  // Save to standalone list in localStorage
+  var key='hvacnexus_equip_types';
+  var stored=[];
+  try{stored=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}
+  stored.push(val);
+  localStorage.setItem(key,JSON.stringify(stored));
+  document.getElementById('newTypeInput').value='';
+  renderManageTypes();
+  renderRegister();
+}
 
 function renderManageTypes(){
   var types=getEquipTypes();
   var list=document.getElementById('manageTypesList');
-  if(!types.length){
-    list.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px">No equipment types yet</div>';
-    return;
+  var html='';
+  if(types.length){
+    html=types.map(function(t){
+      var count=companyTemplates.filter(function(x){return x.equipType===t;}).length;
+      var canDelete=count===0;
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)">'
+        +'<input class="mi" value="'+escH(t)+'" style="flex:1;font-size:13px" data-orig="'+escH(t)+'" onblur="renameEquipType(this)">'
+        +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted);white-space:nowrap">'+count+' ITP'+(count!==1?'s':'')+'</span>'
+        +'<button onclick="deleteEquipType(\''+escH(t)+'\')" '+(canDelete?'':'disabled title="Cannot delete — '+count+' ITPs exist"')+' '
+        +'style="background:none;border:none;cursor:'+(canDelete?'pointer':'not-allowed')+';color:'+(canDelete?'var(--danger)':'var(--border)')+';font-size:16px;padding:2px 4px">🗑</button>'
+        +'</div>';
+    }).join('');
+  } else {
+    html='<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">No equipment types yet — add one below</div>';
   }
-  list.innerHTML=types.map(function(t){
-    var count=companyTemplates.filter(function(x){return x.equipType===t;}).length;
-    var canDelete=count===0;
-    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)">'
-      +'<input class="mi" value="'+escH(t)+'" style="flex:1;font-size:13px" data-orig="'+escH(t)+'" onblur="renameEquipType(this)">'
-      +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted);white-space:nowrap">'+count+' ITP'+(count!==1?'s':'')+'</span>'
-      +'<button onclick="deleteEquipType(\''+escH(t)+'\')" '+(canDelete?'':'disabled title="Cannot delete — '+count+' ITPs exist"')+' '
-      +'style="background:none;border:none;cursor:'+(canDelete?'pointer':'not-allowed')+';color:'+(canDelete?'var(--danger)':'var(--border)')+';font-size:16px;padding:2px 4px">🗑</button>'
-      +'</div>';
-  }).join('');
+  // Add new type row at bottom
+  html+='<div style="display:flex;gap:8px;padding:12px 16px;background:var(--surface2);border-top:1px solid var(--border)">'
+    +'<input class="mi" id="newTypeInput" placeholder="New equipment type name…" style="flex:1;font-size:13px" onkeydown="if(event.key===\'Enter\')addEquipType()">'
+    +'<button class="bp bsm btn" onclick="addEquipType()">＋ Add</button>'
+    +'</div>';
+  list.innerHTML=html;
 }
 
 function renameEquipType(inp){
   var orig=inp.dataset.orig;
   var newVal=inp.value.trim();
   if(!newVal||newVal===orig)return;
+  // Rename in templates
   companyTemplates.forEach(function(t){if(t.equipType===orig)t.equipType=newVal;});
+  // Rename in standalone list
+  try{
+    var key='hvacnexus_equip_types';
+    var stored=JSON.parse(localStorage.getItem(key)||'[]');
+    var idx=stored.indexOf(orig);
+    if(idx>=0){stored[idx]=newVal;localStorage.setItem(key,JSON.stringify(stored));}
+  }catch(e){}
   save();renderRegister();
   inp.dataset.orig=newVal;
   renderManageTypes();
@@ -1607,7 +1643,14 @@ function deleteEquipType(type){
   var count=companyTemplates.filter(function(t){return t.equipType===type;}).length;
   if(count>0){alert('Cannot delete "'+type+'" — '+count+' ITP'+(count!==1?'s':'')+' exist under this type.');return;}
   if(!confirm('Delete equipment type "'+type+'"?'))return;
+  // Remove from standalone list
+  try{
+    var key='hvacnexus_equip_types';
+    var stored=JSON.parse(localStorage.getItem(key)||'[]');
+    localStorage.setItem(key,JSON.stringify(stored.filter(function(t){return t!==type;})));
+  }catch(e){}
   renderManageTypes();
+  renderRegister();
 }
 
 // ── IMPORT MODAL (project level) ──
