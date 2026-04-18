@@ -130,6 +130,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
 .modal-hdr h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;flex:1}
 .modal-body{padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
 .modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
+.searchable-wrap{position:relative;width:100%}
+.searchable-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 12px;outline:none;box-sizing:border-box}
+.searchable-input:focus{border-color:var(--accent)}
+.searchable-dropdown{position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:8px;z-index:9999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.6);display:none}
+.searchable-dropdown.open{display:block}
+.sd-option{padding:9px 14px;cursor:pointer;font-size:13px;color:var(--text)}
+.sd-option:hover{background:var(--surface3)}
 .ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
 .mi{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%}
 .mi:focus{border-color:var(--accent)}
@@ -247,9 +254,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
       </div>
       <div>
         <label class="ml">Filter by Equipment Type</label>
-        <select class="mi" id="itpEquipTypeFilter" style="height:36px;appearance:auto;cursor:pointer" onchange="filterItpList()">
-          <option value="">— All Types —</option>
-        </select>
+        <div class="searchable-wrap">
+          <input class="searchable-input" id="itpEquipTypeFilter" placeholder="Search equipment type…" autocomplete="off"
+            oninput="onItpEquipSearch()" onfocus="openItpEquipDd()" onblur="setTimeout(closeItpEquipDd,150)"/>
+          <div class="searchable-dropdown" id="itpEquipDd"></div>
+        </div>
       </div>
       <div>
         <label class="ml">Select ITP Templates <span id="itpSelCount" style="font-family:DM Mono,monospace;font-size:10px;color:var(--accent);margin-left:6px"></span></label>
@@ -674,22 +683,53 @@ function nextRef(prefix,field){
 var _itpPinCache=null;
 var _itpSelectedTemplates=[];
 
+function getItpEquipTypes(){
+  return [...new Set((templates||[]).map(function(t){return t.equipType||'';}).filter(Boolean))].sort();
+}
 function populateItpTypes(){
-  var sel=document.getElementById('itpEquipTypeFilter');
-  if(!sel)return;
-  // Collect unique equipment types — from equipType field, falling back to parsing itpType name
-  var types=[...new Set((templates||[]).map(function(t){
-    return t.equipType||'';
-  }).filter(Boolean))].sort();
-  sel.innerHTML='<option value="">— All Types —</option>'+types.map(function(t){
-    return '<option value="'+escH(t)+'">'+escH(t)+'</option>';
-  }).join('');
+  renderItpEquipDd('');
+}
+function renderItpEquipDd(q){
+  var types=getItpEquipTypes();
+  var filtered=q?types.filter(function(t){return t.toLowerCase().includes(q.toLowerCase());}):types;
+  var dd=document.getElementById('itpEquipDd');if(!dd)return;
+  var html='';
+  if(!q)html='<div class="sd-option" onmousedown="selectItpEquipType(\'\')">— All Types —</div>';
+  filtered.forEach(function(t){
+    html+='<div class="sd-option" onmousedown="selectItpEquipType(\''+escH(t)+'\')">'+escH(t)+'</div>';
+  });
+  if(!filtered.length&&q)html='<div style="padding:10px 14px;color:var(--muted);font-size:12px">No types found</div>';
+  dd.innerHTML=html;
+  // Use fixed positioning to escape modal overflow clipping
+  var inp=document.getElementById('itpEquipTypeFilter');
+  if(inp){
+    var r=inp.getBoundingClientRect();
+    dd.style.cssText='position:fixed;left:'+r.left+'px;top:'+(r.bottom+4)+'px;width:'+r.width+'px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;z-index:9999;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+  }
+}
+function onItpEquipSearch(){
+  var q=document.getElementById('itpEquipTypeFilter').value||'';
+  renderItpEquipDd(q);
+  openItpEquipDd();
+  filterItpList();
+}
+function openItpEquipDd(){
+  renderItpEquipDd(document.getElementById('itpEquipTypeFilter').value||'');
+  var dd=document.getElementById('itpEquipDd');if(dd)dd.style.display='block';
+}
+function closeItpEquipDd(){
+  var dd=document.getElementById('itpEquipDd');if(dd)dd.style.display='none';
+}
+function selectItpEquipType(val){
+  document.getElementById('itpEquipTypeFilter').value=val;
+  closeItpEquipDd();
+  filterItpList();
 }
 function filterItpList(){
-  var eq=(document.getElementById('itpEquipTypeFilter')||{}).value||'';
+  var eq=(document.getElementById('itpEquipTypeFilter').value||'').trim();
   var filtered=(templates||[]).filter(function(t){
     if(!eq)return true;
-    return (t.equipType||'')=== eq
+    return (t.equipType||'').toLowerCase().includes(eq.toLowerCase())
       ||(t.itpType||'').toLowerCase().includes(eq.toLowerCase());
   });
   renderItpCheckList(filtered);
@@ -743,6 +783,7 @@ function openItpMo(pin){
   document.getElementById('itpEquip').value=pin?(pin.equip||''):'';
   document.getElementById('itpDelBtn').style.display=pin?'':'none';
   var ef=document.getElementById('itpEquipTypeFilter');if(ef)ef.value='';
+  closeItpEquipDd();
   populateItpTypes();filterItpList();
   document.getElementById('itpMo').classList.add('open');
 }
