@@ -47,7 +47,21 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 /* SUMMARY BAR */
 .sum-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:stretch;overflow-x:auto;flex-shrink:0}
 .sc{padding:11px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:3px;flex-shrink:0}
-.act-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:12px;padding:3px 8px;transition:all .13s;position:relative}
+.wf-track{display:flex;align-items:center;gap:0;padding:12px 0}
+.wf-step{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:110px;cursor:pointer;position:relative}
+.wf-dot{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;background:var(--surface2)}
+.wf-dot.done{background:var(--green);border-color:var(--green);color:#080c12}
+.wf-dot.active{background:var(--accent);border-color:var(--accent);color:#080c12;box-shadow:0 0 14px rgba(0,200,255,.35)}
+.wf-dot.rejected{background:var(--danger);border-color:var(--danger);color:#fff}
+.wf-dot.warn{background:var(--warn);border-color:var(--warn);color:#080c12}
+.wf-dot.draft-dot{background:var(--surface3);border-color:var(--border);color:var(--muted)}
+.wf-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:center}
+.wf-date{font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);text-align:center}
+.wf-line{flex:1;height:2px;background:var(--border);align-self:center;margin-top:-20px;min-width:20px}
+.wf-line.done{background:var(--green)}
+.wf-step:hover .wf-dot:not(.done):not(.active){border-color:var(--accent);color:var(--accent)}
+.wf-step .wf-change{font-family:'DM Mono',monospace;font-size:8px;color:var(--accent);text-align:center;opacity:0;transition:opacity .13s}
+.wf-step:hover .wf-change{opacity:1}border-radius:6px;color:var(--muted);cursor:pointer;font-size:12px;padding:3px 8px;transition:all .13s;position:relative}
 .act-btn:hover{color:var(--text);border-color:var(--text2);background:var(--surface2)}
 .act-btn.danger:hover{color:var(--danger);border-color:rgba(255,77,109,.4);background:var(--danger-dim)}
 .act-btn .tip{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--surface3);border:1px solid var(--border);border-radius:5px;font-size:10px;padding:2px 7px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;color:var(--text2)}
@@ -337,6 +351,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
               <th style="width:55px">Rev</th>
               <th>Title</th>
               <th style="width:110px">Sub Date</th>
+              <th style="width:80px">Lead Time</th>
               <th style="width:110px">Type</th>
               <th>Documents</th>
               <th style="width:110px">Status</th>
@@ -359,16 +374,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
         <div class="det-meta" id="detMeta"></div>
       </div>
       <div class="det-actions">
-        <select class="fsel" id="detStatus" onchange="updateStatus(this.value)" style="font-size:12px">
-          <option value="Draft">Draft</option>
-          <option value="Submitted">Submitted</option>
-          <option value="Approved">Approved</option>
-          <option value="Rejected">Rejected</option>
-          <option value="Revise & Resubmit">Revise &amp; Resubmit</option>
-        </select>
-        <button class="bp bsm btn" onclick="saveDetail()">💾 Save</button>
+        <button class="bg bsm btn" id="tsExportBtn" onclick="exportTsPdf()" style="color:var(--accent);border-color:rgba(0,200,255,.3);display:none">⬇ Export PDF</button>
+        <button class="bp bsm btn" id="publishRevBtn" onclick="openPublishRevModal()" style="display:none">📤 Publish Revision</button>
+        <button class="bg bsm btn" id="newDraftBtn" onclick="openNewDraftModal()" style="display:none">＋ New Draft</button>
+        <button class="bg bsm btn" id="supersedeBtn" style="display:none" onclick="openSupersedeModal()">↑ Supersede Rev</button>
       </div>
     </div>
+
+    <!-- WORKFLOW TRACKER -->
+    <div id="workflowTracker" style="padding:16px 28px 0"></div>
 
     <!-- REV HISTORY STRIP -->
     <div style="padding:12px 28px 0">
@@ -596,7 +610,65 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
   </div>
 </div>
 
-<!-- EQUIP PICKER MODAL -->
+<!-- PUBLISH REVISION MODAL -->
+<div class="mo" id="publishRevModal" onclick="if(event.target===this)closePublishRevModal()">
+  <div class="modal" style="width:460px">
+    <div class="modal-hdr"><h3>📤 Publish Revision</h3><p>Once published this revision is locked. Status changes will be tracked.</p></div>
+    <div class="modal-body">
+      <div class="sup-note"><span class="sup-note-icon">ℹ️</span><span>Publishing locks all documents and fields. You can still change the status and add consultant feedback. To make document changes, create a new draft.</span></div>
+      <label class="ml">Submission Date *</label>
+      <input class="mi" id="pub-date" type="date"/>
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closePublishRevModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="confirmPublishRev()">📤 Publish</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS CHANGE MODAL -->
+<div class="mo" id="statusChangeModal" onclick="if(event.target===this)closeStatusChangeModal()">
+  <div class="modal" style="width:500px">
+    <div class="modal-hdr"><h3 id="statusChangeMoTitle">Change Status</h3><p id="statusChangeMoSub"></p></div>
+    <div class="modal-body">
+      <label class="ml">Date *</label>
+      <input class="mi" id="stChange-date" type="date"/>
+      <label class="ml" id="stChange-commentLbl" style="margin-top:10px">Comment</label>
+      <textarea class="mi" id="stChange-comment" rows="3" style="resize:vertical;min-height:70px;margin-top:4px" placeholder="Add consultant comments, decision notes…"></textarea>
+      <label class="ml" style="margin-top:10px">Attachments <span style="color:var(--muted);font-weight:400">(consultant markups, response docs)</span></label>
+      <div class="upload-zone" id="dropStChange" style="margin-top:4px" onclick="document.getElementById('fileStChange').click()" ondragover="handleDrag(event,'dropStChange')" ondragleave="handleDragLeave('dropStChange')" ondrop="handleDropStChange(event)">
+        <input type="file" id="fileStChange" multiple accept=".pdf,.doc,.docx" onchange="handleStChangeFile(this)">
+        <div class="upload-icon">📎</div>
+        <div class="upload-text">Drag & drop or <span>browse</span></div>
+      </div>
+      <div id="stChangeFileList" style="margin-top:6px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closeStatusChangeModal()">Cancel</button>
+      <button class="bp bsm btn" id="stChangeConfirmBtn" onclick="confirmStatusChange()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW DRAFT MODAL -->
+<div class="mo" id="newDraftModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="width:460px">
+    <div class="modal-hdr"><h3>＋ New Draft Revision</h3><p>Start a new draft based on the current revision</p></div>
+    <div class="modal-body">
+      <div class="sup-note"><span class="sup-note-icon">ℹ️</span><span>All documents and settings from the current revision are carried over. You can edit freely before publishing.</span></div>
+      <label class="ml">New Revision No.</label>
+      <input class="mi mono" id="newDraft-rev" placeholder="e.g. Rev 02"/>
+      <label class="ml" style="margin-top:10px">New Submission Date</label>
+      <input class="mi" id="newDraft-date" type="date"/>
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="document.getElementById('newDraftModal').classList.remove('open')">Cancel</button>
+      <button class="bp bsm btn" onclick="confirmNewDraft()">Create Draft →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUPERSEDE MODAL -->
 <div class="mo" id="equipPickModal" onclick="if(event.target===this)closeEquipPicker()">
   <div class="modal equip-pick-modal">
     <div class="modal-hdr">
@@ -786,7 +858,7 @@ function renderList(){
 
   if(!list.length){
     var msg=submissions.length?'No results match your filters.':'No submissions yet — click <strong>＋ New Submission</strong> to get started.';
-    document.getElementById('tsBody').innerHTML='<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📤</div><div class="empty-title">Technical Submissions Register</div><div class="empty-sub">'+msg+'</div></div></td></tr>';
+    document.getElementById('tsBody').innerHTML='<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📤</div><div class="empty-title">Technical Submissions Register</div><div class="empty-sub">'+msg+'</div></div></td></tr>';
     return;
   }
 
@@ -798,6 +870,7 @@ function renderList(){
       +'<td><span class="ts-rev'+(s.revisions.length>1?' superseded':'')+'" title="'+s.revisions.length+' revision'+(s.revisions.length!==1?'s':'')+'">'+escH(curRev.rev)+'</span></td>'
       +'<td style="font-weight:500;color:var(--text)">'+escH(s.title)+'</td>'
       +'<td style="color:var(--text2);font-family:DM Mono,monospace;font-size:11px">'+fmtDate(curRev.date)+'</td>'
+      +'<td style="color:var(--text2);font-family:DM Mono,monospace;font-size:11px">'+(curRev.leadTime?curRev.leadTime+'w':'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(s.type||'—')+'</td>'
       +'<td>'+docChips(curRev)+'</td>'
       +'<td><span class="status-badge '+stClass(s.status)+'">'+escH(s.status)+'</span></td>'
@@ -891,15 +964,22 @@ function renderDetail(){
     var v=document.createElement('div');v.className='det-meta-val';v.textContent=val;
     d.appendChild(l);d.appendChild(v);metaEl.appendChild(d);
   }
-  addMeta('Sub Date',fmtDate(rev.date)||'—');
-  addMeta('Type',s.type||'—');
+  addMeta('Sub Date',fmtDate(rev.date)||'\u2014');
+  addMeta('Equipment Type',s.type||'\u2014');
   if(s.clientDocNo)addMeta('Client Doc No',s.clientDocNo);
   if(s.revisions.length>1)addMeta('Revisions',s.revisions.length+' total');
 
-  // Status
-  document.getElementById('detStatus').value=s.status;
-  var supersedeBtn=document.getElementById('supersedeBtn');
-  supersedeBtn.style.display=isViewingLatest()?'':'none';
+  // Workflow tracker
+  renderWorkflowTracker(s);
+
+  // Button visibility
+  var pub=isRevPublished(s);
+  var isLatestRev=isViewingLatest();
+  var isDraft=!pub;
+  document.getElementById('publishRevBtn').style.display=(isDraft&&isLatestRev)?'':'none';
+  document.getElementById('newDraftBtn').style.display=(pub&&isLatestRev&&s.status!=='Draft')?'':'none';
+  document.getElementById('supersedeBtn').style.display='none';
+  document.getElementById('tsExportBtn').style.display='';
 
   // Rev pills
   renderRevPills(s);
@@ -914,25 +994,25 @@ function renderDetail(){
   renderFileSection('photos',rev);
   renderFileSection('other',rev);
 
-  // Add export button to det-actions if not already there
-  var detActions=document.querySelector('.det-actions');
-  if(detActions&&!document.getElementById('tsExportBtn')){
-    var expBtn=document.createElement('button');expBtn.id='tsExportBtn';expBtn.className='bg bsm btn';
-    expBtn.innerHTML='⬇ Export PDF';expBtn.style.cssText='color:var(--accent);border-color:rgba(0,200,255,.3)';
-    expBtn.onclick=exportTsPdf;
-    detActions.insertBefore(expBtn,detActions.firstChild);
-  }
-
-  // If viewing old rev, lock editing
+  // Lock editing if published or viewing old rev
   var isLatest=isViewingLatest();
-  document.getElementById('detStatus').disabled=!isLatest;
-  document.querySelectorAll('.upload-zone').forEach(function(z){z.style.display=isLatest?'':'none';});
-  document.getElementById('leadTimeInput').disabled=!isLatest;
-  document.getElementById('warrantyParts').disabled=!isLatest;
-  document.getElementById('warrantyLabour').disabled=!isLatest;
+  var editable=isLatest&&isDraft;
+  document.querySelectorAll('.upload-zone').forEach(function(z){z.style.display=editable?'':'none';});
+  document.getElementById('leadTimeInput').disabled=!editable;
+  document.getElementById('warrantyParts').disabled=!editable;
+  document.getElementById('warrantyLabour').disabled=!editable;
   document.getElementById('equipUnlinkBtn').style.display='none';
-  if(isLatest&&rev.linkedEquip&&rev.linkedEquip.ids&&rev.linkedEquip.ids.length){
+  if(editable&&rev.linkedEquip&&rev.linkedEquip.ids&&rev.linkedEquip.ids.length){
     document.getElementById('equipUnlinkBtn').style.display='';
+  }
+  if(!editable){
+    document.getElementById('equipUnlinkBtn').style.display='none';
+    // Hide link equipment button too
+    var linkBtn=document.querySelector('.equip-link-bar .bg');
+    if(linkBtn)linkBtn.style.display='none';
+  } else {
+    var linkBtn2=document.querySelector('.equip-link-bar .bg');
+    if(linkBtn2)linkBtn2.style.display='';
   }
 }
 
@@ -1456,24 +1536,157 @@ function toggleSec(id){
   document.getElementById('sec-'+id).classList.toggle('collapsed');
 }
 
-/* STATUS UPDATE */
-function updateStatus(val){
-  var s=submissions.find(function(x){return x.id===activeId;});
-  if(!s)return;
-  s.status=val;
-  save();
+/* ── WORKFLOW ── */
+var WF_MAIN_STEPS=['Submitted','Approved','Rejected','Revise & Resubmit'];
+var WF_COMMENT_REQUIRED=['Rejected','Revise & Resubmit'];
+var _pendingStatus='';
+var _stChangeFiles=[];
+
+function renderWorkflowTracker(s){
+  var el=document.getElementById('workflowTracker');
+  if(!el)return;
+  if(!isRevPublished(s)){
+    el.innerHTML='<div style="padding:10px 0"><span style="background:var(--surface3);border:1px solid var(--border);border-radius:20px;font-family:DM Mono,monospace;font-size:10px;padding:4px 14px;color:var(--muted)">✏ Draft — publish revision to begin status tracking</span></div>';
+    return;
+  }
+  var history=s.statusHistory||[];
+  var WF_ICONS={Submitted:'📤',Approved:'✓',Rejected:'✕','Revise & Resubmit':'↩'};
+  var html='<div class="wf-track">';
+  WF_MAIN_STEPS.forEach(function(step,i){
+    var entries=history.filter(function(h){return h.status===step;});
+    var entry=entries[entries.length-1];
+    var isCurrent=s.status===step;
+    var isDone=!!entry;
+    var dotCls=isCurrent?(step==='Rejected'?'rejected':step==='Revise & Resubmit'?'warn':'active')
+               :isDone?(step==='Rejected'?'rejected':step==='Revise & Resubmit'?'warn':'done'):'draft-dot';
+    if(i>0)html+='<div class="wf-line'+(isDone?' done':'')+'"></div>';
+    html+='<div class="wf-step" onclick="openStatusChangeFor(''+step.replace(/'/g,"\\'")+'')" title="Click to update">'
+      +'<div class="wf-dot '+dotCls+'">'+(WF_ICONS[step]||'○')+'</div>'
+      +'<div class="wf-lbl">'+step+'</div>'
+      +(entry?'<div class="wf-date">'+fmtDate(entry.date)+'</div>':'<div class="wf-date" style="opacity:.3">—</div>')
+      +'<div class="wf-change">Update →</div>'
+      +'</div>';
+  });
+  html+='</div>';
+  var feedbacks=history.filter(function(h){return h.comment||(h.files&&h.files.length);});
+  if(feedbacks.length){
+    html+='<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">';
+    feedbacks.forEach(function(h){
+      html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 14px">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 7px;border-radius:20px;background:var(--surface3);color:var(--text2)">'+escH(h.status)+'</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">'+fmtDate(h.date)+'</span>'
+        +'</div>'
+        +(h.comment?'<div style="font-size:12px;color:var(--text);line-height:1.5;margin-bottom:4px">'+escH(h.comment)+'</div>':'')
+        +((h.files&&h.files.length)?'<div style="display:flex;gap:6px;flex-wrap:wrap">'+h.files.map(function(f){return '<span style="font-size:11px;color:var(--accent);font-family:DM Mono,monospace">📎 '+escH(f.name)+'</span>';}).join('')+'</div>':'')
+        +'</div>';
+    });
+    html+='</div>';
+  }
+  el.innerHTML=html;
 }
 
-/* SAVE DETAIL (also updates status) */
+function isRevPublished(s){
+  var rev=s.revisions&&s.revisions[s.revisions.length-1];
+  return !!(rev&&rev.published)||(s.status&&s.status!=='Draft');
+}
+
+function openStatusChangeFor(status){
+  if(!isViewingLatest())return;
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  if(!isRevPublished(s)){showTsToast('Publish the revision first');return;}
+  _pendingStatus=status;_stChangeFiles=[];
+  var titles={Submitted:'Mark as Submitted',Approved:'Mark as Approved',Rejected:'Mark as Rejected','Revise & Resubmit':'Mark as Revise & Resubmit'};
+  var subs={Submitted:'Record submission date.',Approved:'Record approval date and consultant notes.',Rejected:'Record rejection date and feedback.',
+    'Revise & Resubmit':'Record date and consultant comments.'};
+  document.getElementById('statusChangeMoTitle').textContent=titles[status]||status;
+  document.getElementById('statusChangeMoSub').textContent=subs[status]||'';
+  var reqd=WF_COMMENT_REQUIRED.includes(status);
+  document.getElementById('stChange-commentLbl').textContent=reqd?'Comment *':'Comment';
+  document.getElementById('stChange-date').value=today();
+  document.getElementById('stChange-comment').value='';
+  document.getElementById('stChangeFileList').innerHTML='';
+  document.getElementById('statusChangeModal').classList.add('open');
+}
+function closeStatusChangeModal(){document.getElementById('statusChangeModal').classList.remove('open');_stChangeFiles=[];}
+
+function handleDropStChange(e){
+  e.preventDefault();document.getElementById('dropStChange').classList.remove('drag-over');
+  Array.from(e.dataTransfer.files).forEach(function(f){addStChangeFile(f);});
+}
+function handleStChangeFile(inp){Array.from(inp.files).forEach(function(f){addStChangeFile(f);});inp.value='';}
+function addStChangeFile(f){
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    _stChangeFiles.push({name:f.name,size:formatBytes(f.size),data:ev.target.result});
+    renderStChangeFiles();
+  };
+  reader.readAsDataURL(f);
+}
+function renderStChangeFiles(){
+  document.getElementById('stChangeFileList').innerHTML=_stChangeFiles.map(function(f,i){
+    return '<div class="file-row"><span class="file-icon">📎</span><span class="file-name">'+escH(f.name)+'</span>'
+      +'<button class="file-del" onclick="_stChangeFiles.splice('+i+',1);renderStChangeFiles()">&#x2715;</button></div>';
+  }).join('');
+}
+function confirmStatusChange(){
+  var date=document.getElementById('stChange-date').value;
+  var comment=document.getElementById('stChange-comment').value.trim();
+  if(!date){alert('Date is required.');return;}
+  if(WF_COMMENT_REQUIRED.includes(_pendingStatus)&&!comment){alert('Comment is required for '+_pendingStatus+'.');return;}
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  s.status=_pendingStatus;
+  if(_pendingStatus==='Approved')s.approvedDate=date;
+  if(!s.statusHistory)s.statusHistory=[];
+  s.statusHistory.push({status:_pendingStatus,date:date,comment:comment,files:_stChangeFiles.slice()});
+  save();closeStatusChangeModal();renderDetail();showTsToast('Status updated to '+_pendingStatus);
+}
+
+function openPublishRevModal(){document.getElementById('pub-date').value=today();document.getElementById('publishRevModal').classList.add('open');}
+function closePublishRevModal(){document.getElementById('publishRevModal').classList.remove('open');}
+function confirmPublishRev(){
+  var date=document.getElementById('pub-date').value;
+  if(!date){alert('Submission date is required.');return;}
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  var rev=s.revisions[s.revisions.length-1];
+  rev.date=date;rev.published=true;
+  s.status='Submitted';
+  if(!s.statusHistory)s.statusHistory=[];
+  s.statusHistory.push({status:'Submitted',date:date,comment:'',files:[]});
+  save();closePublishRevModal();renderDetail();showTsToast('Revision published \u2013 status set to Submitted');
+}
+
+function openNewDraftModal(){
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  var curRev=s.revisions[s.revisions.length-1];
+  document.getElementById('newDraft-rev').value=nextRevNum(curRev.rev);
+  document.getElementById('newDraft-date').value=today();
+  document.getElementById('newDraftModal').classList.add('open');
+}
+function confirmNewDraft(){
+  var newRev=document.getElementById('newDraft-rev').value.trim();
+  var date=document.getElementById('newDraft-date').value;
+  if(!newRev){alert('Revision number is required.');return;}
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  var curRev=s.revisions[s.revisions.length-1];
+  var newRevObj=JSON.parse(JSON.stringify(curRev));
+  newRevObj.rev=newRev;newRevObj.date=date;
+  newRevObj.published=false;newRevObj.supersedeReason='';
+  newRevObj.files={data:[],msds:[],spec:[],photos:[],other:[],warranty:[]};
+  s.revisions.push(newRevObj);
+  s.status='Draft';
+  document.getElementById('newDraftModal').classList.remove('open');
+  save();activeRevIdx=null;renderDetail();showTsToast('New draft created: '+newRev);
+}
+
+/* STATUS UPDATE (legacy compatibility) */
+function updateStatus(val){
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  s.status=val;save();
+}
 function saveDetail(){
-  var s=submissions.find(function(x){return x.id===activeId;});
-  if(!s)return;
-  s.status=document.getElementById('detStatus').value;
-  save();
-  // Flash save indicator
-  var btn=document.querySelector('.det-actions .bp');
-  var orig=btn.textContent;btn.textContent='✓ Saved';btn.style.background='#00e5a0';
-  setTimeout(function(){btn.textContent=orig;btn.style.background='';},1500);
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  save();showTsToast('Saved');
 }
 
 /* NEW SUBMISSION MODAL */
