@@ -462,28 +462,19 @@ var _hiRenderTask=null;
 function renderPdf(pdf){
   pdf.getPage(1).then(function(page){
     _pdfPage=page;
-    // Render directly at high resolution — single pass, no swap
-    var dpr=window.devicePixelRatio||1;
-    var hiScale=Math.max(4,dpr*4);
-    var vp=page.getViewport({scale:hiScale});
+    var vp=page.getViewport({scale:1});
     var canvas=document.getElementById('pdfCanvas');
-    // Canvas pixel size = hi-res
     canvas.width=vp.width;
     canvas.height=vp.height;
-    // CSS display size = 1x equivalent (so transform math stays simple)
-    var vp1=page.getViewport({scale:1});
-    canvas.style.width=vp1.width+'px';
-    canvas.style.height=vp1.height+'px';
-    _canvasW=vp1.width;   // always store 1x size for transform math
-    _canvasH=vp1.height;
+    canvas.style.width='';
+    canvas.style.height='';
+    _canvasW=vp.width;
+    _canvasH=vp.height;
     var ctx=canvas.getContext('2d');
     page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
       document.getElementById('loading').style.display='none';
       requestAnimationFrame(function(){
-        var v=document.getElementById('viewer');
-        console.log('viewer dims:',v.clientWidth,v.clientHeight,'canvasW:',_canvasW,'canvasH:',_canvasH,'dpr:',window.devicePixelRatio);
         fitToScreen();
-        console.log('scale:',_scale,'offsetX:',_offsetX,'offsetY:',_offsetY);
         renderPins();
         renderPanel();
       });
@@ -508,15 +499,11 @@ function applyTransform(){
 }
 function fitToScreen(){
   var v=document.getElementById('viewer');
-  var canvas=document.getElementById('pdfCanvas');
   var vw=v.clientWidth,vh=v.clientHeight;
-  // Use CSS canvas size (not hi-res pixel size) for transform math
-  var cw=canvas.offsetWidth||_canvasW;
-  var ch=canvas.offsetHeight||_canvasH;
-  var sx=vw/cw,sy=vh/ch;
+  var sx=vw/_canvasW,sy=vh/_canvasH;
   _scale=Math.min(sx,sy)*0.92;
-  _offsetX=(vw-cw*_scale)/2;
-  _offsetY=(vh-ch*_scale)/2;
+  _offsetX=(vw-_canvasW*_scale)/2;
+  _offsetY=(vh-_canvasH*_scale)/2;
   applyTransform();
 }
 function zoom(f){
