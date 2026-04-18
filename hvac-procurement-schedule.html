@@ -738,6 +738,8 @@ function renderTable(){
     if(_editMode)tr.classList.add('editing');
     var stHex=item.status==='Not ordered'?'#ff4d6d':'#ddeeff';
     var lw=item.leadWeeks?parseInt(item.leadWeeks):null;
+    var tsLw=(_tsLookup[item.equipId]||{}).leadTime?parseInt((_tsLookup[item.equipId]||{}).leadTime):null;
+    var effectiveLw=lw||tsLw||null;
     var statusCell=_editMode
       ?'<select class="proc-edit" onchange="inlineUpdate(\''+item.id+'\',\'status\',this.value)" style="color:'+stHex+'">'+['Not ordered','Ordered','Ready','Delivered','Supplied by others'].map(function(s){return'<option value="'+s+'"'+(item.status===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'
       :'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+stHex+'">'+escH(item.status||'—')+'</span>';
@@ -745,8 +747,8 @@ function renderTable(){
       ?'<input type="date" class="proc-edit" value="'+(item.orderDate||'')+'" onchange="inlineUpdate(\''+item.id+'\',\'orderDate\',this.value)" style="min-width:130px"/>'
       :'<span style="font-family:DM Mono,monospace;font-size:11px">'+fmtD(item.orderDate)+'</span>';
     var leadCell=_editMode
-      ?'<input type="number" class="proc-edit" value="'+(lw||'')+'" min="1" max="999" step="1" inputmode="numeric" placeholder="—" onchange="inlineUpdate(\''+item.id+'\',\'leadWeeks\',this.value)" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" style="width:70px;text-align:right"/>'
-      :'<span style="font-family:DM Mono,monospace;font-size:11px">'+(lw?lw+' wk':'—')+'</span>';
+      ?'<input type="number" class="proc-edit" value="'+(effectiveLw||'')+'" min="1" max="999" step="1" inputmode="numeric" placeholder="—" onchange="inlineUpdate(\''+item.id+'\',\'leadWeeks\',this.value)" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" style="width:70px;text-align:right"/>'
+      :'<span style="font-family:DM Mono,monospace;font-size:11px" title="'+(tsLw&&!lw?'from tech sub':'manual')+'">'+(effectiveLw?effectiveLw+' wk'+(tsLw&&!lw?' <span style="font-size:9px;color:var(--accent)">TS</span>':''):'—')+'</span>';
     var commentsCell=_editMode
       ?'<textarea class="proc-edit" onchange="inlineUpdate(\''+item.id+'\',\'comments\',this.value)" style="min-width:260px;min-height:36px">'+escH(item.comments||'')+'</textarea>'
       :'<span>'+escH(item.comments||'')+'</span>';
