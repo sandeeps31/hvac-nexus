@@ -297,7 +297,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
   </div>
 
   <!-- SUMMARY BAR -->
-  <div class="sum-bar">
+  <div class="sum-bar" id="sumBar">
     <div class="sc cb"><div class="sc-lbl">Total</div><div class="sc-val" id="sTotal">0</div><div class="sc-sub">submissions</div></div>
     <div class="sc cw"><div class="sc-lbl">Submitted</div><div class="sc-val" id="sSubmitted">0</div><div class="sc-sub">awaiting review</div></div>
     <div class="sc cg"><div class="sc-lbl">Approved</div><div class="sc-val" id="sApproved">0</div><div class="sc-sub">accepted</div></div>
@@ -306,7 +306,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
   </div>
 
   <!-- TOOLBAR -->
-  <div class="toolbar">
+  <div class="toolbar" id="tsToolbar">
     <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search submissions…" oninput="renderList()"></div>
     <select class="fsel" id="stFil" onchange="renderList()">
       <option value="">All Statuses</option>
@@ -797,6 +797,8 @@ function renderList(){
 function showList(){
   document.getElementById('listView').style.display='';
   document.getElementById('detailView').classList.remove('open');
+  document.getElementById('sumBar').style.display='';
+  document.getElementById('tsToolbar').style.display='';
   document.getElementById('backBtn').style.display='none';
   document.getElementById('supersedeBtn').style.display='none';
   document.getElementById('newBtn').style.display='';
@@ -812,6 +814,8 @@ function openDetail(id){
   activeRevIdx=null; // view latest by default
   document.getElementById('listView').style.display='none';
   document.getElementById('detailView').classList.add('open');
+  document.getElementById('sumBar').style.display='none';
+  document.getElementById('tsToolbar').style.display='none';
   document.getElementById('backBtn').style.display='';
   document.getElementById('supersedeBtn').style.display='';
   document.getElementById('newBtn').style.display='none';
@@ -1045,79 +1049,64 @@ async function exportTsPdf(){
     var proj=dbGetCurrentProject()||{};
     var projName=proj.name||proj.projectName||'Project';
     var projNum=proj.num||proj.number||'';
-    var W=595,H=842;
+    var W=595,H=842; // A4 portrait
 
     // ── COVER PAGE ──
     var cover=pdf.addPage([W,H]);
     cover.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
     cover.drawRectangle({x:0,y:H-80,width:W,height:80,color:rgb(0.039,0.071,0.118)});
-    // Company logo placeholder
     cover.drawRectangle({x:20,y:H-72,width:100,height:56,color:rgb(0.08,0.12,0.2),borderColor:rgb(0,0.78,0.55),borderWidth:1});
     cover.drawText('COMPANY LOGO',{x:28,y:H-46,size:7,font:bold,color:rgb(0,0.898,0.627)});
-    // HVAC Nexus placeholder
     cover.drawRectangle({x:W-120,y:H-72,width:100,height:56,color:rgb(0.08,0.12,0.2),borderColor:rgb(0,0.78,0.55),borderWidth:1});
     cover.drawText('HVAC NEXUS',{x:W-113,y:H-46,size:7,font:bold,color:rgb(0,0.898,0.627)});
-    // Accent rule
     cover.drawRectangle({x:20,y:H-90,width:W-40,height:2,color:rgb(0,0.898,0.627)});
-    // Title
     cover.drawText('TECHNICAL SUBMISSION',{x:20,y:H-130,size:18,font:bold,color:rgb(0.039,0.071,0.118)});
-    // Submission block
     cover.drawRectangle({x:20,y:H-195,width:W-40,height:50,color:rgb(0.039,0.071,0.118)});
     cover.drawText(s.num+' \u00B7 '+rev.rev,{x:32,y:H-168,size:14,font:bold,color:rgb(0,0.898,0.627)});
-    // Title text (may be long — truncate)
     var titleStr=s.title.length>70?s.title.substring(0,67)+'...':s.title;
     cover.drawText(titleStr,{x:32,y:H-184,size:10,font:font,color:rgb(0.7,0.8,0.9)});
-    // Details
+    // Details — Type renamed to Equipment Type, removed warranty and date generated
     var detY=H-220,detRows=[];
     detRows.push(['Submission No.',s.num]);
     if(s.clientDocNo)detRows.push(['Client Doc No.',s.clientDocNo]);
-    detRows.push(['Type',s.type||'—']);
-    detRows.push(['Date',fmtDate(rev.date)||'—']);
+    detRows.push(['Equipment Type',s.type||'—']);
     detRows.push(['Status',s.status||'—']);
     if(rev.leadTime)detRows.push(['Lead Time',rev.leadTime+' weeks']);
     detRows.forEach(function(r,i){
       cover.drawText(r[0]+':',{x:20,y:detY-i*18,size:9,font:bold,color:rgb(0.35,0.35,0.35)});
       cover.drawText(String(r[1]),{x:150,y:detY-i*18,size:9,font:font,color:rgb(0.1,0.1,0.1)});
     });
-    // Warranty
-    var w=rev.warranty||{};
-    if(w.partsYears||w.labourYears){
-      var wY=detY-detRows.length*18-10;
-      cover.drawRectangle({x:20,y:wY-28,width:W-40,height:1,color:rgb(0.85,0.85,0.85)});
-      cover.drawText('WARRANTY',{x:20,y:wY-14,size:7,font:bold,color:rgb(0.5,0.5,0.5)});
-      if(w.partsYears)cover.drawText('Parts: '+w.partsYears,{x:20,y:wY-28,size:9,font:font,color:rgb(0.1,0.1,0.1)});
-      if(w.labourYears)cover.drawText('Labour: '+w.labourYears,{x:150,y:wY-28,size:9,font:font,color:rgb(0.1,0.1,0.1)});
-    }
-    // Divider
-    var divY=H-430;
+    var divY=H-380;
     cover.drawRectangle({x:20,y:divY,width:W-40,height:1,color:rgb(0.85,0.85,0.85)});
     cover.drawText('PROJECT',{x:20,y:divY-16,size:7,font:bold,color:rgb(0.5,0.5,0.5)});
     cover.drawText(projName,{x:20,y:divY-30,size:13,font:bold,color:rgb(0.039,0.071,0.118)});
     if(projNum)cover.drawText('Project No: '+projNum,{x:20,y:divY-46,size:9,font:font,color:rgb(0.4,0.4,0.4)});
-    cover.drawText('Date Generated',{x:W-180,y:divY-16,size:7,font:bold,color:rgb(0.5,0.5,0.5)});
-    cover.drawText(new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}),{x:W-180,y:divY-30,size:9,font:font,color:rgb(0.1,0.1,0.1)});
-    // Footer
     cover.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
     cover.drawText('Generated by HVAC Nexus',{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
 
+    // Section numbering — only increment when section has content
     var pageCounter=0;
-    function sectionPage(title){
-      var p=pdf.addPage([W,H]);pageCounter++;
-      p.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
-      p.drawRectangle({x:0,y:H-44,width:W,height:44,color:rgb(0.039,0.071,0.118)});
-      p.drawText(title,{x:20,y:H-26,size:13,font:bold,color:rgb(0,0.898,0.627)});
-      p.drawText(s.num+' \u00B7 '+s.title.substring(0,50),{x:20,y:H-38,size:8,font:font,color:rgb(0.6,0.7,0.7)});
-      p.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
+    var sectionNum=0;
+
+    function sectionPage(num,title,isLandscape){
+      var pw=isLandscape?H:W, ph=isLandscape?W:H;
+      var p=pdf.addPage([pw,ph]);pageCounter++;
+      p.drawRectangle({x:0,y:0,width:pw,height:ph,color:rgb(1,1,1)});
+      p.drawRectangle({x:0,y:ph-44,width:pw,height:44,color:rgb(0.039,0.071,0.118)});
+      p.drawText(num+'. '+title,{x:20,y:ph-26,size:13,font:bold,color:rgb(0,0.898,0.627)});
+      p.drawText(s.num+' \u00B7 '+s.title.substring(0,50),{x:20,y:ph-38,size:8,font:font,color:rgb(0.6,0.7,0.7)});
+      p.drawRectangle({x:0,y:0,width:pw,height:24,color:rgb(0.039,0.071,0.118)});
       p.drawText(projName+(projNum?' \u00B7 '+projNum:''),{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
-      p.drawText('Page '+pageCounter,{x:W-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
+      p.drawText('Page '+pageCounter,{x:pw-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
+      return p;
     }
 
-    async function appendFiles(files,sectionTitle){
+    async function appendFiles(files,title){
       if(!files||!files.length)return;
-      // Only append PDFs
       var pdfs=files.filter(function(f){return (f.name||'').toLowerCase().endsWith('.pdf')&&f.data;});
       if(!pdfs.length)return;
-      sectionPage(sectionTitle);
+      sectionNum++;
+      sectionPage(sectionNum,title,false);
       for(var i=0;i<pdfs.length;i++){
         try{
           var src=await PDFDocument.load(pdfs[i].data);
@@ -1126,18 +1115,99 @@ async function exportTsPdf(){
             pageCounter++;
             var emb=await pdf.embedPage(src.getPage(indices[pi]));
             var sz=emb.size();
-            var avH=H-68,avW=W;
-            var sc=Math.min(avW/sz.width,avH/sz.height);
+            var isLand=sz.width>sz.height;
+            var pw2=isLand?H:W, ph2=isLand?W:H;
+            var avH2=ph2-68,avW2=pw2;
+            var sc=Math.min(avW2/sz.width,avH2/sz.height);
             var sw=sz.width*sc,sh=sz.height*sc;
-            var p2=pdf.addPage([W,H]);
-            p2.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
-            p2.drawPage(emb,{x:(W-sw)/2,y:24+(avH-sh)/2,width:sw,height:sh});
-            p2.drawRectangle({x:0,y:H-44,width:W,height:44,color:rgb(0.039,0.071,0.118)});
-            p2.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
+            var p2=pdf.addPage([pw2,ph2]);
+            p2.drawRectangle({x:0,y:0,width:pw2,height:ph2,color:rgb(1,1,1)});
+            p2.drawPage(emb,{x:(pw2-sw)/2,y:24+(avH2-sh)/2,width:sw,height:sh});
+            p2.drawRectangle({x:0,y:ph2-44,width:pw2,height:44,color:rgb(0.039,0.071,0.118)});
+            p2.drawRectangle({x:0,y:0,width:pw2,height:24,color:rgb(0.039,0.071,0.118)});
             p2.drawText(projName+(projNum?' \u00B7 '+projNum:''),{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
-            p2.drawText('Page '+pageCounter,{x:W-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
+            p2.drawText('Page '+pageCounter,{x:pw2-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
           }
         }catch(e){console.warn('appendFiles failed:',e);}
+      }
+    }
+
+    // ── 1. EQUIPMENT SCHEDULE (drawn as table, not from PDF) ──
+    var linked=rev.linkedEquip;
+    if(linked&&linked.ids&&linked.ids.length){
+      sectionNum++;
+      var equipRows=getEquipByType(linked.typeId).filter(function(r){return linked.ids.indexOf(r.id||r.tag)>=0;});
+      if(equipRows.length){
+        // Determine if table is wide (>4 cols from template) → landscape
+        var equipCols=[
+          {k:'tag',l:'Equipment ID'},
+          {k:'location',l:'Location'},
+          {k:'make',l:'Manufacturer'},
+          {k:'model',l:'Model'}
+        ];
+        // Add extra cols from template fields
+        var tplTab=_cachedEquipData&&_cachedEquipData.tabs&&_cachedEquipData.tabs.find(function(t){return t.id===linked.typeId;});
+        if(tplTab){
+          (tplTab.sections||[]).forEach(function(sec){
+            (sec.fields||[]).forEach(function(f){
+              var k=f.key==='equipment_id'?'tag':f.key;
+              if(!equipCols.find(function(c){return c.k===k;})){
+                equipCols.push({k:k,l:f.label});
+              }
+            });
+          });
+        }
+        var isWide=equipCols.length>5;
+        var pw=isWide?H:W, ph=isWide?W:H;
+        var pg=sectionPage(sectionNum,'Equipment Schedule',isWide);
+        // Draw table on section page
+        var tblX=20,tblY=ph-60,rowH=16;
+        var colW=Math.floor((pw-40)/Math.min(equipCols.length,8));
+        // Header row
+        pg.drawRectangle({x:tblX,y:tblY-rowH,width:pw-40,height:rowH,color:rgb(0.039,0.071,0.118)});
+        equipCols.slice(0,8).forEach(function(col,ci){
+          pg.drawText(col.l.substring(0,14),{x:tblX+ci*colW+4,y:tblY-rowH+4,size:7,font:bold,color:rgb(0,0.898,0.627)});
+        });
+        var curY=tblY-rowH*2;
+        equipRows.forEach(function(row,ri){
+          if(curY<30)return;
+          if(ri%2===0)pg.drawRectangle({x:tblX,y:curY,width:pw-40,height:rowH,color:rgb(0.96,0.97,0.98)});
+          equipCols.slice(0,8).forEach(function(col,ci){
+            var val=String(row[col.k]||row.tag||'—').substring(0,16);
+            pg.drawText(val,{x:tblX+ci*colW+4,y:curY+4,size:7,font:font,color:rgb(0.1,0.1,0.1)});
+          });
+          curY-=rowH;
+        });
+        // If more rows than fit, add continuation pages
+        var remainRows=equipRows.slice(Math.floor((tblY-rowH*2-30)/rowH));
+        var startIdx=Math.floor((tblY-rowH*2-30)/rowH);
+        if(startIdx<equipRows.length){
+          var pgR=null;var rY=0;
+          for(var ri2=startIdx;ri2<equipRows.length;ri2++){
+            if(!pgR||rY<30){
+              pageCounter++;
+              pgR=pdf.addPage([pw,ph]);
+              pgR.drawRectangle({x:0,y:0,width:pw,height:ph,color:rgb(1,1,1)});
+              pgR.drawRectangle({x:0,y:ph-44,width:pw,height:44,color:rgb(0.039,0.071,0.118)});
+              pgR.drawText(sectionNum+'. Equipment Schedule (cont.)',{x:20,y:ph-26,size:11,font:bold,color:rgb(0,0.898,0.627)});
+              pgR.drawRectangle({x:0,y:0,width:pw,height:24,color:rgb(0.039,0.071,0.118)});
+              pgR.drawText('Page '+pageCounter,{x:pw-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
+              rY=ph-60;
+              pgR.drawRectangle({x:tblX,y:rY-rowH,width:pw-40,height:rowH,color:rgb(0.039,0.071,0.118)});
+              equipCols.slice(0,8).forEach(function(col,ci){
+                pgR.drawText(col.l.substring(0,14),{x:tblX+ci*colW+4,y:rY-rowH+4,size:7,font:bold,color:rgb(0,0.898,0.627)});
+              });
+              rY-=rowH*2;
+            }
+            var row=equipRows[ri2];
+            if(ri2%2===0)pgR.drawRectangle({x:tblX,y:rY,width:pw-40,height:rowH,color:rgb(0.96,0.97,0.98)});
+            equipCols.slice(0,8).forEach(function(col,ci){
+              var val=String(row[col.k]||row.tag||'—').substring(0,16);
+              pgR.drawText(val,{x:tblX+ci*colW+4,y:rY+4,size:7,font:font,color:rgb(0.1,0.1,0.1)});
+            });
+            rY-=rowH;
+          }
+        }
       }
     }
 
