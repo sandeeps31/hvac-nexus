@@ -247,7 +247,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
       </div>
       <div>
         <label class="ml">Filter by Equipment Type</label>
-        <input class="mi" id="itpEquipTypeFilter" placeholder="Type to filter e.g. FCU…" oninput="filterItpList()" style="font-size:13px">
+        <select class="mi" id="itpEquipTypeFilter" style="height:36px;appearance:auto;cursor:pointer" onchange="filterItpList()">
+          <option value="">— All Types —</option>
+        </select>
       </div>
       <div>
         <label class="ml">Select ITP Templates <span id="itpSelCount" style="font-family:DM Mono,monospace;font-size:10px;color:var(--accent);margin-left:6px"></span></label>
@@ -673,15 +675,22 @@ var _itpPinCache=null;
 var _itpSelectedTemplates=[];
 
 function populateItpTypes(){
-  // Nothing to populate — now a free-text filter input
+  var sel=document.getElementById('itpEquipTypeFilter');
+  if(!sel)return;
+  // Collect unique equipment types — from equipType field, falling back to parsing itpType name
+  var types=[...new Set((templates||[]).map(function(t){
+    return t.equipType||'';
+  }).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">— All Types —</option>'+types.map(function(t){
+    return '<option value="'+escH(t)+'">'+escH(t)+'</option>';
+  }).join('');
 }
 function filterItpList(){
-  var q=((document.getElementById('itpEquipTypeFilter')||{}).value||'').trim().toLowerCase();
+  var eq=(document.getElementById('itpEquipTypeFilter')||{}).value||'';
   var filtered=(templates||[]).filter(function(t){
-    if(!q)return true;
-    // Match on equipType field OR itpType name (for templates without equipType set)
-    return (t.equipType||'').toLowerCase().includes(q)
-      ||(t.itpType||'').toLowerCase().includes(q);
+    if(!eq)return true;
+    return (t.equipType||'')=== eq
+      ||(t.itpType||'').toLowerCase().includes(eq.toLowerCase());
   });
   renderItpCheckList(filtered);
 }
