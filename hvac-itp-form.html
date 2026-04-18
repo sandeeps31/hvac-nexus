@@ -594,6 +594,7 @@ function getEquipData(equipId){
 
 // ── RENDER SECTIONS ──
 function renderSections(){
+  if(!responses.rows)responses.rows={};
   var page=document.getElementById('formPage');page.innerHTML='';
   if(!itpRevision||!itpRevision.sections||!itpRevision.sections.length){
     // No template found — show basic form
@@ -645,11 +646,12 @@ function renderPlantSection(sec){
     var tdV=document.createElement('td');tdV.className='plant-val';
     var autoVal=(equipData&&(equipData[f.equipKey]||equipData.make))||'';
     if(f.equipKey==='manufacturer'&&!autoVal)autoVal=equipData&&(equipData.make||equipData.manufacturer)||'';
-    // Use stored response or auto value
+    // Guard: ensure responses.rows exists
+    if(!responses.rows)responses.rows={};
     var storedVal=responses.rows[sec.id+'_'+f.key]!==undefined?responses.rows[sec.id+'_'+f.key]:autoVal;
     var inp=document.createElement('input');inp.className='plant-inp';inp.value=storedVal;inp.placeholder=f.editable?'Enter value…':'';
     if(!f.editable&&autoVal){inp.readOnly=true;inp.style.opacity='.7';inp.style.cursor='default';}
-    (function(sk){inp.onchange=function(){responses.rows[sk]=this.value;autosave();updateProgress();};})(sec.id+'_'+f.key);
+    (function(sk){inp.onchange=function(){if(!responses.rows)responses.rows={};responses.rows[sk]=this.value;autosave();updateProgress();};})(sec.id+'_'+f.key);
     tdV.appendChild(inp);tr.appendChild(tdL);tr.appendChild(tdV);tbl.appendChild(tr);
   });
   // Photo row
@@ -663,6 +665,7 @@ function renderPlantSection(sec){
 
 // ── REGULAR ROW ──
 function renderRow(row, sec){
+  if(!responses.rows)responses.rows={};
   var wrap=document.createElement('div');wrap.className='row-item';
   var stepEl=document.createElement('div');stepEl.className='row-step';stepEl.textContent=row.step||'';
   var descEl=document.createElement('div');descEl.className='row-desc'+(row.flags&&row.flags.mandatory?' row-mandatory':'');descEl.textContent=row.desc||'';
@@ -733,6 +736,7 @@ function renderYesNo(key,options,stored){
 
 // ── PHOTO BUTTON ──
 function renderPhotoBtn(key){
+  if(!responses.rows)responses.rows={};
   var existing=responses.rows[key];var count=Array.isArray(existing)?existing.length:0;
   var label=document.createElement('label');label.className='photo-btn';
   var inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.multiple=true;
