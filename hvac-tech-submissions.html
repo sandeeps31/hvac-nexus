@@ -47,21 +47,25 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 /* SUMMARY BAR */
 .sum-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:stretch;overflow-x:auto;flex-shrink:0}
 .sc{padding:11px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:3px;flex-shrink:0}
-.wf-track{display:flex;align-items:center;gap:0;padding:12px 0}
-.wf-step{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:110px;cursor:pointer;position:relative}
-.wf-dot{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;background:var(--surface2)}
-.wf-dot.done{background:var(--green);border-color:var(--green);color:#080c12}
-.wf-dot.active{background:var(--accent);border-color:var(--accent);color:#080c12;box-shadow:0 0 14px rgba(0,200,255,.35)}
-.wf-dot.rejected{background:var(--danger);border-color:var(--danger);color:#fff}
-.wf-dot.warn{background:var(--warn);border-color:var(--warn);color:#080c12}
-.wf-dot.draft-dot{background:var(--surface3);border-color:var(--border);color:var(--muted)}
-.wf-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:center}
-.wf-date{font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);text-align:center}
-.wf-line{flex:1;height:2px;background:var(--border);align-self:center;margin-top:-20px;min-width:20px}
-.wf-line.done{background:var(--green)}
-.wf-step:hover .wf-dot:not(.done):not(.active){border-color:var(--accent);color:var(--accent)}
-.wf-step .wf-change{font-family:'DM Mono',monospace;font-size:8px;color:var(--accent);text-align:center;opacity:0;transition:opacity .13s}
-.wf-step:hover .wf-change{opacity:1}border-radius:6px;color:var(--muted);cursor:pointer;font-size:12px;padding:3px 8px;transition:all .13s;position:relative}
+.wf-group{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:10px}
+.wf-group-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.wf-group-rev{font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);border-radius:20px;padding:2px 10px}
+.wf-group-status{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted)}
+.wf-events{display:flex;align-items:center;flex-wrap:wrap;gap:0}
+.wf-event{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:100px;cursor:pointer;padding:4px 8px;border-radius:7px;transition:background .13s}
+.wf-event:hover{background:var(--surface3)}
+.wf-chip{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid;font-size:12px;font-weight:600;transition:all .15s}
+.wf-chip.submitted{background:rgba(0,200,255,.1);border-color:rgba(0,200,255,.3);color:var(--accent)}
+.wf-chip.approved{background:rgba(0,229,160,.1);border-color:rgba(0,229,160,.3);color:var(--green)}
+.wf-chip.rejected{background:rgba(255,77,109,.1);border-color:rgba(255,77,109,.3);color:var(--danger)}
+.wf-chip.revise{background:rgba(255,184,48,.1);border-color:rgba(255,184,48,.3);color:var(--warn)}
+.wf-event-date{font-family:'DM Mono',monospace;font-size:9px;color:var(--text2)}
+.wf-event-comment{font-size:10px;color:var(--muted);font-style:italic;max-width:120px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.wf-arrow{color:var(--muted);font-size:14px;padding:0 2px;align-self:center;margin-top:-18px}
+.wf-add-btn{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:80px;cursor:pointer;padding:4px 8px;border-radius:7px;opacity:.6;transition:all .13s}
+.wf-add-btn:hover{opacity:1;background:var(--surface3)}
+.wf-add-chip{padding:5px 12px;border-radius:20px;border:1.5px dashed var(--border);font-size:11px;color:var(--muted)}
+.wf-add-btn:hover .wf-add-chip{border-color:var(--accent);color:var(--accent)}border-radius:6px;color:var(--muted);cursor:pointer;font-size:12px;padding:3px 8px;transition:all .13s;position:relative}
 .act-btn:hover{color:var(--text);border-color:var(--text2);background:var(--surface2)}
 .act-btn.danger:hover{color:var(--danger);border-color:rgba(255,77,109,.4);background:var(--danger-dim)}
 .act-btn .tip{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--surface3);border:1px solid var(--border);border-radius:5px;font-size:10px;padding:2px 7px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;color:var(--text2)}
@@ -744,33 +748,26 @@ function today(){return new Date().toISOString().split('T')[0];}
 
 /* DATA */
 var _cachedEquipData = null;
-var _fullSubmissions = null;
 var _dataLoaded = false;
 
 function save(){
-  if(!_dataLoaded)return; // never overwrite with empty data
-  _fullSubmissions=submissions;
+  if(!_dataLoaded)return;
   dbSetTechSubmissions(_tsPNum,submissions).catch(function(e){console.error(e);});
 }
 
-async function load(){
+(async function(){
+  if(typeof dbReady!=='undefined')await dbReady;
   try{
     var s=await dbGetTechSubmissions(_tsPNum);
     submissions=Array.isArray(s)?s:[];
-    _fullSubmissions=submissions;
-  }catch(e){submissions=[];_fullSubmissions=[];}
+  }catch(e){submissions=[];}
   _dataLoaded=true;
-  // Equipment schedule loads non-blocking
+  renderList();
+  // Load equipment schedule non-blocking after list is shown
   dbGetEquipment(_tsPNum).then(function(eq){
     _cachedEquipData=(typeof eq==='string')?JSON.parse(eq):eq;
   }).catch(function(){_cachedEquipData=null;});
-}
-
-(function(){
-  var tbody=document.getElementById('tsBody');
-  if(tbody)tbody.innerHTML='<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--muted);font-family:DM Mono,monospace;font-size:12px">Loading submissions\u2026</td></tr>';
 })();
-load().then(function(){renderList();});
 
 /* GEN SUBMISSION NUMBER */
 function genSubNum(){
@@ -1567,39 +1564,103 @@ function renderWorkflowTracker(s){
     return;
   }
   var history=s.statusHistory||[];
+  if(!history.length){el.innerHTML='';return;}
+
   var WF_ICONS={Submitted:'📤',Approved:'✓',Rejected:'✕','Revise & Resubmit':'↩'};
-  var html='<div class="wf-track">';
-  WF_MAIN_STEPS.forEach(function(step,i){
-    var entries=history.filter(function(h){return h.status===step;});
-    var entry=entries[entries.length-1];
-    var isCurrent=s.status===step;
-    var isDone=!!entry;
-    var dotCls=isCurrent?(step==='Rejected'?'rejected':step==='Revise & Resubmit'?'warn':'active')
-               :isDone?(step==='Rejected'?'rejected':step==='Revise & Resubmit'?'warn':'done'):'draft-dot';
-    if(i>0)html+='<div class="wf-line'+(isDone?' done':'')+'"></div>';
-    html+='<div class="wf-step" data-step="'+escH(step)+'" onclick="openStatusChangeFor(this.dataset.step)" title="Click to update">'
-      +'<div class="wf-dot '+dotCls+'">'+(WF_ICONS[step]||'○')+'</div>'
-      +'<div class="wf-lbl">'+escH(step)+'</div>'
-      +(entry?'<div class="wf-date">'+fmtDate(entry.date)+'</div>':'<div class="wf-date" style="opacity:.3">—</div>')
-      +'<div class="wf-change">Update →</div>'
-      +'</div>';
+  var WF_CLS={Submitted:'submitted',Approved:'approved',Rejected:'rejected','Revise & Resubmit':'revise'};
+
+  // Group history by revision — each entry should have .rev set
+  // Fall back: entries without rev get assigned to first revision
+  var groups={};var groupOrder=[];
+  history.forEach(function(h){
+    var r=h.rev||(s.revisions&&s.revisions[0]?s.revisions[0].rev:'Rev 01');
+    if(!groups[r]){groups[r]=[];groupOrder.push(r);}
+    groups[r].push(h);
   });
-  html+='</div>';
-  var feedbacks=history.filter(function(h){return h.comment||(h.files&&h.files.length);});
-  if(feedbacks.length){
-    html+='<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">';
-    feedbacks.forEach(function(h){
-      html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 14px">'
-        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-        +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 7px;border-radius:20px;background:var(--surface3);color:var(--text2)">'+escH(h.status)+'</span>'
-        +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">'+fmtDate(h.date)+'</span>'
-        +'</div>'
-        +(h.comment?'<div style="font-size:12px;color:var(--text);line-height:1.5;margin-bottom:4px">'+escH(h.comment)+'</div>':'')
-        +((h.files&&h.files.length)?'<div style="display:flex;gap:6px;flex-wrap:wrap">'+h.files.map(function(f){return '<span style="font-size:11px;color:var(--accent);font-family:DM Mono,monospace">📎 '+escH(f.name)+'</span>';}).join('')+'</div>':'')
-        +'</div>';
+
+  // Determine current rev label for the latest group
+  var latestRevLabel=s.revisions&&s.revisions.length?s.revisions[s.revisions.length-1].rev:'';
+  var isEditable=isViewingLatest();
+
+  var html='<div style="display:flex;flex-direction:column;gap:8px;padding:8px 0">';
+
+  groupOrder.forEach(function(revLabel){
+    var entries=groups[revLabel];
+    var isCurrentRev=revLabel===latestRevLabel;
+
+    // Status summary for group header
+    var lastEntry=entries[entries.length-1];
+    var lastStatus=lastEntry?lastEntry.status:'';
+    var statusCls=WF_CLS[lastStatus]||'submitted';
+
+    html+='<div class="wf-group">';
+    // Group header
+    html+='<div class="wf-group-hdr">'
+      +'<span class="wf-group-rev">'+escH(revLabel)+'</span>'
+      +(isCurrentRev?'<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent)">current</span>':'')
+      +'</div>';
+
+    // Events row
+    html+='<div class="wf-events">';
+    entries.forEach(function(h,i){
+      var cls=WF_CLS[h.status]||'submitted';
+      var icon=WF_ICONS[h.status]||'○';
+      if(i>0)html+='<div class="wf-arrow">→</div>';
+      html+='<div class="wf-event" data-step="'+escH(h.status)+'" onclick="'+(isCurrentRev&&isEditable?'openStatusChangeFor(this.dataset.step)':'')+'">'+
+        '<div class="wf-chip '+cls+'"><span>'+icon+'</span><span>'+escH(h.status)+'</span></div>'+
+        '<div class="wf-event-date">'+fmtDate(h.date)+'</div>'+
+        (h.comment?'<div class="wf-event-comment" title="'+escH(h.comment)+'">'+escH(h.comment)+'</div>':'')+
+        '</div>';
     });
-    html+='</div>';
-  }
+
+    // Add next step button — only on current rev, only if editable
+    if(isCurrentRev&&isEditable){
+      // Suggest next logical step
+      var statuses=entries.map(function(e){return e.status;});
+      var suggestions=[];
+      if(!statuses.includes('Approved')&&!statuses.includes('Rejected')&&!statuses.includes('Revise & Resubmit')){
+        suggestions=['Approved','Rejected','Revise & Resubmit'];
+      } else if(statuses.includes('Revise & Resubmit')&&!statuses.includes('Approved')&&!statuses.includes('Rejected')){
+        suggestions=['Approved','Rejected'];
+      } else {
+        // Allow updating any step
+        suggestions=['Submitted','Approved','Rejected','Revise & Resubmit'];
+      }
+      if(suggestions.length){
+        suggestions.forEach(function(sug){
+          var sugCls=WF_CLS[sug]||'submitted';
+          var sugIcon=WF_ICONS[sug]||'○';
+          html+='<div class="wf-arrow" style="opacity:.3">→</div>';
+          html+='<div class="wf-add-btn" data-step="'+escH(sug)+'" onclick="openStatusChangeFor(this.dataset.step)" title="Set '+escH(sug)+'">'
+            +'<div class="wf-add-chip '+sugCls+'" style="border-style:dashed;opacity:.6">'+sugIcon+' '+escH(sug)+'</div>'
+            +'<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--muted)">add</div>'
+            +'</div>';
+        });
+      }
+    }
+    html+='</div>'; // wf-events
+
+    // Feedback cards for this group (comment/files)
+    var feedbacks=entries.filter(function(h){return h.comment||(h.files&&h.files.length);});
+    if(feedbacks.length){
+      html+='<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">';
+      feedbacks.forEach(function(h){
+        html+='<div style="background:var(--surface3);border-radius:6px;padding:8px 12px">'
+          +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+          +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 6px;border-radius:10px;background:var(--surface2);color:var(--text2)">'+escH(h.status)+'</span>'
+          +'<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted)">'+fmtDate(h.date)+'</span>'
+          +'</div>'
+          +(h.comment?'<div style="font-size:12px;color:var(--text);line-height:1.5">'+escH(h.comment)+'</div>':'')
+          +((h.files&&h.files.length)?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">'+h.files.map(function(f){return'<span style="font-size:11px;color:var(--accent);font-family:DM Mono,monospace">📎 '+escH(f.name)+'</span>';}).join('')+'</div>':'')
+          +'</div>';
+      });
+      html+='</div>';
+    }
+
+    html+='</div>'; // wf-group
+  });
+
+  html+='</div>';
   el.innerHTML=html;
 }
 
@@ -1655,7 +1716,8 @@ function confirmStatusChange(){
   s.status=_pendingStatus;
   if(_pendingStatus==='Approved')s.approvedDate=date;
   if(!s.statusHistory)s.statusHistory=[];
-  s.statusHistory.push({status:_pendingStatus,date:date,comment:comment,files:_stChangeFiles.slice()});
+  var _curRevLabel=s.revisions&&s.revisions.length?s.revisions[s.revisions.length-1].rev:'';
+  s.statusHistory.push({status:_pendingStatus,date:date,comment:comment,files:_stChangeFiles.slice(),rev:_curRevLabel});
   save();closeStatusChangeModal();renderDetail();showTsToast('Status updated to '+_pendingStatus);
 }
 
@@ -1669,7 +1731,8 @@ function confirmPublishRev(){
   rev.date=date;rev.published=true;
   s.status='Submitted';
   if(!s.statusHistory)s.statusHistory=[];
-  s.statusHistory.push({status:'Submitted',date:date,comment:'',files:[]});
+  var _pubRevLabel=s.revisions&&s.revisions.length?s.revisions[s.revisions.length-1].rev:'';
+  s.statusHistory.push({status:'Submitted',date:date,comment:'',files:[],rev:_pubRevLabel});
   save();closePublishRevModal();renderDetail();showTsToast('Revision published \u2013 status set to Submitted');
 }
 
