@@ -128,8 +128,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 .det-body{padding:20px 28px;display:flex;flex-direction:column;gap:12px}
 
 /* REV HISTORY STRIP */
-.rev-strip{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.rev-strip-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);flex-shrink:0}
+.rev-strip{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;gap:0}
+.rev-strip-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block}
 .rev-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;transition:all .13s}
 .rev-pill:hover{border-color:var(--accent)}
 .rev-pill.current{border-color:var(--accent);background:var(--accent-dim)}
@@ -392,8 +392,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
     <!-- REV HISTORY STRIP -->
     <div style="padding:12px 28px 0">
       <div class="rev-strip">
-        <span class="rev-strip-lbl">Revisions</span>
-        <div id="revPills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        <span class="rev-strip-lbl">Revision History</span>
+        <div id="revPills"></div>
       </div>
     </div>
 
@@ -1038,15 +1038,51 @@ function renderRevPills(s){
   s.revisions.forEach(function(rv,idx){
     var isLatest=idx===s.revisions.length-1;
     var isViewing=(activeRevIdx===idx)||(activeRevIdx===null&&isLatest);
-    var pill=document.createElement('div');
-    pill.className='rev-pill'+(isViewing?' current':' old');
-    pill.title=rv.supersedeReason?'Superseded: '+rv.supersedeReason:'';
-    pill.onclick=(function(i){return function(){activeRevIdx=i;renderDetail();};})(idx);
+    var isDraft=!rv.published&&isLatest&&s.status==='Draft';
 
-    var numSpan=document.createElement('span');numSpan.className='rp-num';numSpan.textContent=rv.rev;
-    var dateSpan=document.createElement('span');dateSpan.className='rp-date';dateSpan.textContent=fmtDate(rv.date);
-    pill.appendChild(numSpan);pill.appendChild(dateSpan);
-    if(!isLatest){var sup=document.createElement('span');sup.className='rp-sup';sup.textContent='SUPERSEDED';pill.appendChild(sup);}
+    var pill=document.createElement('div');
+    pill.style.cssText='display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:7px;cursor:pointer;transition:background .12s;'+(isViewing?'background:var(--accent-dim);border:1px solid rgba(0,200,255,.25)':'border:1px solid transparent');
+    pill.onmouseover=function(){if(!isViewing)this.style.background='var(--surface3)';};
+    pill.onmouseout=function(){if(!isViewing)this.style.background='';};
+    pill.onclick=(function(i){return function(e){if(e.target.closest('button'))return;activeRevIdx=i;renderDetail();};})(idx);
+
+    // Rev number
+    var num=document.createElement('span');
+    num.style.cssText='font-family:DM Mono,monospace;font-size:11px;font-weight:700;color:'+(isViewing?'var(--accent)':isLatest?'var(--text)':'var(--muted)')+';min-width:44px';
+    num.textContent=rv.rev;
+
+    // Date
+    var date=document.createElement('span');
+    date.style.cssText='font-family:DM Mono,monospace;font-size:11px;color:var(--text2);min-width:80px';
+    date.textContent=fmtDate(rv.date)||'—';
+
+    // Status chip
+    var chip=document.createElement('span');
+    if(isDraft){
+      chip.style.cssText='font-family:DM Mono,monospace;font-size:9px;padding:1px 7px;border-radius:10px;background:var(--surface3);color:var(--muted);border:1px solid var(--border)';
+      chip.textContent='DRAFT';
+    } else if(isLatest){
+      chip.style.cssText='font-family:DM Mono,monospace;font-size:9px;padding:1px 7px;border-radius:10px;background:rgba(0,229,160,.12);color:var(--green);border:1px solid rgba(0,229,160,.3)';
+      chip.textContent='CURRENT';
+    } else {
+      chip.style.cssText='font-family:DM Mono,monospace;font-size:9px;padding:1px 7px;border-radius:10px;background:rgba(255,77,109,.08);color:var(--danger);border:1px solid rgba(255,77,109,.2)';
+      chip.textContent='SUPERSEDED';
+    }
+
+    // Download button (only for published revisions)
+    var dl=document.createElement('button');
+    dl.style.cssText='background:none;border:1px solid var(--border);border-radius:5px;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 7px;transition:all .13s;margin-left:auto;flex-shrink:0';
+    dl.title='Export PDF for '+rv.rev;
+    dl.textContent='⬇ PDF';
+    dl.onmouseover=function(){this.style.color='var(--accent)';this.style.borderColor='rgba(0,200,255,.4)';};
+    dl.onmouseout=function(){this.style.color='var(--muted)';this.style.borderColor='var(--border)';};
+    dl.onclick=(function(i){return function(e){
+      e.stopPropagation();
+      activeRevIdx=i;
+      exportTsPdf();
+    };})(idx);
+
+    pill.appendChild(num);pill.appendChild(date);pill.appendChild(chip);pill.appendChild(dl);
     container.appendChild(pill);
   });
 }
