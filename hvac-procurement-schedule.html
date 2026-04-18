@@ -317,17 +317,16 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
     <h3 id="modalTitle">Add Procurement Item</h3>
     <p class="msub">Enter item details. ETA auto-calculates from order date + lead time.</p>
     <label class="ml">Equipment ID</label>
-    <input class="mi" id="f-equipid" placeholder="e.g. GCT001/FCU/L01/0001"/>
-    <div class="mgrid2">
-      <div><label class="ml">Building</label><input class="mi" id="f-building" placeholder="e.g. Level 3"/></div>
-      <div><label class="ml">Location</label><input class="mi" id="f-location" placeholder="e.g. Zone A"/></div>
+    <input class="mi" id="f-equipid" placeholder="e.g. GCT001/FCU/L01/0001" oninput="updateModalEquipPreview()"/>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px" id="equipPreview">
+      <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">Location</div><div style="font-size:12px;color:var(--text2)" id="prev-location">—</div></div>
+      <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">Manufacturer</div><div style="font-size:12px;color:var(--text2)" id="prev-manufacturer">—</div></div>
+      <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">Model</div><div style="font-size:12px;color:var(--text2)" id="prev-model">—</div></div>
+      <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">Equipment Type</div><div style="font-size:12px;color:var(--text2)" id="prev-type">—</div></div>
     </div>
-    <div class="mgrid2">
-      <div><label class="ml">Manufacturer</label><input class="mi" id="f-maker" placeholder="e.g. Daikin"/></div>
-      <div><label class="ml">Model</label><input class="mi" id="f-model" placeholder="e.g. FTXS35"/></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:5px">
+      <span style="color:var(--accent)">ℹ</span> Location, Manufacturer, Model and Type are pulled live from the Equipment Schedule
     </div>
-    <label class="ml">Equipment Type</label>
-    <input class="mi" id="f-type" placeholder="e.g. Fan coil unit"/>
     <div class="mgrid2">
       <div><label class="ml">Qty ordered</label><input class="mi" id="f-qty" type="number" placeholder="e.g. 24"/></div>
       <div><label class="ml">Qty delivered</label><input class="mi" id="f-qtydelivered" type="number" placeholder="0"/></div>
@@ -346,7 +345,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
     </div>
     <div class="mgrid3">
       <div><label class="ml">Order date</label><input class="mi" id="f-orderdate" type="date" oninput="recalcETA()"/></div>
-      <div><label class="ml">Lead time (weeks)</label><input class="mi" id="f-leadtime" type="number" placeholder="e.g. 8" oninput="recalcETA()"/></div>
+      <div><label class="ml">Lead time (weeks) <span id="leadTimeHint" style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);margin-left:6px"></span></label><input class="mi" id="f-leadtime" type="number" placeholder="e.g. 8" oninput="recalcETA()"/></div>
       <div><label class="ml">ETA (auto-calculated)</label><div class="eta-preview" id="etaPreview">—</div></div>
     </div>
     <label class="ml">Comments</label>
@@ -399,6 +398,7 @@ function isPast(ds){if(!ds)return false;return ds<today();}
 
 // DATA
 var _tsLookup={}; // equipId -> {status, approvedDate} from tech subs
+var _equipLookup={}; // equipId -> {location, manufacturer, model, equipType} — always master
 function save(){dbSetProcurement(_psPNum,items).catch(e=>console.error(e));}
 async function load(){try{var p=await dbGetProcurement(_psPNum);items=Array.isArray(p)?p:[];}catch(e){items=[];}}
 // ETA RECALC
@@ -770,14 +770,21 @@ function renderTable(){
         th.appendChild(th2);
       });
     }
+    // Pull master fields from equipment schedule lookup
+    var _eq=_equipLookup[item.equipId]||{};
+    var _location=_eq.location||item.location||'—';
+    var _subLocation=_eq.subLocation||item.location||'—';
+    var _manufacturer=_eq.manufacturer||item.manufacturer||'—';
+    var _model=_eq.model||item.model||'—';
+    var _equipType=_eq.equipType||item.equipType||'—';
     // Build cells in user-defined column order
     var cellMap={
       equipId:'<td class="equip-id">'+escH(item.equipId||'—')+'</td>',
-      building:'<td style="color:var(--text2)">'+escH(item.building||'—')+'</td>',
-      location:'<td style="color:var(--muted);font-size:12px">'+escH(item.location||'—')+'</td>',
-      manufacturer:'<td style="font-weight:500">'+escH(item.manufacturer||'—')+'</td>',
-      model:'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(item.model||'—')+'</td>',
-      equipType:'<td class="equip-type">'+escH(item.equipType||'—')+'</td>',
+      building:'<td style="color:var(--text2)">'+escH(_location)+'</td>',
+      location:'<td style="color:var(--muted);font-size:12px">'+escH(_subLocation)+'</td>',
+      manufacturer:'<td style="font-weight:500">'+escH(_manufacturer)+'</td>',
+      model:'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(_model)+'</td>',
+      equipType:'<td class="equip-type">'+escH(_equipType)+'</td>',
       subApproval:'<td style="font-size:12px;color:var(--text2)">'+fmtD(item.subApproval)+'</td>',
       subApprovalStatus:(function(){
         var ts=_tsLookup[item.equipId]||{};
@@ -809,20 +816,17 @@ function openAddModal(){
   editingId=null;
   document.getElementById('modalTitle').textContent='Add Procurement Item';
   document.getElementById('f-equipid').value='';
-  document.getElementById('f-location').value='';
-  document.getElementById('f-subarea').value='';
-  document.getElementById('f-maker').value='';
-  document.getElementById('f-model').value='';
-  document.getElementById('f-type').value='';
   document.getElementById('f-qty').value='';
   document.getElementById('f-qtydelivered').value='';
   document.getElementById('f-subapproval').value='';
   document.getElementById('f-status').value='Not ordered';
   document.getElementById('f-orderdate').value='';
   document.getElementById('f-leadtime').value='';
+  var hint=document.getElementById('leadTimeHint');if(hint)hint.textContent='';
   document.getElementById('f-comments').value='';
   document.getElementById('etaPreview').textContent='—';
   document.getElementById('deleteBtn').style.display='none';
+  updateModalEquipPreview();
   document.getElementById('addModal').classList.add('open');
   setTimeout(function(){document.getElementById('f-equipid').focus();},80);
 }
@@ -831,21 +835,30 @@ function openEditModal(id){
   editingId=id;
   document.getElementById('modalTitle').textContent='Edit Item';
   document.getElementById('f-equipid').value=item.equipId||'';
-  document.getElementById('f-building').value=item.building||'';
-  document.getElementById('f-location').value=item.location||'';
-  document.getElementById('f-maker').value=item.manufacturer||'';
-  document.getElementById('f-model').value=item.model||'';
-  document.getElementById('f-type').value=item.equipType||'';
   document.getElementById('f-qty').value=item.qty||'';
   document.getElementById('f-qtydelivered').value=item.qtyDelivered||'';
   document.getElementById('f-subapproval').value=item.subApproval||'';
   document.getElementById('f-status').value=item.status||'Not ordered';
   document.getElementById('f-orderdate').value=item.orderDate||'';
-  document.getElementById('f-leadtime').value=item.leadWeeks||'';
+  // Pre-populate lead time from tech sub if not already set by user
+  var tsLeadTime=(_tsLookup[item.equipId]||{}).leadTime||'';
+  var userLeadTime=item.leadWeeks||'';
+  document.getElementById('f-leadtime').value=userLeadTime||tsLeadTime;
+  var hint=document.getElementById('leadTimeHint');
+  if(hint)hint.textContent=tsLeadTime&&!userLeadTime?'from tech sub: '+tsLeadTime+'w':tsLeadTime?'tech sub: '+tsLeadTime+'w':'';
   document.getElementById('f-comments').value=item.comments||'';
   document.getElementById('etaPreview').textContent=item.eta?fmtD(item.eta):'—';
   document.getElementById('deleteBtn').style.display='';
+  updateModalEquipPreview();
   document.getElementById('addModal').classList.add('open');
+}
+function updateModalEquipPreview(){
+  var id=(document.getElementById('f-equipid').value||'').trim();
+  var eq=_equipLookup[id]||{};
+  document.getElementById('prev-location').textContent=eq.location||'—';
+  document.getElementById('prev-manufacturer').textContent=eq.manufacturer||'—';
+  document.getElementById('prev-model').textContent=eq.model||'—';
+  document.getElementById('prev-type').textContent=eq.equipType||'—';
 }
 function closeModal(){document.getElementById('addModal').classList.remove('open');}
 function saveItem(){
@@ -857,11 +870,6 @@ function saveItem(){
   var item={
     id:editingId||('ps'+nid()),
     equipId:equipId,
-    building:document.getElementById('f-building').value.trim(),
-    location:document.getElementById('f-location').value.trim(),
-    manufacturer:document.getElementById('f-maker').value.trim(),
-    model:document.getElementById('f-model').value.trim(),
-    equipType:document.getElementById('f-type').value.trim(),
     qty:parseInt(document.getElementById('f-qty').value)||0,
     qtyDelivered:parseInt(document.getElementById('f-qtydelivered').value)||0,
     subApproval:document.getElementById('f-subapproval').value,
@@ -897,21 +905,76 @@ function exportCSV(){
 (async function(){
   await load();
   if(typeof dbReady !== 'undefined') await dbReady;
+  // Load equipment schedule data for ID resolution
+  var _equipData=null;
+  try{
+    var rawEq=await dbGetEquipment(_psPNum);
+    _equipData=(typeof rawEq==='string')?JSON.parse(rawEq):rawEq;
+  }catch(e){}
+  // Load equipment schedule — always master for equipId, location, manufacturer, model
+  try{
+    var eqRaw=await dbGetEquipment(_psPNum);
+    if(eqRaw&&eqRaw.tabs){
+      eqRaw.tabs.forEach(function(tab){
+        if(!Array.isArray(tab.rows))return;
+        var typeLabel=getTypeLabel(tab);
+        tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
+          var id=(row.tag||row.equipment_id||'').trim();
+          if(!id)return;
+          _equipLookup[id]={
+            location:getRowField(row,tab,['location','Location']),
+            subLocation:getRowField(row,tab,['sublocation','subLocation','sub_location','Sub Location','Sub location']),
+            manufacturer:getRowField(row,tab,['manufacturer','make','maker','Manufacturer','Make']),
+            model:getRowField(row,tab,['model','Model']),
+            equipType:typeLabel
+          };
+        });
+      });
+    }
+  }catch(e){}
   // Load tech subs and build equipment ID lookup
   try{
     var tsSubs=await dbGetTechSubmissions(_psPNum);
     if(Array.isArray(tsSubs)){
       tsSubs.forEach(function(sub){
-        var rev=sub.revisions&&sub.revisions[sub.revisions.length-1];
-        if(!rev||!rev.linkedEquip||!rev.linkedEquip.ids)return;
-        rev.linkedEquip.ids.forEach(function(eid){
-          if(!_tsLookup[eid]||sub.status==='Approved'){
-            _tsLookup[eid]={status:sub.status,approvedDate:sub.approvedDate||''};
+        // Use approved revision if exists, otherwise latest published, otherwise latest
+        var revToUse=null;
+        sub.revisions&&sub.revisions.forEach(function(rv){
+          if(!revToUse)revToUse=rv;
+          else if(sub.status==='Approved'&&rv.published)revToUse=rv;
+          else if(rv.published&&!revToUse.published)revToUse=rv;
+        });
+        if(!revToUse)return;
+        var linked=revToUse.linkedEquip;
+        if(!linked||!linked.ids||!linked.ids.length)return;
+        var entry={status:sub.status,approvedDate:sub.approvedDate||'',leadTime:revToUse.leadTime||''};
+        // Store under raw IDs first
+        linked.ids.forEach(function(eid){
+          var existing=_tsLookup[eid];
+          if(!existing||sub.status==='Approved'||(existing.status!=='Approved'&&sub.status==='Submitted')){
+            _tsLookup[eid]=entry;
           }
         });
+        // Resolve internal row IDs to tag values via equipment schedule
+        if(_equipData&&_equipData.tabs){
+          var tab=_equipData.tabs.find(function(t){return t.id===linked.typeId;});
+          if(tab&&tab.rows){
+            tab.rows.forEach(function(row){
+              var rowInternalId=row.id;
+              var rowTag=row.tag||row.equipId||row.equipment_id||'';
+              if(!rowTag)return;
+              if(linked.ids.indexOf(rowInternalId)>=0||linked.ids.indexOf(rowTag)>=0){
+                var existing2=_tsLookup[rowTag];
+                if(!existing2||sub.status==='Approved'||(existing2.status!=='Approved'&&sub.status==='Submitted')){
+                  _tsLookup[rowTag]=entry;
+                }
+              }
+            });
+          }
+        }
       });
     }
-  }catch(e){}
+  }catch(e){console.warn('Tech sub lookup failed:',e);}
   renderTable();
   checkEquipSync();
   renderApprovalBanner();
