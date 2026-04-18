@@ -665,14 +665,20 @@ function onPlace(xPct,yPct){
 }
 
 // ── NEXT REF ──
-function nextRef(prefix,field){
-  var pins=curDrawing?curDrawing.pins||[]:[];
+function nextRef(prefix){
+  // Scan ALL drawings for highest existing ref
   var max=0;
-  pins.forEach(function(p){
-    var m=(p.ref||'').match(new RegExp('^'+prefix+'-(\\d+)$'));
-    if(m){var n=parseInt(m[1]);if(n>max)max=n;}
+  drawings.forEach(function(d){
+    (d.pins||[]).forEach(function(p){
+      var m=(p.ref||'').match(new RegExp('^'+prefix+'-(\\d+)$'));
+      if(m){var n=parseInt(m[1]);if(n>max)max=n;}
+      // Also check itps array on each pin for individual refs
+      (p.itps||[]).forEach(function(itp){
+        var mi=(itp.ref||'').match(new RegExp('^'+prefix+'-(\\d+)$'));
+        if(mi){var ni=parseInt(mi[1]);if(ni>max)max=ni;}
+      });
+    });
   });
-  // Also check defects table for DEF refs
   if(prefix==='DEF'){
     defects.forEach(function(d){var m=(d.ref||'').match(/^DEF-(\d+)$/);if(m){var n=parseInt(m[1]);if(n>max)max=n;}});
   }
@@ -793,13 +799,24 @@ function saveItpPin(){
   if(!curDrawing.pins)curDrawing.pins=[];
   var u=dbGetCurrentUser();var equip=document.getElementById('itpEquip').value.trim();
   if(_itpPinCache){
-    _itpPinCache.itps=_itpSelectedTemplates.slice();
-    _itpPinCache.itpTypeLabel=_itpSelectedTemplates[0].itpType||'';
+    // On edit — preserve existing refs, assign new ones only to newly added templates
+    var existingRefs={};
+    (_itpPinCache.itps||[]).forEach(function(itp){if(itp.ref&&itp.itpNo)existingRefs[itp.itpNo]=itp.ref;});
+    _itpPinCache.itps=_itpSelectedTemplates.map(function(t){
+      var ref=existingRefs[t.itpNo]||nextRef('ITP');
+      return {itpNo:t.itpNo,itpType:t.itpType,ref:ref};
+    });
+    _itpPinCache.itpTypeLabel=_itpPinCache.itps[0].itpType||'';
+    _itpPinCache.ref=_itpPinCache.itps[0].ref||_itpPinCache.ref;
     _itpPinCache.equip=equip;
     responses[_itpPinCache.id]=responses[_itpPinCache.id]||{};
   } else {
-    var ref=nextRef('ITP');
-    var pin={id:nid(),type:'itp',ref:ref,itps:_itpSelectedTemplates.slice(),itpTypeLabel:_itpSelectedTemplates[0].itpType||'',equip:equip,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    // New pin — assign sequential ref to each template
+    var itpsWithRefs=_itpSelectedTemplates.map(function(t){
+      return {itpNo:t.itpNo,itpType:t.itpType,ref:nextRef('ITP')};
+    });
+    var firstRef=itpsWithRefs[0].ref;
+    var pin={id:nid(),type:'itp',ref:firstRef,itps:itpsWithRefs,itpTypeLabel:itpsWithRefs[0].itpType||'',equip:equip,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
     curDrawing.pins.push(pin);responses[pin.id]={status:'not-started'};
   }
   saveAll();renderPins();renderPanel();closeItpMo();
@@ -1036,22 +1053,20 @@ function showItpClusterPopup(pin){
   var pNum=(dbGetCurrentProject()||{}).num||pKey||'';
   var dwgId=(curDrawing&&curDrawing.id)||'';
   var stCls=PIN_STATUS_CLS[(responses[pin.id]||{}).status||'not-started']||'ns';
-  var html='<div class="icp-hdr"><span>'+escH(pin.ref||'')+(pin.equip?' · '+escH(pin.equip):'')+'</span>'
+  // Header: equipment ID only
+  var html='<div class="icp-hdr"><span>'+escH(pin.equip||pin.ref||'')+'</span>'
     +'<button onclick="closeItpClusterPopup()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px">✕</button></div>';
   (pin.itps||[]).forEach(function(itp){
     var url='hvac-itp-form.html?pinId='+encodeURIComponent(pin.id)+'&drawingId='+encodeURIComponent(dwgId)+(pNum?'&p='+encodeURIComponent(pNum):'')+(itp.itpNo?'&itpNo='+encodeURIComponent(itp.itpNo):'');
+    // Format: ITP-XXXX  FCU — Water Cooled
+    var label=(itp.ref?itp.ref+' ':'')+escH(itp.itpType||itp.itpNo||'');
     html+='<div class="icp-item" onclick="window.open(\''+url+'\',\'_blank\')">'
       +'<div class="icp-dot '+stCls+'"></div>'
-      +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH(itp.itpType||itp.itpNo||'')+'</div>'
-      +(itp.itpNo?'<div style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">'+escH(itp.itpNo)+'</div>':'')
-      +'</div>'
-      +'<span style="font-size:10px;color:var(--accent)">↗</span>'
+      +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:DM Sans,sans-serif">'+label+'</div>'
       +'</div>';
   });
   html+='<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px">'
-    +'<button class="mbtn" style="flex:1;font-size:11px" onclick="closeItpClusterPopup();openItpMo(arguments[0])" '
-    +'data-pin-id="'+escH(pin.id)+'" onclick="closeItpClusterPopup();openItpMo(_getCurrentPin(\''+escH(pin.id)+'\'))">✏ Edit Pin</button>'
+    +'<button class="mbtn" style="flex:1;font-size:11px" onclick="closeItpClusterPopup();openItpMo(_getCurrentPin(\''+escH(pin.id)+'\'))">✏ Edit Pin</button>'
     +'</div>';
   var pop=document.createElement('div');
   pop.className='itp-cluster-popup';
@@ -1155,6 +1170,25 @@ function renderPanel(){
     var st=resp.status||'not-started';
     var stCls=PIN_STATUS_CLS[st]||'ns';
     var stLbl=PIN_STATUS_LBL[st]||st;
+
+    if(p.type==='itp'&&p.itps&&p.itps.length>1){
+      // Cluster pin — render one row per ITP
+      p.itps.forEach(function(itp){
+        var item=document.createElement('div');
+        item.className='pin-item itp';
+        item.dataset.pid=p.id;
+        item.addEventListener('click',function(){highlightPin(this.dataset.pid);});
+        var hdr=document.createElement('div');hdr.className='pi-hdr';
+        hdr.innerHTML='<div class="pi-dot"></div>'
+          +'<span class="pi-ref">'+escH(itp.ref||p.ref||'')+'</span>'
+          +'<span class="pi-desc" title="'+escH(itp.itpType||'')+'">'+escH(itp.itpType||'')+(p.equip?' · '+escH(p.equip):'')+'</span>'
+          +'<span class="pi-st '+stCls+'">'+escH(stLbl)+'</span>';
+        item.appendChild(hdr);
+        list.appendChild(item);
+      });
+      return;
+    }
+
     var desc='';
     if(p.type==='itp')desc=p.itpTypeLabel||(p.equip||'');
     else if(p.type==='defect'){var dr=defects.find(function(d){return d.pinId===p.id;});desc=dr?dr.desc:'';}
