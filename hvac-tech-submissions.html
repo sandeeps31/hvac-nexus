@@ -472,6 +472,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
             <label style="font-family:DM Mono,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap;min-width:120px">Labour Warranty</label>
             <input id="warrantyLabour" class="mi" style="max-width:180px" placeholder="e.g. 5 years" oninput="saveWarranty()">
           </div>
+          <div style="margin-top:4px">
+            <div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Warranty Documentation</div>
+            <div class="upload-zone" id="dropWarranty" onclick="document.getElementById('fileWarranty').click()" ondragover="handleDrag(event,'dropWarranty')" ondragleave="handleDragLeave('dropWarranty')" ondrop="handleDrop(event,'warranty')">
+              <input type="file" id="fileWarranty" multiple accept=".pdf,.doc,.docx" onchange="handleFileInput(this,'warranty')">
+              <div class="upload-icon">📎</div>
+              <div class="upload-text">Drag & drop warranty documents or <span>browse</span></div>
+            </div>
+            <div class="file-list" id="fileList-warranty"></div>
+          </div>
         </div>
       </div>
 
@@ -1007,8 +1016,12 @@ function renderWarranty(rev){
   var cnt=document.getElementById('sec-warranty-count');
   if(cnt){
     var parts=[w.partsYears?'Parts: '+w.partsYears:'',w.labourYears?'Labour: '+w.labourYears:''].filter(Boolean);
+    var fileCount=(rev.files&&rev.files.warranty)?rev.files.warranty.length:0;
+    if(fileCount)parts.push(fileCount+' file'+(fileCount!==1?'s':''));
     cnt.textContent=parts.join(' · ');
   }
+  // Render warranty file list
+  renderFileSection('warranty',rev);
 }
 
 function saveLeadTime(val){
@@ -1215,6 +1228,59 @@ async function exportTsPdf(){
     await appendFiles(f.data,'Data Sheets');
     await appendFiles(f.msds,'MSDS');
     await appendFiles(f.spec,'Spec Sign-Off');
+
+    // Lead Time — always show page if value exists
+    if(rev.leadTime){
+      sectionNum++;
+      var ltPage=sectionPage(sectionNum,'Lead Time',false);
+      var ltText='The lead time for this equipment is '+rev.leadTime+' weeks.';
+      ltPage.drawText(ltText,{x:40,y:H-120,size:13,font:font,color:rgb(0.1,0.1,0.1)});
+    }
+
+    // Warranty — show if values OR files exist
+    var w=rev.warranty||{};
+    var hasWarrantyText=!!(w.partsYears||w.labourYears);
+    var warrantyFiles=(f.warranty||[]).filter(function(fi){return (fi.name||'').toLowerCase().endsWith('.pdf')&&fi.data;});
+    if(hasWarrantyText||warrantyFiles.length){
+      sectionNum++;
+      var wPage=sectionPage(sectionNum,'Warranty',false);
+      var wY=H-110;
+      if(w.partsYears){
+        wPage.drawText('Parts Warranty:',{x:40,y:wY,size:10,font:bold,color:rgb(0.35,0.35,0.35)});
+        wPage.drawText(w.partsYears,{x:200,y:wY,size:10,font:font,color:rgb(0.1,0.1,0.1)});
+        wY-=22;
+      }
+      if(w.labourYears){
+        wPage.drawText('Labour Warranty:',{x:40,y:wY,size:10,font:bold,color:rgb(0.35,0.35,0.35)});
+        wPage.drawText(w.labourYears,{x:200,y:wY,size:10,font:font,color:rgb(0.1,0.1,0.1)});
+      }
+      // Append warranty PDFs after the text page
+      for(var wi=0;wi<warrantyFiles.length;wi++){
+        try{
+          var wsrc=await PDFDocument.load(warrantyFiles[wi].data);
+          var windices=wsrc.getPageIndices();
+          for(var wpi=0;wpi<windices.length;wpi++){
+            pageCounter++;
+            var wemb=await pdf.embedPage(wsrc.getPage(windices[wpi]));
+            var wsz=wemb.size();
+            var wisLand=wsz.width>wsz.height;
+            var wpw=wisLand?H:W,wph=wisLand?W:H;
+            var wavH=wph-68,wavW=wpw;
+            var wsc=Math.min(wavW/wsz.width,wavH/wsz.height);
+            var wsw=wsz.width*wsc,wsh=wsz.height*wsc;
+            var wp2=pdf.addPage([wpw,wph]);
+            wp2.drawRectangle({x:0,y:0,width:wpw,height:wph,color:rgb(1,1,1)});
+            wp2.drawPage(wemb,{x:(wpw-wsw)/2,y:24+(wavH-wsh)/2,width:wsw,height:wsh});
+            wp2.drawRectangle({x:0,y:wph-44,width:wpw,height:44,color:rgb(0.039,0.071,0.118)});
+            wp2.drawRectangle({x:0,y:0,width:wpw,height:24,color:rgb(0.039,0.071,0.118)});
+            wp2.drawText(projName+(projNum?' \u00B7 '+projNum:''),{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
+            wp2.drawText('Page '+pageCounter,{x:wpw-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
+          }
+        }catch(e){console.warn('warranty PDF failed:',e);}
+      }
+    }
+
+    await appendFiles(f.photos,'Photos');
     await appendFiles(f.other,'Other Documents');
 
     var bytes=await pdf.save();
@@ -1408,7 +1474,7 @@ function createSubmission(){
       rev:'Rev 01',
       date:document.getElementById('f-date').value,
       linkedEquip:null,
-      files:{data:[],msds:[],spec:[],photos:[],other:[]},
+      files:{data:[],msds:[],spec:[],photos:[],other:[],warranty:[]},
       specRows:[],
       warranty:{partsYears:'5 years',labourYears:'5 years'},
       leadTime:'',
@@ -1450,7 +1516,7 @@ function confirmSupersede(){
   newRevObj.date=date;
   newRevObj.supersedeReason='';
   // New rev starts fresh with no files (user will upload new docs)
-  newRevObj.files={data:[],msds:[],spec:[],photos:[],other:[]};
+  newRevObj.files={data:[],msds:[],spec:[],photos:[],other:[],warranty:[]};
   // Carry over warranty and lead time
   newRevObj.warranty=JSON.parse(JSON.stringify(curRev.warranty||{partsYears:'',labourYears:''}));
   newRevObj.leadTime=curRev.leadTime||'';
