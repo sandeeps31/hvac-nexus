@@ -462,21 +462,34 @@ var _hiRenderTask=null;
 function renderPdf(pdf){
   pdf.getPage(1).then(function(page){
     _pdfPage=page;
-    var vp=page.getViewport({scale:1});
+    var vp=page.getViewport({scale:0.75});
     var canvas=document.getElementById('pdfCanvas');
     canvas.width=vp.width;
     canvas.height=vp.height;
-    canvas.style.width='';
-    canvas.style.height='';
-    _canvasW=vp.width;
-    _canvasH=vp.height;
+    canvas.style.width='';canvas.style.height='';
+    _canvasW=vp.width;_canvasH=vp.height;
     var ctx=canvas.getContext('2d');
+    // Pass 1: quick render at 0.75x
     page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
       document.getElementById('loading').style.display='none';
       requestAnimationFrame(function(){
         fitToScreen();
         renderPins();
         renderPanel();
+        // Pass 2: hi-res upgrade in background
+        var dpr=window.devicePixelRatio||1;
+        var hiScale=Math.min(dpr*2,4);
+        var vpHi=page.getViewport({scale:hiScale});
+        var vp1=page.getViewport({scale:1});
+        canvas.width=vpHi.width;
+        canvas.height=vpHi.height;
+        canvas.style.width=vp1.width+'px';
+        canvas.style.height=vp1.height+'px';
+        _canvasW=vp1.width;_canvasH=vp1.height;
+        var ctx2=canvas.getContext('2d');
+        page.render({canvasContext:ctx2,viewport:vpHi}).promise.then(function(){
+          fitToScreen();renderPins();
+        }).catch(function(){});
       });
     }).catch(function(e){console.error('render error',e);});
   });
