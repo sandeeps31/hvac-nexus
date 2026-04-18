@@ -744,15 +744,32 @@ function today(){return new Date().toISOString().split('T')[0];}
 
 /* DATA */
 var _cachedEquipData = null;
-function save(){dbSetTechSubmissions(_tsPNum,submissions).catch(function(e){console.error(e);});}
-async function load(){
-  try{var s=await dbGetTechSubmissions(_tsPNum);submissions=Array.isArray(s)?s:[];}catch(e){submissions=[];}
-  // Load and cache equipment schedule
-  try{
-    var eq=await dbGetEquipment(_tsPNum);
-    _cachedEquipData=(typeof eq==='string')?JSON.parse(eq):eq;
-  }catch(e){_cachedEquipData=null;}
+var _fullSubmissions = null;
+var _dataLoaded = false;
+
+function save(){
+  if(!_dataLoaded)return; // never overwrite with empty data
+  _fullSubmissions=submissions;
+  dbSetTechSubmissions(_tsPNum,submissions).catch(function(e){console.error(e);});
 }
+
+async function load(){
+  try{
+    var s=await dbGetTechSubmissions(_tsPNum);
+    submissions=Array.isArray(s)?s:[];
+    _fullSubmissions=submissions;
+  }catch(e){submissions=[];_fullSubmissions=[];}
+  _dataLoaded=true;
+  // Equipment schedule loads non-blocking
+  dbGetEquipment(_tsPNum).then(function(eq){
+    _cachedEquipData=(typeof eq==='string')?JSON.parse(eq):eq;
+  }).catch(function(){_cachedEquipData=null;});
+}
+
+(function(){
+  var tbody=document.getElementById('tsBody');
+  if(tbody)tbody.innerHTML='<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--muted);font-family:DM Mono,monospace;font-size:12px">Loading submissions\u2026</td></tr>';
+})();
 load().then(function(){renderList();});
 
 /* GEN SUBMISSION NUMBER */
@@ -1560,9 +1577,9 @@ function renderWorkflowTracker(s){
     var dotCls=isCurrent?(step==='Rejected'?'rejected':step==='Revise & Resubmit'?'warn':'active')
                :isDone?(step==='Rejected'?'rejected':step==='Revise & Resubmit'?'warn':'done'):'draft-dot';
     if(i>0)html+='<div class="wf-line'+(isDone?' done':'')+'"></div>';
-    html+='<div class="wf-step" onclick="openStatusChangeFor(''+step.replace(/'/g,"\\'")+'')" title="Click to update">'
+    html+='<div class="wf-step" data-step="'+escH(step)+'" onclick="openStatusChangeFor(this.dataset.step)" title="Click to update">'
       +'<div class="wf-dot '+dotCls+'">'+(WF_ICONS[step]||'○')+'</div>'
-      +'<div class="wf-lbl">'+step+'</div>'
+      +'<div class="wf-lbl">'+escH(step)+'</div>'
       +(entry?'<div class="wf-date">'+fmtDate(entry.date)+'</div>':'<div class="wf-date" style="opacity:.3">—</div>')
       +'<div class="wf-change">Update →</div>'
       +'</div>';
