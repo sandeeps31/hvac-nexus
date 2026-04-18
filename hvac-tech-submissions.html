@@ -275,7 +275,6 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 </style>
 <script src="head-common.js"></script>
 <script src="db.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script>
 // ── HVAC Nexus Auth Guard — redirect only, db.js handles token refresh ──
 (function(){
@@ -743,24 +742,38 @@ function save(){
   dbSetTechSubmissions(_tsPNum,submissions).catch(function(e){console.error(e);});
 }
 
+var _CACHE_KEY='hvacnexus_ts_cache_'+(_tsProj.num||_tsProj.number||'GCT001');
+
+// Show cached data IMMEDIATELY — zero wait
+(function(){
+  try{
+    var cached=localStorage.getItem(_CACHE_KEY);
+    if(cached){submissions=JSON.parse(cached);_dataLoaded=true;renderList();}
+  }catch(e){}
+})();
+
+// Then fetch fresh data from Supabase in background
 (async function(){
-  // Try immediately with whatever session is available
   var loaded=false;
   try{
     var s=await dbGetTechSubmissions(_tsPNum);
-    if(Array.isArray(s)){submissions=s;_dataLoaded=true;renderList();loaded=true;}
+    if(Array.isArray(s)){
+      submissions=s;_dataLoaded=true;
+      localStorage.setItem(_CACHE_KEY,JSON.stringify(s));
+      renderList();loaded=true;
+    }
   }catch(e){}
-  // If that failed (expired token), wait for dbReady then retry once
   if(!loaded){
     if(typeof dbReady!=='undefined')await dbReady;
     try{
       var s2=await dbGetTechSubmissions(_tsPNum);
       submissions=Array.isArray(s2)?s2:[];
+      localStorage.setItem(_CACHE_KEY,JSON.stringify(submissions));
     }catch(e){submissions=[];}
     _dataLoaded=true;
     renderList();
   }
-  // Load equipment schedule non-blocking
+  // Load equipment non-blocking
   dbGetEquipment(_tsPNum).then(function(eq){
     _cachedEquipData=(typeof eq==='string')?JSON.parse(eq):eq;
   }).catch(function(){_cachedEquipData=null;});
@@ -1253,7 +1266,15 @@ function saveWarranty(){
 async function exportTsPdf(){
   var s=submissions.find(function(x){return x.id===activeId;});
   if(!s){alert('No submission open.');return;}
-  if(typeof PDFLib==='undefined'){alert('PDF-lib not loaded.');return;}
+  if(typeof PDFLib==='undefined'){
+    showTsToast('Loading PDF library…');
+    await new Promise(function(resolve,reject){
+      var sc=document.createElement('script');
+      sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+      sc.onload=resolve;sc.onerror=reject;
+      document.head.appendChild(sc);
+    });
+  }
   var rev=getViewingRev();
   showTsToast('Building PDF\u2026');
   try{
