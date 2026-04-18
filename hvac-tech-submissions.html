@@ -759,14 +759,23 @@ function save(){
 }
 
 (async function(){
-  if(typeof dbReady!=='undefined')await dbReady;
+  // Try immediately with whatever session is available
+  var loaded=false;
   try{
     var s=await dbGetTechSubmissions(_tsPNum);
-    submissions=Array.isArray(s)?s:[];
-  }catch(e){submissions=[];}
-  _dataLoaded=true;
-  renderList();
-  // Load equipment schedule non-blocking after list is shown
+    if(Array.isArray(s)){submissions=s;_dataLoaded=true;renderList();loaded=true;}
+  }catch(e){}
+  // If that failed (expired token), wait for dbReady then retry once
+  if(!loaded){
+    if(typeof dbReady!=='undefined')await dbReady;
+    try{
+      var s2=await dbGetTechSubmissions(_tsPNum);
+      submissions=Array.isArray(s2)?s2:[];
+    }catch(e){submissions=[];}
+    _dataLoaded=true;
+    renderList();
+  }
+  // Load equipment schedule non-blocking
   dbGetEquipment(_tsPNum).then(function(eq){
     _cachedEquipData=(typeof eq==='string')?JSON.parse(eq):eq;
   }).catch(function(){_cachedEquipData=null;});
