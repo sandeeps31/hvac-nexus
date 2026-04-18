@@ -959,7 +959,29 @@ function duplicateTpl(tplId){
   var src=templates.find(function(t){return t.id===tplId;});if(!src)return;
   var copy=JSON.parse(JSON.stringify(src));
   copy.id=nid();copy.tplNo=genTplNum();copy.name=copy.name+' (copy)';copy.createdAt=todayStr();copy.updatedAt=todayStr();
-  copy.revisions=[];
+  // Get source sections from published or latest revision
+  var srcRev=publishedRev(src)||currentRev(src);
+  var srcSections=srcRev?JSON.parse(JSON.stringify(srcRev.sections)):[{name:'__none__',fields:[]}];
+  // Ensure the 4 locked fields exist in the first section — add any missing ones at the front
+  var LOCKED=[
+    {key:'equipId',label:'Equipment ID',type:'text',unit:'',required:true,defaultVal:'',exampleVal:'FCU-L3-01',options:[],locked:true},
+    {key:'location',label:'Location',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'Level 3',options:[],locked:true},
+    {key:'manufacturer',label:'Manufacturer',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'Daikin',options:[],locked:true},
+    {key:'model',label:'Model',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'FWD-125',options:[],locked:true}
+  ];
+  var firstSec=srcSections[0]||(srcSections[0]={name:'__none__',fields:[]});
+  // Mark existing fields that match locked keys as locked, add missing ones at front
+  var existingKeys=firstSec.fields.map(function(f){return f.key;});
+  var toInsert=[];
+  LOCKED.forEach(function(lf){
+    var existing=firstSec.fields.find(function(f){return f.key===lf.key||f.label===lf.label;});
+    if(existing){existing.locked=true;}
+    else{toInsert.push(lf);}
+  });
+  firstSec.fields=toInsert.concat(firstSec.fields);
+  // Create a new draft revision with the merged sections
+  var ver=1;
+  copy.revisions=[{version:ver,status:'draft',sections:srcSections,createdAt:todayStr(),notes:'Duplicated from '+src.name}];
   templates.push(copy);save();renderRegister();showToast('Template duplicated');
 }
 function deleteTpl(tplId){
