@@ -277,26 +277,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 <script src="db.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script>
-// ── HVAC Nexus Auth Guard ──
-(async function(){
-  var DEV_BYPASS=false;
-  if(typeof dbReady !== 'undefined') await dbReady;
-  if(DEV_BYPASS)return;
-  var stored=localStorage.getItem('hvacnexus_session');
-  if(!stored){window.location.href='hvac-login.html';return;}
-  try{
-    var sess=JSON.parse(stored);
-    if(Date.now()/1000<(sess.expires_at||0)-60){
-      // Set _authSession if db.js loaded
-      if(typeof _authSession!=='undefined')_authSession=sess;
-      return;
-    }
-    var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
-    var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
-    var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
-    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
-    else{localStorage.removeItem('hvacnexus_session');window.location.href='hvac-login.html';}
-  }catch(e){window.location.href='hvac-login.html';}
+// ── HVAC Nexus Auth Guard — redirect only, db.js handles token refresh ──
+(function(){
+  if(!localStorage.getItem('hvacnexus_session')){
+    window.location.href='hvac-login.html';
+  }
 })();
 </script>
 </head>
