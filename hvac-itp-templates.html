@@ -52,6 +52,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .fsel:focus{border-color:var(--accent);color:var(--text)}.fsel option{background:var(--surface2)}
 .reg-page{padding:16px 24px 60px}
 .reg-tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.chip-equip{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(0,200,255,.1);color:var(--accent);border:1px solid rgba(0,200,255,.25);white-space:nowrap}
+.chip-cat-install{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(0,229,160,.1);color:var(--green);border:1px solid rgba(0,229,160,.25);white-space:nowrap}
+.chip-cat-precx{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(255,184,48,.1);color:var(--warn);border:1px solid rgba(255,184,48,.25);white-space:nowrap}
+.chip-cat-cx{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(167,139,250,.15);color:#c4b5fd;border:1px solid rgba(167,139,250,.3);white-space:nowrap}
 .reg-tbl thead tr{background:var(--surface2)}
 .reg-tbl th{padding:9px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
 .reg-tbl td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
@@ -260,6 +264,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   <div class="view active" id="view-register">
     <div class="reg-toolbar">
       <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search ITP templates…" oninput="renderRegister()"></div>
+      <select class="fsel" id="filterEquip" onchange="renderRegister()" style="font-size:12px"><option value="">All Equipment Types</option></select>
+      <select class="fsel" id="filterCat" onchange="renderRegister()" style="font-size:12px">
+        <option value="">All Categories</option>
+        <option value="Installation">Installation</option>
+        <option value="Pre-Commissioning">Pre-Commissioning</option>
+        <option value="Commissioning">Commissioning</option>
+      </select>
       <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="itpCount"></span>
     </div>
     <div class="reg-page">
@@ -268,6 +279,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
           <tr>
             <th style="width:100px">ITP No.</th>
             <th>ITP Type / Name</th>
+            <th style="width:120px">Equipment Type</th>
+            <th style="width:130px">Category</th>
             <th style="width:70px">Version</th>
             <th style="width:90px">Status</th>
             <th style="width:110px">Created</th>
@@ -293,8 +306,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <div class="emf"><span class="emf-lbl">ITP Type</span><div class="emf-val" id="ed-itptype"></div></div>
       <div class="emf"><span class="emf-lbl">Version</span><div class="emf-val mono" id="ed-version"></div></div>
       <div class="emf"><span class="emf-lbl">Creator</span><div class="emf-val" id="ed-creator"></div></div>
-      <div class="emf"><span class="emf-lbl">Date Created</span><div class="emf-val" id="ed-created"></div></div>
       <div class="emf"><span class="emf-lbl">Last Modified</span><div class="emf-val" id="ed-modified"></div></div>
+    </div>
+    <!-- Editable meta row -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface2)">
+      <div style="flex:2;padding:8px 16px;border-right:1px solid var(--border)">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">ITP Type Name <span style="color:var(--accent)">✏ editable</span></div>
+        <input id="proj-itptype-input" class="mi" style="font-size:12px;padding:4px 8px" placeholder="e.g. FCU — Installation ITP" onblur="saveProjItpMeta()"/>
+      </div>
+      <div style="flex:1;padding:8px 16px;border-right:1px solid var(--border)">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Equipment Type <span style="color:var(--accent)">✏ editable</span></div>
+        <input id="proj-equiptype-input" class="mi" style="font-size:12px;padding:4px 8px" placeholder="e.g. FCU" onblur="saveProjItpMeta()"/>
+      </div>
+      <div style="flex:1;padding:8px 16px">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">ITP Category <span style="color:var(--accent)">✏ editable</span></div>
+        <select id="proj-itpcat-input" class="mi" style="font-size:12px;padding:4px 8px;height:32px;appearance:auto;cursor:pointer" onchange="saveProjItpMeta()">
+          <option value="">— Select —</option>
+          <option value="Installation">Installation</option>
+          <option value="Pre-Commissioning">Pre-Commissioning</option>
+          <option value="Commissioning">Commissioning</option>
+        </select>
+      </div>
     </div>
     <!-- Flag legend -->
     <div style="padding:8px 24px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -435,7 +467,6 @@ var activeItpId = null;
 var _uid = 0;
 function nid(){return 'itp'+(++_uid)+Date.now();}
 
-function itpCatBadge(cat){if(!cat)return '';var cls=cat==='Installation'?'itp-cat-install':cat==='Pre-Commissioning'?'itp-cat-precx':'itp-cat-cx';return '<span class="itp-cat-badge '+cls+'">'+cat+'</span>';}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function todayStr(){return new Date().toISOString().split('T')[0];}
 function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
@@ -616,34 +647,51 @@ function openEditor(itpId){
 function renderRegister(){
   updateTabCounts();
   var q=(document.getElementById('srch').value||'').toLowerCase();
+  var ef=(document.getElementById('filterEquip')||{}).value||'';
+  var cf=(document.getElementById('filterCat')||{}).value||'';
   var list=templates.filter(function(t){
-    return !q||(t.itpNo||'').toLowerCase().includes(q)||(t.itpType||'').toLowerCase().includes(q);
+    return (!q||(t.itpNo||'').toLowerCase().includes(q)||(t.itpType||'').toLowerCase().includes(q)||(t.equipType||'').toLowerCase().includes(q))
+      &&(!ef||(t.equipType||'')===ef)
+      &&(!cf||(t.itpCategory||'')===cf);
   });
+
+  // Populate equipment type filter
+  var equipSel=document.getElementById('filterEquip');
+  if(equipSel){
+    var cur=equipSel.value;
+    var types=[...new Set(templates.map(function(t){return t.equipType||'';}).filter(Boolean))].sort();
+    equipSel.innerHTML='<option value="">All Equipment Types</option>'+types.map(function(t){return'<option value="'+escH(t)+'"'+(t===cur?' selected':'')+'>'+escH(t)+'</option>';}).join('');
+  }
+
   var levelLabel=currentLevel==='company'?'company library':'project';
   document.getElementById('itpCount').textContent=list.length+' template'+(list.length!==1?'s':'');
+  var catCls={'Installation':'chip-cat-install','Pre-Commissioning':'chip-cat-precx','Commissioning':'chip-cat-cx'};
   if(!list.length){
     var emptyMsg=currentLevel==='project'
       ?'No project templates yet. Use <strong>Import from Company</strong> to add templates, or create a new one.'
       :'No company templates yet. Create your first company-level ITP template.';
-    document.getElementById('regBody').innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No ITP templates yet</div><div class="empty-sub">'+emptyMsg+'</div></div></td></tr>';
+    document.getElementById('regBody').innerHTML='<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No ITP templates yet</div><div class="empty-sub">'+emptyMsg+'</div></div></td></tr>';
     return;
   }
   var rows='';
   list.forEach(function(itp){
-    var rev=currentRev(itp); // last published, or last draft if never published
-    var hasDraftInProgress=isDraft(itp)&&itp.revisions.length>1; // draft on top of a published version
+    var rev=currentRev(itp);
+    var hasDraftInProgress=isDraft(itp)&&itp.revisions.length>1;
     var verClass=rev.status==='current'?'current':rev.status==='draft'?'draft':'';
     var stBadge=rev.status==='current'
       ?'<span class="status-badge sb-current">Current</span>'+(hasDraftInProgress?'<span class="status-badge sb-draft" style="margin-left:4px">Draft ↑</span>':'')
       :rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>'
       :'<span class="status-badge sb-superseded">Superseded</span>';
     var importedBadge=itp.importedFrom?'<span class="imported-badge">imported</span>':'';
+    var equipChip=itp.equipType?'<span class="chip-equip">'+escH(itp.equipType)+'</span>':'<span style="color:var(--muted);font-size:11px">—</span>';
+    var catChip=itp.itpCategory?'<span class="'+(catCls[itp.itpCategory]||'chip-equip')+'">'+escH(itp.itpCategory)+'</span>':'<span style="color:var(--muted);font-size:11px">—</span>';
     rows+='<tr style="cursor:pointer" onclick="editItp(\''+itp.id+'\')">'
       +'<td><span class="itp-num">'+escH(itp.itpNo)+'</span></td>'
-      +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+itpCatBadge(itp.itpCategory)+importedBadge+'</td>'
+      +'<td><span class="itp-name">'+escH(itp.itpType)+'</span>'+importedBadge+'</td>'
+      +'<td>'+equipChip+'</td>'
+      +'<td>'+catChip+'</td>'
       +'<td><span class="itp-ver '+verClass+'">v'+rev.version+'</span></td>'
       +'<td>'+stBadge+'</td>'
-      +'<td style="color:var(--text2);font-size:12px">'+fmtDate(itp.createdDate)+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.modifiedDate)+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(rev.lastUsed)+'</td>'
       +'<td onclick="event.stopPropagation()">'
@@ -652,7 +700,6 @@ function renderRegister(){
           +'<button class="act-btn" onclick="exportItpPDF(\''+itp.id+'\')" title="Export PDF"><span class="tip">Export PDF</span>📄</button>'
           +'<button class="act-btn warn" onclick="duplicateItp(\''+itp.id+'\')" title="Duplicate"><span class="tip">Duplicate</span>⧉</button>'
           +'<button class="act-btn" onclick="openRevHist(\''+itp.id+'\')" title="Revision history"><span class="tip">Revision history</span>🕐</button>'
-          +'<button class="act-btn" onclick="copyItp(\''+itp.id+'\')" title="Copy"><span class="tip">Copy</span>📋</button>'
           +'<button class="act-btn danger" onclick="deleteItp(\''+itp.id+'\')" title="Delete"><span class="tip">Delete</span>🗑</button>'
         +'</div>'
       +'</td>'
@@ -671,8 +718,11 @@ function renderEditor(){
   document.getElementById('ed-itptype').textContent=itp.itpType;
   document.getElementById('ed-version').textContent='v'+rev.version+(rev.status==='draft'?' (Draft)':rev.status==='current'?' (Current)':'');
   document.getElementById('ed-creator').textContent=itp.createdBy||'—';
-  document.getElementById('ed-created').textContent=fmtDate(itp.createdDate);
   document.getElementById('ed-modified').textContent=fmtDate(rev.modifiedDate)||'—';
+  // Populate editable meta fields
+  var ti=document.getElementById('proj-itptype-input');if(ti)ti.value=itp.itpType||'';
+  var ei=document.getElementById('proj-equiptype-input');if(ei)ei.value=itp.equipType||'';
+  var ci=document.getElementById('proj-itpcat-input');if(ci)ci.value=itp.itpCategory||'';
 
   var stBadge=rev.status==='current'?'<span class="status-badge sb-current">Current</span>':rev.status==='draft'?'<span class="status-badge sb-draft">Draft</span>':'<span class="status-badge sb-superseded">Superseded</span>';
   document.getElementById('editorStatusBadge').innerHTML=stBadge;
@@ -681,6 +731,17 @@ function renderEditor(){
   document.getElementById('publishBtn').style.display=canEdit?'':'none';
 
   renderEditorBody(itp, rev, canEdit);
+}
+
+function saveProjItpMeta(){
+  var itp=templates.find(function(t){return t.id===activeItpId;});if(!itp)return;
+  var newType=(document.getElementById('proj-itptype-input').value||'').trim();
+  var newEquip=(document.getElementById('proj-equiptype-input').value||'').trim();
+  var newCat=document.getElementById('proj-itpcat-input').value||'';
+  if(newType){itp.itpType=newType;document.getElementById('ed-itptype').textContent=newType;document.getElementById('editorTitle').textContent=newType;document.getElementById('bcCurr').textContent=itp.itpNo+' — '+newType;}
+  itp.equipType=newEquip;
+  itp.itpCategory=newCat;
+  save();
 }
 
 function renderEditorBody(itp, rev, canEdit){
@@ -1123,6 +1184,8 @@ function confirmImport(){
       id:nid(),
       itpNo:src.itpNo,
       itpType:src.itpType,
+      equipType:src.equipType||'',
+      itpCategory:src.itpCategory||'',
       createdBy:me,
       createdDate:todayStr(),
       importedFrom:cId,
