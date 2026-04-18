@@ -1340,15 +1340,47 @@ function genCxItpNo(){
 function toggleCxSelect(tag){
   if(cxSelectedItems.has(tag))cxSelectedItems.delete(tag);
   else cxSelectedItems.add(tag);
+  // Update just this row's visuals — no full re-render
+  var cb=document.querySelector('#trackerBody input[data-tag="'+tag+'"]');
+  if(cb){
+    cb.checked=cxSelectedItems.has(tag);
+    var td=cb.closest('td');
+    var tr=cb.closest('tr');
+    if(td)td.style.background=cb.checked?'var(--accent-dim)':'var(--surface)';
+    if(tr){var tagTd=tr.querySelector('.tag-cell');if(tagTd)tagTd.style.background=cb.checked?'var(--accent-dim)':'';}
+  }
+  // Update header checkbox state
+  var allChk=document.getElementById('selectAllChk');
+  if(allChk){
+    var all=document.querySelectorAll('#trackerBody input[type=checkbox][data-tag]');
+    var allSel=Array.from(all).every(function(c){return cxSelectedItems.has(c.dataset.tag);});
+    var anySel=Array.from(all).some(function(c){return cxSelectedItems.has(c.dataset.tag);});
+    allChk.checked=allSel;
+    allChk.indeterminate=!allSel&&anySel;
+  }
   updateBatchBar();
 }
 function toggleCxSelectAll(){
-  var allRows=document.querySelectorAll('#trackerBody tr');
-  var visibleTags=[];
-  allRows.forEach(function(row){var cb=row.querySelector('input[type=checkbox]');if(cb)visibleTags.push(cb.dataset.tag);});
-  var allSelected=visibleTags.every(function(t){return cxSelectedItems.has(t);});
-  visibleTags.forEach(function(t){if(allSelected)cxSelectedItems.delete(t);else cxSelectedItems.add(t);});
-  renderTracker();
+  var checkboxes=document.querySelectorAll('#trackerBody input[type=checkbox][data-tag]');
+  var tags=[];
+  checkboxes.forEach(function(cb){tags.push(cb.dataset.tag);});
+  var allSelected=tags.length>0&&tags.every(function(t){return cxSelectedItems.has(t);});
+  tags.forEach(function(t){if(allSelected)cxSelectedItems.delete(t);else cxSelectedItems.add(t);});
+  // Update checkboxes directly — no full re-render
+  checkboxes.forEach(function(cb){
+    cb.checked=cxSelectedItems.has(cb.dataset.tag);
+    var td=cb.closest('td');
+    var tr=cb.closest('tr');
+    if(td)td.style.background=cb.checked?'var(--accent-dim)':'var(--surface)';
+    // Also update frozen tag cell background
+    if(tr){
+      var tagTd=tr.querySelector('.tag-cell');
+      if(tagTd)tagTd.style.background=cb.checked?'var(--accent-dim)':'';
+    }
+  });
+  var allChk=document.getElementById('selectAllChk');
+  if(allChk){allChk.checked=!allSelected;allChk.indeterminate=false;}
+  updateBatchBar();
 }
 function updateBatchBar(){
   var bar=document.getElementById('batchActionBar');
@@ -2160,22 +2192,22 @@ async function buildEquipPdf(tag,t,d){
   async function appendPdf(data){
     try{
       var s=await PDFDocument.load(data);
-      var pp=await pdf.copyPages(s,s.getPageIndices());
-      pp.forEach(function(srcPage){
+      var indices=s.getPageIndices();
+      for(var pi=0;pi<indices.length;pi++){
         pageCounter++;
-        var p=pdf.addPage([W,H]);
-        p.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
-        var sz=srcPage.getSize();
+        var embedded=await pdf.embedPage(s.getPage(indices[pi]));
+        var sz=embedded.size();
         var avW=W,avH=H-74;
         var sc=Math.min(avW/sz.width,avH/sz.height);
         var sw=sz.width*sc,sh=sz.height*sc;
-        p.drawPage(srcPage,{x:(W-sw)/2,y:24+(avH-sh)/2,width:sw,height:sh});
+        var p=pdf.addPage([W,H]);
+        p.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
+        p.drawEmbeddedPage(embedded,{x:(W-sw)/2,y:24+(avH-sh)/2,width:sw,height:sh});
         p.drawRectangle({x:0,y:H-50,width:W,height:50,color:rgb(0.039,0.071,0.118)});
         p.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
         p.drawText(projName+(projNum?' \u00B7 '+projNum:''),{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
         p.drawText('Page '+pageCounter,{x:W-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
-        pdf.addPage(p);
-      });
+      }
     }catch(e){console.warn('appendPdf failed:',e);}
   }
   if(!d.airBalance||!d.airBalance.na){var ar=(d.airBalance&&d.airBalance.revisions)||[];if(ar.length){sectionPage('Air Balance Test Sheet');await appendPdf(ar[ar.length-1].data);}}
