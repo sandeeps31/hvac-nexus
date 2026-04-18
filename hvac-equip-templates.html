@@ -492,7 +492,7 @@ function renderEditor(){
       +'</div></div>';
   } else {
     mb.innerHTML='<div class="emf"><span class="emf-lbl">Form No.</span><span class="emf-val mono">'+escH(tpl.tplNo||'—')+'</span></div>'
-      +'<div class="emf"><span class="emf-lbl">Equipment Type</span><span class="emf-val" id="tplNameDisplay">'+escH(tpl.name||'—')+'</span> <button class="btn bg bsm" style="margin-left:8px;font-size:11px" onclick="renameTpl()">✏ Rename</button></div>'
+      +'<div class="emf"><span class="emf-lbl">Equipment Type</span><span class="emf-val">'+escH(tpl.name||'—')+'</span></div>'
       +'<div class="emf"><span class="emf-lbl">Group</span><span class="emf-val">'+escH(tpl.group||'—')+'</span></div>'
       +'<div class="emf"><span class="emf-lbl">Layout</span><span class="emf-val">'+(tpl.layout==='vertical'?'↕ Vertical':'↔ Horizontal')+'</span></div>'
       +'<div class="emf"><span class="emf-lbl">Created</span><span class="emf-val">'+fmtDate(tpl.createdAt)+'</span></div>';
@@ -603,8 +603,13 @@ function renderEditorBody(tpl,rev,canEdit){
       if(canEdit){
         html+='<div class="eq-field-row" draggable="true" data-si="'+si+'" data-fi="'+fi+'" ondragstart="fldDragStart(event,'+si+','+fi+')" ondragover="fldDragOver(event)" ondrop="fldDrop(event,'+si+','+fi+')" ondragleave="fldDragLeave(event)" ondragend="fldDragEnd(event)">'
           +'<div class="drag-handle">⠿</div>'
-          +'<input class="si" value="'+escHs(f.label)+'" oninput="fieldUpdate('+si+','+fi+',\'label\',this.value)" placeholder="e.g. Air Flow"/>'
-          +'<select class="si" onchange="fieldUpdate('+si+','+fi+',\'type\',this.value)">'
+          +(f.locked
+            ?'<input class="si" value="'+escHs(f.label)+'" disabled style="opacity:.7;cursor:not-allowed" title="This field name cannot be changed"/>'
+            +'<span style="font-family:DM Mono,monospace;font-size:8px;padding:1px 6px;background:var(--accent-dim);color:var(--accent);border-radius:10px;border:1px solid rgba(0,200,255,.25);white-space:nowrap;align-self:center">locked</span>'
+            :'<input class="si" value="'+escHs(f.label)+'" oninput="fieldUpdate('+si+','+fi+',\'label\',this.value)" placeholder="e.g. Air Flow"/>'
+            +'<span></span>'
+          )
+          +'<select class="si" onchange="fieldUpdate('+si+','+fi+',\'type\',this.value)"'+(f.locked?' disabled style="opacity:.7"':'')+' >'
           +FIELD_TYPES.map(function(ft){return'<option value="'+ft.key+'"'+(ft.key===(f.type||'text')?' selected':'')+'>'+ft.label+'</option>';}).join('')
           +'</select>'
           +'<input class="si" value="'+escHs(f.unit||'')+'" oninput="fieldUpdate('+si+','+fi+',\'unit\',this.value)" placeholder="l/s"/>'
@@ -615,8 +620,11 @@ function renderEditorBody(tpl,rev,canEdit){
             :'<span></span>'
           )
           +'<input class="si" value="'+escHs(f.exampleVal||'')+'" oninput="fieldUpdate('+si+','+fi+',\'exampleVal\',this.value)" placeholder="e.g. TB1-ATT-01"/>'
-          +'<div style="text-align:center"><input type="checkbox" '+(f.required?'checked':'')+' onchange="fieldUpdate('+si+','+fi+',\'required\',this.checked)"/></div>'
-          +'<button onclick="fieldDelete('+si+','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1">×</button>'
+          +'<div style="text-align:center"><input type="checkbox" '+(f.required?'checked':'')+' onchange="fieldUpdate('+si+','+fi+',\'required\',this.checked)"'+(f.locked?' disabled':'')+'/></div>'
+          +(f.locked
+            ?'<span style="width:24px;display:inline-block"></span>'
+            :'<button onclick="fieldDelete('+si+','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1">×</button>'
+          )
           +'</div>';
       } else {
         html+='<div style="display:grid;grid-template-columns:22px 200px 110px 60px 220px 150px 44px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center">'
@@ -661,18 +669,6 @@ function getDraftSections(){
   return rev.sections;
 }
 
-function renameTpl(){
-  var tpl=templates.find(function(t){return t.id===activeTplId;});
-  if(!tpl)return;
-  var newName=prompt('Equipment Type Name:',tpl.name||'');
-  if(newName===null)return;
-  newName=newName.trim();
-  if(!newName){alert('Name cannot be empty.');return;}
-  tpl.name=newName;
-  save();
-  renderEditor();
-  showToast('✓ Renamed to "'+newName+'"');
-}
 function tplMeta(key,val){
   var tpl=templates.find(function(t){return t.id===activeTplId;});
   if(!tpl)return;
@@ -713,6 +709,7 @@ function fieldAdd(si){
 }
 function fieldDelete(si,fi){
   var s=getDraftSections();if(!s)return;
+  if(s[si].fields[fi]&&s[si].fields[fi].locked){showToast('This field cannot be deleted.');return;}
   s[si].fields.splice(fi,1);markDirty();renderEditor();
 }
 var DROPDOWN_PRESETS={
@@ -728,6 +725,7 @@ var DROPDOWN_PRESETS={
 
 function fieldUpdate(si,fi,prop,val){
   var s=getDraftSections();if(!s)return;
+  if(prop==='label'&&s[si].fields[fi]&&s[si].fields[fi].locked)return; // cannot rename locked fields
   s[si].fields[fi][prop]=val;
   if(prop==='label')s[si].fields[fi].key=val.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
   // Auto-populate dropdown options based on label
@@ -882,11 +880,17 @@ function startDraft(tpl,rerender){
   var pubRev=publishedRev(tpl);
   var existingDraft=tpl.revisions&&tpl.revisions.find(function(r){return r.status==='draft';});
   // Preserve sections from existing draft or published rev — never wipe to empty
+  var DEFAULT_LOCKED_FIELDS=[
+    {key:'equipId',label:'Equipment ID',type:'text',unit:'',required:true,defaultVal:'',exampleVal:'FCU-L3-01',options:[],locked:true},
+    {key:'location',label:'Location',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'Level 3',options:[],locked:true},
+    {key:'manufacturer',label:'Manufacturer',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'Daikin',options:[],locked:true},
+    {key:'model',label:'Model',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'FWD-125',options:[],locked:true}
+  ];
   var newSections=pubRev
     ?JSON.parse(JSON.stringify(pubRev.sections))
     :existingDraft&&existingDraft.sections&&existingDraft.sections.length
       ?JSON.parse(JSON.stringify(existingDraft.sections))
-      :[{name:'__none__',fields:[]}];
+      :[{name:'__none__',fields:DEFAULT_LOCKED_FIELDS}];
   var ver=nextVersion(tpl);
   tpl.revisions=tpl.revisions||[];
   // Remove any existing draft
