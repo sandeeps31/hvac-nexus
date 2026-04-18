@@ -798,12 +798,29 @@ function saveItpPin(){
   if(!_itpSelectedTemplates.length){toast('Select at least one ITP template');return;}
   if(!curDrawing.pins)curDrawing.pins=[];
   var u=dbGetCurrentUser();var equip=document.getElementById('itpEquip').value.trim();
+
+  // Calculate starting ref number once, then increment for each ITP
+  function nextItpRefNum(){
+    var max=0;
+    drawings.forEach(function(d){
+      (d.pins||[]).forEach(function(p){
+        var m=(p.ref||'').match(/^ITP-(\d+)$/);
+        if(m){var n=parseInt(m[1]);if(n>max)max=n;}
+        (p.itps||[]).forEach(function(itp){
+          var mi=(itp.ref||'').match(/^ITP-(\d+)$/);
+          if(mi){var ni=parseInt(mi[1]);if(ni>max)max=ni;}
+        });
+      });
+    });
+    return max+1;
+  }
+
   if(_itpPinCache){
-    // On edit — preserve existing refs, assign new ones only to newly added templates
     var existingRefs={};
     (_itpPinCache.itps||[]).forEach(function(itp){if(itp.ref&&itp.itpNo)existingRefs[itp.itpNo]=itp.ref;});
-    _itpPinCache.itps=_itpSelectedTemplates.map(function(t){
-      var ref=existingRefs[t.itpNo]||nextRef('ITP');
+    var startNum=nextItpRefNum();
+    _itpPinCache.itps=_itpSelectedTemplates.map(function(t,i){
+      var ref=existingRefs[t.itpNo]||('ITP-'+String(startNum+i).padStart(4,'0'));
       return {itpNo:t.itpNo,itpType:t.itpType,ref:ref};
     });
     _itpPinCache.itpTypeLabel=_itpPinCache.itps[0].itpType||'';
@@ -811,9 +828,9 @@ function saveItpPin(){
     _itpPinCache.equip=equip;
     responses[_itpPinCache.id]=responses[_itpPinCache.id]||{};
   } else {
-    // New pin — assign sequential ref to each template
-    var itpsWithRefs=_itpSelectedTemplates.map(function(t){
-      return {itpNo:t.itpNo,itpType:t.itpType,ref:nextRef('ITP')};
+    var startNum=nextItpRefNum();
+    var itpsWithRefs=_itpSelectedTemplates.map(function(t,i){
+      return {itpNo:t.itpNo,itpType:t.itpType,ref:'ITP-'+String(startNum+i).padStart(4,'0')};
     });
     var firstRef=itpsWithRefs[0].ref;
     var pin={id:nid(),type:'itp',ref:firstRef,itps:itpsWithRefs,itpTypeLabel:itpsWithRefs[0].itpType||'',equip:equip,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
