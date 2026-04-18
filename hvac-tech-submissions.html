@@ -1011,7 +1011,7 @@ function renderDetail(){
   // Lock editing if published or viewing old rev
   var isLatest=isViewingLatest();
   var editable=isLatest&&isDraft;
-  document.querySelectorAll('.upload-zone').forEach(function(z){z.style.display=editable?'':'none';});
+  document.querySelectorAll('.upload-zone').forEach(function(z){if(z.closest('.mo'))return;z.style.display=editable?'':'none';});
   document.getElementById('leadTimeInput').disabled=!editable;
   document.getElementById('warrantyParts').disabled=!editable;
   document.getElementById('warrantyLabour').disabled=!editable;
@@ -1552,7 +1552,7 @@ function toggleSec(id){
 
 /* ── WORKFLOW ── */
 var WF_MAIN_STEPS=['Submitted','Approved','Rejected','Revise & Resubmit'];
-var WF_COMMENT_REQUIRED=['Rejected','Revise & Resubmit'];
+var WF_COMMENT_REQUIRED=['Submitted','Approved','Rejected','Revise & Resubmit'];
 var _pendingStatus='';
 var _stChangeFiles=[];
 
@@ -1569,95 +1569,68 @@ function renderWorkflowTracker(s){
   var WF_ICONS={Submitted:'📤',Approved:'✓',Rejected:'✕','Revise & Resubmit':'↩'};
   var WF_CLS={Submitted:'submitted',Approved:'approved',Rejected:'rejected','Revise & Resubmit':'revise'};
 
-  // Group history by revision — each entry should have .rev set
-  // Fall back: entries without rev get assigned to first revision
-  var groups={};var groupOrder=[];
+  // Group by revision label
+  var groups={},groupOrder=[];
   history.forEach(function(h){
     var r=h.rev||(s.revisions&&s.revisions[0]?s.revisions[0].rev:'Rev 01');
     if(!groups[r]){groups[r]=[];groupOrder.push(r);}
     groups[r].push(h);
   });
 
-  // Determine current rev label for the latest group
   var latestRevLabel=s.revisions&&s.revisions.length?s.revisions[s.revisions.length-1].rev:'';
   var isEditable=isViewingLatest();
 
-  var html='<div style="display:flex;flex-direction:column;gap:8px;padding:8px 0">';
+  // Build horizontal groups row
+  var html='<div style="display:flex;flex-wrap:wrap;gap:10px;padding:8px 0;align-items:flex-start">';
 
   groupOrder.forEach(function(revLabel){
     var entries=groups[revLabel];
     var isCurrentRev=revLabel===latestRevLabel;
 
-    // Status summary for group header
-    var lastEntry=entries[entries.length-1];
-    var lastStatus=lastEntry?lastEntry.status:'';
-    var statusCls=WF_CLS[lastStatus]||'submitted';
+    html+='<div style="background:var(--surface2);border:1px solid '+(isCurrentRev?'rgba(0,200,255,.25)':'var(--border)')+';border-radius:10px;padding:10px 14px;min-width:0">';
 
-    html+='<div class="wf-group">';
-    // Group header
-    html+='<div class="wf-group-hdr">'
-      +'<span class="wf-group-rev">'+escH(revLabel)+'</span>'
-      +(isCurrentRev?'<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent)">current</span>':'')
+    // Rev label header
+    html+='<div style="margin-bottom:8px;display:flex;align-items:center;gap:6px">'
+      +'<span style="font-family:DM Mono,monospace;font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);border-radius:20px;padding:1px 9px">'+escH(revLabel)+'</span>'
+      +(isCurrentRev?'<span style="font-family:DM Mono,monospace;font-size:8px;color:var(--accent);opacity:.7">current</span>':'')
       +'</div>';
 
-    // Events row
-    html+='<div class="wf-events">';
+    // Horizontal event chips with arrows
+    html+='<div style="display:flex;align-items:flex-start;gap:4px;flex-wrap:wrap">';
     entries.forEach(function(h,i){
       var cls=WF_CLS[h.status]||'submitted';
       var icon=WF_ICONS[h.status]||'○';
-      if(i>0)html+='<div class="wf-arrow">→</div>';
-      html+='<div class="wf-event" data-step="'+escH(h.status)+'" onclick="'+(isCurrentRev&&isEditable?'openStatusChangeFor(this.dataset.step)':'')+'">'+
-        '<div class="wf-chip '+cls+'"><span>'+icon+'</span><span>'+escH(h.status)+'</span></div>'+
-        '<div class="wf-event-date">'+fmtDate(h.date)+'</div>'+
-        (h.comment?'<div class="wf-event-comment" title="'+escH(h.comment)+'">'+escH(h.comment)+'</div>':'')+
-        '</div>';
+      if(i>0)html+='<div style="color:var(--muted);font-size:12px;padding:0 2px;margin-top:8px">→</div>';
+      // Each chip is clickable if current rev + editable
+      var clickable=isCurrentRev&&isEditable;
+      html+='<div '+(clickable?'data-step="'+escH(h.status)+'" onclick="openStatusChangeFor(this.dataset.step)" ':'')+
+        'style="display:flex;flex-direction:column;align-items:center;gap:2px;'+(clickable?'cursor:pointer':'')+'">'+
+        '<div class="wf-chip '+cls+'">'+icon+' '+escH(h.status)+'</div>'+
+        '<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--text2);text-align:center">'+fmtDate(h.date)+'</div>'+
+        (h.comment?'<div style="font-size:9px;color:var(--muted);font-style:italic;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(h.comment)+'">'+escH(h.comment)+'</div>':'')
+        +'</div>';
     });
 
-    // Add next step button — only on current rev, only if editable
+    // Add next step buttons on current rev only
     if(isCurrentRev&&isEditable){
-      // Suggest next logical step
       var statuses=entries.map(function(e){return e.status;});
       var suggestions=[];
-      if(!statuses.includes('Approved')&&!statuses.includes('Rejected')&&!statuses.includes('Revise & Resubmit')){
-        suggestions=['Approved','Rejected','Revise & Resubmit'];
-      } else if(statuses.includes('Revise & Resubmit')&&!statuses.includes('Approved')&&!statuses.includes('Rejected')){
-        suggestions=['Approved','Rejected'];
-      } else {
-        // Allow updating any step
-        suggestions=['Submitted','Approved','Rejected','Revise & Resubmit'];
+      if(!statuses.includes('Approved')&&!statuses.includes('Rejected')){
+        if(!statuses.includes('Revise & Resubmit'))suggestions=['Approved','Rejected','Revise & Resubmit'];
+        else suggestions=['Approved','Rejected'];
       }
-      if(suggestions.length){
-        suggestions.forEach(function(sug){
-          var sugCls=WF_CLS[sug]||'submitted';
-          var sugIcon=WF_ICONS[sug]||'○';
-          html+='<div class="wf-arrow" style="opacity:.3">→</div>';
-          html+='<div class="wf-add-btn" data-step="'+escH(sug)+'" onclick="openStatusChangeFor(this.dataset.step)" title="Set '+escH(sug)+'">'
-            +'<div class="wf-add-chip '+sugCls+'" style="border-style:dashed;opacity:.6">'+sugIcon+' '+escH(sug)+'</div>'
-            +'<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--muted)">add</div>'
-            +'</div>';
-        });
-      }
-    }
-    html+='</div>'; // wf-events
-
-    // Feedback cards for this group (comment/files)
-    var feedbacks=entries.filter(function(h){return h.comment||(h.files&&h.files.length);});
-    if(feedbacks.length){
-      html+='<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">';
-      feedbacks.forEach(function(h){
-        html+='<div style="background:var(--surface3);border-radius:6px;padding:8px 12px">'
-          +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
-          +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 6px;border-radius:10px;background:var(--surface2);color:var(--text2)">'+escH(h.status)+'</span>'
-          +'<span style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted)">'+fmtDate(h.date)+'</span>'
-          +'</div>'
-          +(h.comment?'<div style="font-size:12px;color:var(--text);line-height:1.5">'+escH(h.comment)+'</div>':'')
-          +((h.files&&h.files.length)?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">'+h.files.map(function(f){return'<span style="font-size:11px;color:var(--accent);font-family:DM Mono,monospace">📎 '+escH(f.name)+'</span>';}).join('')+'</div>':'')
+      suggestions.forEach(function(sug){
+        var sugCls=WF_CLS[sug]||'submitted';
+        var sugIcon=WF_ICONS[sug]||'○';
+        html+='<div style="color:var(--muted);font-size:12px;padding:0 2px;margin-top:8px;opacity:.4">→</div>';
+        html+='<div data-step="'+escH(sug)+'" onclick="openStatusChangeFor(this.dataset.step)" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;opacity:.5;transition:opacity .13s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.5">'
+          +'<div class="wf-chip '+sugCls+'" style="border-style:dashed">'+sugIcon+' '+escH(sug)+'</div>'
+          +'<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--muted)">+ add</div>'
           +'</div>';
       });
-      html+='</div>';
     }
-
-    html+='</div>'; // wf-group
+    html+='</div>'; // events row
+    html+='</div>'; // group card
   });
 
   html+='</div>';
