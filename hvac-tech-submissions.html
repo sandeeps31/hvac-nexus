@@ -245,6 +245,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 </style>
 <script src="head-common.js"></script>
 <script src="db.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script>
 // ── HVAC Nexus Auth Guard ──
 (async function(){
@@ -376,13 +377,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
     <div class="det-body">
 
       <!-- 1. Equipment Schedule -->
+      <!-- 1. Equipment Schedule -->
       <div class="sec-card" id="sec-equip">
         <div class="sec-hdr" onclick="toggleSec('equip')">
-          <div class="sec-hdr-left">
-            <span class="sec-icon">🗂️</span>
-            <span class="sec-title">Equipment Schedule</span>
-            <span class="sec-count" id="sec-equip-count">0 items</span>
-          </div>
+          <div class="sec-hdr-left"><span class="sec-icon">🗂️</span><span class="sec-title">Equipment Schedule</span><span class="sec-count" id="sec-equip-count">0 items</span></div>
           <span class="sec-chev">▾</span>
         </div>
         <div class="sec-body">
@@ -398,11 +396,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
       <!-- 2. Data Sheets -->
       <div class="sec-card" id="sec-data">
         <div class="sec-hdr" onclick="toggleSec('data')">
-          <div class="sec-hdr-left">
-            <span class="sec-icon">📄</span>
-            <span class="sec-title">Data Sheets</span>
-            <span class="sec-count" id="sec-data-count">0 files</span>
-          </div>
+          <div class="sec-hdr-left"><span class="sec-icon">📄</span><span class="sec-title">Data Sheets</span><span class="sec-count" id="sec-data-count">0 files</span></div>
           <span class="sec-chev">▾</span>
         </div>
         <div class="sec-body">
@@ -410,40 +404,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
             <input type="file" id="fileData" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png" onchange="handleFileInput(this,'data')">
             <div class="upload-icon">📎</div>
             <div class="upload-text">Drag & drop files or <span>browse</span></div>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px">PDF, Word, Excel, Images</div>
           </div>
           <div class="file-list" id="fileList-data"></div>
         </div>
       </div>
 
-      <!-- 3. Spec Sign-Off -->
-      <div class="sec-card" id="sec-spec">
-        <div class="sec-hdr" onclick="toggleSec('spec')">
-          <div class="sec-hdr-left">
-            <span class="sec-icon">✅</span>
-            <span class="sec-title">Spec Sign-Off</span>
-            <span class="sec-count" id="sec-spec-count">0 clauses</span>
-          </div>
-          <span class="sec-chev">▾</span>
-        </div>
-        <div class="sec-body">
-          <div class="spec-grid" id="specGrid"></div>
-          <div class="add-spec-row">
-            <input class="add-spec-input" id="newSpecClause" placeholder="Clause ref (e.g. 15.2.3)" style="max-width:150px"/>
-            <input class="add-spec-input" id="newSpecDesc" placeholder="Clause description…"/>
-            <button class="bp bsm btn" onclick="addSpecRow()">＋ Add</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4. MSDS -->
+      <!-- 3. MSDS -->
       <div class="sec-card" id="sec-msds">
         <div class="sec-hdr" onclick="toggleSec('msds')">
-          <div class="sec-hdr-left">
-            <span class="sec-icon">⚠️</span>
-            <span class="sec-title">MSDS</span>
-            <span class="sec-count" id="sec-msds-count">0 files</span>
-          </div>
+          <div class="sec-hdr-left"><span class="sec-icon">⚠️</span><span class="sec-title">MSDS</span><span class="sec-count" id="sec-msds-count">0 files</span></div>
           <span class="sec-chev">▾</span>
         </div>
         <div class="sec-body">
@@ -451,20 +420,65 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
             <input type="file" id="fileMsds" multiple accept=".pdf,.doc,.docx" onchange="handleFileInput(this,'msds')">
             <div class="upload-icon">🛡️</div>
             <div class="upload-text">Drag & drop MSDS files or <span>browse</span></div>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px">PDF, Word documents</div>
           </div>
           <div class="file-list" id="fileList-msds"></div>
         </div>
       </div>
 
-      <!-- 5. Photos -->
+      <!-- 4. Spec Sign-Off -->
+      <div class="sec-card" id="sec-spec">
+        <div class="sec-hdr" onclick="toggleSec('spec')">
+          <div class="sec-hdr-left"><span class="sec-icon">✅</span><span class="sec-title">Spec Sign-Off</span><span class="sec-count" id="sec-spec-count">0 files</span></div>
+          <span class="sec-chev">▾</span>
+        </div>
+        <div class="sec-body">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:6px;border-left:3px solid var(--accent)">📎 Attach specification compliance documents related to this submission only</div>
+          <div class="upload-zone" id="dropSpec" onclick="document.getElementById('fileSpec').click()" ondragover="handleDrag(event,'dropSpec')" ondragleave="handleDragLeave('dropSpec')" ondrop="handleDrop(event,'spec')">
+            <input type="file" id="fileSpec" multiple accept=".pdf,.doc,.docx" onchange="handleFileInput(this,'spec')">
+            <div class="upload-icon">📋</div>
+            <div class="upload-text">Drag & drop spec compliance documents or <span>browse</span></div>
+          </div>
+          <div class="file-list" id="fileList-spec"></div>
+        </div>
+      </div>
+
+      <!-- 5. Lead Time -->
+      <div class="sec-card" id="sec-leadtime">
+        <div class="sec-hdr" onclick="toggleSec('leadtime')">
+          <div class="sec-hdr-left"><span class="sec-icon">⏱️</span><span class="sec-title">Lead Time</span><span class="sec-count" id="sec-leadtime-count"></span></div>
+          <span class="sec-chev">▾</span>
+        </div>
+        <div class="sec-body" style="padding:16px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <label style="font-family:DM Mono,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap">Lead Time</label>
+            <input id="leadTimeInput" class="mi" style="max-width:200px" placeholder="e.g. 12" oninput="saveLeadTime(this.value)">
+            <span style="font-size:13px;color:var(--text2)">weeks</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Warranty -->
+      <div class="sec-card" id="sec-warranty">
+        <div class="sec-hdr" onclick="toggleSec('warranty')">
+          <div class="sec-hdr-left"><span class="sec-icon">🛡</span><span class="sec-title">Warranty</span><span class="sec-count" id="sec-warranty-count"></span></div>
+          <span class="sec-chev">▾</span>
+        </div>
+        <div class="sec-body" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <label style="font-family:DM Mono,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap;min-width:120px">Parts Warranty</label>
+            <input id="warrantyParts" class="mi" style="max-width:180px" placeholder="e.g. 5 years" oninput="saveWarranty()">
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <label style="font-family:DM Mono,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap;min-width:120px">Labour Warranty</label>
+            <input id="warrantyLabour" class="mi" style="max-width:180px" placeholder="e.g. 5 years" oninput="saveWarranty()">
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. Photos -->
       <div class="sec-card" id="sec-photos">
         <div class="sec-hdr" onclick="toggleSec('photos')">
-          <div class="sec-hdr-left">
-            <span class="sec-icon">📷</span>
-            <span class="sec-title">Photos</span>
-            <span class="sec-count" id="sec-photos-count">0 files</span>
-          </div>
+          <div class="sec-hdr-left"><span class="sec-icon">📷</span><span class="sec-title">Photos</span><span class="sec-count" id="sec-photos-count">0 files</span></div>
           <span class="sec-chev">▾</span>
         </div>
         <div class="sec-body">
@@ -472,9 +486,24 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
             <input type="file" id="filePhotos" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.heic" onchange="handleFileInput(this,'photos')">
             <div class="upload-icon">🖼️</div>
             <div class="upload-text">Drag & drop photos or <span>browse</span></div>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG, HEIC, WebP</div>
           </div>
           <div class="file-list" id="fileList-photos"></div>
+        </div>
+      </div>
+
+      <!-- 8. Other Documents -->
+      <div class="sec-card" id="sec-other">
+        <div class="sec-hdr" onclick="toggleSec('other')">
+          <div class="sec-hdr-left"><span class="sec-icon">📁</span><span class="sec-title">Other Documents</span><span class="sec-count" id="sec-other-count">0 files</span></div>
+          <span class="sec-chev">▾</span>
+        </div>
+        <div class="sec-body">
+          <div class="upload-zone" id="dropOther" onclick="document.getElementById('fileOther').click()" ondragover="handleDrag(event,'dropOther')" ondragleave="handleDragLeave('dropOther')" ondrop="handleDrop(event,'other')">
+            <input type="file" id="fileOther" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png" onchange="handleFileInput(this,'other')">
+            <div class="upload-icon">📎</div>
+            <div class="upload-text">Drag & drop documents or <span>browse</span></div>
+          </div>
+          <div class="file-list" id="fileList-other"></div>
         </div>
       </div>
 
@@ -488,7 +517,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
   <div class="modal">
     <div class="modal-hdr">
       <h3>New Technical Submission</h3>
-      <p>Create a new submission for this project</p>
+      <p>Created as Draft — complete details in the submission view</p>
     </div>
     <div class="modal-body">
       <div class="mgrid">
@@ -497,8 +526,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
           <input class="mi mono" id="f-num" readonly/>
         </div>
         <div>
-          <label class="ml">Revision No.</label>
-          <input class="mi mono" id="f-rev" value="Rev 01" readonly/>
+          <label class="ml">Client Doc No.</label>
+          <input class="mi mono" id="f-clientdoc" placeholder="e.g. ITP-M-001"/>
         </div>
       </div>
       <label class="ml">Title *</label>
@@ -519,10 +548,6 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
           </select>
         </div>
       </div>
-      <label class="ml">Submitted To</label>
-      <input class="mi" id="f-submitto" placeholder="e.g. Principal Contractor / Superintendent"/>
-      <label class="ml">Notes</label>
-      <textarea class="mi" id="f-notes" rows="3" style="resize:vertical;min-height:70px" placeholder="Any additional notes for this submission…"></textarea>
     </div>
     <div class="modal-footer">
       <button class="bg bsm btn" onclick="closeNewModal()">Cancel</button>
@@ -632,8 +657,16 @@ function today(){return new Date().toISOString().split('T')[0];}
 (function(){try{var cs=(dbGetCurrentUser()||{});if(cs.userName)document.getElementById('sbUserName').textContent=cs.userName;}catch(e){}})();
 
 /* DATA */
+var _cachedEquipData = null;
 function save(){dbSetTechSubmissions(_tsPNum,submissions).catch(function(e){console.error(e);});}
-async function load(){try{var s=await dbGetTechSubmissions(_tsPNum);submissions=Array.isArray(s)?s:[];}catch(e){submissions=[];}}
+async function load(){
+  try{var s=await dbGetTechSubmissions(_tsPNum);submissions=Array.isArray(s)?s:[];}catch(e){submissions=[];}
+  // Load and cache equipment schedule
+  try{
+    var eq=await dbGetEquipment(_tsPNum);
+    _cachedEquipData=(typeof eq==='string')?JSON.parse(eq):eq;
+  }catch(e){_cachedEquipData=null;}
+}
 load().then(function(){renderList();});
 
 /* GEN SUBMISSION NUMBER */
@@ -677,13 +710,15 @@ async function loadEquipSchedule(){
 }
 
 function getEquipTypes(){
-  var eq=loadEquipSchedule();
+  var eq=_cachedEquipData;
   if(!eq||!eq.tabs)return [];
-  return eq.tabs.filter(function(t){return t.rows&&t.rows.length>0;});
+  return eq.tabs.filter(function(t){return t.rows&&t.rows.length>0;}).map(function(t){
+    return {id:t.id,label:t.name||t.label||t.id,rows:t.rows};
+  });
 }
 
 function getEquipByType(typeId){
-  var eq=loadEquipSchedule();
+  var eq=_cachedEquipData;
   if(!eq||!eq.tabs)return [];
   var tab=eq.tabs.find(function(t){return t.id===typeId;});
   return tab?tab.rows:[];
@@ -816,7 +851,7 @@ function renderDetail(){
   }
   addMeta('Sub Date',fmtDate(rev.date)||'—');
   addMeta('Type',s.type||'—');
-  addMeta('Submitted To',s.submitTo||'—');
+  if(s.clientDocNo)addMeta('Client Doc No',s.clientDocNo);
   if(s.revisions.length>1)addMeta('Revisions',s.revisions.length+' total');
 
   // Status
@@ -830,15 +865,29 @@ function renderDetail(){
   // Sections
   renderEquipSection(rev);
   renderFileSection('data',rev);
-  renderSpecSection(rev);
   renderFileSection('msds',rev);
+  renderFileSection('spec',rev);
+  renderLeadTime(rev);
+  renderWarranty(rev);
   renderFileSection('photos',rev);
+  renderFileSection('other',rev);
+
+  // Add export button to det-actions if not already there
+  var detActions=document.querySelector('.det-actions');
+  if(detActions&&!document.getElementById('tsExportBtn')){
+    var expBtn=document.createElement('button');expBtn.id='tsExportBtn';expBtn.className='bg bsm btn';
+    expBtn.innerHTML='⬇ Export PDF';expBtn.style.cssText='color:var(--accent);border-color:rgba(0,200,255,.3)';
+    expBtn.onclick=exportTsPdf;
+    detActions.insertBefore(expBtn,detActions.firstChild);
+  }
 
   // If viewing old rev, lock editing
   var isLatest=isViewingLatest();
   document.getElementById('detStatus').disabled=!isLatest;
   document.querySelectorAll('.upload-zone').forEach(function(z){z.style.display=isLatest?'':'none';});
-  document.querySelector('.add-spec-row').style.display=isLatest?'':'none';
+  document.getElementById('leadTimeInput').disabled=!isLatest;
+  document.getElementById('warrantyParts').disabled=!isLatest;
+  document.getElementById('warrantyLabour').disabled=!isLatest;
   document.getElementById('equipUnlinkBtn').style.display='none';
   if(isLatest&&rev.linkedEquip&&rev.linkedEquip.ids&&rev.linkedEquip.ids.length){
     document.getElementById('equipUnlinkBtn').style.display='';
@@ -915,26 +964,203 @@ function renderFileSection(type,rev){
   var files=(rev.files&&rev.files[type])||[];
   var listEl=document.getElementById('fileList-'+type);
   var countEl=document.getElementById('sec-'+type+'-count');
-  var label={'data':'files','msds':'files','photos':'files'};
-  countEl.textContent=files.length+' '+(label[type]||'files');
-
+  if(countEl)countEl.textContent=files.length+' file'+(files.length!==1?'s':'');
+  if(!listEl)return;
   listEl.innerHTML='';
   var isLatest=isViewingLatest();
   files.forEach(function(f,i){
     var row=document.createElement('div');row.className='file-row';
-    var icon=document.createElement('span');icon.className='file-icon';
-    icon.textContent=fileIcon(f.name);
-    var name=document.createElement('span');name.className='file-name';name.textContent=f.name;
-    name.title=f.name;
+    var icon=document.createElement('span');icon.className='file-icon';icon.textContent=fileIcon(f.name);
+    var name=document.createElement('span');name.className='file-name';name.textContent=f.name;name.title=f.name;
     var size=document.createElement('span');size.className='file-size';size.textContent=f.size||'';
     row.appendChild(icon);row.appendChild(name);row.appendChild(size);
     if(isLatest){
       var del=document.createElement('button');del.className='file-del';del.textContent='✕';del.title='Remove';
-      del.onclick=(function(idx,t){return function(){removeFile(idx,t);};})(i,type);
+      del.onclick=(function(idx,t){return function(){
+        if(!confirm('Remove this file? This cannot be undone.'))return;
+        removeFile(idx,t);
+      };})(i,type);
       row.appendChild(del);
     }
     listEl.appendChild(row);
   });
+}
+
+function renderLeadTime(rev){
+  var inp=document.getElementById('leadTimeInput');
+  if(!inp)return;
+  inp.value=rev.leadTime||'';
+  var cnt=document.getElementById('sec-leadtime-count');
+  if(cnt)cnt.textContent=rev.leadTime?rev.leadTime+' weeks':'';
+}
+
+function renderWarranty(rev){
+  var w=rev.warranty||{partsYears:'',labourYears:''};
+  var p=document.getElementById('warrantyParts');
+  var l=document.getElementById('warrantyLabour');
+  if(p)p.value=w.partsYears||'';
+  if(l)l.value=w.labourYears||'';
+  var cnt=document.getElementById('sec-warranty-count');
+  if(cnt){
+    var parts=[w.partsYears?'Parts: '+w.partsYears:'',w.labourYears?'Labour: '+w.labourYears:''].filter(Boolean);
+    cnt.textContent=parts.join(' · ');
+  }
+}
+
+function saveLeadTime(val){
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  var rev=s.revisions[s.revisions.length-1];
+  rev.leadTime=val;
+  var cnt=document.getElementById('sec-leadtime-count');
+  if(cnt)cnt.textContent=val?val+' weeks':'';
+  save();
+}
+
+function saveWarranty(){
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  var rev=s.revisions[s.revisions.length-1];
+  if(!rev.warranty)rev.warranty={};
+  rev.warranty.partsYears=(document.getElementById('warrantyParts')||{}).value||'';
+  rev.warranty.labourYears=(document.getElementById('warrantyLabour')||{}).value||'';
+  var cnt=document.getElementById('sec-warranty-count');
+  if(cnt){
+    var parts=[rev.warranty.partsYears?'Parts: '+rev.warranty.partsYears:'',rev.warranty.labourYears?'Labour: '+rev.warranty.labourYears:''].filter(Boolean);
+    cnt.textContent=parts.join(' · ');
+  }
+  save();
+}
+
+/* EXPORT PDF */
+async function exportTsPdf(){
+  var s=submissions.find(function(x){return x.id===activeId;});
+  if(!s){alert('No submission open.');return;}
+  if(typeof PDFLib==='undefined'){alert('PDF-lib not loaded.');return;}
+  var rev=getViewingRev();
+  showTsToast('Building PDF\u2026');
+  try{
+    var PDFDocument=PDFLib.PDFDocument,rgb=PDFLib.rgb,StandardFonts=PDFLib.StandardFonts;
+    var pdf=await PDFDocument.create();
+    var font=await pdf.embedFont(StandardFonts.Helvetica);
+    var bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+    var proj=dbGetCurrentProject()||{};
+    var projName=proj.name||proj.projectName||'Project';
+    var projNum=proj.num||proj.number||'';
+    var W=595,H=842;
+
+    // ── COVER PAGE ──
+    var cover=pdf.addPage([W,H]);
+    cover.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
+    cover.drawRectangle({x:0,y:H-80,width:W,height:80,color:rgb(0.039,0.071,0.118)});
+    // Company logo placeholder
+    cover.drawRectangle({x:20,y:H-72,width:100,height:56,color:rgb(0.08,0.12,0.2),borderColor:rgb(0,0.78,0.55),borderWidth:1});
+    cover.drawText('COMPANY LOGO',{x:28,y:H-46,size:7,font:bold,color:rgb(0,0.898,0.627)});
+    // HVAC Nexus placeholder
+    cover.drawRectangle({x:W-120,y:H-72,width:100,height:56,color:rgb(0.08,0.12,0.2),borderColor:rgb(0,0.78,0.55),borderWidth:1});
+    cover.drawText('HVAC NEXUS',{x:W-113,y:H-46,size:7,font:bold,color:rgb(0,0.898,0.627)});
+    // Accent rule
+    cover.drawRectangle({x:20,y:H-90,width:W-40,height:2,color:rgb(0,0.898,0.627)});
+    // Title
+    cover.drawText('TECHNICAL SUBMISSION',{x:20,y:H-130,size:18,font:bold,color:rgb(0.039,0.071,0.118)});
+    // Submission block
+    cover.drawRectangle({x:20,y:H-195,width:W-40,height:50,color:rgb(0.039,0.071,0.118)});
+    cover.drawText(s.num+' \u00B7 '+rev.rev,{x:32,y:H-168,size:14,font:bold,color:rgb(0,0.898,0.627)});
+    // Title text (may be long — truncate)
+    var titleStr=s.title.length>70?s.title.substring(0,67)+'...':s.title;
+    cover.drawText(titleStr,{x:32,y:H-184,size:10,font:font,color:rgb(0.7,0.8,0.9)});
+    // Details
+    var detY=H-220,detRows=[];
+    detRows.push(['Submission No.',s.num]);
+    if(s.clientDocNo)detRows.push(['Client Doc No.',s.clientDocNo]);
+    detRows.push(['Type',s.type||'—']);
+    detRows.push(['Date',fmtDate(rev.date)||'—']);
+    detRows.push(['Status',s.status||'—']);
+    if(rev.leadTime)detRows.push(['Lead Time',rev.leadTime+' weeks']);
+    detRows.forEach(function(r,i){
+      cover.drawText(r[0]+':',{x:20,y:detY-i*18,size:9,font:bold,color:rgb(0.35,0.35,0.35)});
+      cover.drawText(String(r[1]),{x:150,y:detY-i*18,size:9,font:font,color:rgb(0.1,0.1,0.1)});
+    });
+    // Warranty
+    var w=rev.warranty||{};
+    if(w.partsYears||w.labourYears){
+      var wY=detY-detRows.length*18-10;
+      cover.drawRectangle({x:20,y:wY-28,width:W-40,height:1,color:rgb(0.85,0.85,0.85)});
+      cover.drawText('WARRANTY',{x:20,y:wY-14,size:7,font:bold,color:rgb(0.5,0.5,0.5)});
+      if(w.partsYears)cover.drawText('Parts: '+w.partsYears,{x:20,y:wY-28,size:9,font:font,color:rgb(0.1,0.1,0.1)});
+      if(w.labourYears)cover.drawText('Labour: '+w.labourYears,{x:150,y:wY-28,size:9,font:font,color:rgb(0.1,0.1,0.1)});
+    }
+    // Divider
+    var divY=H-430;
+    cover.drawRectangle({x:20,y:divY,width:W-40,height:1,color:rgb(0.85,0.85,0.85)});
+    cover.drawText('PROJECT',{x:20,y:divY-16,size:7,font:bold,color:rgb(0.5,0.5,0.5)});
+    cover.drawText(projName,{x:20,y:divY-30,size:13,font:bold,color:rgb(0.039,0.071,0.118)});
+    if(projNum)cover.drawText('Project No: '+projNum,{x:20,y:divY-46,size:9,font:font,color:rgb(0.4,0.4,0.4)});
+    cover.drawText('Date Generated',{x:W-180,y:divY-16,size:7,font:bold,color:rgb(0.5,0.5,0.5)});
+    cover.drawText(new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}),{x:W-180,y:divY-30,size:9,font:font,color:rgb(0.1,0.1,0.1)});
+    // Footer
+    cover.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
+    cover.drawText('Generated by HVAC Nexus',{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
+
+    var pageCounter=0;
+    function sectionPage(title){
+      var p=pdf.addPage([W,H]);pageCounter++;
+      p.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
+      p.drawRectangle({x:0,y:H-44,width:W,height:44,color:rgb(0.039,0.071,0.118)});
+      p.drawText(title,{x:20,y:H-26,size:13,font:bold,color:rgb(0,0.898,0.627)});
+      p.drawText(s.num+' \u00B7 '+s.title.substring(0,50),{x:20,y:H-38,size:8,font:font,color:rgb(0.6,0.7,0.7)});
+      p.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
+      p.drawText(projName+(projNum?' \u00B7 '+projNum:''),{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
+      p.drawText('Page '+pageCounter,{x:W-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
+    }
+
+    async function appendFiles(files,sectionTitle){
+      if(!files||!files.length)return;
+      // Only append PDFs
+      var pdfs=files.filter(function(f){return (f.name||'').toLowerCase().endsWith('.pdf')&&f.data;});
+      if(!pdfs.length)return;
+      sectionPage(sectionTitle);
+      for(var i=0;i<pdfs.length;i++){
+        try{
+          var src=await PDFDocument.load(pdfs[i].data);
+          var indices=src.getPageIndices();
+          for(var pi=0;pi<indices.length;pi++){
+            pageCounter++;
+            var emb=await pdf.embedPage(src.getPage(indices[pi]));
+            var sz=emb.size();
+            var avH=H-68,avW=W;
+            var sc=Math.min(avW/sz.width,avH/sz.height);
+            var sw=sz.width*sc,sh=sz.height*sc;
+            var p2=pdf.addPage([W,H]);
+            p2.drawRectangle({x:0,y:0,width:W,height:H,color:rgb(1,1,1)});
+            p2.drawPage(emb,{x:(W-sw)/2,y:24+(avH-sh)/2,width:sw,height:sh});
+            p2.drawRectangle({x:0,y:H-44,width:W,height:44,color:rgb(0.039,0.071,0.118)});
+            p2.drawRectangle({x:0,y:0,width:W,height:24,color:rgb(0.039,0.071,0.118)});
+            p2.drawText(projName+(projNum?' \u00B7 '+projNum:''),{x:20,y:8,size:7,font:font,color:rgb(0.4,0.5,0.5)});
+            p2.drawText('Page '+pageCounter,{x:W-55,y:8,size:8,font:bold,color:rgb(0,0.898,0.627)});
+          }
+        }catch(e){console.warn('appendFiles failed:',e);}
+      }
+    }
+
+    var f=rev.files||{};
+    await appendFiles(f.data,'Data Sheets');
+    await appendFiles(f.msds,'MSDS');
+    await appendFiles(f.spec,'Spec Sign-Off');
+    await appendFiles(f.other,'Other Documents');
+
+    var bytes=await pdf.save();
+    var blob=new Blob([bytes],{type:'application/pdf'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download=s.num+'_'+rev.rev+'_Technical_Submission.pdf';a.click();
+    URL.revokeObjectURL(url);
+    showTsToast('\u2713 PDF exported');
+  }catch(err){console.error(err);showTsToast('Export failed: '+err.message);}
+}
+
+function showTsToast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.remove();},2500);
 }
 
 function fileIcon(name){
@@ -964,11 +1190,17 @@ function processFiles(fileList,type){
   var rev=s.revisions[s.revisions.length-1];
   if(!rev.files)rev.files={};
   if(!rev.files[type])rev.files[type]=[];
+  var pending=fileList.length;
   for(var i=0;i<fileList.length;i++){
-    var f=fileList[i];
-    rev.files[type].push({name:f.name,size:formatBytes(f.size),added:today()});
+    (function(f){
+      var reader=new FileReader();
+      reader.onload=function(ev){
+        rev.files[type].push({name:f.name,size:formatBytes(f.size),added:today(),data:ev.target.result});
+        if(--pending===0){save();renderDetail();}
+      };
+      reader.readAsDataURL(f);
+    })(fileList[i]);
   }
-  save();renderDetail();
 }
 
 function removeFile(idx,type){
@@ -1083,12 +1315,10 @@ function saveDetail(){
 /* NEW SUBMISSION MODAL */
 function openNewModal(){
   document.getElementById('f-num').value=genSubNum();
-  document.getElementById('f-rev').value='Rev 01';
+  document.getElementById('f-clientdoc').value='';
   document.getElementById('f-title').value='';
   document.getElementById('f-date').value=today();
   document.getElementById('f-type').value='Equipment';
-  document.getElementById('f-submitto').value='';
-  document.getElementById('f-notes').value='';
   document.getElementById('newModal').classList.add('open');
   setTimeout(function(){document.getElementById('f-title').focus();},80);
 }
@@ -1100,17 +1330,18 @@ function createSubmission(){
   var s={
     id:nid(),
     num:document.getElementById('f-num').value,
+    clientDocNo:document.getElementById('f-clientdoc').value.trim(),
     title:title,
     type:document.getElementById('f-type').value,
-    submitTo:document.getElementById('f-submitto').value.trim(),
-    notes:document.getElementById('f-notes').value.trim(),
     status:'Draft',
     revisions:[{
-      rev:document.getElementById('f-rev').value,
+      rev:'Rev 01',
       date:document.getElementById('f-date').value,
       linkedEquip:null,
-      files:{data:[],msds:[],photos:[]},
+      files:{data:[],msds:[],spec:[],photos:[],other:[]},
       specRows:[],
+      warranty:{partsYears:'5 years',labourYears:'5 years'},
+      leadTime:'',
       supersedeReason:''
     }]
   };
@@ -1149,7 +1380,10 @@ function confirmSupersede(){
   newRevObj.date=date;
   newRevObj.supersedeReason='';
   // New rev starts fresh with no files (user will upload new docs)
-  newRevObj.files={data:[],msds:[],photos:[]};
+  newRevObj.files={data:[],msds:[],spec:[],photos:[],other:[]};
+  // Carry over warranty and lead time
+  newRevObj.warranty=JSON.parse(JSON.stringify(curRev.warranty||{partsYears:'',labourYears:''}));
+  newRevObj.leadTime=curRev.leadTime||'';
   s.revisions.push(newRevObj);
   save();
   closeSupersedeModal();
@@ -1199,44 +1433,88 @@ function openEquipPicker(){
 }
 
 function renderEquipPickList(tab,currentLinked){
-  var rows=tab.rows||[];
+  var allRows=tab.rows||[];
   var list=document.getElementById('equipPickList');
   pickedEquipIds=currentLinked&&currentLinked.typeId===tab.id?(currentLinked.ids||[]).slice():[];
-  updatePickSelCount();
 
-  if(!rows.length){list.innerHTML='<div class="equip-pick-empty">No items in this equipment type.</div>';return;}
+  // Filter state
+  var mfFilter='';var mdFilter='';
 
-  list.innerHTML='';
+  function doRender(){
+    var rows=allRows.filter(function(r){
+      if(mfFilter&&(r.make||r.manufacturer||'').toLowerCase().indexOf(mfFilter.toLowerCase())<0)return false;
+      if(mdFilter&&(r.model||'').toLowerCase().indexOf(mdFilter.toLowerCase())<0)return false;
+      return true;
+    });
 
-  // Select All row
-  var allRow=document.createElement('div');allRow.className='equip-pick-row';allRow.style.background='var(--surface2)';
-  var allCb=document.createElement('input');allCb.type='checkbox';allCb.id='epk-all';
-  allCb.checked=rows.every(function(r){return pickedEquipIds.indexOf(r.id||r.tag)>=0;});
-  allCb.onchange=function(){
-    if(this.checked)pickedEquipIds=rows.map(function(r){return r.id||r.tag;});
-    else pickedEquipIds=[];
-    renderEquipPickList(tab,{typeId:tab.id,ids:pickedEquipIds});
-  };
-  var allLbl=document.createElement('label');allLbl.setAttribute('for','epk-all');allLbl.style.fontSize='12px';allLbl.style.color='var(--text2)';allLbl.style.cursor='pointer';allLbl.textContent='Select all ('+rows.length+' items)';
-  allRow.appendChild(allCb);allRow.appendChild(allLbl);
-  list.appendChild(allRow);
+    list.innerHTML='';
 
-  rows.forEach(function(r){
-    var rowId=r.id||r.tag||r.equipId;
-    var row=document.createElement('div');row.className='equip-pick-row';
-    var cb=document.createElement('input');cb.type='checkbox';cb.checked=pickedEquipIds.indexOf(rowId)>=0;
-    cb.onchange=(function(rid){return function(){
-      if(this.checked){if(pickedEquipIds.indexOf(rid)<0)pickedEquipIds.push(rid);}
-      else{pickedEquipIds=pickedEquipIds.filter(function(x){return x!==rid;});}
-      updatePickSelCount();
-      document.getElementById('epk-all').checked=rows.every(function(r2){return pickedEquipIds.indexOf(r2.id||r2.tag)>=0;});
-    };})(rowId);
-    var tag=document.createElement('span');tag.className='equip-pick-tag';tag.textContent=r.tag||r.equipId||rowId;
-    var desc=document.createElement('span');desc.className='equip-pick-desc';desc.textContent=r.description||r.desc||r.name||'—';
-    var loc=document.createElement('span');loc.className='equip-pick-loc';loc.textContent=r.location||r.loc||'';
-    row.appendChild(cb);row.appendChild(tag);row.appendChild(desc);row.appendChild(loc);
-    list.appendChild(row);
-  });
+    // Filter bar
+    var filterBar=document.createElement('div');
+    filterBar.style.cssText='display:flex;gap:8px;padding:8px;background:var(--surface3);border-bottom:1px solid var(--border)';
+    var mfInp=document.createElement('input');
+    mfInp.placeholder='Filter manufacturer…';mfInp.value=mfFilter;
+    mfInp.style.cssText='flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:12px;padding:5px 9px;outline:none';
+    mfInp.oninput=function(){mfFilter=this.value;doRender();};
+    var mdInp=document.createElement('input');
+    mdInp.placeholder='Filter model…';mdInp.value=mdFilter;
+    mdInp.style.cssText='flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:12px;padding:5px 9px;outline:none';
+    mdInp.oninput=function(){mdFilter=this.value;doRender();};
+    filterBar.appendChild(mfInp);filterBar.appendChild(mdInp);
+    list.appendChild(filterBar);
+
+    if(!rows.length){
+      var empty=document.createElement('div');empty.style.cssText='padding:16px;color:var(--muted);font-size:12px;text-align:center';
+      empty.textContent='No items match filters.';list.appendChild(empty);
+      return;
+    }
+
+    // Header row
+    var hdr=document.createElement('div');
+    hdr.style.cssText='display:grid;grid-template-columns:32px 1fr 1fr 1fr;gap:0;padding:6px 10px;background:var(--surface2);border-bottom:1px solid var(--border)';
+    ['','Equipment ID','Manufacturer','Model'].forEach(function(h){
+      var s=document.createElement('span');s.style.cssText='font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)';s.textContent=h;hdr.appendChild(s);
+    });
+    list.appendChild(hdr);
+
+    // Select All
+    var allRow=document.createElement('div');
+    allRow.style.cssText='display:grid;grid-template-columns:32px 1fr;padding:7px 10px;background:var(--surface3);border-bottom:1px solid var(--border);align-items:center;cursor:pointer';
+    var allCb=document.createElement('input');allCb.type='checkbox';allCb.style.cssText='accent-color:var(--accent);width:14px;height:14px;cursor:pointer';
+    var allSel=rows.every(function(r){return pickedEquipIds.indexOf(r.id||r.tag)>=0;});
+    allCb.checked=allSel;
+    allCb.onchange=function(){
+      if(this.checked)rows.forEach(function(r){var id=r.id||r.tag;if(pickedEquipIds.indexOf(id)<0)pickedEquipIds.push(id);});
+      else{var ids=rows.map(function(r){return r.id||r.tag;});pickedEquipIds=pickedEquipIds.filter(function(x){return ids.indexOf(x)<0;});}
+      updatePickSelCount();doRender();
+    };
+    var allLbl=document.createElement('span');allLbl.style.cssText='font-size:12px;color:var(--text2);cursor:pointer';allLbl.textContent='Select all ('+rows.length+' items)';
+    allLbl.onclick=function(){allCb.checked=!allCb.checked;allCb.onchange.call(allCb);};
+    allRow.appendChild(allCb);allRow.appendChild(allLbl);list.appendChild(allRow);
+
+    rows.forEach(function(r){
+      var rowId=r.id||r.tag||r.equipId;
+      var row=document.createElement('div');
+      row.style.cssText='display:grid;grid-template-columns:32px 1fr 1fr 1fr;padding:7px 10px;border-bottom:1px solid var(--border);align-items:center;transition:background .1s;cursor:pointer';
+      row.onmouseover=function(){this.style.background='var(--surface2)';};
+      row.onmouseout=function(){this.style.background='';};
+      var cb=document.createElement('input');cb.type='checkbox';cb.style.cssText='accent-color:var(--accent);width:14px;height:14px;cursor:pointer';
+      cb.checked=pickedEquipIds.indexOf(rowId)>=0;
+      cb.onchange=(function(rid){return function(){
+        if(this.checked){if(pickedEquipIds.indexOf(rid)<0)pickedEquipIds.push(rid);}
+        else{pickedEquipIds=pickedEquipIds.filter(function(x){return x!==rid;});}
+        updatePickSelCount();
+      };})(rowId);
+      row.onclick=function(e){if(e.target!==cb){cb.checked=!cb.checked;cb.onchange.call(cb);}};
+      var tag=document.createElement('span');tag.style.cssText='font-family:DM Mono,monospace;font-size:11px;color:var(--accent)';tag.textContent=r.tag||r.equipId||rowId;
+      var mf=document.createElement('span');mf.style.cssText='font-size:12px;color:var(--text2)';mf.textContent=r.make||r.manufacturer||'—';
+      var md=document.createElement('span');md.style.cssText='font-size:12px;color:var(--text2)';md.textContent=r.model||'—';
+      row.appendChild(cb);row.appendChild(tag);row.appendChild(mf);row.appendChild(md);
+      list.appendChild(row);
+    });
+    updatePickSelCount();
+  }
+  doRender();
 }
 
 function updatePickSelCount(){
