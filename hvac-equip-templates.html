@@ -62,7 +62,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .emf-val.mono{font-family:'DM Mono',monospace;color:var(--accent)}
 .emf-input{background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 10px;outline:none;transition:border-color .2s;width:100%}
 .emf-input:focus{border-color:var(--accent)}.emf-input::placeholder{color:var(--muted)}
-.editor-body{padding:20px 24px 80px}
+.editor-body{padding:20px 24px 80px;overflow-x:auto}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
 .mo.open{opacity:1;pointer-events:all}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;max-width:96vw;transform:translateY(10px);transition:transform .2s;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
@@ -108,9 +108,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
 .bc{display:flex;align-items:center;gap:7px;font-size:13px}.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
-.main{margin-left:230px;transition:margin-left .25s}
+.main{margin-left:230px;transition:margin-left .25s;min-width:0;overflow-x:auto}
 /* FIELD BUILDER */
-.eq-section{border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden}
+.eq-section{border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow-x:auto;overflow-y:hidden}
 .eq-section-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:2px solid var(--border)}
 .eq-section-hdr.no-header-style{background:var(--surface2);border-bottom:1px solid var(--border)}
 .eq-section-hdr.has-header-style{background:var(--surface3)}
@@ -891,6 +891,19 @@ function startDraft(tpl,rerender){
     :existingDraft&&existingDraft.sections&&existingDraft.sections.length
       ?JSON.parse(JSON.stringify(existingDraft.sections))
       :[{name:'__none__',fields:DEFAULT_LOCKED_FIELDS}];
+  // Re-enforce locked field order at front of first section for existing sections
+  if(newSections.length&&newSections[0].fields&&newSections[0].fields.length){
+    var sec0=newSections[0];
+    var orderedL=[];
+    DEFAULT_LOCKED_FIELDS.forEach(function(lf){
+      var ex=sec0.fields.find(function(f){return f.key===lf.key||f.label===lf.label;});
+      if(ex){ex.locked=true;orderedL.push(ex);}
+      else{orderedL.push(JSON.parse(JSON.stringify(lf)));}
+    });
+    var lockedK=DEFAULT_LOCKED_FIELDS.map(function(l){return l.key;});
+    sec0.fields.forEach(function(f){if(!lockedK.includes(f.key)&&!f.locked)orderedL.push(f);});
+    sec0.fields=orderedL;
+  }
   var ver=nextVersion(tpl);
   tpl.revisions=tpl.revisions||[];
   // Remove any existing draft
@@ -970,15 +983,19 @@ function duplicateTpl(tplId){
     {key:'model',label:'Model',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'FWD-125',options:[],locked:true}
   ];
   var firstSec=srcSections[0]||(srcSections[0]={name:'__none__',fields:[]});
-  // Mark existing fields that match locked keys as locked, add missing ones at front
-  var existingKeys=firstSec.fields.map(function(f){return f.key;});
-  var toInsert=[];
+  // Ensure locked fields are first in their defined order, mark existing ones as locked
+  var orderedFields=[];
   LOCKED.forEach(function(lf){
     var existing=firstSec.fields.find(function(f){return f.key===lf.key||f.label===lf.label;});
-    if(existing){existing.locked=true;}
-    else{toInsert.push(lf);}
+    if(existing){existing.locked=true;orderedFields.push(existing);}
+    else{orderedFields.push(lf);}
   });
-  firstSec.fields=toInsert.concat(firstSec.fields);
+  // Append remaining non-locked fields that aren't one of the 4
+  var lockedKeys=LOCKED.map(function(l){return l.key;});
+  firstSec.fields.forEach(function(f){
+    if(!lockedKeys.includes(f.key)&&!(f.locked))orderedFields.push(f);
+  });
+  firstSec.fields=orderedFields;
   // Create a new draft revision with the merged sections
   var ver=1;
   copy.revisions=[{version:ver,status:'draft',sections:srcSections,createdAt:todayStr(),notes:'Duplicated from '+src.name}];
