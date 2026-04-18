@@ -426,15 +426,12 @@ function saveDefects(){
 (async function(){
   if(typeof dbReady!=='undefined')await dbReady;
   await loadData();
-  console.log('[DV] drawingId:',drawingId,'drawings count:',drawings.length,'templates:',templates.length);
-  console.log('[DV] curDrawing:',curDrawing?curDrawing.num:'NULL');
   if(!drawingId){showError('No drawing ID');return;}
   if(!curDrawing){showError('Drawing not found (id='+drawingId+')');return;}
   document.title=(curDrawing.num||'Drawing')+' — HVAC NEXUS';
   document.getElementById('topNum').textContent=curDrawing.num||'—';
   document.getElementById('topName').textContent=curDrawing.name||'';
   populateItpTypes();
-  console.log('[DV] pdfUrl:',curDrawing.pdfUrl,'hasPdfData:',!!(curDrawing.pdfData));
   if(curDrawing.pdfUrl){loadFromUrl(curDrawing.pdfUrl);}
   else if(curDrawing.pdfData){loadFromData(curDrawing.pdfData);}
   else{showNoPdf();}
@@ -444,18 +441,15 @@ function saveDefects(){
 
 // ── PDF RENDER ──
 function loadFromUrl(url){
-  console.log('[DV] loadFromUrl:', url);
   var headers={'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA'};
   try{var s=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(s.access_token)headers['Authorization']='Bearer '+s.access_token;}catch(e){}
   fetch(url,{headers:headers})
     .then(function(r){
-      console.log('[DV] fetch response status:',r.status,'ok:',r.ok);
-      if(!r.ok)throw new Error('HTTP '+r.status);
+          if(!r.ok)throw new Error('HTTP '+r.status);
       return r.arrayBuffer();
     })
     .then(function(buf){
-      console.log('[DV] PDF buffer size:',buf.byteLength);
-      pdfjsLib.getDocument({data:buf}).promise.then(renderPdf).catch(function(e){showError('PDF render error: '+e.message);});
+          pdfjsLib.getDocument({data:buf}).promise.then(renderPdf).catch(function(e){showError('PDF render error: '+e.message);});
     })
     .catch(function(e){
       console.error('[DV] fetch failed:',e);
