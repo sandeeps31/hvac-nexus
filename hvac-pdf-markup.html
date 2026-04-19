@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Markup — HVAC NEXUS</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0e18;color:#ddeeff;font-family:'DM Sans',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+
+/* TOPBAR */
+.topbar{height:52px;background:#0e1520;border-bottom:1px solid #1e3050;display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;z-index:100}
+.tb-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#ddeeff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.tb-sub{font-size:11px;color:#4a6a8a;margin-top:1px}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:all .15s}
+.bp{background:#00c8ff;color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:#7a9bbf;border:1px solid #1e3050}.bg:hover{color:#ddeeff;border-color:#4a6a8a}
+.bdanger{background:rgba(255,77,109,.15);color:#ff4d6d;border:1px solid rgba(255,77,109,.3)}.bdanger:hover{background:rgba(255,77,109,.25)}
+
+/* TOOLBAR */
+.toolbar{height:48px;background:#0b1019;border-bottom:1px solid #1a2640;display:flex;align-items:center;padding:0 12px;gap:6px;flex-shrink:0}
+.tool-sep{width:1px;height:28px;background:#1e3050;margin:0 4px}
+.tool-btn{width:36px;height:36px;border-radius:8px;border:1.5px solid #1e3050;background:transparent;color:#7a9bbf;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s;position:relative}
+.tool-btn:hover{border-color:#4a6a8a;color:#ddeeff;background:#141d2e}
+.tool-btn.active{border-color:#ffb830;background:rgba(255,184,48,.12);color:#ffb830}
+.tool-btn .tip{position:absolute;bottom:calc(100%+6px);left:50%;transform:translateX(-50%);background:#0e1520;color:#ddeeff;font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #1e3050;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:999}
+.tool-btn:hover .tip{opacity:1}
+.color-pick{display:flex;gap:4px;align-items:center}
+.cp-dot{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
+.cp-dot.sel{border-color:#fff;transform:scale(1.2)}
+.opacity-lbl{font-size:11px;color:#4a6a8a;margin-left:4px}
+.opacity-sl{width:70px;accent-color:#ffb830}
+.page-nav{display:flex;align-items:center;gap:8px;margin-left:auto}
+.page-nav button{width:28px;height:28px;border-radius:6px;border:1px solid #1e3050;background:transparent;color:#7a9bbf;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.page-nav button:hover:not(:disabled){background:#141d2e;color:#ddeeff}
+.page-nav button:disabled{opacity:.3;cursor:default}
+.page-num{font-family:'DM Mono',monospace;font-size:12px;color:#7a9bbf;min-width:60px;text-align:center}
+.zoom-ctrl{display:flex;align-items:center;gap:4px;margin-left:8px}
+.zoom-ctrl button{width:26px;height:26px;border-radius:5px;border:1px solid #1e3050;background:transparent;color:#7a9bbf;cursor:pointer;font-size:13px}
+.zoom-ctrl button:hover{background:#141d2e;color:#ddeeff}
+.zoom-pct{font-family:'DM Mono',monospace;font-size:11px;color:#4a6a8a;min-width:38px;text-align:center}
+
+/* VIEWER */
+.viewer-wrap{flex:1;overflow:hidden;position:relative;background:#111828}
+.viewer{width:100%;height:100%;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:24px}
+.pdf-stage{position:relative;display:inline-block;box-shadow:0 8px 40px rgba(0,0,0,.7)}
+#pdfCanvas{display:block}
+#annotLayer{position:absolute;top:0;left:0;pointer-events:all;overflow:visible}
+
+/* STATUS BAR */
+.statusbar{height:26px;background:#080c14;border-top:1px solid #1a2640;display:flex;align-items:center;padding:0 14px;gap:16px;flex-shrink:0}
+.sb-item{font-family:'DM Mono',monospace;font-size:10px;color:#3a5a7a}
+.sb-item span{color:#7a9bbf}
+
+/* ANNOTATION SELECTED */
+.annot-sel-ring{outline:2px dashed #00c8ff;outline-offset:3px}
+
+/* TOAST */
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #1e3050;border-radius:8px;padding:9px 20px;font-size:12px;color:#ddeeff;z-index:9999;pointer-events:none;transition:opacity .3s}
+
+/* EXPORT OVERLAY */
+.export-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9998;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.export-overlay.show{display:flex}
+.export-overlay p{font-size:14px;color:#ddeeff}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="flex:1;min-width:0">
+    <div class="tb-title" id="tbTitle">PDF Markup</div>
+    <div class="tb-sub" id="tbSub"></div>
+  </div>
+  <button class="btn bg" id="btnUndo" onclick="undo()" title="Undo">↩ Undo</button>
+  <button class="btn bdanger" id="btnDelSel" onclick="deleteSelected()" style="display:none">🗑 Delete</button>
+  <div class="tool-sep"></div>
+  <button class="btn bp" onclick="exportPDF()">⬇ Export PDF</button>
+  <button class="btn bg" onclick="saveAndClose()">✓ Save & Close</button>
+</div>
+
+<div class="toolbar">
+  <!-- Tools -->
+  <button class="tool-btn active" id="tool-select" onclick="setTool('select')" title=""><span class="tip">Select / Move</span>↖</button>
+  <button class="tool-btn" id="tool-rect" onclick="setTool('rect')" title=""><span class="tip">Rectangle</span>▭</button>
+  <button class="tool-btn" id="tool-cloud" onclick="setTool('cloud')" title=""><span class="tip">Cloud</span>☁</button>
+  <button class="tool-btn" id="tool-text" onclick="setTool('text')" title=""><span class="tip">Text Label</span>T</button>
+  <div class="tool-sep"></div>
+  <!-- Colours -->
+  <div class="color-pick">
+    <div class="cp-dot sel" style="background:#ffb830" data-col="#ffb830" onclick="setColor(this)" title="Yellow"></div>
+    <div class="cp-dot" style="background:#ff4d6d" data-col="#ff4d6d" onclick="setColor(this)" title="Red"></div>
+    <div class="cp-dot" style="background:#00c8ff" data-col="#00c8ff" onclick="setColor(this)" title="Cyan"></div>
+    <div class="cp-dot" style="background:#00e5a0" data-col="#00e5a0" onclick="setColor(this)" title="Green"></div>
+  </div>
+  <span class="opacity-lbl">Opacity</span>
+  <input type="range" class="opacity-sl" id="opacitySlider" min="10" max="80" value="35" oninput="updateOpacity(this.value)">
+  <div class="tool-sep"></div>
+  <!-- Page nav -->
+  <div class="page-nav">
+    <button onclick="changePage(-1)" id="btnPrev">‹</button>
+    <span class="page-num" id="pageNum">1 / 1</span>
+    <button onclick="changePage(1)" id="btnNext">›</button>
+  </div>
+  <!-- Zoom -->
+  <div class="zoom-ctrl">
+    <button onclick="changeZoom(-0.15)">−</button>
+    <span class="zoom-pct" id="zoomPct">100%</span>
+    <button onclick="changeZoom(0.15)">+</button>
+    <button onclick="fitPage()" title="Fit to screen" style="width:auto;padding:0 6px;font-size:10px">Fit</button>
+  </div>
+</div>
+
+<div class="viewer-wrap">
+  <div class="viewer" id="viewer">
+    <div class="pdf-stage" id="pdfStage">
+      <canvas id="pdfCanvas"></canvas>
+      <svg id="annotLayer" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <span class="sb-item">Tool: <span id="sbTool">Select</span></span>
+  <span class="sb-item">Page: <span id="sbPage">1/1</span></span>
+  <span class="sb-item">Annotations: <span id="sbAnnotCount">0</span></span>
+  <span class="sb-item" id="sbCoords"></span>
+</div>
+
+<div class="export-overlay" id="exportOverlay">
+  <div style="width:40px;height:40px;border:3px solid #00c8ff;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></div>
+  <p>Burning annotations into PDF…</p>
+</div>
+
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="db.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── PARAMS ──
+var params=new URLSearchParams(window.location.search);
+var subId=params.get('subId')||'';
+var fileType=params.get('type')||'data'; // data/msds
+var fileIdx=parseInt(params.get('idx')||'0');
+var pKey=params.get('p')||'';
+
+// ── STATE ──
+var _tool='select';
+var _color='#ffb830';
+var _opacity=0.35;
+var _scale=1.0;
+var _pdfDoc=null;
+var _pdfBytes=null;
+var _currentPage=1;
+var _totalPages=1;
+var _pageW=0,_pageH=0;
+var _annots={}; // keyed by page: {1:[...], 2:[...]}
+var _selectedId=null;
+var _drawing=false;
+var _startX=0,_startY=0;
+var _undoStack=[];
+var _submission=null;
+var _fileObj=null;
+var _dragOff={x:0,y:0};
+var _dragging=false;
+
+// ── INIT ──
+(async function(){
+  if(typeof dbReady!=='undefined')await dbReady;
+  var proj=dbGetCurrentProject()||{};
+  if(!pKey)pKey=proj.num||proj.number||'';
+
+  var subs=await dbGetTechSubmissions(pKey)||[];
+  _submission=subs.find(function(s){return s.id===subId;})||null;
+  if(!_submission){showToast('Submission not found');return;}
+
+  var rev=_submission.revisions[_submission.revisions.length-1];
+  var files=(rev.files&&rev.files[fileType])||[];
+  _fileObj=files[fileIdx]||null;
+  if(!_fileObj){showToast('File not found');return;}
+
+  document.getElementById('tbTitle').textContent=_fileObj.name||'PDF Markup';
+  document.getElementById('tbSub').textContent=_submission.num+' — '+_submission.title;
+
+  // Load existing annotations
+  _annots=(_fileObj.annotations)||{};
+
+  // Load PDF
+  if(_fileObj.url){
+    await loadPdf(_fileObj.url);
+  } else {
+    showToast('No PDF URL — upload the file first');
+  }
+})();
+
+async function loadPdf(url){
+  var headers={'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA'};
+  try{var s=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(s.access_token)headers['Authorization']='Bearer '+s.access_token;}catch(e){}
+  var resp=await fetch(url,{headers:headers});
+  if(!resp.ok){showToast('Could not load PDF');return;}
+  _pdfBytes=new Uint8Array(await resp.arrayBuffer());
+  _pdfDoc=await pdfjsLib.getDocument({data:_pdfBytes}).promise;
+  _totalPages=_pdfDoc.numPages;
+  await renderPage(_currentPage);
+  fitPage();
+}
+
+async function renderPage(n){
+  _currentPage=n;
+  var page=await _pdfDoc.getPage(n);
+  var vp=page.getViewport({scale:1});
+  _pageW=vp.width;_pageH=vp.height;
+  var canvas=document.getElementById('pdfCanvas');
+  var renderScale=2; // hi-res
+  var vpHi=page.getViewport({scale:renderScale});
+  canvas.width=vpHi.width;canvas.height=vpHi.height;
+  canvas.style.width=vp.width+'px';canvas.style.height=vp.height+'px';
+  var ctx=canvas.getContext('2d');
+  await page.render({canvasContext:ctx,viewport:vpHi}).promise;
+  // Resize SVG overlay
+  var svg=document.getElementById('annotLayer');
+  svg.setAttribute('width',vp.width);svg.setAttribute('height',vp.height);
+  svg.style.width=vp.width+'px';svg.style.height=vp.height+'px';
+  updatePageNav();
+  renderAnnots();
+}
+
+// ── ZOOM ──
+function changeZoom(delta){
+  _scale=Math.max(0.3,Math.min(3,_scale+delta));
+  applyZoom();
+}
+function fitPage(){
+  var viewer=document.getElementById('viewer');
+  var vw=viewer.clientWidth-48,vh=viewer.clientHeight-48;
+  var sx=vw/_pageW,sy=vh/_pageH;
+  _scale=Math.min(sx,sy,1.5);
+  applyZoom();
+}
+function applyZoom(){
+  var stage=document.getElementById('pdfStage');
+  stage.style.transform='scale('+_scale+')';
+  stage.style.transformOrigin='top center';
+  document.getElementById('zoomPct').textContent=Math.round(_scale*100)+'%';
+}
+
+// ── PAGE NAV ──
+function changePage(dir){
+  var n=_currentPage+dir;
+  if(n<1||n>_totalPages)return;
+  renderPage(n);
+}
+function updatePageNav(){
+  var t=_currentPage+' / '+_totalPages;
+  document.getElementById('pageNum').textContent=t;
+  document.getElementById('sbPage').textContent=_currentPage+'/'+_totalPages;
+  document.getElementById('btnPrev').disabled=_currentPage<=1;
+  document.getElementById('btnNext').disabled=_currentPage>=_totalPages;
+}
+
+// ── TOOLS ──
+function setTool(t){
+  _tool=t;
+  _selectedId=null;
+  document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
+  var el=document.getElementById('tool-'+t);if(el)el.classList.add('active');
+  document.getElementById('sbTool').textContent={select:'Select',rect:'Rectangle',cloud:'Cloud',text:'Text Label'}[t]||t;
+  document.getElementById('btnDelSel').style.display='none';
+  var svg=document.getElementById('annotLayer');
+  svg.style.cursor={select:'default',rect:'crosshair',cloud:'crosshair',text:'text'}[t]||'default';
+  renderAnnots();
+}
+function setColor(el){
+  _color=el.dataset.col;
+  document.querySelectorAll('.cp-dot').forEach(function(d){d.classList.remove('sel');});
+  el.classList.add('sel');
+}
+function updateOpacity(v){_opacity=parseInt(v)/100;}
+
+// ── ANNOTATION DATA ──
+function nid(){return 'a_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);}
+function pageAnnots(){
+  if(!_annots[_currentPage])_annots[_currentPage]=[];
+  return _annots[_currentPage];
+}
+function pushUndo(){_undoStack.push(JSON.parse(JSON.stringify(_annots)));}
+
+// ── SVG DRAW ──
+var _tempEl=null;
+var svg=null;
+
+window.addEventListener('DOMContentLoaded',function(){
+  svg=document.getElementById('annotLayer');
+  svg.addEventListener('mousedown',onMouseDown);
+  svg.addEventListener('mousemove',onMouseMove);
+  svg.addEventListener('mouseup',onMouseUp);
+  svg.addEventListener('mousemove',function(e){
+    var pt=svgPt(e);
+    document.getElementById('sbCoords').textContent='x:'+Math.round(pt.x)+' y:'+Math.round(pt.y);
+  });
+});
+
+function svgPt(e){
+  var r=svg.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/_scale,y:(e.clientY-r.top)/_scale};
+}
+
+function onMouseDown(e){
+  if(e.button!==0)return;
+  var pt=svgPt(e);
+  if(_tool==='select'){
+    // Hit test
+    var hit=null;
+    var annots=pageAnnots();
+    for(var i=annots.length-1;i>=0;i--){
+      var a=annots[i];
+      if(hitTest(a,pt.x,pt.y)){hit=a;break;}
+    }
+    if(hit){
+      _selectedId=hit.id;
+      _dragging=true;
+      _dragOff={x:pt.x-hit.x,y:pt.y-hit.y};
+      document.getElementById('btnDelSel').style.display='';
+    } else {
+      _selectedId=null;
+      document.getElementById('btnDelSel').style.display='none';
+    }
+    renderAnnots();
+    return;
+  }
+  if(_tool==='text'){
+    var label=prompt('Enter label text:');
+    if(!label)return;
+    pushUndo();
+    pageAnnots().push({id:nid(),type:'text',x:pt.x,y:pt.y,text:label,color:_color,page:_currentPage});
+    renderAnnots();updateAnnotCount();saveAnnots();
+    return;
+  }
+  _drawing=true;
+  _startX=pt.x;_startY=pt.y;
+  // Create temp element
+  _tempEl=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  _tempEl.setAttribute('x',pt.x);_tempEl.setAttribute('y',pt.y);
+  _tempEl.setAttribute('width',0);_tempEl.setAttribute('height',0);
+  _tempEl.setAttribute('fill',hexToRgba(_color,_opacity));
+  _tempEl.setAttribute('stroke',_color);_tempEl.setAttribute('stroke-width','2');
+  _tempEl.style.pointerEvents='none';
+  svg.appendChild(_tempEl);
+}
+
+function onMouseMove(e){
+  if(!_drawing&&!_dragging)return;
+  var pt=svgPt(e);
+  if(_dragging&&_selectedId){
+    var annots=pageAnnots();
+    var a=annots.find(function(x){return x.id===_selectedId;});
+    if(a){a.x=pt.x-_dragOff.x;a.y=pt.y-_dragOff.y;renderAnnots();}
+    return;
+  }
+  if(_drawing&&_tempEl){
+    var x=Math.min(pt.x,_startX),y=Math.min(pt.y,_startY);
+    var w=Math.abs(pt.x-_startX),h=Math.abs(pt.y-_startY);
+    _tempEl.setAttribute('x',x);_tempEl.setAttribute('y',y);
+    _tempEl.setAttribute('width',w);_tempEl.setAttribute('height',h);
+  }
+}
+
+function onMouseUp(e){
+  if(_dragging){
+    _dragging=false;
+    saveAnnots();
+    return;
+  }
+  if(!_drawing)return;
+  _drawing=false;
+  var pt=svgPt(e);
+  var x=Math.min(pt.x,_startX),y=Math.min(pt.y,_startY);
+  var w=Math.abs(pt.x-_startX),h=Math.abs(pt.y-_startY);
+  if(_tempEl){svg.removeChild(_tempEl);_tempEl=null;}
+  if(w<6||h<6)return; // too small
+  pushUndo();
+  pageAnnots().push({id:nid(),type:_tool,x:x,y:y,w:w,h:h,color:_color,opacity:_opacity,page:_currentPage});
+  renderAnnots();updateAnnotCount();saveAnnots();
+}
+
+function hitTest(a,mx,my){
+  if(a.type==='text')return mx>=a.x-4&&mx<=a.x+160&&my>=a.y-20&&my<=a.y+4;
+  return mx>=a.x&&mx<=a.x+a.w&&my>=a.y&&my<=a.y+a.h;
+}
+
+// ── RENDER ANNOTATIONS ──
+function renderAnnots(){
+  var s=document.getElementById('annotLayer');
+  while(s.firstChild)s.removeChild(s.firstChild);
+  var annots=pageAnnots();
+  annots.forEach(function(a){
+    var el;
+    if(a.type==='rect'){
+      el=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      el.setAttribute('x',a.x);el.setAttribute('y',a.y);
+      el.setAttribute('width',a.w);el.setAttribute('height',a.h);
+      el.setAttribute('fill',hexToRgba(a.color,a.opacity||0.35));
+      el.setAttribute('stroke',a.color);el.setAttribute('stroke-width','2');
+    } else if(a.type==='cloud'){
+      el=document.createElementNS('http://www.w3.org/2000/svg','g');
+      // Cloud = rect with bumpy top using path
+      var path=buildCloudPath(a.x,a.y,a.w,a.h);
+      var p=document.createElementNS('http://www.w3.org/2000/svg','path');
+      p.setAttribute('d',path);
+      p.setAttribute('fill',hexToRgba(a.color,a.opacity||0.25));
+      p.setAttribute('stroke',a.color);p.setAttribute('stroke-width','2');
+      el.appendChild(p);
+    } else if(a.type==='text'){
+      el=document.createElementNS('http://www.w3.org/2000/svg','g');
+      var bg=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      var tw=Math.max(60,(a.text||'').length*8+16);
+      bg.setAttribute('x',a.x);bg.setAttribute('y',a.y-18);
+      bg.setAttribute('width',tw);bg.setAttribute('height',22);
+      bg.setAttribute('fill',hexToRgba(a.color,0.85));
+      bg.setAttribute('rx','4');
+      var txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x',a.x+8);txt.setAttribute('y',a.y-2);
+      txt.setAttribute('font-size','12');txt.setAttribute('font-family','DM Mono,monospace');
+      txt.setAttribute('fill','#080c12');txt.setAttribute('font-weight','700');
+      txt.textContent=a.text||'';
+      el.appendChild(bg);el.appendChild(txt);
+    }
+    if(el){
+      if(a.id===_selectedId){
+        var hl=document.createElementNS('http://www.w3.org/2000/svg','rect');
+        var pad=4;
+        if(a.type==='text'){hl.setAttribute('x',a.x-pad);hl.setAttribute('y',a.y-18-pad);hl.setAttribute('width',Math.max(60,(a.text||'').length*8+16)+pad*2);hl.setAttribute('height',22+pad*2);}
+        else{hl.setAttribute('x',a.x-pad);hl.setAttribute('y',a.y-pad);hl.setAttribute('width',(a.w||0)+pad*2);hl.setAttribute('height',(a.h||0)+pad*2);}
+        hl.setAttribute('fill','none');hl.setAttribute('stroke','#00c8ff');hl.setAttribute('stroke-width','1.5');hl.setAttribute('stroke-dasharray','5,3');hl.setAttribute('rx','3');
+        hl.style.pointerEvents='none';
+        s.appendChild(hl);
+      }
+      s.appendChild(el);
+    }
+  });
+}
+
+function buildCloudPath(x,y,w,h){
+  // Cloud: rectangle with arc bumps on top edge
+  var bumps=Math.max(2,Math.round(w/40));
+  var bw=w/bumps;
+  var br=bw*0.38;
+  var d='M '+x+','+(y+h);
+  d+=' L '+x+','+(y+br*1.2);
+  for(var i=0;i<bumps;i++){
+    var cx=x+bw*i+bw/2;
+    d+=' A '+br+','+br+' 0 0 1 '+(x+bw*(i+1))+','+(y+br*1.2);
+  }
+  d+=' L '+(x+w)+','+(y+h)+' Z';
+  return d;
+}
+
+// ── DELETE / UNDO ──
+function deleteSelected(){
+  if(!_selectedId)return;
+  pushUndo();
+  _annots[_currentPage]=pageAnnots().filter(function(a){return a.id!==_selectedId;});
+  _selectedId=null;
+  document.getElementById('btnDelSel').style.display='none';
+  renderAnnots();updateAnnotCount();saveAnnots();
+}
+function undo(){
+  if(!_undoStack.length)return;
+  _annots=_undoStack.pop();
+  _selectedId=null;
+  renderAnnots();updateAnnotCount();saveAnnots();
+}
+function updateAnnotCount(){
+  var total=Object.values(_annots).reduce(function(s,a){return s+a.length;},0);
+  document.getElementById('sbAnnotCount').textContent=total;
+}
+
+// ── SAVE ──
+async function saveAnnots(){
+  if(!_submission||!_fileObj)return;
+  _fileObj.annotations=_annots;
+  var subs=await dbGetTechSubmissions(pKey)||[];
+  var idx=subs.findIndex(function(s){return s.id===_submission.id;});
+  if(idx>=0)subs[idx]=_submission;
+  await dbSetTechSubmissions(pKey,subs);
+}
+
+async function saveAndClose(){
+  await saveAnnots();
+  showToast('Saved ✓');
+  setTimeout(function(){window.close();},600);
+}
+
+// ── EXPORT PDF ──
+async function exportPDF(){
+  if(!_pdfBytes){showToast('No PDF loaded');return;}
+  document.getElementById('exportOverlay').classList.add('show');
+  try{
+    var {PDFDocument,rgb,degrees}=PDFLib;
+    var pdfDoc=await PDFDocument.load(_pdfBytes);
+    var pages=pdfDoc.getPages();
+
+    // Draw annotations on each page
+    for(var pageNum=1;pageNum<=_totalPages;pageNum++){
+      var annots=(_annots[pageNum]||[]);
+      if(!annots.length)continue;
+      var page=pages[pageNum-1];
+      var pgH=page.getHeight();
+      var pgW=page.getWidth();
+      // Get the rendered page dimensions (1x scale)
+      var pdfPage=await _pdfDoc.getPage(pageNum);
+      var vp=pdfPage.getViewport({scale:1});
+      var scaleX=pgW/vp.width;
+      var scaleY=pgH/vp.height;
+
+      annots.forEach(function(a){
+        var col=hexToRgb(a.color);
+        var op=a.opacity||0.35;
+        if(a.type==='rect'){
+          // PDF coords: bottom-left origin, flip Y
+          var px=a.x*scaleX;
+          var py=pgH-(a.y+a.h)*scaleY;
+          var pw=a.w*scaleX;
+          var ph=a.h*scaleY;
+          page.drawRectangle({x:px,y:py,width:pw,height:ph,color:rgb(col.r,col.g,col.b),opacity:op,borderColor:rgb(col.r,col.g,col.b),borderWidth:1.5});
+        } else if(a.type==='cloud'){
+          // Approximate cloud as rectangle with dashed border
+          var px=a.x*scaleX,py=pgH-(a.y+a.h)*scaleY,pw=a.w*scaleX,ph=a.h*scaleY;
+          page.drawRectangle({x:px,y:py,width:pw,height:ph,color:rgb(col.r,col.g,col.b),opacity:op*0.7,borderColor:rgb(col.r,col.g,col.b),borderWidth:2,borderDashArray:[5,3]});
+        } else if(a.type==='text'&&a.text){
+          var px=a.x*scaleX,py=pgH-a.y*scaleY;
+          var tw=Math.max(60,(a.text||'').length*7+16);
+          page.drawRectangle({x:px,y:py-4,width:tw*scaleX,height:16*scaleY,color:rgb(col.r,col.g,col.b),opacity:0.85});
+          page.drawText(a.text,{x:px+4*scaleX,y:py,size:10*scaleY,color:rgb(0.03,0.05,0.09)});
+        }
+      });
+    }
+
+    var bytes=await pdfDoc.save();
+    var blob=new Blob([bytes],{type:'application/pdf'});
+    var url=URL.createObjectURL(blob);
+    var link=document.createElement('a');
+    link.href=url;
+    link.download=(_fileObj.name||'markup').replace('.pdf','')+'-marked.pdf';
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('PDF exported ✓');
+  }catch(e){console.error(e);showToast('Export failed: '+e.message);}
+  document.getElementById('exportOverlay').classList.remove('show');
+}
+
+// ── HELPERS ──
+function hexToRgba(hex,alpha){
+  var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+function hexToRgb(hex){
+  return {r:parseInt(hex.slice(1,3),16)/255,g:parseInt(hex.slice(3,5),16)/255,b:parseInt(hex.slice(5,7),16)/255};
+}
+function showToast(msg){
+  var t=document.querySelector('.toast');
+  if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(t._tid);t._tid=setTimeout(function(){t.style.opacity='0';},2000);
+}
+</script>
+</body>
+</html>
