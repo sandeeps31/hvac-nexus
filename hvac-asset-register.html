@@ -252,24 +252,40 @@ function buildAssets(){
     });
   });
 
-  // Tech sub warranty lookup — matched by linked equipment IDs
+  // Tech sub warranty lookup — scan ALL revisions for linked equip IDs + warranty
   var tsWarranty={};
   _techSubs.forEach(function(sub){
     var revs=sub.revisions||[];
-    var latestRev=revs[revs.length-1];
-    if(!latestRev)return;
-    var linked=latestRev.linkedEquip;
-    var ids=(linked&&linked.ids)||[];
-    var w=latestRev.warranty||{};
-    ids.forEach(function(eid){
-      if(!tsWarranty[eid]){
-        tsWarranty[eid]={
-          partsWarranty:w.partsYears||'',
-          labourWarranty:w.labourYears||''
-        };
+    // Scan all revisions — warranty or linkedEquip may be on any rev
+    revs.forEach(function(rev){
+      var w=rev.warranty||{};
+      var partsYears=w.partsYears||sub.warrantyParts||sub.partsYears||'';
+      var labourYears=w.labourYears||sub.warrantyLabour||sub.labourYears||'';
+      if(!partsYears&&!labourYears)return; // nothing to record
+
+      var linked=rev.linkedEquip;
+      var ids=(linked&&linked.ids)||[];
+
+      // Also check sub-level linkedEquip (older data structure)
+      if(!ids.length&&sub.linkedEquip&&sub.linkedEquip.ids){
+        ids=sub.linkedEquip.ids;
       }
+
+      ids.forEach(function(eid){
+        // Prefer latest revision warranty — only overwrite if not set yet
+        // (revisions are in order, so last write wins = latest rev)
+        tsWarranty[eid]={
+          partsWarranty:partsYears,
+          labourWarranty:labourYears
+        };
+      });
     });
   });
+
+  // Debug — log what warranty data was found
+  var wCount=Object.keys(tsWarranty).length;
+  console.log('Warranty lookup: found data for',wCount,'equipment IDs from',_techSubs.length,'tech subs');
+  if(wCount)console.log('Sample warranty entries:',Object.entries(tsWarranty).slice(0,3));
 
   // ITP serial number lookup — scan all response data
   var snLookup={};
