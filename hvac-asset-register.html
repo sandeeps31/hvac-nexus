@@ -285,7 +285,8 @@ function buildAssets(){
   // Debug — log what warranty data was found
   var wCount=Object.keys(tsWarranty).length;
   console.log('Warranty lookup: found data for',wCount,'equipment IDs from',_techSubs.length,'tech subs');
-  if(wCount)console.log('Sample warranty entries:',Object.entries(tsWarranty).slice(0,3));
+  console.log('Warranty IDs found:',Object.keys(tsWarranty));
+  console.log('Equipment IDs in schedule (first 5):',equipRows.slice(0,5).map(function(r){return r._equipId;}));
 
   // ITP serial number lookup — scan all response data
   var snLookup={};
@@ -308,7 +309,7 @@ function buildAssets(){
     _assets.push({
       equipId:id,
       equipType:row._equipType||row.equipType||'',
-      location:row.location||row.building||'',
+      location:normLoc(row.location||row.building||''),
       manufacturer:row.manufacturer||row.make||'',
       model:row.model||'',
       serialNo:snLookup[id]||ov.serialNo||'',
@@ -322,6 +323,13 @@ function buildAssets(){
 
   populateFilters();
   renderTable();
+}
+
+function normLoc(s){
+  // Normalise location: collapse whitespace, uppercase, trim
+  // e.g. "ROM P 10" and "ROMP 10" both → "ROMP 10"
+  return String(s||'').replace(/\s+/g,' ').trim().toUpperCase()
+    .replace(/\bROM\s+P\b/g,'ROMP'); // specific fix: "ROM P" → "ROMP"
 }
 
 function populateFilters(){
