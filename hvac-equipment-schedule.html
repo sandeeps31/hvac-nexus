@@ -2389,166 +2389,237 @@ function exportRevPDF(){
   else tryRender();
 }
 function exportRevXLSX(){
-  var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
+  var tabId=activeId;
+  var tab=tabs.find(function(t){return t.id===tabId;});
+  if(!tab)return;
   var tr=getTabRev(tabId);
   var effectiveIdx=(typeof exportingRevIdx==='number'&&exportingRevIdx>=0)?exportingRevIdx:(viewingRevIdx!==null?viewingRevIdx:null);
   var rv=(effectiveIdx!==null&&effectiveIdx!==undefined)?tr.revisions[effectiveIdx]:tr.revisions[tr.revisions.length-1];
-  var cols=tab?getCols(tab):[];
   var revLabel=rv?rv.rev:'Draft';
-  var tabName=tab?tab.name||tab.type:'Equip';
-  var isDraftExport2=(exportingRevIdx===-1);
-  // Clean published state (null/null): diff against itself → zero changes shown
-  // Draft (-1): diff against last published rev
-  // Specific rev (>=0): diff against previous rev
-  var isCleanPublished=(exportingRevIdx===null&&viewingRevIdx===null);
-  var prevRevIdx=isCleanPublished?(tr.revisions.length-1):isDraftExport2?tr.revisions.length-1:((typeof exportingRevIdx==='number'&&exportingRevIdx>=0)?exportingRevIdx-1:tr.revisions.length-2);
-  var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
   var isDraftExport=(exportingRevIdx===-1);
-  var snapRows;
-  if(typeof exportingRevIdx==='number'&&exportingRevIdx>=0){
-    snapRows=tr.revisions[exportingRevIdx]?tr.revisions[exportingRevIdx].snapshot||[]:[];
-  } else if(isDraftExport){
-    snapRows=tab?tab.rows.filter(function(r){return!r._deleted&&!r._importDeleted;}):[];
-  } else if(viewingRevIdx!==null){
-    snapRows=tr.revisions[viewingRevIdx]?tr.revisions[viewingRevIdx].snapshot||[]:[];
-  } else {
-    snapRows=tr.revisions.length?tr.revisions[tr.revisions.length-1].snapshot||[]:[];
-  }
-  var diff=computeDiff(baseRows,snapRows);
+  var isCleanPublished=(exportingRevIdx===null&&viewingRevIdx===null);
+  var prevRevIdx=isCleanPublished?(tr.revisions.length-1):isDraftExport?tr.revisions.length-1:((typeof exportingRevIdx==='number'&&exportingRevIdx>=0)?exportingRevIdx-1:tr.revisions.length-2);
+  var baseRows=prevRevIdx>=0&&tr.revisions[prevRevIdx]?tr.revisions[prevRevIdx].snapshot||[]:[];
   var hasDiff=baseRows.length>0;
-  // For draft exports: only show live rows (no deleted from base)
-  // For published revision exports: include rows deleted since previous revision
+  var snapRows;
+  if(typeof exportingRevIdx==='number'&&exportingRevIdx>=0){snapRows=tr.revisions[exportingRevIdx]?tr.revisions[exportingRevIdx].snapshot||[]:[];}
+  else if(isDraftExport){snapRows=tab.rows.filter(function(r){return!r._deleted&&!r._importDeleted;});}
+  else if(viewingRevIdx!==null){snapRows=tr.revisions[viewingRevIdx]?tr.revisions[viewingRevIdx].snapshot||[]:[];}
+  else{snapRows=tr.revisions.length?tr.revisions[tr.revisions.length-1].snapshot||[]:[];}
+  var diff=computeDiff(baseRows,snapRows);
   var rows=snapRows.slice();
   if(hasDiff&&!isDraftExport){
-    baseRows.forEach(function(br){
-      if(diff.deleted.indexOf(rowKey(br))>=0)rows.push(Object.assign({},br,{_exportDeleted:true}));
+    baseRows.forEach(function(br){if(diff.deleted.indexOf(rowKey(br))>=0)rows.push(Object.assign({},br,{_exportDeleted:true}));});
+  }
+
+  var cols=getCols(tab);
+  var isVert=(tab.layout==='vertical');
+  var tabName=(tab.name||tab.type||'Schedule').replace(/[^a-zA-Z0-9 ]/g,'').substring(0,28);
+  var sheetName=(tabName+' '+revLabel).substring(0,31);
+  var hasSections=cols.some(function(c){return c.sectionName;});
+
+  // Build dropdown map from template sections
+  var dropdownMap={};
+  (tab.sections||[]).forEach(function(sec){
+    (sec.fields||[]).forEach(function(f){
+      if(f.type==='dropdown'&&f.options&&f.options.length){
+        var fKey=f.key==='equipment_id'?'tag':f.key;
+        dropdownMap[fKey]=f.options.slice();
+      }
+    });
+  });
+  (tab.cc||[]).forEach(function(c){if(c.sel&&c.options&&c.options.length)dropdownMap[c.k]=c.options.slice();});
+  cols.forEach(function(c){if(c.sel&&!dropdownMap[c.k])dropdownMap[c.k]=STATUSES.slice();});
+
+  // Load locations from project settings if available
+  var locationOptions=[];
+  try{
+    var ps=JSON.parse(localStorage.getItem('hvacnexus_project_settings_'+_eqPNum)||'{}');
+    if(ps.locations&&ps.locations.length)locationOptions=ps.locations;
+  }catch(e){}
+  if(locationOptions.length){
+    // Apply to any location/sublocation column
+    cols.forEach(function(c){
+      if(c.k==='location'||c.k==='sublocation'||c.k==='area')dropdownMap[c.k]=locationOptions;
     });
   }
+
+  function colLetter(ci){return ci<26?String.fromCharCode(65+ci):(String.fromCharCode(64+Math.floor(ci/26))+String.fromCharCode(65+(ci%26)));}
+
   function doXlsx(){
     var wb=XLSX.utils.book_new();
-    var wsData=[cols.map(function(c){return c.l;})];
-    rows.forEach(function(r){wsData.push(cols.map(function(c){return r[c.k]||'';}));});
-    var ws=XLSX.utils.aoa_to_sheet(wsData);
-    ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,14)};});
-    var sheetName=(tabName+' '+revLabel).substring(0,31);
-    XLSX.utils.book_append_sheet(wb,ws,sheetName);
-    var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+    var ws;
 
-    // Inject styles via JSZip
-    function applyStyles(zip){
-      // Build style index map: 0=normal,1=header,2=green,3=red,4=yellow,5=red-strike
-      var stylesXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        +'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-        +'<fonts count="4">'
-        +'<font><sz val="9"/><name val="Arial"/></font>'
-        +'<font><sz val="9"/><name val="Arial"/><b/><color rgb="FFFFFFFF"/></font>'
-        +'<font><sz val="9"/><name val="Arial"/><strike/><color rgb="FF990000"/></font>'
-        +'<font><sz val="9"/><name val="Arial"/></font>'
-        +'</fonts>'
-        +'<fills count="6">'
-        +'<fill><patternFill patternType="none"/></fill>'
-        +'<fill><patternFill patternType="gray125"/></fill>'
-        +'<fill><patternFill patternType="solid"><fgColor rgb="FF0E1520"/><bgColor indexed="64"/></patternFill></fill>'
-        +'<fill><patternFill patternType="solid"><fgColor rgb="FFC6EFCE"/><bgColor indexed="64"/></patternFill></fill>'
-        +'<fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/><bgColor indexed="64"/></patternFill></fill>'
-        +'<fill><patternFill patternType="solid"><fgColor rgb="FFFFF176"/><bgColor indexed="64"/></patternFill></fill>'
-        +'</fills>'
-        +'<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
-        +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-        +'<cellXfs count="6">'
-        +'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
-        +'<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'
-        +'<xf numFmtId="0" fontId="3" fillId="3" borderId="0" xfId="0" applyFill="1"/>'
-        +'<xf numFmtId="0" fontId="3" fillId="4" borderId="0" xfId="0" applyFill="1"/>'
-        +'<xf numFmtId="0" fontId="3" fillId="5" borderId="0" xfId="0" applyFill="1"/>'
-        +'<xf numFmtId="0" fontId="2" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/>'
-        +'</cellXfs>'
-        +'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
-        +'</styleSheet>';
+    if(isVert){
+      // ── VERTICAL LAYOUT: equipment IDs as columns, fields as rows ──
+      // Row 0: Equipment ID header row
+      // Then: section header rows + field rows
+      var dataRows=[];
+      var dvMap={}; // colIdx → options for vertical (equipment cols start at col 1)
 
-      zip.file('xl/styles.xml', stylesXml);
+      // Header row: "FIELD" label + equipment tags
+      var headerRow=['Equipment ID'];
+      rows.forEach(function(r){headerRow.push(r.tag||'');});
+      dataRows.push(headerRow);
 
-      // Patch sheet XML to add s= attributes to cells
-      var sheetKey=null;
-      zip.forEach(function(path,file){if(/xl[\/\\]worksheets[\/\\]sheet\d+\.xml$/i.test(path)&&!sheetKey)sheetKey=path;});
-      console.log('sheetKey found:',sheetKey);
-      if(!sheetKey){
-        // Try alternate path format
-        zip.forEach(function(path){if(path.indexOf('sheet1.xml')>=0&&!sheetKey)sheetKey=path;});
+      // Field rows grouped by section
+      var lastSec=null;
+      cols.forEach(function(c){
+        if(c.k==='tag'||c.k==='equipment_id')return;
+        // Section header row
+        if(c.sectionName&&c.sectionName!==lastSec){
+          lastSec=c.sectionName;
+          var secRow=[c.sectionName];
+          rows.forEach(function(){secRow.push('');});
+          dataRows.push(secRow);
+        }
+        // Field row: label | value per equipment
+        var fieldRow=[c.l+(c.unit?' ('+c.unit+')':'')];
+        rows.forEach(function(r){fieldRow.push(r[c.k]||'');});
+        dataRows.push(fieldRow);
+        // For dropdowns in vertical: each equipment item column for this row needs validation
+        // Store: {rowIdx, colStart, colEnd, options}
+        if(dropdownMap[c.k]){
+          dvMap[dataRows.length-1]={options:dropdownMap[c.k],colStart:1,colEnd:rows.length};
+        }
+      });
+
+      ws=XLSX.utils.aoa_to_sheet(dataRows);
+      // Col widths: label col wide, equipment cols fixed
+      ws['!cols']=[{wch:28}].concat(rows.map(function(){return{wch:16};}));
+
+      // Styles: row 0 = header (dark), section rows = accent, other rows = normal
+      var sectionRowIdxs={};
+      var ri2=1;
+      var ls2=null;
+      cols.forEach(function(c){
+        if(c.k==='tag'||c.k==='equipment_id')return;
+        if(c.sectionName&&c.sectionName!==ls2){ls2=c.sectionName;sectionRowIdxs[ri2]=true;ri2++;}
+        ri2++;
+      });
+      // Style header row (row 0)
+      for(var ci=0;ci<=rows.length;ci++){
+        var ref=colLetter(ci)+'1';
+        if(ws[ref])ws[ref].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0E1520'}},alignment:{horizontal:'center',vertical:'center',wrapText:true}};
       }
-      if(!sheetKey){fallback(wbout);return;}
+      // Style section rows
+      Object.keys(sectionRowIdxs).forEach(function(ri){
+        var rowNum=parseInt(ri)+1;
+        for(var ci=0;ci<=rows.length;ci++){
+          var ref2=colLetter(ci)+rowNum;
+          if(ws[ref2])ws[ref2].s={font:{bold:true,name:'Arial',sz:9,color:{rgb:'00C8FF'}},fill:{fgColor:{rgb:'0A1628'}},alignment:{horizontal:'left'}};
+        }
+      });
+      // Freeze first column (field labels)
+      ws['!freeze']={xSplit:1,ySplit:1,topLeftCell:'B2',activePane:'bottomRight',state:'frozen'};
 
-      zip.file(sheetKey).async('string').then(function(sheetXml){
-        // Build cell style map
-        var cellStyles={};
-        // Row 0 = headers -> style 1
-        cols.forEach(function(c,ci){
-          var col=ci<26?String.fromCharCode(65+ci):(String.fromCharCode(64+Math.floor(ci/26))+String.fromCharCode(65+(ci%26)));
-          cellStyles[col+'1']='1';
-        });
-        // Data rows
+      XLSX.utils.book_append_sheet(wb,ws,sheetName);
+
+      // Build DV entries for vertical layout (row-based validation)
+      var dvEntries=[];
+      Object.keys(dvMap).forEach(function(rowIdx){
+        var dv=dvMap[rowIdx];
+        var excelRow=parseInt(rowIdx)+1; // 1-indexed
+        var formula1='"'+dv.options.slice(0,20).map(function(o){return o.replace(/[,"]/g,'');}).join(',').substring(0,250)+'"';
+        // Each equipment column at this row
+        for(var ci=dv.colStart;ci<=dv.colEnd;ci++){
+          var sqref=colLetter(ci)+excelRow;
+          dvEntries.push('<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'"><formula1>'+formula1.replace(/"/g,'&quot;')+'</formula1></dataValidation>');
+        }
+      });
+
+      if(dvEntries.length){
+        var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
+        injectDataValidation(wbout,dvEntries,sheetName,tabName);
+        return;
+      }
+
+    } else {
+      // ── HORIZONTAL LAYOUT: rows=equipment, cols=fields ──
+      var aoa=[];
+      var hdrRow=hasSections?2:1; // 0-based index of the column header row
+
+      // Row 0: section group headers (merged spans shown as repeated values — Excel merges via styling)
+      if(hasSections){
+        aoa.push(cols.map(function(c){return c.sectionName||'';}));
+      }
+
+      // Row 1 (or 0): column headers
+      aoa.push(cols.map(function(c){return c.l+(c.unit?' ('+c.unit+')':'');}));
+
+      // Data rows
+      rows.forEach(function(r){
+        aoa.push(cols.map(function(c){return r[c.k]||'';}));
+      });
+
+      ws=XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,16)};});
+      ws['!freeze']={xSplit:1,ySplit:hdrRow+1,topLeftCell:colLetter(1)+(hdrRow+2),activePane:'bottomRight',state:'frozen'};
+
+      // Styles
+      for(var ci=0;ci<cols.length;ci++){
+        if(hasSections){
+          var gRef=colLetter(ci)+'1';
+          var secVal=(aoa[0][ci]||'');
+          if(ws[gRef])ws[gRef].s={font:{bold:true,name:'Arial',sz:9,color:{rgb:secVal?'FFFFFF':'888888'}},fill:{fgColor:{rgb:secVal?'1A2640':'0E1520'}},alignment:{horizontal:'center'}};
+        }
+        var hRef=colLetter(ci)+(hdrRow+1);
+        if(ws[hRef])ws[hRef].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0E1520'}},alignment:{horizontal:'center',vertical:'center',wrapText:true}};
+      }
+
+      // Diff colouring on data rows
+      if(hasDiff){
         rows.forEach(function(r,ri){
-          var rowNum=ri+2; // 1-indexed, row 1 = headers
+          var rowNum=hdrRow+2+ri; // 1-indexed
           var key=rowKey(r);
-          var isAdded=hasDiff&&diff.added.indexOf(key)>=0;
-          var isDel=r._exportDeleted||r._deleted||(hasDiff&&diff.deleted.indexOf(key)>=0);
-          var cf=(!isAdded&&!isDel&&hasDiff)?(diff.changedIds[key]||[]):[];
+          var isAdded=diff.added.indexOf(key)>=0;
+          var isDel=r._exportDeleted||r._deleted||(diff.deleted.indexOf(key)>=0);
+          var cf=(!isAdded&&!isDel)?diff.changedIds[key]||[]:[];
           cols.forEach(function(c,ci){
-            var col=ci<26?String.fromCharCode(65+ci):(String.fromCharCode(64+Math.floor(ci/26))+String.fromCharCode(65+(ci%26)));
-            var ref=col+rowNum;
-            if(isAdded)cellStyles[ref]='2';
-            else if(isDel)cellStyles[ref]='5';
-            else if(cf.indexOf(c.k)>=0)cellStyles[ref]='4';
+            var ref=colLetter(ci)+rowNum;
+            if(!ws[ref])return;
+            if(isAdded)ws[ref].s={fill:{fgColor:{rgb:'C6EFCE'}}};
+            else if(isDel)ws[ref].s={font:{strike:true,color:{rgb:'990000'}},fill:{fgColor:{rgb:'FFC7CE'}}};
+            else if(cf.indexOf(c.k)>=0)ws[ref].s={fill:{fgColor:{rgb:'FFFF76'}}};
           });
         });
+      }
 
-        // Inject s= attribute into each <c> element
-        sheetXml=sheetXml.replace(/<c r="([A-Z]+\d+)"([^/]*?)(\/?>)/g,function(match,ref,attrs,close){
-          var si=cellStyles[ref];
-          if(!si)return match;
-          // Remove existing s= if any
-          attrs=attrs.replace(/\s+s="[^"]*"/,'');
-          return '<c r="'+ref+'" s="'+si+'"'+attrs+close;
-        });
+      XLSX.utils.book_append_sheet(wb,ws,sheetName);
 
-        zip.file(sheetKey,sheetXml);
-        zip.generateAsync({type:'arraybuffer'}).then(function(out){
-          var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-          var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-          a.download='HVAC_Nexus_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+revLabel.replace(/[^a-zA-Z0-9]/g,'')+'.xlsx';
-          a.click();URL.revokeObjectURL(a.href);
-          closeM('exportRevModal');
-        });
+      // Build DV entries for horizontal layout
+      var dvEntries2=[];
+      var dataStartRow=hdrRow+2; // 1-indexed
+      cols.forEach(function(col,ci){
+        var opts=dropdownMap[col.k];
+        if(!opts||!opts.length)return;
+        var sqref=colLetter(ci)+dataStartRow+':'+colLetter(ci)+'2000';
+        var formula1='"'+opts.slice(0,20).map(function(o){return o.replace(/[,"]/g,'');}).join(',').substring(0,250)+'"';
+        dvEntries2.push('<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'"><formula1>'+formula1.replace(/"/g,'&quot;')+'</formula1></dataValidation>');
       });
+
+      if(dvEntries2.length){
+        var wbout2=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
+        injectDataValidation(wbout2,dvEntries2,sheetName,tabName);
+        return;
+      }
     }
 
-    function fallback(data){
-      var blob=new Blob([new Uint8Array(data)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-      var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-      a.download='HVAC_Nexus_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+revLabel.replace(/[^a-zA-Z0-9]/g,'')+'.xlsx';
-      a.click();URL.revokeObjectURL(a.href);
-      closeM('exportRevModal');
-    }
-
-    // Load JSZip and apply styles
-    function runWithJSZip(JSZipLib){
-      try{
-        new JSZipLib().loadAsync(new Uint8Array(wbout)).then(function(zip){
-          try{applyStyles(zip);}catch(e){console.warn('applyStyles error:',e);fallback(wbout);}
-        }).catch(function(e){console.warn('JSZip load error:',e);fallback(wbout);});
-      }catch(e){console.warn('JSZip error:',e);fallback(wbout);}
-    }
-    if(typeof JSZip!=='undefined'){runWithJSZip(JSZip);}
-    else{
-      var s=document.createElement('script');
-      s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-      s.onload=function(){runWithJSZip(JSZip);};
-      s.onerror=function(){fallback(wbout);};
-      document.head.appendChild(s);
-    }
+    // Fallback: no dropdowns, just download directly
+    XLSX.writeFile(wb,'HVAC_Nexus_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+revLabel.replace(/[^a-zA-Z0-9]/g,'')+'.xlsx');
+    closeM('exportRevModal');
   }
-  if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=doXlsx;document.head.appendChild(s);}else{doXlsx();}
+
+  if(typeof XLSX==='undefined'){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=doXlsx;
+    document.head.appendChild(s);
+  } else {
+    doXlsx();
+  }
 }
+
 function showToast(msg){
   var t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none';
