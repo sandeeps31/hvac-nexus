@@ -600,51 +600,12 @@ async function migrateLocalStorageToSupabase() {
   return results;
 }
 
-// ── SOFT DELETE UTILITIES ──
-// Standard pattern for all modules — never hard-delete files from storage.
-// Call softDeleteFile(fileObj) instead of splicing the array.
-// Call isFileActive(fileObj) to filter visible files.
-// Call getDeletedFiles(filesArray) to list recoverable files.
-
-function softDeleteFile(fileObj) {
-  if (!fileObj) return;
-  fileObj._deleted = true;
-  fileObj._deletedAt = new Date().toISOString().split('T')[0];
+// ── Asset Register ──
+async function dbGetAssetRegister(projectNum) {
+  return await dbGetProject('asset_register', projectNum) || {};
 }
-
-function isFileActive(fileObj) {
-  return fileObj && !fileObj._deleted;
-}
-
-function getActiveFiles(filesArray) {
-  return (filesArray || []).filter(isFileActive);
-}
-
-function getDeletedFiles(filesArray) {
-  return (filesArray || []).filter(function(f) { return f && f._deleted; });
-}
-
-function restoreFile(fileObj) {
-  if (!fileObj) return;
-  delete fileObj._deleted;
-  delete fileObj._deletedAt;
-}
-
-// Permanently remove deleted files older than retentionDays (default 30)
-// Returns the purged files array (same ref, mutated)
-function purgeOldDeletedFiles(filesArray, retentionDays) {
-  retentionDays = retentionDays || 30;
-  var cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - retentionDays);
-  var cutoffStr = cutoff.toISOString().split('T')[0];
-  var kept = (filesArray || []).filter(function(f) {
-    if (!f._deleted) return true; // active — keep
-    if (!f._deletedAt) return false; // deleted but no date — purge
-    return f._deletedAt > cutoffStr; // deleted recently — keep
-  });
-  filesArray.length = 0;
-  kept.forEach(function(f) { filesArray.push(f); });
-  return filesArray;
+async function dbSetAssetRegister(projectNum, data) {
+  return await dbSetProject('asset_register', projectNum, data);
 }
 
 // ── Specifications ──
@@ -655,54 +616,43 @@ async function dbSetSpecifications(projectNum, data) {
   return await dbSetProject('specifications', projectNum, data);
 }
 
-// ── AI USAGE LOGGING ──
-// Call after every Claude API response to track token consumption
-// usage = { input_tokens, output_tokens } from the API response
-// module = 'specifications', 'commissioning', etc.
-// action = 'qa', 'conflict_detection', 'compliance_checklist', etc.
-async function dbLogAiUsage(projectNum, module, action, usage){
+// ── Soft Delete Utilities ──
+function softDeleteFile(fileObj){if(!fileObj)return;fileObj._deleted=true;fileObj._deletedAt=new Date().toISOString().split('T')[0];}
+function isFileActive(fileObj){return fileObj&&!fileObj._deleted;}
+function getActiveFiles(filesArray){return(filesArray||[]).filter(isFileActive);}
+function getDeletedFiles(filesArray){return(filesArray||[]).filter(function(f){return f&&f._deleted;});}
+function restoreFile(fileObj){if(!fileObj)return;delete fileObj._deleted;delete fileObj._deletedAt;}
+function purgeOldDeletedFiles(filesArray,retentionDays){
+  retentionDays=retentionDays||30;
+  var cutoff=new Date();cutoff.setDate(cutoff.getDate()-retentionDays);
+  var cutoffStr=cutoff.toISOString().split('T')[0];
+  var kept=(filesArray||[]).filter(function(f){
+    if(!f._deleted)return true;
+    if(!f._deletedAt)return false;
+    return f._deletedAt>cutoffStr;
+  });
+  filesArray.length=0;kept.forEach(function(f){filesArray.push(f);});
+  return filesArray;
+}
+
+// ── AI Usage Logging ──
+async function dbLogAiUsage(projectNum,module,action,usage){
   try{
     var companyId=null;
-    try{
-      var sess=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');
-      companyId=sess.company_id||null;
-    }catch(e){}
-
+    try{var sess=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');companyId=sess.company_id||null;}catch(e){}
     var inputTokens=(usage&&usage.input_tokens)||0;
     var outputTokens=(usage&&usage.output_tokens)||0;
-    // Sonnet pricing: $3/M input, $15/M output
     var costUsd=((inputTokens/1000000)*3)+((outputTokens/1000000)*15);
-
     var SUPA_URL='https://qbsjrccrgkbevncvxbio.supabase.co';
     var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
     var token=SUPA_KEY;
-    try{
-      if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token)token=_authSession.access_token;
+    try{if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token)token=_authSession.access_token;
       else{var ss=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(ss.access_token)token=ss.access_token;}
     }catch(e){}
-
     await fetch(SUPA_URL+'/rest/v1/ai_usage',{
       method:'POST',
-      headers:{
-        'apikey':SUPA_KEY,
-        'Authorization':'Bearer '+token,
-        'Content-Type':'application/json',
-        'Prefer':'return=minimal'
-      },
-      body:JSON.stringify({
-        company_id:companyId,
-        project_num:projectNum||null,
-        module:module||'unknown',
-        action:action||'query',
-        model:'claude-sonnet-4-6',
-        input_tokens:inputTokens,
-        output_tokens:outputTokens,
-        cost_usd:parseFloat(costUsd.toFixed(6)),
-        created_at:new Date().toISOString()
-      })
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({company_id:companyId,project_num:projectNum||null,module:module||'unknown',action:action||'query',model:'claude-sonnet-4-6',input_tokens:inputTokens,output_tokens:outputTokens,cost_usd:parseFloat(costUsd.toFixed(6)),created_at:new Date().toISOString()})
     });
-  }catch(e){
-    // Silent fail — never let logging break the UI
-    console.warn('AI usage log failed:',e.message);
-  }
+  }catch(e){console.warn('AI usage log failed:',e.message);}
 }
