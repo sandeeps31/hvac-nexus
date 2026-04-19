@@ -1069,14 +1069,51 @@ var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 var SUPA_BUCKET='drawings';
 async function uploadFileToSupabase(file,subId,type){
   var path='techsubs/'+subId+'/'+type+'/'+Date.now()+'-'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  var sess={};try{sess=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');}catch(e){}
+  // Get session token — try _authSession first (set by db.js), then localStorage
+  var token=SUPA_KEY;
+  try{
+    if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token){
+      token=_authSession.access_token;
+    } else {
+      var sess=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');
+      if(sess.access_token)token=sess.access_token;
+    }
+  }catch(e){}
   var res=await fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET+'/'+path,{
     method:'POST',
-    headers:{'Authorization':'Bearer '+(sess.access_token||SUPA_KEY),'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},
+    headers:{
+      'apikey':SUPA_KEY,
+      'Authorization':'Bearer '+token,
+      'Content-Type':file.type||'application/octet-stream',
+      'x-upsert':'true'
+    },
     body:file
   });
-  if(!res.ok)throw new Error('Upload failed: '+await res.text());
+  if(!res.ok){
+    var errText=await res.text();
+    // If drawings bucket RLS blocks it, try the documents bucket
+    if(errText.includes('security policy')||errText.includes('Unauthorized')){
+      return await uploadToDocsBucket(file,path,token);
+    }
+    throw new Error('Upload failed: '+errText);
+  }
   return SUPA_URL+'/storage/v1/object/public/'+SUPA_BUCKET+'/'+path;
+}
+
+async function uploadToDocsBucket(file,path,token){
+  // Try 'documents' bucket — create it in Supabase if not exists
+  var res=await fetch(SUPA_URL+'/storage/v1/object/documents/'+path,{
+    method:'POST',
+    headers:{
+      'apikey':SUPA_KEY,
+      'Authorization':'Bearer '+token,
+      'Content-Type':file.type||'application/octet-stream',
+      'x-upsert':'true'
+    },
+    body:file
+  });
+  if(!res.ok)throw new Error('Upload failed on both buckets: '+await res.text());
+  return SUPA_URL+'/storage/v1/object/public/documents/'+path;
 }
 
 /* FILE SECTIONS */
@@ -1815,8 +1852,9 @@ async function exportTsPdf(){
       if(!pdfs.length)return;
       addSectionPage(title);
       var sess={};try{sess=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');}catch(e){}
-      var headers={'apikey':SUPA_KEY};
-      if(sess.access_token)headers['Authorization']='Bearer '+sess.access_token;
+      var token=SUPA_KEY;
+      try{if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token)token=_authSession.access_token;else if(sess.access_token)token=sess.access_token;}catch(e){}
+      var headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+token};
       for(var i=0;i<pdfs.length;i++){
         try{
           var resp=await fetch(pdfs[i].url,{headers:headers});
