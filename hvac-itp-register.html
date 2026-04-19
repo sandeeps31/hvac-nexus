@@ -274,29 +274,34 @@ async function loadAll(){
   drawings.forEach(function(drw){
     (drw.pins||[]).filter(function(p){return p.type==='itp';}).forEach(function(pin){
       var resp=responses[pin.id]||{};
-      var tmpl=templates.find(function(t){return t.itpType===pin.itpTypeLabel;});
-      // Pull location from responses, fallback to equipment schedule
       var equipId=resp.equipId||pin.equip||'';
       var eq=lookupEquip(equipId);
       var building=resp.locBuilding||(eq&&(eq.building||eq.floor||eq.level||''))||'';
       var location=resp.locLocation||(eq&&(eq.location||eq.room||''))||'';
       var subLocation=resp.locSubLocation||(eq&&(eq.sublocation||eq.subLocation||''))||'';
-      allItps.push({
-        ref:pin.ref||'',
-        formNo:tmpl?tmpl.itpNo:'—',
-        itpType:pin.itpTypeLabel||'',
-        equip:equipId,
-        docNo:resp.docNo||'',
-        building:building,
-        location:location,
-        subLocation:subLocation,
-        status:resp.status||'not-started',
-        drawingId:drw.id,
-        pinId:pin.id,
-        createdBy:resp.raisedBy||'',
-        deleted:resp.deleted||false,
-        deletedBy:resp.deletedBy||'',
-        deletedDate:resp.deletedDate||''
+
+      // Expand cluster pins — one entry per ITP in the itps array
+      var itpEntries=pin.itps&&pin.itps.length?pin.itps:[{ref:pin.ref,itpType:pin.itpTypeLabel||'',itpNo:''}];
+      itpEntries.forEach(function(itp){
+        var tmpl=templates.find(function(t){return t.itpNo===itp.itpNo||t.itpType===itp.itpType;});
+        allItps.push({
+          ref:itp.ref||pin.ref||'',
+          formNo:tmpl?tmpl.itpNo:(itp.itpNo||'—'),
+          itpType:itp.itpType||pin.itpTypeLabel||'',
+          equip:equipId,
+          docNo:resp.docNo||'',
+          building:building,
+          location:location,
+          subLocation:subLocation,
+          status:resp.status||'not-started',
+          drawingId:drw.id,
+          pinId:pin.id,
+          itpNo:itp.itpNo||'',
+          createdBy:resp.raisedBy||'',
+          deleted:resp.deleted||false,
+          deletedBy:resp.deletedBy||'',
+          deletedDate:resp.deletedDate||''
+        });
       });
     });
   });
@@ -414,17 +419,19 @@ function render(){
       var isMono=c.key==='ref'||c.key==='formNo'||c.key==='equip';
       return '<td class="'+(isMono?'mono ref':'')+'">'+escH(v)+'</td>';
     }).join('');
-    return '<tr class="'+(itp.deleted?'deleted':'')+'" onclick="openItp(\''+escH(itp.drawingId)+'\',\''+escH(itp.pinId)+'\')" title="'+(itp.deleted?'Deleted by '+escH(itp.deletedBy)+' on '+escH(itp.deletedDate):'Click to open ITP form')+'">'+cells+'</tr>';
+    return '<tr class="'+(itp.deleted?'deleted':'')+'" onclick="openItp(\''+escH(itp.drawingId)+'\',\''+escH(itp.pinId)+'\',\''+escH(itp.itpNo||'')+'\',\''+escH(itp.ref||'')+'\')" title="'+(itp.deleted?'Deleted by '+escH(itp.deletedBy)+' on '+escH(itp.deletedDate):'Click to open ITP form')+'">'+cells+'</tr>';
   }).join('');
 
   document.getElementById('emptyState').style.display=filtered.length?'none':'block';
   renderStats(filtered);
 }
 
-function openItp(drawingId, pinId){
+function openItp(drawingId, pinId, itpNo, itpRef){
   if(!drawingId||!pinId)return;
   var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
   var url=b+'hvac-itp-form.html?drawingId='+encodeURIComponent(drawingId)+'&pinId='+encodeURIComponent(pinId);
+  if(itpNo)url+='&itpNo='+encodeURIComponent(itpNo);
+  else if(itpRef)url+='&itpRef='+encodeURIComponent(itpRef);
   window.open(url,'_blank');
 }
 
