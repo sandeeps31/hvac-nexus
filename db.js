@@ -427,14 +427,6 @@ async function dbSetTechSubmissions(projectNum, data) {
   return await dbSetProject('tech_submissions', projectNum, data);
 }
 
-// ── Asset Register ──
-async function dbGetAssetRegister(projectNum) {
-  return await dbGetProject('asset_register', projectNum) || {};
-}
-async function dbSetAssetRegister(projectNum, data) {
-  return await dbSetProject('asset_register', projectNum, data);
-}
-
 // ── Vendor Invoices ──
 async function dbGetVendorInvoices(projectNum) {
   return await dbGetProject('procurement', projectNum+'_vi') || {};
@@ -606,4 +598,51 @@ async function migrateLocalStorageToSupabase() {
   console.log('Migration complete:', results.filter(r => r.status === 'ok').length, 'succeeded,', results.filter(r => r.status === 'error').length, 'failed');
   console.table(results);
   return results;
+}
+
+// ── SOFT DELETE UTILITIES ──
+// Standard pattern for all modules — never hard-delete files from storage.
+// Call softDeleteFile(fileObj) instead of splicing the array.
+// Call isFileActive(fileObj) to filter visible files.
+// Call getDeletedFiles(filesArray) to list recoverable files.
+
+function softDeleteFile(fileObj) {
+  if (!fileObj) return;
+  fileObj._deleted = true;
+  fileObj._deletedAt = new Date().toISOString().split('T')[0];
+}
+
+function isFileActive(fileObj) {
+  return fileObj && !fileObj._deleted;
+}
+
+function getActiveFiles(filesArray) {
+  return (filesArray || []).filter(isFileActive);
+}
+
+function getDeletedFiles(filesArray) {
+  return (filesArray || []).filter(function(f) { return f && f._deleted; });
+}
+
+function restoreFile(fileObj) {
+  if (!fileObj) return;
+  delete fileObj._deleted;
+  delete fileObj._deletedAt;
+}
+
+// Permanently remove deleted files older than retentionDays (default 30)
+// Returns the purged files array (same ref, mutated)
+function purgeOldDeletedFiles(filesArray, retentionDays) {
+  retentionDays = retentionDays || 30;
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+  var cutoffStr = cutoff.toISOString().split('T')[0];
+  var kept = (filesArray || []).filter(function(f) {
+    if (!f._deleted) return true; // active — keep
+    if (!f._deletedAt) return false; // deleted but no date — purge
+    return f._deletedAt > cutoffStr; // deleted recently — keep
+  });
+  filesArray.length = 0;
+  kept.forEach(function(f) { filesArray.push(f); });
+  return filesArray;
 }
