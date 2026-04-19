@@ -764,11 +764,12 @@ function stClass(s){var m={'Draft':'st-draft','Submitted':'st-submitted','Approv
 /* DOC CHIPS for table */
 function docChips(rev){
   var chips=[];
+  function activeCount(arr){return (arr||[]).filter(function(f){return !f._deleted;}).length;}
   if(rev.linkedEquip&&rev.linkedEquip.ids&&rev.linkedEquip.ids.length) chips.push('<span class="doc-chip dc-equip">Equip('+rev.linkedEquip.ids.length+')</span>');
-  if(rev.files&&rev.files.data&&rev.files.data.length) chips.push('<span class="doc-chip dc-data">Data('+rev.files.data.length+')</span>');
+  var dc=rev.files?activeCount(rev.files.data):0; if(dc)chips.push('<span class="doc-chip dc-data">Data('+dc+')</span>');
   if(rev.specRows&&rev.specRows.length) chips.push('<span class="doc-chip dc-spec">Spec('+rev.specRows.length+')</span>');
-  if(rev.files&&rev.files.msds&&rev.files.msds.length) chips.push('<span class="doc-chip dc-msds">MSDS('+rev.files.msds.length+')</span>');
-  if(rev.files&&rev.files.photos&&rev.files.photos.length) chips.push('<span class="doc-chip dc-photo">Photos('+rev.files.photos.length+')</span>');
+  var mc=rev.files?activeCount(rev.files.msds):0; if(mc)chips.push('<span class="doc-chip dc-msds">MSDS('+mc+')</span>');
+  var pc=rev.files?activeCount(rev.files.photos):0; if(pc)chips.push('<span class="doc-chip dc-photo">Photos('+pc+')</span>');
   return chips.length?'<div class="doc-chips">'+chips.join('')+'</div>':'<span style="color:var(--muted);font-size:12px">No docs yet</span>';
 }
 
@@ -1063,10 +1064,10 @@ function renderEquipSection(rev){
 /* SUPABASE UPLOAD */
 var SUPA_URL='https://qbsjrccrgkbevncvxbio.supabase.co';
 var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
-var SUPA_BUCKET='drawings';
+var SUPA_BUCKET='documents'; // dedicated bucket for tech sub files
+
 async function uploadFileToSupabase(file,subId,type){
   var path='techsubs/'+subId+'/'+type+'/'+Date.now()+'-'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  // Get session token — try _authSession first (set by db.js), then localStorage
   var token=SUPA_KEY;
   try{
     if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token){
@@ -1086,39 +1087,18 @@ async function uploadFileToSupabase(file,subId,type){
     },
     body:file
   });
-  if(!res.ok){
-    var errText=await res.text();
-    // If drawings bucket RLS blocks it, try the documents bucket
-    if(errText.includes('security policy')||errText.includes('Unauthorized')){
-      return await uploadToDocsBucket(file,path,token);
-    }
-    throw new Error('Upload failed: '+errText);
-  }
+  if(!res.ok)throw new Error('Upload failed: '+await res.text());
   return SUPA_URL+'/storage/v1/object/public/'+SUPA_BUCKET+'/'+path;
-}
-
-async function uploadToDocsBucket(file,path,token){
-  // Try 'documents' bucket — create it in Supabase if not exists
-  var res=await fetch(SUPA_URL+'/storage/v1/object/documents/'+path,{
-    method:'POST',
-    headers:{
-      'apikey':SUPA_KEY,
-      'Authorization':'Bearer '+token,
-      'Content-Type':file.type||'application/octet-stream',
-      'x-upsert':'true'
-    },
-    body:file
-  });
-  if(!res.ok)throw new Error('Upload failed on both buckets: '+await res.text());
-  return SUPA_URL+'/storage/v1/object/public/documents/'+path;
 }
 
 /* FILE SECTIONS */
 function renderFileSection(type,rev){
-  var files=(rev.files&&rev.files[type])||[];
+  var allFiles=(rev.files&&rev.files[type])||[];
+  var files=allFiles.filter(function(f){return !f._deleted;});
+  var deletedCount=allFiles.length-files.length;
   var listEl=document.getElementById('fileList-'+type);
   var countEl=document.getElementById('sec-'+type+'-count');
-  if(countEl)countEl.textContent=files.length+' file'+(files.length!==1?'s':'');
+  if(countEl)countEl.textContent=files.length+' file'+(files.length!==1?'s':'')+(deletedCount?' ('+deletedCount+' removed)':'');
   if(!listEl)return;
   listEl.innerHTML='';
   var isLatest=isViewingLatest();
@@ -1248,7 +1228,11 @@ async function processFiles(fileList,type){
 function removeFile(idx,type){
   var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
   var rev=s.revisions[s.revisions.length-1];
-  if(rev.files&&rev.files[type])rev.files[type].splice(idx,1);
+  if(rev.files&&rev.files[type]&&rev.files[type][idx]){
+    // Soft delete — mark as deleted, keep URL intact so file stays in storage
+    rev.files[type][idx]._deleted=true;
+    rev.files[type][idx]._deletedAt=today();
+  }
   save();renderDetail();
 }
 
@@ -1882,7 +1866,7 @@ async function exportTsPdf(){
     // Append all PDFs in a file section
     async function appendSection(files,title){
       if(!files||!files.length)return;
-      var pdfs=files.filter(function(f){return (f.name||'').toLowerCase().endsWith('.pdf')&&f.url;});
+      var pdfs=files.filter(function(f){return !f._deleted&&(f.name||'').toLowerCase().endsWith('.pdf')&&f.url;});
       if(!pdfs.length)return;
       sectionNum++;
       sectionPage(sectionNum,title,false);
@@ -1979,7 +1963,7 @@ async function exportTsPdf(){
 
     // ── 6. WARRANTY — render if values OR warranty files exist ──
     var w=rev.warranty||{};
-    var warrantyFiles=(f.warranty||[]).filter(function(fi){return (fi.name||'').toLowerCase().endsWith('.pdf')&&fi.url;});
+    var warrantyFiles=(f.warranty||[]).filter(function(fi){return !fi._deleted&&(fi.name||'').toLowerCase().endsWith('.pdf')&&fi.url;});
     var hasWarrantyText=!!(w.partsYears||w.labourYears);
     if(hasWarrantyText||warrantyFiles.length){
       sectionNum++;
