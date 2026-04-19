@@ -252,24 +252,23 @@ function buildAssets(){
     });
   });
 
-  // Build row ID → equipId lookup (linkedEquip.ids stores row IDs like 'r1','r2' not tag names)
-  var rowIdToEquipId={};
-  var rIdx=1;
+  // Build per-tab row ID → equipId map
+  // Equipment schedule row IDs (r1, r2...) are tab-scoped sequential IDs
+  var tabRowMap={};  // tabId → { rowId: equipTag }
   (_equipData.tabs||[]).forEach(function(tab){
+    var map={};
     (tab.rows||[]).filter(function(r){return !r._deleted;}).forEach(function(row){
       var equipId=(row.equipId||row.tag||'').trim();
       if(!equipId)return;
-      // Map by any stored id field
-      if(row.id)rowIdToEquipId[row.id]=equipId;
-      if(row._id)rowIdToEquipId[row._id]=equipId;
-      if(row.rowId)rowIdToEquipId[row.rowId]=equipId;
-      // Map by sequential r1/r2/r3 index (how the equipment schedule stores row refs)
-      rowIdToEquipId['r'+rIdx]=equipId;
-      rIdx++;
+      if(row.id)map[row.id]=equipId;
+      if(row._id)map[row._id]=equipId;
     });
+    tabRowMap[tab.id]=map;
+    tabRowMap[tab.name]=map;  // also index by name as fallback
+    tabRowMap[tab.label]=map;
   });
 
-  // Tech sub warranty lookup — scan ALL revisions, resolve row IDs → tag IDs
+  // Tech sub warranty lookup — resolve row IDs using tab context from linkedEquip.typeId
   var tsWarranty={};
   _techSubs.forEach(function(sub){
     (sub.revisions||[]).forEach(function(rev){
@@ -280,16 +279,19 @@ function buildAssets(){
       var linked=rev.linkedEquip;
       var ids=(linked&&linked.ids)||[];
       if(!ids.length&&sub.linkedEquip&&sub.linkedEquip.ids)ids=sub.linkedEquip.ids;
+      var typeId=(linked&&linked.typeId)||(sub.linkedEquip&&sub.linkedEquip.typeId)||'';
+      // Get the row map for this specific tab
+      var rowMap=tabRowMap[typeId]||{};
       ids.forEach(function(rawId){
-        // Resolve row ID (r1, r2...) to actual equipment tag
-        var equipId=rowIdToEquipId[rawId]||rawId;
+        // Try tab-scoped lookup first, then fall back to rawId as tag
+        var equipId=rowMap[rawId]||rawId;
         tsWarranty[equipId]={partsWarranty:partsYears,labourWarranty:labourYears};
       });
     });
   });
 
   // Debug — remove once warranty confirmed working
-  console.log('Warranty lookup: found data for',Object.keys(tsWarranty).length,'equipment IDs from',_techSubs.length,'tech subs');
+  console.log('Warranty lookup: found data for',Object.keys(tsWarranty).length,'equipment IDs');
   console.log('Warranty IDs resolved:',Object.keys(tsWarranty).slice(0,5));
   console.log('Equipment IDs in schedule (first 5):',equipRows.slice(0,5).map(function(r){return r._equipId;}));
 
