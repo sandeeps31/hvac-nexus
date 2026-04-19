@@ -250,11 +250,11 @@ async function dbSetProject(table, projectNum, data) {
         body: JSON.stringify({ data, updated_at: new Date().toISOString() })
       });
     } else {
-      // Get company_id from session for new row inserts
+      // Get company_id from auth helper or localStorage
       let companyId = null;
       try {
-        const sess = JSON.parse(localStorage.getItem('hvacnexus_session') || '{}');
-        companyId = sess.company_id || null;
+        if (typeof authGetCompanyId === 'function') companyId = authGetCompanyId();
+        if (!companyId) companyId = localStorage.getItem('hvacnexus_company_id');
       } catch(e) {}
       await sbFetch(table, {
         method: 'POST',
