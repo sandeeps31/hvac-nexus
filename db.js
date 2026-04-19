@@ -250,9 +250,15 @@ async function dbSetProject(table, projectNum, data) {
         body: JSON.stringify({ data, updated_at: new Date().toISOString() })
       });
     } else {
+      // Get company_id from session for new row inserts
+      let companyId = null;
+      try {
+        const sess = JSON.parse(localStorage.getItem('hvacnexus_session') || '{}');
+        companyId = sess.company_id || null;
+      } catch(e) {}
       await sbFetch(table, {
         method: 'POST',
-        body: JSON.stringify({ project_num: projectNum, data })
+        body: JSON.stringify({ project_num: projectNum, data, company_id: companyId })
       });
     }
     return true;
