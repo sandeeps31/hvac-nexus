@@ -54,7 +54,7 @@
         <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span></div>
         <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span></div>
         <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></div>
-        <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span></div>
+        <div class="sb-item" onclick="navTo('hvac-specifications.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span></div>
         <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span></div>
         <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📅</span><span class="sb-item-label">Project plan</span></div>
       </div>
@@ -94,6 +94,7 @@
         <div class="sb-item" onclick="navTo('hvac-asset-register.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Asset register</span></div>
         <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📖</span><span class="sb-item-label">O&amp;M manuals</span></div>
         <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">🔧</span><span class="sb-item-label">Maintenance plan</span></div>
+        <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">🎓</span><span class="sb-item-label">User training</span></div>
       </div>
     </div>
 

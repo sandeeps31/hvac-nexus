@@ -172,6 +172,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
       <button class="sb-item" id="nav-deleted" onclick="showView('deleted')">
         <span class="sb-item-icon">🗑️</span> Deleted Files
       </button>
+      <button class="sb-item" id="nav-aiusage" onclick="showView('aiusage')">
+        <span class="sb-item-icon">🤖</span> AI Usage
+      </button>
     </div>
     <div class="sb-footer">
       <div class="sb-av" id="sbAv">S</div>
@@ -408,6 +411,53 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
           <div id="dlEmpty" style="display:none;padding:40px;text-align:center;color:var(--muted);font-size:13px">No deleted files found for this company.</div>
         </div>
       </div>
+      <!-- ── AI USAGE VIEW ── -->
+      <div class="view" id="view-aiusage" style="display:none">
+        <div class="view-hdr">
+          <div>
+            <div class="view-title">AI Usage</div>
+            <div class="view-sub">Token consumption and estimated cost per company</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <select id="auPeriod" onchange="loadAiUsage()" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:DM Sans,sans-serif;font-size:12px;padding:5px 10px;outline:none">
+              <option value="30">Last 30 days</option>
+              <option value="7">Last 7 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="all">All time</option>
+            </select>
+            <select id="auCompany" onchange="loadAiUsage()" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:DM Sans,sans-serif;font-size:12px;padding:5px 10px;outline:none">
+              <option value="">All companies</option>
+            </select>
+          </div>
+        </div>
+        <div class="page">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+            <div class="stat-card"><div class="stat-val" id="auTotalRequests">—</div><div class="stat-sub">Total requests</div></div>
+            <div class="stat-card"><div class="stat-val" id="auTotalTokens">—</div><div class="stat-sub">Total tokens</div></div>
+            <div class="stat-card"><div class="stat-val" id="auTotalCost">—</div><div class="stat-sub">Est. cost (USD)</div></div>
+            <div class="stat-card"><div class="stat-val" id="auAvgCost">—</div><div class="stat-sub">Avg cost / request</div></div>
+          </div>
+
+          <div style="font-family:DM Mono,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">By Company</div>
+          <table class="tbl" style="margin-bottom:20px">
+            <thead><tr><th>Company</th><th style="text-align:right">Requests</th><th style="text-align:right">Input Tokens</th><th style="text-align:right">Output Tokens</th><th style="text-align:right">Est. Cost (USD)</th><th>Top Module</th></tr></thead>
+            <tbody id="auByCompany"><tr class="loading-row"><td colspan="6"><span class="spinner-sm"></span></td></tr></tbody>
+          </table>
+
+          <div style="font-family:DM Mono,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">By Module</div>
+          <table class="tbl" style="margin-bottom:20px">
+            <thead><tr><th>Module</th><th>Action</th><th style="text-align:right">Requests</th><th style="text-align:right">Avg Tokens</th><th style="text-align:right">Total Cost (USD)</th></tr></thead>
+            <tbody id="auByModule"><tr class="loading-row"><td colspan="5"><span class="spinner-sm"></span></td></tr></tbody>
+          </table>
+
+          <div style="font-family:DM Mono,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Recent Requests</div>
+          <table class="tbl">
+            <thead><tr><th>Date / Time</th><th>Company</th><th>Project</th><th>Module</th><th>Action</th><th style="text-align:right">In</th><th style="text-align:right">Out</th><th style="text-align:right">Cost</th></tr></thead>
+            <tbody id="auRecent"><tr class="loading-row"><td colspan="8"><span class="spinner-sm"></span></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
   </div><!-- /main -->
 </div><!-- /layout -->
 
@@ -787,10 +837,131 @@ function showView(v){
   var el=document.getElementById('view-'+v);
   if(el){el.classList.add('active');el.style.display='';}
   document.getElementById('nav-'+v).classList.add('active');
-  var titles={overview:'Overview',companies:'Companies',users:'All Users',team:'HVACNex Team',backups:'Backups',deleted:'Deleted Files'};
+  var titles={overview:'Overview',companies:'Companies',users:'All Users',team:'HVACNex Team',backups:'Backups',deleted:'Deleted Files',aiusage:'AI Usage'};
   document.getElementById('pageTitle').textContent=titles[v]||v;
   if(v==='backups')populateBkCompanySelect();
   if(v==='deleted')populateDlCompanySelect();
+  if(v==='aiusage'){populateAuCompanySelect();loadAiUsage();}
+}
+
+// ── AI USAGE ──
+function populateAuCompanySelect(){
+  var sel=document.getElementById('auCompany');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">All companies</option>';
+  _companies.forEach(function(c){
+    var opt=document.createElement('option');
+    opt.value=c.id;opt.textContent=c.name;
+    if(c.id===cur)opt.selected=true;
+    sel.appendChild(opt);
+  });
+}
+
+async function loadAiUsage(){
+  var period=document.getElementById('auPeriod').value;
+  var cid=document.getElementById('auCompany').value;
+
+  // Build date filter
+  var dateFilter='';
+  if(period!=='all'){
+    var d=new Date();d.setDate(d.getDate()-parseInt(period));
+    dateFilter='&created_at=gte.'+d.toISOString();
+  }
+  var compFilter=cid?'&company_id=eq.'+cid:'';
+
+  try{
+    var rows=await sbGet('ai_usage?select=*&order=created_at.desc&limit=500'+dateFilter+compFilter);
+    if(!rows||!rows.length){
+      ['auTotalRequests','auTotalTokens','auTotalCost','auAvgCost'].forEach(function(id){document.getElementById(id).textContent='0';});
+      document.getElementById('auByCompany').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">No AI usage in this period</td></tr>';
+      document.getElementById('auByModule').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">No data</td></tr>';
+      document.getElementById('auRecent').innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">No data</td></tr>';
+      return;
+    }
+
+    // ── Summary cards ──
+    var totalReq=rows.length;
+    var totalIn=rows.reduce(function(s,r){return s+(r.input_tokens||0);},0);
+    var totalOut=rows.reduce(function(s,r){return s+(r.output_tokens||0);},0);
+    var totalCost=rows.reduce(function(s,r){return s+(r.cost_usd||0);},0);
+    var avgCost=totalReq?totalCost/totalReq:0;
+
+    document.getElementById('auTotalRequests').textContent=totalReq.toLocaleString();
+    document.getElementById('auTotalTokens').textContent=((totalIn+totalOut)/1000).toFixed(0)+'K';
+    document.getElementById('auTotalCost').textContent='$'+totalCost.toFixed(4);
+    document.getElementById('auAvgCost').textContent='$'+avgCost.toFixed(4);
+
+    // ── By company ──
+    var byComp={};
+    rows.forEach(function(r){
+      var cid2=r.company_id||'unknown';
+      if(!byComp[cid2])byComp[cid2]={requests:0,input:0,output:0,cost:0,modules:{}};
+      byComp[cid2].requests++;
+      byComp[cid2].input+=r.input_tokens||0;
+      byComp[cid2].output+=r.output_tokens||0;
+      byComp[cid2].cost+=r.cost_usd||0;
+      var mod=r.module||'unknown';
+      byComp[cid2].modules[mod]=(byComp[cid2].modules[mod]||0)+1;
+    });
+
+    var compRows=Object.keys(byComp).sort(function(a,b){return byComp[b].cost-byComp[a].cost;});
+    document.getElementById('auByCompany').innerHTML=compRows.map(function(cid2){
+      var d=byComp[cid2];
+      var comp=_companies.find(function(c){return c.id===cid2;})||{name:cid2.slice(0,8)+'…'};
+      var topMod=Object.keys(d.modules).sort(function(a,b){return d.modules[b]-d.modules[a];})[0]||'—';
+      return '<tr>'
+        +'<td><strong>'+esc(comp.name)+'</strong></td>'
+        +'<td style="text-align:right;font-family:DM Mono,monospace;font-size:12px">'+d.requests+'</td>'
+        +'<td style="text-align:right;font-family:DM Mono,monospace;font-size:12px">'+(d.input/1000).toFixed(0)+'K</td>'
+        +'<td style="text-align:right;font-family:DM Mono,monospace;font-size:12px">'+(d.output/1000).toFixed(0)+'K</td>'
+        +'<td style="text-align:right;font-family:DM Mono,monospace;font-size:12px;color:#00e5a0">$'+d.cost.toFixed(4)+'</td>'
+        +'<td><span class="pill pill-blue" style="font-size:9px">'+esc(topMod)+'</span></td>'
+        +'</tr>';
+    }).join('')||'<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:16px">No data</td></tr>';
+
+    // ── By module ──
+    var byMod={};
+    rows.forEach(function(r){
+      var key=(r.module||'unknown')+':::'+(r.action||'query');
+      if(!byMod[key])byMod[key]={module:r.module,action:r.action,requests:0,tokens:0,cost:0};
+      byMod[key].requests++;
+      byMod[key].tokens+=(r.input_tokens||0)+(r.output_tokens||0);
+      byMod[key].cost+=r.cost_usd||0;
+    });
+
+    var modRows=Object.values(byMod).sort(function(a,b){return b.cost-a.cost;});
+    document.getElementById('auByModule').innerHTML=modRows.map(function(d){
+      var avgTok=d.requests?Math.round(d.tokens/d.requests):0;
+      return '<tr>'
+        +'<td><span class="pill pill-muted" style="font-size:10px">'+esc(d.module||'—')+'</span></td>'
+        +'<td style="font-size:12px;color:var(--text2)">'+esc(d.action||'—')+'</td>'
+        +'<td style="text-align:right;font-family:DM Mono,monospace;font-size:12px">'+d.requests+'</td>'
+        +'<td style="text-align:right;font-family:DM Mono,monospace;font-size:12px">'+(avgTok/1000).toFixed(0)+'K</td>'
+        +'<td style="text-align:right;font-family:DM Mono,monospace;font-size:12px;color:#00e5a0">$'+d.cost.toFixed(4)+'</td>'
+        +'</tr>';
+    }).join('')||'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px">No data</td></tr>';
+
+    // ── Recent 50 requests ──
+    document.getElementById('auRecent').innerHTML=rows.slice(0,50).map(function(r){
+      var comp=_companies.find(function(c){return c.id===r.company_id;})||{name:'—'};
+      var dt=new Date(r.created_at);
+      var dtStr=dt.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' '+dt.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+      return '<tr>'
+        +'<td class="mono" style="font-size:11px;color:var(--muted)">'+dtStr+'</td>'
+        +'<td style="font-size:12px">'+esc(comp.name)+'</td>'
+        +'<td class="mono" style="font-size:11px;color:var(--muted)">'+esc(r.project_num||'—')+'</td>'
+        +'<td><span class="pill pill-muted" style="font-size:9px">'+esc(r.module||'—')+'</span></td>'
+        +'<td style="font-size:11px;color:var(--text2)">'+esc(r.action||'—')+'</td>'
+        +'<td style="text-align:right;font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+(((r.input_tokens||0)/1000).toFixed(0))+'K</td>'
+        +'<td style="text-align:right;font-family:DM Mono,monospace;font-size:11px;color:var(--muted)">'+(((r.output_tokens||0)/1000).toFixed(0))+'K</td>'
+        +'<td style="text-align:right;font-family:DM Mono,monospace;font-size:11px;color:#00e5a0">$'+(r.cost_usd||0).toFixed(4)+'</td>'
+        +'</tr>';
+    }).join('')||'<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:16px">No data</td></tr>';
+
+  }catch(e){
+    console.error('AI usage load failed:',e);
+    showToast('Failed to load AI usage: '+e.message);
+  }
 }
 
 // ── UTILS ──

@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="theme.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Specifications — HVAC NEXUS</title>
+<script src="head-common.js"></script>
+<style>
+/* ── LAYOUT ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px}
+.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}
+.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted)}
+.bwarn{background:rgba(255,184,48,.15);color:#ffb830;border:1px solid rgba(255,184,48,.3)}.bwarn:hover{background:rgba(255,184,48,.25)}
+.bdanger{background:rgba(255,77,109,.12);color:#ff4d6d;border:1px solid rgba(255,77,109,.3)}.bdanger:hover{background:rgba(255,77,109,.22)}
+.bsm{padding:5px 12px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── TWO-PANE LAYOUT ── */
+.body-wrap{flex:1;display:flex;overflow:hidden}
+.left-pane{width:340px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+.right-pane{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── LEFT: SPEC LIST ── */
+.pane-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;background:var(--surface)}
+.pane-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.spec-list{flex:1;overflow-y:auto}
+.spec-item{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;display:flex;flex-direction:column;gap:3px}
+.spec-item:hover{background:var(--surface2)}
+.spec-item.active{background:rgba(0,200,255,.07);border-left:3px solid var(--accent)}
+.spec-item.active .si-num{color:var(--accent)}
+.si-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.si-title{font-size:13px;font-weight:500;color:var(--text)}
+.si-meta{font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.si-rev{font-family:'DM Mono',monospace;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--surface3);color:var(--text2)}
+.si-status{font-size:10px;padding:1px 7px;border-radius:10px;font-family:'DM Mono',monospace}
+.st-current{background:rgba(0,229,160,.1);color:#00e5a0;border:1px solid rgba(0,229,160,.2)}
+.st-superseded{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.st-draft{background:rgba(255,184,48,.1);color:#ffb830;border:1px solid rgba(255,184,48,.2)}
+.drop-zone{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .15s;margin:12px}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:rgba(0,200,255,.04)}
+.drop-zone-icon{font-size:24px;margin-bottom:6px}
+.drop-zone-text{font-size:12px;color:var(--muted)}
+.drop-zone-text span{color:var(--accent);cursor:pointer}
+
+/* ── RIGHT: SPEC DETAIL ── */
+.detail-empty{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--muted)}
+.detail-empty-icon{font-size:48px;opacity:.3}
+.det-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.det-hdr{padding:16px 24px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface)}
+.det-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:2px}
+.det-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px}
+.det-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rev-pills{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.rev-pill{padding:3px 10px;border-radius:20px;font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;border:1px solid var(--border);color:var(--muted);transition:all .12s}
+.rev-pill:hover{border-color:var(--accent);color:var(--accent)}
+.rev-pill.current{background:rgba(0,200,255,.1);border-color:var(--accent);color:var(--accent)}
+.rev-pill.old{opacity:.6}
+
+/* ── TABS ── */
+.tab-bar{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.tab{padding:10px 18px;font-size:13px;color:var(--text2);cursor:pointer;border:none;background:transparent;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;transition:all .12s;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-pane{flex:1;overflow:hidden;display:none;flex-direction:column}
+.tab-pane.active{display:flex}
+
+/* ── PDF VIEWER TAB ── */
+.pdf-view-wrap{flex:1;overflow:hidden;background:#1a1a2e;display:flex;align-items:center;justify-content:center;position:relative}
+.pdf-canvas-wrap{overflow:auto;width:100%;height:100%;display:flex;align-items:flex-start;justify-content:center;padding:16px}
+#pdfCanvas{box-shadow:0 4px 24px rgba(0,0,0,.6);display:block}
+.pdf-toolbar{padding:8px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;background:var(--surface)}
+.pdf-toolbar button{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center}
+.pdf-toolbar button:hover{background:var(--surface2);color:var(--text)}
+.pdf-toolbar button:disabled{opacity:.3;cursor:default}
+.page-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);min-width:60px;text-align:center}
+.zoom-pct{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);min-width:38px;text-align:center}
+.search-hl{background:#ffb830;color:#080c12;border-radius:2px}
+
+/* ── AI ASSISTANT TAB ── */
+.ai-pane{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.ai-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.ai-msg{max-width:85%;padding:11px 14px;border-radius:10px;font-size:13px;line-height:1.6}
+.ai-msg.user{align-self:flex-end;background:rgba(0,200,255,.1);border:1px solid rgba(0,200,255,.2);color:var(--text)}
+.ai-msg.assistant{align-self:flex-start;background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+.ai-msg.assistant .clause-ref{font-family:'DM Mono',monospace;font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(0,200,255,.1);color:var(--accent);margin-right:4px;cursor:pointer}
+.ai-msg.assistant .clause-ref:hover{background:rgba(0,200,255,.2)}
+.ai-msg.thinking{opacity:.6;font-style:italic}
+.ai-input-area{padding:12px 16px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.ai-scope{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.scope-chip{padding:3px 10px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid var(--border);color:var(--muted);transition:all .12s;font-family:'DM Mono',monospace}
+.scope-chip.sel{background:rgba(0,200,255,.1);border-color:var(--accent);color:var(--accent)}
+.ai-row{display:flex;gap:8px;align-items:flex-end}
+.ai-inp{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;outline:none;resize:none;min-height:40px;max-height:100px;line-height:1.4}
+.ai-inp:focus{border-color:var(--accent)}
+.voice-btn{width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s;flex-shrink:0}
+.voice-btn:hover{border-color:var(--accent);color:var(--accent)}
+.voice-btn.listening{border-color:#ff4d6d;background:rgba(255,77,109,.1);color:#ff4d6d;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.ai-quick-btns{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.quick-btn{padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'DM Sans',sans-serif;transition:all .12s}
+.quick-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── CONFLICT TAB ── */
+.conflict-pane{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.conflict-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.conflict-hdr{padding:10px 14px;display:flex;align-items:center;gap:8px;background:rgba(255,184,48,.06);border-bottom:1px solid var(--border)}
+.conflict-body{padding:12px 14px;font-size:12px;color:var(--text2);line-height:1.6}
+.conflict-sources{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.conflict-src{font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text2)}
+.run-btn-wrap{padding:16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:8px;align-items:center}
+
+/* ── COMPLIANCE TAB ── */
+.compliance-pane{flex:1;overflow-y:auto;padding:16px}
+.compliance-section{margin-bottom:16px}
+.compliance-section-hdr{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.clause-row{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border-radius:7px;margin-bottom:4px;background:var(--surface2);border:1px solid var(--border)}
+.clause-ref-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(0,200,255,.08);color:var(--accent);border:1px solid rgba(0,200,255,.2);white-space:nowrap;flex-shrink:0}
+.clause-text{font-size:12px;color:var(--text);flex:1;line-height:1.5}
+.clause-status{flex-shrink:0}
+.cs-sel{background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:2px 6px;font-family:'DM Mono',monospace}
+
+/* ── MODAL ── */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:500;display:none;align-items:center;justify-content:center}
+.mo.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;max-width:560px;width:96vw;transform:translateY(8px);transition:transform .2s;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.mo.open .modal{transform:translateY(0)}
+.modal-hdr{padding:20px 24px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-hdr h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;margin:0}
+.modal-hdr p{font-size:12px;color:var(--muted);margin:4px 0 0}
+.modal-body{padding:20px 24px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+.mi{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;outline:none;box-sizing:border-box}
+.mi:focus{border-color:var(--accent)}
+.ms{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;outline:none;cursor:pointer}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.suggest-badge{font-size:10px;color:var(--accent);font-family:'DM Mono',monospace;margin-left:6px;opacity:.7}
+
+/* ── TOAST / SPINNER ── */
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #1e3050;color:var(--text);font-size:12px;padding:9px 20px;border-radius:8px;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-thinking{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;align-self:flex-start;font-size:12px;color:var(--muted)}
+.dot-anim span{animation:dotbounce .8s ease-in-out infinite}
+.dot-anim span:nth-child(2){animation-delay:.15s}
+.dot-anim span:nth-child(3){animation-delay:.3s}
+@keyframes dotbounce{0%,80%,100%{opacity:.3}40%{opacity:1}}
+</style>
+</head>
+<body>
+
+<div id="app-sidebar"></div>
+<script src="sidebar.js"></script>
+
+<div class="main" id="mainWrap">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl bc-proj-name" onclick="navTo('project-dashboard.html')">Project</span>
+      <span class="bcs">›</span>
+      <span class="bcc">Specifications</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn bg bsm" onclick="runConflictDetection()" id="conflictBtn" title="Scan all specs for conflicts">⚡ Detect Conflicts</button>
+      <button class="btn bg bsm" onclick="exportCompliancePDF()" title="Export compliance summary">📄 Compliance Report</button>
+      <button class="btn bp bsm" onclick="openUploadModal()">＋ Add Spec</button>
+    </div>
+  </div>
+
+  <!-- BODY: LEFT + RIGHT PANES -->
+  <div class="body-wrap">
+
+    <!-- LEFT: SPEC LIST -->
+    <div class="left-pane">
+      <div class="pane-hdr">
+        <span class="pane-title">Documents</span>
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-left:auto" id="specCount">0 specs</span>
+      </div>
+      <div class="drop-zone" id="dropZone" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" accept=".pdf" multiple style="display:none" onchange="handleFileInput(this)">
+        <div class="drop-zone-icon">📂</div>
+        <div class="drop-zone-text">Drop PDFs here or <span>browse</span></div>
+      </div>
+      <div class="spec-list" id="specList"></div>
+    </div>
+
+    <!-- RIGHT: DETAIL -->
+    <div class="right-pane" id="rightPane">
+      <div class="detail-empty" id="detailEmpty">
+        <div class="detail-empty-icon">📋</div>
+        <div style="font-size:14px;font-weight:500">Select a specification</div>
+        <div style="font-size:12px">Upload PDFs or click a document to view</div>
+      </div>
+
+      <div class="det-wrap" id="detWrap" style="display:none">
+        <!-- Header -->
+        <div class="det-hdr">
+          <div class="det-num" id="detNum"></div>
+          <div class="det-title" id="detTitle"></div>
+          <div class="det-actions">
+            <span id="detStatusBadge"></span>
+            <button class="btn bg bsm" id="markupBtn" onclick="openMarkup()">✏ Mark Up</button>
+            <button class="btn bg bsm" onclick="openNewDraftModal()">＋ New Draft</button>
+            <button class="btn bdanger bsm" onclick="deleteSpec()">🗑</button>
+          </div>
+          <div class="rev-pills" id="revPills"></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-bar">
+          <button class="tab active" onclick="showTab('pdf')" id="tab-pdf">📄 Document</button>
+          <button class="tab" onclick="showTab('ai')" id="tab-ai">🤖 AI Assistant</button>
+          <button class="tab" onclick="showTab('conflicts')" id="tab-conflicts">⚡ Conflicts</button>
+          <button class="tab" onclick="showTab('compliance')" id="tab-compliance">✅ Compliance</button>
+          <button class="tab" onclick="showTab('bookmarks')" id="tab-bookmarks">🔖 Bookmarks</button>
+        </div>
+
+        <!-- PDF TAB -->
+        <div class="tab-pane active" id="pane-pdf">
+          <div class="pdf-toolbar">
+            <button onclick="changePage(-1)" id="btnPrev">‹</button>
+            <span class="page-num" id="pageNum">— / —</span>
+            <button onclick="changePage(1)" id="btnNext">›</button>
+            <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+            <button onclick="changeZoom(-0.2)">−</button>
+            <span class="zoom-pct" id="zoomPct">100%</span>
+            <button onclick="changeZoom(0.2)">+</button>
+            <button onclick="fitPage()" style="font-size:10px;width:auto;padding:0 8px">Fit</button>
+            <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+            <input id="pdfSearch" placeholder="Search in document…" oninput="searchInPdf(this.value)"
+              style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:4px 8px;outline:none;width:180px">
+            <button onclick="prevSearchResult()" title="Previous result">↑</button>
+            <button onclick="nextSearchResult()" title="Next result">↓</button>
+            <span id="searchCount" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)"></span>
+          </div>
+          <div class="pdf-view-wrap">
+            <div class="pdf-canvas-wrap" id="pdfCanvasWrap">
+              <canvas id="pdfCanvas"></canvas>
+            </div>
+            <div id="pdfEmpty" style="color:var(--muted);font-size:13px;text-align:center">
+              <div style="font-size:32px;margin-bottom:8px">📄</div>
+              <div>No PDF uploaded for this revision</div>
+              <button class="btn bp bsm" style="margin-top:12px" onclick="document.getElementById('fileInput').click()">Upload PDF</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI ASSISTANT TAB -->
+        <div class="tab-pane" id="pane-ai">
+          <div class="ai-pane">
+            <div style="padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'DM Mono',monospace;letter-spacing:.5px;text-transform:uppercase">Query scope</div>
+              <div class="ai-scope" id="aiScope">
+                <span class="scope-chip sel" data-scope="current" onclick="toggleScope(this)">This spec</span>
+                <span class="scope-chip" data-scope="all" onclick="toggleScope(this)">All specs</span>
+              </div>
+              <div class="ai-quick-btns">
+                <button class="quick-btn" onclick="quickAsk('What are the testing and commissioning requirements?')">🔧 Commissioning reqs</button>
+                <button class="quick-btn" onclick="quickAsk('What are the approved manufacturers and products?')">🏭 Approved manufacturers</button>
+                <button class="quick-btn" onclick="quickAsk('What insulation specifications are required?')">🌡 Insulation specs</button>
+                <button class="quick-btn" onclick="quickAsk('What warranty requirements are specified?')">🛡 Warranty reqs</button>
+                <button class="quick-btn" onclick="quickAsk('Summarise the key requirements for this specification section')">📋 Summarise</button>
+              </div>
+            </div>
+            <div class="ai-messages" id="aiMessages">
+              <div class="ai-msg assistant">
+                👋 Ask me anything about this specification. I'll find the exact clause and detail.<br><br>
+                <strong>Examples:</strong><br>
+                • "What pressure testing is required for chilled water pipework?"<br>
+                • "List all mandatory witness points for commissioning"<br>
+                • "What does clause 15.4 say about vibration isolation?"
+              </div>
+            </div>
+            <div class="ai-input-area">
+              <div class="ai-row">
+                <textarea class="ai-inp" id="aiInput" placeholder="Ask about this specification…" rows="1"
+                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiQuery()}"
+                  oninput="autoResize(this)"></textarea>
+                <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()" title="Voice input">🎤</button>
+                <button class="btn bp bsm" onclick="sendAiQuery()" id="sendBtn">Send</button>
+              </div>
+              <div style="font-size:10px;color:var(--muted);margin-top:6px;font-family:'DM Mono',monospace">
+                Enter to send · Shift+Enter for new line · 🎤 for voice
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONFLICTS TAB -->
+        <div class="tab-pane" id="pane-conflicts">
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+            <div class="run-btn-wrap">
+              <button class="btn bwarn" onclick="runConflictDetection()" id="conflictRunBtn">⚡ Scan All Specs for Conflicts</button>
+              <span style="font-size:11px;color:var(--muted)" id="conflictStatus"></span>
+            </div>
+            <div class="conflict-pane" id="conflictResults">
+              <div style="color:var(--muted);font-size:13px;text-align:center;padding:40px">
+                Click "Scan All Specs for Conflicts" to detect contradictions across uploaded specifications.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COMPLIANCE TAB -->
+        <div class="tab-pane" id="pane-compliance">
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+            <div class="run-btn-wrap">
+              <button class="btn bp bsm" onclick="generateComplianceChecklist()">✅ Generate Compliance Checklist</button>
+              <button class="btn bg bsm" onclick="exportCompliancePDF()">📄 Export Report</button>
+              <span style="font-size:11px;color:var(--muted)" id="complianceStatus"></span>
+            </div>
+            <div class="compliance-pane" id="complianceResults">
+              <div style="color:var(--muted);font-size:13px;text-align:center;padding:40px">
+                Generate a compliance checklist from this specification's mandatory requirements.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOOKMARKS TAB -->
+        <div class="tab-pane" id="pane-bookmarks">
+          <div style="flex:1;overflow-y:auto;padding:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Saved Clauses</span>
+              <button class="btn bg bsm" onclick="addBookmark()">＋ Add Bookmark</button>
+            </div>
+            <div id="bookmarkList"></div>
+          </div>
+        </div>
+
+      </div><!-- /det-wrap -->
+    </div><!-- /right-pane -->
+  </div><!-- /body-wrap -->
+</div><!-- /main -->
+
+<!-- UPLOAD / EDIT MODAL -->
+<div class="mo" id="uploadModal" onclick="if(event.target===this)closeUploadModal()">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="uploadModalTitle">Add Specification</h3>
+      <p id="uploadModalSub">Auto-suggested from filename — edit if needed</p>
+    </div>
+    <div class="modal-body">
+      <div class="mgrid">
+        <div>
+          <label class="ml">Doc No. <span class="suggest-badge" id="suggestDocNo"></span></label>
+          <input class="mi" id="f-docno" placeholder="e.g. MEC-SPEC-001">
+        </div>
+        <div>
+          <label class="ml">Revision <span class="suggest-badge" id="suggestRev"></span></label>
+          <input class="mi" id="f-rev" placeholder="e.g. Rev A">
+        </div>
+      </div>
+      <div>
+        <label class="ml">Title <span class="suggest-badge" id="suggestTitle"></span></label>
+        <input class="mi" id="f-title" placeholder="e.g. Mechanical Services Specification">
+      </div>
+      <div class="mgrid">
+        <div>
+          <label class="ml">Division / Section</label>
+          <select class="ms" id="f-division">
+            <option value="">— Select —</option>
+            <option value="Mechanical">Mechanical (Div 15)</option>
+            <option value="Electrical">Electrical (Div 16)</option>
+            <option value="Fire">Fire Services</option>
+            <option value="Controls">BMS / Controls</option>
+            <option value="Civil">Civil / Structural</option>
+            <option value="Hydraulic">Hydraulic</option>
+            <option value="General">General</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="ml">Date</label>
+          <input class="mi" type="date" id="f-date">
+        </div>
+      </div>
+      <div>
+        <label class="ml">PDF File</label>
+        <div id="filePickArea" style="background:var(--surface2);border:1.5px dashed var(--border);border-radius:8px;padding:14px;text-align:center;cursor:pointer;font-size:12px;color:var(--muted)" onclick="document.getElementById('modalFileInput').click()">
+          <input type="file" id="modalFileInput" accept=".pdf" style="display:none" onchange="handleModalFile(this)">
+          <span id="filePickLabel">Click to select PDF</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bg bsm" onclick="closeUploadModal()">Cancel</button>
+      <button class="btn bp bsm" onclick="saveSpec()" id="saveSpecBtn">Save Specification</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW DRAFT MODAL -->
+<div class="mo" id="newDraftModal" onclick="if(event.target===this)closeNewDraftModal()">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>Create New Draft Revision</h3>
+      <p>Current revision will be archived. A new draft will carry all settings forward.</p>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">New Revision No.</label>
+        <input class="mi" id="nd-rev" placeholder="e.g. Rev B">
+      </div>
+      <div>
+        <label class="ml">Reason / Change Summary</label>
+        <input class="mi" id="nd-reason" placeholder="e.g. Addendum 1 — updated insulation requirements">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bg bsm" onclick="closeNewDraftModal()">Cancel</button>
+      <button class="btn bp bsm" onclick="confirmNewDraft()">＋ Create Draft</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD BOOKMARK MODAL -->
+<div class="mo" id="bookmarkModal" onclick="if(event.target===this)closeBookmarkModal()">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>🔖 Add Bookmark</h3>
+      <p>Save a clause reference for quick access</p>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">Clause Reference</label>
+        <input class="mi" id="bm-clause" placeholder="e.g. 15.4.2">
+      </div>
+      <div>
+        <label class="ml">Note</label>
+        <input class="mi" id="bm-note" placeholder="e.g. Vibration isolation — 25mm spring isolators">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bg bsm" onclick="closeBookmarkModal()">Cancel</button>
+      <button class="btn bp bsm" onclick="saveBookmark()">Save Bookmark</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="db.js"></script>
+<script>
+(function(){if(!localStorage.getItem('hvacnexus_session')){window.location.href='hvac-login.html';}})();
+</script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── CONFIG ──
+const SUPA_URL='https://qbsjrccrgkbevncvxbio.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+const SUPA_BUCKET='documents';
+const AI_MODEL='claude-sonnet-4-20250514';
+
+// ── STATE ──
+var _proj=null,_pNum='';
+var _specs=[];           // all spec documents
+var _activeId=null;      // active spec id
+var _activeRevIdx=null;  // null = latest
+var _pdfDoc=null;        // pdf.js document
+var _pdfPage=1;
+var _pdfTotal=0;
+var _pdfScale=1.2;
+var _pdfBytes=null;
+var _aiHistory=[];       // conversation history
+var _aiScope='current';  // 'current' or 'all'
+var _pendingFile=null;   // file being uploaded in modal
+var _isEditing=false;    // editing existing spec
+var _dataLoaded=false;
+var _searchResults=[];
+var _searchIdx=0;
+var _recognition=null;   // Web Speech API
+
+// ── INIT ──
+(async function(){
+  if(typeof dbReady!=='undefined')await dbReady;
+  _proj=dbGetCurrentProject()||{};
+  _pNum=_proj.num||_proj.number||'';
+  document.querySelectorAll('.bc-proj-name').forEach(function(el){el.textContent=_proj.name||'Project';});
+  var s=await dbGetSpecifications(_pNum).catch(function(){return [];});
+  _specs=Array.isArray(s)?s:[];
+  _dataLoaded=true;
+  renderSpecList();
+  initVoice();
+})();
+
+// ── UTILS ──
+function nid(){return 'sp'+Date.now()+'_'+Math.random().toString(36).slice(2,6);}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function today(){return new Date().toISOString().split('T')[0];}
+function navTo(p){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+p;}
+function showToast(msg,dur){
+  var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('show');},dur||2500);
+}
+function save(){if(!_dataLoaded)return;dbSetSpecifications(_pNum,_specs).catch(function(e){console.error(e);});}
+function getActiveSpec(){return _specs.find(function(s){return s.id===_activeId;})||null;}
+function getViewingRev(){
+  var s=getActiveSpec();if(!s)return null;
+  if(_activeRevIdx!==null)return s.revisions[_activeRevIdx];
+  return s.revisions[s.revisions.length-1];
+}
+
+// ── FILENAME PARSER — auto-suggest without AI ──
+function parseFilename(filename){
+  var name=filename.replace(/\.pdf$/i,'').replace(/[_-]+/g,' ');
+  var suggestions={title:'',docNo:'',rev:''};
+
+  // Rev detection patterns: Rev A, Rev-01, RevB, R01, revision 2, v2.1
+  var revPatterns=[
+    /\b(Rev(?:ision)?[\s.-]?([A-Z0-9]{1,3}))\b/i,
+    /\bR([0-9]{1,2})\b/,
+    /\bv([0-9]+(?:\.[0-9]+)?)\b/i,
+    /-([A-D])\b/,
+    /_(Rev\s?[A-Z0-9]+)/i
+  ];
+  for(var i=0;i<revPatterns.length;i++){
+    var m=name.match(revPatterns[i]);
+    if(m){suggestions.rev=m[1]||'Rev '+m[2]||m[0];break;}
+  }
+
+  // Doc No patterns: MEC-SPEC-001, 15-HVAC, S-M-001, spec section numbers
+  var docPatterns=[
+    /\b([A-Z]{2,5}[-_][A-Z]{2,5}[-_][0-9]{2,4})\b/,
+    /\b([A-Z]{1,4}[-_][0-9]{3,5})\b/,
+    /\b(Section\s?[0-9]{4,6})\b/i,
+    /\b([0-9]{5,6})\b/,  // CSI division number
+    /^([A-Z0-9-]{4,15})\s/
+  ];
+  for(var j=0;j<docPatterns.length;j++){
+    var dm=filename.replace(/\.pdf$/i,'').match(docPatterns[j]);
+    if(dm){suggestions.docNo=dm[1];break;}
+  }
+
+  // Title — remove doc no and rev from name, clean up remainder
+  var title=name;
+  if(suggestions.docNo)title=title.replace(suggestions.docNo,'');
+  if(suggestions.rev)title=title.replace(suggestions.rev,'');
+  title=title.replace(/[-_]+/g,' ').replace(/\s+/g,' ').trim();
+  // Capitalise words
+  title=title.replace(/\b\w/g,function(c){return c.toUpperCase();});
+  // Remove leading/trailing dashes, numbers
+  title=title.replace(/^[\s\-0-9]+|[\s\-0-9]+$/g,'').trim();
+  if(title.length>4)suggestions.title=title;
+
+  return suggestions;
+}
+
+// ── UPLOAD ──
+function openUploadModal(fileObj){
+  _isEditing=false;
+  _pendingFile=fileObj||null;
+  document.getElementById('uploadModalTitle').textContent='Add Specification';
+  document.getElementById('uploadModalSub').textContent=fileObj?'Auto-suggested from filename — edit if needed':'Fill in specification details';
+  document.getElementById('f-date').value=today();
+
+  // Auto-suggest from filename
+  if(fileObj){
+    var s=parseFilename(fileObj.name);
+    document.getElementById('f-title').value=s.title||'';
+    document.getElementById('f-docno').value=s.docNo||'';
+    document.getElementById('f-rev').value=s.rev||'Rev A';
+    document.getElementById('suggestTitle').textContent=s.title?'✦ auto':'';
+    document.getElementById('suggestDocNo').textContent=s.docNo?'✦ auto':'';
+    document.getElementById('suggestRev').textContent=s.rev?'✦ auto':'';
+    document.getElementById('filePickLabel').textContent='📎 '+fileObj.name;
+  } else {
+    document.getElementById('f-title').value='';
+    document.getElementById('f-docno').value='';
+    document.getElementById('f-rev').value='Rev A';
+    document.getElementById('suggestTitle').textContent='';
+    document.getElementById('suggestDocNo').textContent='';
+    document.getElementById('suggestRev').textContent='';
+    document.getElementById('filePickLabel').textContent='Click to select PDF';
+  }
+  document.getElementById('uploadModal').classList.add('open');
+  setTimeout(function(){document.getElementById('f-title').focus();},80);
+}
+function closeUploadModal(){document.getElementById('uploadModal').classList.remove('open');_pendingFile=null;}
+
+function handleDragOver(e){e.preventDefault();document.getElementById('dropZone').classList.add('drag-over');}
+function handleDragLeave(e){document.getElementById('dropZone').classList.remove('drag-over');}
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  var files=Array.from(e.dataTransfer.files).filter(function(f){return f.type==='application/pdf';});
+  if(files.length)openUploadModal(files[0]);
+}
+function handleFileInput(inp){
+  var files=Array.from(inp.files).filter(function(f){return f.type==='application/pdf';});
+  if(files.length)openUploadModal(files[0]);
+  inp.value='';
+}
+function handleModalFile(inp){
+  if(inp.files[0]){
+    _pendingFile=inp.files[0];
+    var s=parseFilename(_pendingFile.name);
+    if(!document.getElementById('f-title').value&&s.title)document.getElementById('f-title').value=s.title;
+    if(!document.getElementById('f-docno').value&&s.docNo)document.getElementById('f-docno').value=s.docNo;
+    if(!document.getElementById('f-rev').value&&s.rev)document.getElementById('f-rev').value=s.rev;
+    document.getElementById('filePickLabel').textContent='📎 '+_pendingFile.name;
+  }
+}
+
+async function saveSpec(){
+  var title=document.getElementById('f-title').value.trim();
+  var docNo=document.getElementById('f-docno').value.trim();
+  var rev=document.getElementById('f-rev').value.trim()||'Rev A';
+  if(!title){document.getElementById('f-title').focus();showToast('Please enter a title');return;}
+
+  var btn=document.getElementById('saveSpecBtn');
+  btn.disabled=true;btn.textContent='Saving…';
+
+  try{
+    var url=null,extractedText='';
+    if(_pendingFile){
+      // Upload to Supabase Storage
+      showToast('Uploading PDF…');
+      url=await uploadSpecFile(_pendingFile,docNo||nid());
+      // Extract text from PDF
+      showToast('Extracting text…');
+      extractedText=await extractPdfText(_pendingFile);
+    }
+
+    var revObj={
+      rev:rev,
+      date:document.getElementById('f-date').value||today(),
+      url:url,
+      extractedText:extractedText,
+      fileName:_pendingFile?_pendingFile.name:'',
+      supersedeReason:''
+    };
+
+    if(_isEditing){
+      var spec=getActiveSpec();
+      if(spec){
+        spec.title=title;spec.docNo=docNo;
+        spec.division=document.getElementById('f-division').value;
+        spec.revisions[spec.revisions.length-1]=Object.assign(spec.revisions[spec.revisions.length-1],{rev,url:url||spec.revisions[spec.revisions.length-1].url,extractedText:extractedText||spec.revisions[spec.revisions.length-1].extractedText});
+      }
+    } else {
+      var newSpec={
+        id:nid(),
+        title:title,
+        docNo:docNo,
+        division:document.getElementById('f-division').value,
+        bookmarks:[],
+        complianceClauses:[],
+        revisions:[revObj]
+      };
+      _specs.push(newSpec);
+      _activeId=newSpec.id;_activeRevIdx=null;
+    }
+
+    save();
+    closeUploadModal();
+    renderSpecList();
+    openDetail(_activeId);
+    showToast('✓ Specification saved');
+  }catch(e){
+    console.error(e);showToast('Save failed: '+e.message);
+  }
+  btn.disabled=false;btn.textContent='Save Specification';
+}
+
+// ── SUPABASE UPLOAD ──
+async function uploadSpecFile(file,docId){
+  var path='specifications/'+_pNum+'/'+docId+'_'+Date.now()+'.pdf';
+  var token=SUPA_KEY;
+  try{var ss=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(ss.access_token)token=ss.access_token;}catch(e){}
+  if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token)token=_authSession.access_token;
+  var res=await fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET+'/'+path,{
+    method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/pdf','x-upsert':'true'},
+    body:file
+  });
+  if(!res.ok)throw new Error(await res.text());
+  return SUPA_URL+'/storage/v1/object/public/'+SUPA_BUCKET+'/'+path;
+}
+
+// ── PDF TEXT EXTRACTION ──
+async function extractPdfText(fileOrUrl){
+  var arrayBuffer;
+  if(fileOrUrl instanceof File){
+    arrayBuffer=await fileOrUrl.arrayBuffer();
+  } else {
+    var token=SUPA_KEY;
+    try{var ss=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(ss.access_token)token=ss.access_token;}catch(e){}
+    var r=await fetch(fileOrUrl,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token}});
+    arrayBuffer=await r.arrayBuffer();
+  }
+  var pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+  var text='';
+  for(var i=1;i<=Math.min(pdf.numPages,200);i++){
+    var page=await pdf.getPage(i);
+    var content=await page.getTextContent();
+    text+='[Page '+i+']\n';
+    text+=content.items.map(function(it){return it.str;}).join(' ')+'\n\n';
+  }
+  return text;
+}
+
+// ── SPEC LIST RENDER ──
+function renderSpecList(){
+  var el=document.getElementById('specList');
+  document.getElementById('specCount').textContent=_specs.length+' spec'+(_specs.length!==1?'s':'');
+  if(!_specs.length){
+    el.innerHTML='<div style="padding:20px;text-align:center;font-size:12px;color:var(--muted)">No specifications yet.<br>Drop a PDF above to get started.</div>';
+    return;
+  }
+  // Group by division
+  var groups={};
+  _specs.forEach(function(s){
+    var d=s.division||'General';
+    if(!groups[d])groups[d]=[];
+    groups[d].push(s);
+  });
+  var html='';
+  Object.keys(groups).sort().forEach(function(div){
+    html+='<div style="padding:6px 16px 2px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)">'+escH(div)+'</div>';
+    groups[div].forEach(function(s){
+      var curRev=s.revisions[s.revisions.length-1];
+      var isActive=s.id===_activeId;
+      html+='<div class="spec-item'+(isActive?' active':'')+'" onclick="openDetail(\''+s.id+'\')">'
+        +'<div class="si-num">'+escH(s.docNo||'—')+'</div>'
+        +'<div class="si-title">'+escH(s.title)+'</div>'
+        +'<div class="si-meta">'
+          +'<span class="si-rev">'+escH(curRev.rev)+'</span>'
+          +(s.revisions.length>1?'<span style="font-size:10px;color:var(--muted)">'+s.revisions.length+' revisions</span>':'')
+        +'</div>'
+        +'</div>';
+    });
+  });
+  el.innerHTML=html;
+}
+
+// ── DETAIL ──
+function openDetail(id){
+  _activeId=id;_activeRevIdx=null;_aiHistory=[];
+  renderSpecList();
+  var s=getActiveSpec();if(!s)return;
+  document.getElementById('detailEmpty').style.display='none';
+  document.getElementById('detWrap').style.display='flex';
+  renderDetail();
+  showTab('pdf');
+  renderBookmarks();
+}
+
+function renderDetail(){
+  var s=getActiveSpec();if(!s)return;
+  var rev=getViewingRev();
+  document.getElementById('detNum').textContent=s.docNo||'—';
+  document.getElementById('detTitle').textContent=s.title;
+  // Rev pills
+  var pillsHtml='';
+  s.revisions.forEach(function(rv,i){
+    var isLatest=i===s.revisions.length-1;
+    var isViewing=((_activeRevIdx===null&&isLatest)||_activeRevIdx===i);
+    pillsHtml+='<div class="rev-pill '+(isViewing?'current':'old')+'" onclick="viewRev('+i+')">'
+      +escH(rv.rev)+(isLatest?' · current':'· superseded')
+      +'</div>';
+  });
+  document.getElementById('revPills').innerHTML=pillsHtml;
+  // Load PDF
+  if(rev&&rev.url){
+    loadPdf(rev.url);
+    document.getElementById('pdfEmpty').style.display='none';
+    document.getElementById('pdfCanvas').style.display='block';
+  } else {
+    document.getElementById('pdfEmpty').style.display='flex';
+    document.getElementById('pdfCanvas').style.display='none';
+    _pdfDoc=null;_pdfPage=1;_pdfTotal=0;
+    updatePageNav();
+  }
+}
+
+function viewRev(idx){_activeRevIdx=idx;renderDetail();}
+
+// ── PDF VIEWER ──
+async function loadPdf(url){
+  try{
+    var token=SUPA_KEY;
+    try{var ss=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(ss.access_token)token=ss.access_token;}catch(e){}
+    if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token)token=_authSession.access_token;
+    var resp=await fetch(url,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token}});
+    _pdfBytes=new Uint8Array(await resp.arrayBuffer());
+    _pdfDoc=await pdfjsLib.getDocument({data:_pdfBytes}).promise;
+    _pdfTotal=_pdfDoc.numPages;_pdfPage=1;
+    await renderPdfPage();
+  }catch(e){console.error('PDF load failed:',e);}
+}
+
+async function renderPdfPage(){
+  if(!_pdfDoc)return;
+  var page=await _pdfDoc.getPage(_pdfPage);
+  var vp=page.getViewport({scale:_pdfScale});
+  var canvas=document.getElementById('pdfCanvas');
+  var ctx=canvas.getContext('2d');
+  canvas.width=vp.width;canvas.height=vp.height;
+  await page.render({canvasContext:ctx,viewport:vp}).promise;
+  updatePageNav();
+}
+
+function updatePageNav(){
+  document.getElementById('pageNum').textContent=_pdfTotal?(_pdfPage+' / '+_pdfTotal):'— / —';
+  document.getElementById('btnPrev').disabled=_pdfPage<=1;
+  document.getElementById('btnNext').disabled=_pdfPage>=_pdfTotal;
+  document.getElementById('zoomPct').textContent=Math.round(_pdfScale*100)+'%';
+}
+function changePage(d){
+  var n=_pdfPage+d;
+  if(n<1||n>_pdfTotal)return;
+  _pdfPage=n;renderPdfPage();
+}
+function changeZoom(d){_pdfScale=Math.max(0.5,Math.min(3,_pdfScale+d));renderPdfPage();}
+function fitPage(){
+  var wrap=document.getElementById('pdfCanvasWrap');
+  var canvas=document.getElementById('pdfCanvas');
+  if(!canvas.width)return;
+  var targetW=wrap.clientWidth-32;
+  _pdfScale=_pdfScale*(targetW/canvas.width);
+  renderPdfPage();
+}
+
+// ── PDF SEARCH ──
+var _searchTerms=[];
+function searchInPdf(term){
+  _searchResults=[];_searchIdx=0;
+  document.getElementById('searchCount').textContent='';
+  if(!term||!_pdfDoc){return;}
+  // Search extracted text and find page numbers
+  var rev=getViewingRev();
+  if(!rev||!rev.extractedText)return;
+  var lower=term.toLowerCase();
+  var pages=rev.extractedText.split('[Page ');
+  pages.forEach(function(pg,i){
+    if(i===0)return;
+    var pageNum=parseInt(pg);
+    if(pg.toLowerCase().includes(lower)){
+      _searchResults.push(pageNum);
+    }
+  });
+  document.getElementById('searchCount').textContent=_searchResults.length?_searchResults.length+' pages':'0 results';
+  if(_searchResults.length){
+    _pdfPage=_searchResults[0];
+    renderPdfPage();
+  }
+}
+function nextSearchResult(){
+  if(!_searchResults.length)return;
+  _searchIdx=(_searchIdx+1)%_searchResults.length;
+  _pdfPage=_searchResults[_searchIdx];renderPdfPage();
+  document.getElementById('searchCount').textContent=(_searchIdx+1)+'/'+_searchResults.length+' pages';
+}
+function prevSearchResult(){
+  if(!_searchResults.length)return;
+  _searchIdx=(_searchIdx-1+_searchResults.length)%_searchResults.length;
+  _pdfPage=_searchResults[_searchIdx];renderPdfPage();
+  document.getElementById('searchCount').textContent=(_searchIdx+1)+'/'+_searchResults.length+' pages';
+}
+
+// ── MARKUP ──
+function openMarkup(){
+  var rev=getViewingRev();
+  if(!rev||!rev.url){showToast('No PDF for this revision');return;}
+  // Open in markup tool with spec context
+  var url='hvac-pdf-markup.html?specId='+encodeURIComponent(_activeId)+'&p='+encodeURIComponent(_pNum);
+  window.open(url,'_blank');
+}
+
+// ── TABS ──
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('pane-'+name).classList.add('active');
+  if(name==='ai')setTimeout(function(){document.getElementById('aiInput').focus();},50);
+}
+
+// ── AI ASSISTANT ──
+function toggleScope(el){
+  document.querySelectorAll('.scope-chip').forEach(function(c){c.classList.remove('sel');});
+  el.classList.add('sel');
+  _aiScope=el.dataset.scope;
+}
+function quickAsk(q){document.getElementById('aiInput').value=q;sendAiQuery();}
+function autoResize(ta){ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,100)+'px';}
+
+function getSpecContext(){
+  if(_aiScope==='all'){
+    // All specs
+    return _specs.map(function(s){
+      var rev=s.revisions[s.revisions.length-1];
+      return '=== '+s.title+' ('+s.docNo+' '+rev.rev+') ===\n'+(rev.extractedText||'[Text not extracted]');
+    }).join('\n\n');
+  } else {
+    // Current spec only
+    var s=getActiveSpec();
+    var rev=getViewingRev();
+    if(!s||!rev)return '';
+    return '=== '+s.title+' ('+s.docNo+' '+rev.rev+') ===\n'+(rev.extractedText||'[Text not extracted — PDF may not have been processed]');
+  }
+}
+
+async function sendAiQuery(){
+  var inp=document.getElementById('aiInput');
+  var q=inp.value.trim();
+  if(!q)return;
+  inp.value='';autoResize(inp);
+  document.getElementById('sendBtn').disabled=true;
+
+  // Add user message
+  appendAiMsg('user',q);
+  _aiHistory.push({role:'user',content:q});
+
+  // Show thinking
+  var thinkId='think_'+Date.now();
+  var messagesEl=document.getElementById('aiMessages');
+  var thinkEl=document.createElement('div');
+  thinkEl.id=thinkId;thinkEl.className='ai-thinking';
+  thinkEl.innerHTML='<div class="spinner"></div><span>Reading specification</span><div class="dot-anim"><span>.</span><span>.</span><span>.</span></div>';
+  messagesEl.appendChild(thinkEl);
+  messagesEl.scrollTop=messagesEl.scrollHeight;
+
+  try{
+    var specContext=getSpecContext();
+    var systemPrompt=`You are an HVAC specification assistant for the project "${_proj.name||'this project'}".
+
+You have access to the following specification document(s):
+
+${specContext}
+
+When answering:
+1. Always cite the exact clause number (e.g. "Clause 15.4.2") when referencing specific requirements
+2. Quote the relevant text directly when it matters — accuracy is critical
+3. If asked to summarise, use bullet points with clause references
+4. If a requirement is NOT in the spec, say so clearly
+5. Format clause references as [Clause X.X.X] so they stand out
+6. If you find conflicting requirements, highlight them
+
+Keep answers concise but precise. This is a professional construction context.`;
+
+    var messages=_aiHistory.slice(-8); // keep last 8 turns for context
+    var resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:AI_MODEL,
+        max_tokens:1500,
+        system:systemPrompt,
+        messages:messages
+      })
+    });
+    var data=await resp.json();
+    var answer=(data.content&&data.content[0]&&data.content[0].text)||'No response received.';
+    // Log token usage
+    if(data.usage)dbLogAiUsage(_pNum,'specifications','qa',data.usage);
+
+    thinkEl.remove();
+    appendAiMsg('assistant',answer);
+    _aiHistory.push({role:'assistant',content:answer});
+  }catch(e){
+    thinkEl.remove();
+    appendAiMsg('assistant','⚠ Error: '+e.message);
+  }
+  document.getElementById('sendBtn').disabled=false;
+}
+
+function appendAiMsg(role,text){
+  var el=document.getElementById('aiMessages');
+  var div=document.createElement('div');
+  div.className='ai-msg '+role;
+  // Format clause references as clickable chips
+  var formatted=escH(text).replace(/\[Clause ([\d.]+)\]/g,function(m,ref){
+    return '<span class="clause-ref" onclick="jumpToClause(\''+ref+'\')" title="Search in document">§'+ref+'</span>';
+  });
+  div.innerHTML=formatted;
+  el.appendChild(div);
+  el.scrollTop=el.scrollHeight;
+}
+
+function jumpToClause(ref){
+  showTab('pdf');
+  document.getElementById('pdfSearch').value=ref;
+  searchInPdf(ref);
+}
+
+// ── VOICE INPUT ──
+function initVoice(){
+  var SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SpeechRecognition){
+    document.getElementById('voiceBtn').style.display='none';
+    return;
+  }
+  _recognition=new SpeechRecognition();
+  _recognition.continuous=false;
+  _recognition.interimResults=false;
+  _recognition.lang='en-AU';
+  _recognition.onresult=function(e){
+    var transcript=e.results[0][0].transcript;
+    document.getElementById('aiInput').value=transcript;
+    document.getElementById('voiceBtn').classList.remove('listening');
+    showToast('🎤 "'+transcript.substring(0,40)+'"');
+    sendAiQuery();
+  };
+  _recognition.onerror=function(e){
+    document.getElementById('voiceBtn').classList.remove('listening');
+    showToast('Voice error: '+e.error);
+  };
+  _recognition.onend=function(){
+    document.getElementById('voiceBtn').classList.remove('listening');
+  };
+}
+
+function toggleVoice(){
+  if(!_recognition){showToast('Voice not supported in this browser');return;}
+  var btn=document.getElementById('voiceBtn');
+  if(btn.classList.contains('listening')){
+    _recognition.stop();btn.classList.remove('listening');
+  } else {
+    try{_recognition.start();btn.classList.add('listening');showToast('🎤 Listening…');}
+    catch(e){showToast('Voice: '+e.message);}
+  }
+}
+
+// ── CONFLICT DETECTION ──
+async function runConflictDetection(){
+  if(_specs.length<2){
+    showToast('Upload at least 2 specifications to detect conflicts');
+    return;
+  }
+  showTab('conflicts');
+  var status=document.getElementById('conflictStatus');
+  var results=document.getElementById('conflictResults');
+  var btn=document.getElementById('conflictRunBtn');
+  btn.disabled=true;status.textContent='Scanning…';
+  results.innerHTML='<div style="text-align:center;padding:30px"><div class="spinner"></div><div style="margin-top:10px;font-size:12px;color:var(--muted)">Analysing '+_specs.length+' specifications for conflicts…</div></div>';
+
+  try{
+    // Build spec summaries for Claude
+    var specSummaries=_specs.map(function(s){
+      var rev=s.revisions[s.revisions.length-1];
+      var text=(rev.extractedText||'').substring(0,8000); // limit per spec
+      return s.title+' ('+s.docNo+'):\n'+text;
+    }).join('\n\n---\n\n');
+
+    var resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:AI_MODEL,
+        max_tokens:2000,
+        messages:[{
+          role:'user',
+          content:`You are reviewing the following HVAC project specifications for conflicts and contradictions.\n\nSpecifications:\n${specSummaries}\n\nFind all conflicts, contradictions, or inconsistencies between these specifications. For each conflict:\n1. State which documents conflict\n2. Give the specific clauses or sections\n3. Describe the contradiction clearly\n4. Rate severity: HIGH (will cause variation/dispute), MEDIUM (needs clarification), LOW (minor inconsistency)\n\nRespond in JSON format only:\n{\n  "conflicts": [\n    {\n      "severity": "HIGH|MEDIUM|LOW",\n      "title": "brief title",\n      "description": "what conflicts",\n      "docs": ["Doc 1", "Doc 2"],\n      "clauses": ["Clause X", "Clause Y"]\n    }\n  ],\n  "summary": "overall summary"\n}`
+        }]
+      })
+    });
+    var data=await resp.json();
+    var raw=data.content&&data.content[0]&&data.content[0].text||'{}';
+    var clean=raw.replace(/```json|```/g,'').trim();
+    var parsed=JSON.parse(clean);
+    var conflicts=parsed.conflicts||[];
+    // Log token usage
+    if(data.usage)dbLogAiUsage(_pNum,'specifications','conflict_detection',data.usage);
+
+    status.textContent=conflicts.length+' conflict'+(conflicts.length!==1?'s':'')+' found';
+
+    if(!conflicts.length){
+      results.innerHTML='<div style="text-align:center;padding:40px;color:#00e5a0;font-size:13px">✓ No conflicts detected across '+_specs.length+' specifications.</div>';
+    } else {
+      var sevColor={'HIGH':'#ff4d6d','MEDIUM':'#ffb830','LOW':'#00e5a0'};
+      results.innerHTML='<div style="margin-bottom:12px;font-size:12px;color:var(--text2)">'+escH(parsed.summary||'')+'</div>'
+        +conflicts.map(function(c){
+          var col=sevColor[c.severity]||'var(--muted)';
+          return '<div class="conflict-card">'
+            +'<div class="conflict-hdr">'
+              +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid '+col+';color:'+col+'">'+c.severity+'</span>'
+              +'<span style="font-size:13px;font-weight:500">'+escH(c.title)+'</span>'
+            +'</div>'
+            +'<div class="conflict-body">'+escH(c.description)
+              +'<div class="conflict-sources">'
+                +c.docs.map(function(d){return '<span class="conflict-src">'+escH(d)+'</span>';}).join('')
+                +c.clauses.map(function(cl){return '<span class="conflict-src">'+escH(cl)+'</span>';}).join('')
+              +'</div>'
+            +'</div>'
+            +'</div>';
+        }).join('');
+    }
+  }catch(e){
+    status.textContent='Error';
+    results.innerHTML='<div style="color:var(--danger);padding:20px;font-size:13px">Error: '+escH(e.message)+'</div>';
+  }
+  btn.disabled=false;
+}
+
+// ── COMPLIANCE CHECKLIST ──
+async function generateComplianceChecklist(){
+  var s=getActiveSpec();var rev=getViewingRev();
+  if(!s||!rev||!rev.extractedText){showToast('No spec text available — ensure PDF was uploaded');return;}
+  var status=document.getElementById('complianceStatus');
+  var results=document.getElementById('complianceResults');
+  status.textContent='Generating…';
+  results.innerHTML='<div style="text-align:center;padding:30px"><div class="spinner"></div><div style="margin-top:10px;font-size:12px;color:var(--muted)">Extracting mandatory requirements…</div></div>';
+
+  try{
+    var resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:AI_MODEL,
+        max_tokens:2000,
+        messages:[{
+          role:'user',
+          content:`From the following HVAC specification, extract all mandatory requirements that must be demonstrated for compliance (requirements with "shall", "must", "is required", "to be", etc.).\n\nSpec: ${s.title} (${s.docNo})\n\n${rev.extractedText.substring(0,12000)}\n\nRespond in JSON only:\n{\n  "sections": [\n    {\n      "heading": "section name",\n      "clauses": [\n        {\n          "ref": "clause reference e.g. 15.4.1",\n          "requirement": "what must be done",\n          "evidence": "what evidence is needed"\n        }\n      ]\n    }\n  ]\n}`
+        }]
+      })
+    });
+    var data=await resp.json();
+    var raw=data.content&&data.content[0]&&data.content[0].text||'{}';
+    var clean=raw.replace(/```json|```/g,'').trim();
+    var parsed=JSON.parse(clean);
+    var sections=parsed.sections||[];
+    // Log token usage
+    if(data.usage)dbLogAiUsage(_pNum,'specifications','compliance_checklist',data.usage);
+
+    // Store on spec
+    var s2=getActiveSpec();
+    if(s2)s2.complianceClauses=sections;
+    save();
+
+    status.textContent=sections.reduce(function(t,s){return t+s.clauses.length;},0)+' clauses extracted';
+
+    results.innerHTML=sections.map(function(sec){
+      return '<div class="compliance-section">'
+        +'<div class="compliance-section-hdr">'+escH(sec.heading)+'</div>'
+        +sec.clauses.map(function(cl){
+          return '<div class="clause-row">'
+            +'<span class="clause-ref-badge">'+escH(cl.ref)+'</span>'
+            +'<div class="clause-text"><strong>'+escH(cl.requirement)+'</strong>'
+              +(cl.evidence?'<div style="font-size:11px;color:var(--muted);margin-top:3px">Evidence: '+escH(cl.evidence)+'</div>':'')
+            +'</div>'
+            +'<div class="clause-status"><select class="cs-sel" onchange="updateClauseStatus(\''+escH(cl.ref)+'\',this.value)">'
+              +'<option value="">Pending</option>'
+              +'<option value="compliant">✓ Compliant</option>'
+              +'<option value="nc">✕ Non-compliant</option>'
+              +'<option value="rfi">RFI Raised</option>'
+              +'<option value="na">N/A</option>'
+            +'</select></div>'
+            +'</div>';
+        }).join('')
+        +'</div>';
+    }).join('');
+  }catch(e){
+    status.textContent='Error';
+    results.innerHTML='<div style="color:var(--danger);padding:20px">Error: '+escH(e.message)+'</div>';
+  }
+}
+
+function updateClauseStatus(ref,status){
+  var s=getActiveSpec();if(!s)return;
+  // Find and update in complianceClauses
+  (s.complianceClauses||[]).forEach(function(sec){
+    (sec.clauses||[]).forEach(function(cl){
+      if(cl.ref===ref)cl.status=status;
+    });
+  });
+  save();
+}
+
+// ── EXPORT COMPLIANCE PDF ──
+async function exportCompliancePDF(){
+  var s=getActiveSpec();
+  if(!s){showToast('Select a specification first');return;}
+  if(!s.complianceClauses||!s.complianceClauses.length){
+    showToast('Generate the compliance checklist first');
+    showTab('compliance');return;
+  }
+  if(typeof PDFLib==='undefined'){showToast('PDF library not loaded');return;}
+
+  showToast('Building compliance report…');
+  var {PDFDocument,rgb,StandardFonts}=PDFLib;
+  var pdf=await PDFDocument.create();
+  var font=await pdf.embedFont(StandardFonts.Helvetica);
+  var bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+  var W=595,H=842;
+
+  var page=pdf.addPage([W,H]);
+  page.drawRectangle({x:0,y:H-70,width:W,height:70,color:rgb(0.039,0.071,0.118)});
+  page.drawText('SPECIFICATION COMPLIANCE SUMMARY',{x:20,y:H-30,size:13,font:bold,color:rgb(0,0.898,0.627)});
+  page.drawText(s.title+' · '+s.docNo,{x:20,y:H-46,size:10,font:font,color:rgb(0.7,0.8,0.9)});
+  page.drawText((_proj.name||'')+' · Generated '+new Date().toLocaleDateString('en-AU'),{x:20,y:H-60,size:8,font:font,color:rgb(0.5,0.5,0.5)});
+
+  var y=H-100;var pageNum=1;
+  var statusColors={'compliant':rgb(0,0.9,0.627),'nc':rgb(1,0.3,0.43),'rfi':rgb(1,0.72,0.19),'na':rgb(0.5,0.5,0.5),'':rgb(0.7,0.7,0.7)};
+
+  s.complianceClauses.forEach(function(sec){
+    if(y<80){page=pdf.addPage([W,H]);y=H-40;pageNum++;}
+    page.drawText(sec.heading.toUpperCase(),{x:20,y:y,size:8,font:bold,color:rgb(0.5,0.5,0.5)});
+    y-=14;
+    (sec.clauses||[]).forEach(function(cl){
+      if(y<80){page=pdf.addPage([W,H]);y=H-40;}
+      var col=statusColors[cl.status||'']||rgb(0.7,0.7,0.7);
+      page.drawRectangle({x:20,y:y-12,width:6,height:12,color:col});
+      page.drawText((cl.ref||'—').substring(0,15),{x:32,y:y-10,size:8,font:bold,color:rgb(0.1,0.1,0.1)});
+      var reqText=(cl.requirement||'').substring(0,90);
+      page.drawText(reqText,{x:110,y:y-10,size:8,font:font,color:rgb(0.2,0.2,0.2)});
+      var statusLabel={'compliant':'COMPLIANT','nc':'NON-COMPLIANT','rfi':'RFI','na':'N/A','':'PENDING'};
+      page.drawText(statusLabel[cl.status||'']||'PENDING',{x:W-90,y:y-10,size:7,font:bold,color:col});
+      y-=16;
+    });
+    y-=8;
+  });
+
+  page.drawRectangle({x:0,y:0,width:W,height:20,color:rgb(0.039,0.071,0.118)});
+  page.drawText('Generated by HVAC Nexus · Specification Compliance Summary',{x:20,y:6,size:6,font:font,color:rgb(0.4,0.5,0.5)});
+
+  var bytes=await pdf.save();
+  var blob=new Blob([bytes],{type:'application/pdf'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=s.docNo+'_Compliance_Summary.pdf';a.click();
+  showToast('✓ Compliance report exported');
+}
+
+// ── BOOKMARKS ──
+function addBookmark(){document.getElementById('bm-clause').value='';document.getElementById('bm-note').value='';document.getElementById('bookmarkModal').classList.add('open');}
+function closeBookmarkModal(){document.getElementById('bookmarkModal').classList.remove('open');}
+function saveBookmark(){
+  var clause=document.getElementById('bm-clause').value.trim();
+  var note=document.getElementById('bm-note').value.trim();
+  if(!clause){showToast('Enter a clause reference');return;}
+  var s=getActiveSpec();if(!s)return;
+  if(!s.bookmarks)s.bookmarks=[];
+  s.bookmarks.push({id:nid(),clause,note,date:today()});
+  save();closeBookmarkModal();renderBookmarks();
+  showToast('🔖 Bookmark saved');
+}
+function renderBookmarks(){
+  var s=getActiveSpec();
+  var el=document.getElementById('bookmarkList');
+  if(!s||!s.bookmarks||!s.bookmarks.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:30px">No bookmarks yet.<br>Add clause bookmarks for quick reference.</div>';
+    return;
+  }
+  el.innerHTML=s.bookmarks.map(function(bm,i){
+    return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start">'
+      +'<span style="font-family:DM Mono,monospace;font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(0,200,255,.08);color:var(--accent);border:1px solid rgba(0,200,255,.2);cursor:pointer;flex-shrink:0" onclick="jumpToClause(\''+escH(bm.clause)+'\')">'+escH(bm.clause)+'</span>'
+      +'<div style="flex:1"><div style="font-size:13px;color:var(--text)">'+escH(bm.note||'No note')+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px">'+bm.date+'</div></div>'
+      +'<button onclick="removeBookmark('+i+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px">✕</button>'
+      +'</div>';
+  }).join('');
+}
+function removeBookmark(idx){
+  var s=getActiveSpec();if(!s)return;
+  s.bookmarks.splice(idx,1);save();renderBookmarks();
+}
+
+// ── NEW DRAFT ──
+function openNewDraftModal(){
+  var s=getActiveSpec();if(!s)return;
+  var curRev=s.revisions[s.revisions.length-1];
+  var parts=curRev.rev.match(/([A-Za-z]+\s*)([A-Z0-9]+)/);
+  var nextRev=curRev.rev;
+  if(parts){
+    var letter=parts[2];
+    if(/^[A-Z]$/.test(letter))nextRev=parts[1]+String.fromCharCode(letter.charCodeAt(0)+1);
+    else nextRev=parts[1]+String(parseInt(letter)+1).padStart(letter.length,'0');
+  }
+  document.getElementById('nd-rev').value=nextRev;
+  document.getElementById('nd-reason').value='';
+  document.getElementById('newDraftModal').classList.add('open');
+  setTimeout(function(){document.getElementById('nd-reason').focus();},80);
+}
+function closeNewDraftModal(){document.getElementById('newDraftModal').classList.remove('open');}
+function confirmNewDraft(){
+  var newRev=document.getElementById('nd-rev').value.trim();
+  var reason=document.getElementById('nd-reason').value.trim();
+  if(!newRev){showToast('Enter a revision number');return;}
+  var s=getActiveSpec();if(!s)return;
+  var curRev=s.revisions[s.revisions.length-1];
+  curRev.supersedeReason=reason||'New revision';
+  // Deep copy as new draft (no PDF yet)
+  var newRevObj=JSON.parse(JSON.stringify(curRev));
+  newRevObj.rev=newRev;newRevObj.date=today();newRevObj.supersedeReason='';
+  newRevObj.url=null;newRevObj.fileName='';newRevObj.extractedText='';
+  s.revisions.push(newRevObj);
+  save();closeNewDraftModal();_activeRevIdx=null;
+  renderSpecList();renderDetail();
+  showToast('✓ New draft '+newRev+' created — upload new PDF when ready');
+}
+
+// ── DELETE SPEC ──
+function deleteSpec(){
+  var s=getActiveSpec();if(!s)return;
+  if(!confirm('Delete "'+s.title+'"?\n\nThis cannot be undone.'))return;
+  _specs=_specs.filter(function(x){return x.id!==_activeId;});
+  _activeId=null;save();
+  document.getElementById('detailEmpty').style.display='flex';
+  document.getElementById('detWrap').style.display='none';
+  renderSpecList();
+  showToast('Specification deleted');
+}
+</script>
+</body>
+</html>

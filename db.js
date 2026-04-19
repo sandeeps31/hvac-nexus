@@ -646,3 +646,63 @@ function purgeOldDeletedFiles(filesArray, retentionDays) {
   kept.forEach(function(f) { filesArray.push(f); });
   return filesArray;
 }
+
+// ── Specifications ──
+async function dbGetSpecifications(projectNum) {
+  return await dbGetProject('specifications', projectNum) || [];
+}
+async function dbSetSpecifications(projectNum, data) {
+  return await dbSetProject('specifications', projectNum, data);
+}
+
+// ── AI USAGE LOGGING ──
+// Call after every Claude API response to track token consumption
+// usage = { input_tokens, output_tokens } from the API response
+// module = 'specifications', 'commissioning', etc.
+// action = 'qa', 'conflict_detection', 'compliance_checklist', etc.
+async function dbLogAiUsage(projectNum, module, action, usage){
+  try{
+    var companyId=null;
+    try{
+      var sess=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');
+      companyId=sess.company_id||null;
+    }catch(e){}
+
+    var inputTokens=(usage&&usage.input_tokens)||0;
+    var outputTokens=(usage&&usage.output_tokens)||0;
+    // Sonnet pricing: $3/M input, $15/M output
+    var costUsd=((inputTokens/1000000)*3)+((outputTokens/1000000)*15);
+
+    var SUPA_URL='https://qbsjrccrgkbevncvxbio.supabase.co';
+    var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+    var token=SUPA_KEY;
+    try{
+      if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token)token=_authSession.access_token;
+      else{var ss=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(ss.access_token)token=ss.access_token;}
+    }catch(e){}
+
+    await fetch(SUPA_URL+'/rest/v1/ai_usage',{
+      method:'POST',
+      headers:{
+        'apikey':SUPA_KEY,
+        'Authorization':'Bearer '+token,
+        'Content-Type':'application/json',
+        'Prefer':'return=minimal'
+      },
+      body:JSON.stringify({
+        company_id:companyId,
+        project_num:projectNum||null,
+        module:module||'unknown',
+        action:action||'query',
+        model:'claude-sonnet-4-6',
+        input_tokens:inputTokens,
+        output_tokens:outputTokens,
+        cost_usd:parseFloat(costUsd.toFixed(6)),
+        created_at:new Date().toISOString()
+      })
+    });
+  }catch(e){
+    // Silent fail — never let logging break the UI
+    console.warn('AI usage log failed:',e.message);
+  }
+}
