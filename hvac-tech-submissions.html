@@ -242,6 +242,29 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 .sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
+
+.act-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:13px;padding:3px 8px;transition:all .13s;position:relative}
+.act-btn:hover{color:var(--text);border-color:var(--text2);background:var(--surface2)}
+.act-btn.danger:hover{color:var(--danger);border-color:rgba(255,77,109,.4)}
+.act-btn .tip{position:fixed;background:var(--surface3);border:1px solid var(--border);border-radius:5px;font-size:10px;padding:2px 8px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;color:var(--text2);z-index:9999}
+.act-btn:hover .tip{opacity:1}
+.wf-track{display:flex;align-items:flex-start;gap:0;margin:12px 0 8px;flex-wrap:wrap}
+.wf-step{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;min-width:90px;padding:8px 6px;border-radius:8px;transition:background .15s;position:relative}
+.wf-step:hover{background:var(--surface2)}
+.wf-dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid var(--border);background:var(--surface2);color:var(--muted);transition:all .2s}
+.wf-dot.active{border-color:var(--accent);background:rgba(0,200,255,.12);color:var(--accent)}
+.wf-dot.done{border-color:#00e5a0;background:rgba(0,229,160,.1);color:#00e5a0}
+.wf-dot.rejected{border-color:var(--danger);background:rgba(255,77,109,.1);color:var(--danger)}
+.wf-dot.warn{border-color:var(--warn);background:rgba(255,184,48,.1);color:var(--warn)}
+.wf-dot.draft-dot{opacity:.4}
+.wf-line{flex:1;height:2px;background:var(--border);margin-top:17px;min-width:16px;transition:background .2s}
+.wf-line.done{background:#00e5a0}
+.wf-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);text-align:center}
+.wf-date{font-family:'DM Mono',monospace;font-size:10px;color:var(--text2);text-align:center}
+.wf-change{font-size:9px;color:var(--accent);opacity:0;transition:opacity .15s}
+.wf-step:hover .wf-change{opacity:1}
+.pub-btn{background:rgba(0,200,255,.1);border:1px solid rgba(0,200,255,.3);color:var(--accent);padding:5px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.pub-btn:hover{background:rgba(0,200,255,.2)}
 </style>
 <script src="head-common.js"></script>
 <script src="db.js"></script>
@@ -335,8 +358,9 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
               <th style="width:110px">Sub Date</th>
               <th style="width:110px">Type</th>
               <th>Documents</th>
+              <th style="width:100px">Approval Date</th>
               <th style="width:110px">Status</th>
-              <th style="width:36px"></th>
+              <th style="width:36px" onclick="event.stopPropagation()">Actions</th>
             </tr>
           </thead>
           <tbody id="tsBody"></tbody>
@@ -362,6 +386,18 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
           <option value="Revise & Resubmit">Revise &amp; Resubmit</option>
         </select>
         <button class="bp bsm btn" onclick="saveDetail()">💾 Save</button>
+      </div>
+    </div>
+
+    <!-- WORKFLOW TRACKER -->
+    <div style="padding:12px 28px 0">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Workflow</span>
+          <button class="pub-btn" id="publishRevBtn" onclick="publishRevision()" style="display:none">✓ Publish Revision</button>
+          <button class="bg bsm btn" id="discardDraftBtn" onclick="discardDraft()" style="display:none;color:var(--danger);border-color:rgba(255,77,109,.3)">✕ Discard Draft</button>
+        </div>
+        <div id="workflowTracker"></div>
       </div>
     </div>
 
@@ -508,6 +544,50 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.
 
     </div><!-- /det-body -->
   </div><!-- /detail-wrap -->
+
+
+<!-- STATUS CHANGE MODAL -->
+<div class="mo" id="statusChangeModal" onclick="if(event.target===this)closeStatusChangeModal()">
+  <div class="modal" style="width:520px">
+    <div class="modal-hdr">
+      <h3 id="statusChangeMoTitle">Change Status</h3>
+      <p id="statusChangeMoSub"></p>
+    </div>
+    <div class="modal-body">
+      <label class="ml" id="stChange-commentLbl">Comment</label>
+      <textarea class="mi" id="stChange-comment" rows="3" style="resize:vertical;min-height:70px" placeholder="Enter consultant feedback or notes…"></textarea>
+      <label class="ml" style="margin-top:10px">Date</label>
+      <input class="mi" id="stChange-date" type="date" style="max-width:200px"/>
+      <label class="ml" style="margin-top:10px">Attachments (optional)</label>
+      <div class="upload-zone" id="dropStChange" onclick="document.getElementById('stChangeFileInp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDropStChange(event)">
+        <input type="file" id="stChangeFileInp" multiple onchange="handleStChangeFile(this)">
+        <div class="upload-icon">📎</div>
+        <div class="upload-text">Drag & drop or <span>browse</span></div>
+      </div>
+      <div id="stChangeFileList" style="margin-top:8px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closeStatusChangeModal()">Cancel</button>
+      <button class="bp bsm btn" onclick="confirmStatusChange()">Confirm →</button>
+    </div>
+  </div>
+</div>
+
+<!-- REV HISTORY MODAL -->
+<div class="mo" id="revHistModal" onclick="if(event.target===this)closeRevHist()">
+  <div class="modal" style="width:620px">
+    <div class="modal-hdr">
+      <h3>Revision History</h3>
+      <p id="revHistTitle"></p>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div id="revHistList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closeRevHist()">Close</button>
+    </div>
+  </div>
+</div>
 
 </div><!-- /main -->
 
@@ -658,7 +738,7 @@ function today(){return new Date().toISOString().split('T')[0];}
 /* DATA */
 function save(){dbSetTechSubmissions(_tsPNum,submissions).catch(function(e){console.error(e);});}
 async function load(){try{var s=await dbGetTechSubmissions(_tsPNum);submissions=Array.isArray(s)?s:[];}catch(e){submissions=[];}}
-(async function(){if(typeof dbReady!=='undefined')await dbReady;await load();renderList();})();
+(async function(){if(typeof dbReady!=='undefined')await dbReady;await load();await loadEquipSchedule();renderList();})();
 
 /* GEN SUBMISSION NUMBER */
 function genSubNum(){
@@ -692,22 +772,25 @@ function docChips(rev){
 }
 
 /* LOAD EQUIPMENT FROM SCHEDULE */
+var _cachedEquipData=null;
+
 async function loadEquipSchedule(){
   try{
     var raw=await dbGetEquipment(_tsPNum);
     if(!raw)return null;
-    return (typeof raw==='string')?JSON.parse(raw):raw;
+    _cachedEquipData=(typeof raw==='string')?JSON.parse(raw):raw;
+    return _cachedEquipData;
   }catch(e){return null;}
 }
 
 function getEquipTypes(){
-  var eq=loadEquipSchedule();
+  var eq=_cachedEquipData;
   if(!eq||!eq.tabs)return [];
   return eq.tabs.filter(function(t){return t.rows&&t.rows.length>0;});
 }
 
 function getEquipByType(typeId){
-  var eq=loadEquipSchedule();
+  var eq=_cachedEquipData;
   if(!eq||!eq.tabs)return [];
   var tab=eq.tabs.find(function(t){return t.id===typeId;});
   return tab?tab.rows:[];
@@ -761,26 +844,46 @@ function renderList(){
 
   if(!list.length){
     var msg=submissions.length?'No results match your filters.':'No submissions yet — click <strong>＋ New Submission</strong> to get started.';
-    document.getElementById('tsBody').innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📤</div><div class="empty-title">Technical Submissions Register</div><div class="empty-sub">'+msg+'</div></div></td></tr>';
+    document.getElementById('tsBody').innerHTML='<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📤</div><div class="empty-title">Technical Submissions Register</div><div class="empty-sub">'+msg+'</div></div></td></tr>';
     return;
   }
 
   var rows='';
   list.forEach(function(s){
     var curRev=s.revisions[s.revisions.length-1];
-    rows+='<tr onclick="openDetail(\''+s.id+'\')">'
+    // Find latest approval date from statusHistory
+    var approvalEntry=(s.statusHistory||[]).filter(function(h){return h.status==='Approved';}).slice(-1)[0];
+    var approvalDate=approvalEntry?fmtDate(approvalEntry.date):'—';
+    rows+='<tr onclick="openDetail(\''+s.id+'\')" style="cursor:pointer">'
       +'<td class="ts-num">'+escH(s.num)+'</td>'
       +'<td><span class="ts-rev'+(s.revisions.length>1?' superseded':'')+'" title="'+s.revisions.length+' revision'+(s.revisions.length!==1?'s':'')+'">'+escH(curRev.rev)+'</span></td>'
       +'<td style="font-weight:500;color:var(--text)">'+escH(s.title)+'</td>'
       +'<td style="color:var(--text2);font-family:DM Mono,monospace;font-size:11px">'+fmtDate(curRev.date)+'</td>'
       +'<td style="color:var(--text2)">'+escH(s.type||'—')+'</td>'
       +'<td>'+docChips(curRev)+'</td>'
+      +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+approvalDate+'</td>'
       +'<td><span class="status-badge '+stClass(s.status)+'">'+escH(s.status)+'</span></td>'
-      +'<td onclick="event.stopPropagation()"><button onclick="openDetail(\''+s.id+'\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px" onmouseover="this.style.color=\'#00c8ff\'" onmouseout="this.style.color=\'\'">→</button></td>'
+      +'<td onclick="event.stopPropagation()" style="white-space:nowrap">'
+        +'<button class="act-btn" onclick="openDetail(\''+s.id+'\')" onmouseenter="tipPos(this,event)" onmouseleave="tipHide(this)"><span class="tip">Edit</span>✏</button> '
+        +'<button class="act-btn" onclick="openRevHistory(\''+s.id+'\')" onmouseenter="tipPos(this,event)" onmouseleave="tipHide(this)"><span class="tip">History</span>🕐</button> '
+        +'<button class="act-btn" onclick="duplicateSub(\''+s.id+'\')" onmouseenter="tipPos(this,event)" onmouseleave="tipHide(this)"><span class="tip">Copy</span>📋</button> '
+        +'<button class="act-btn danger" onclick="deleteSub(\''+s.id+'\')" onmouseenter="tipPos(this,event)" onmouseleave="tipHide(this)"><span class="tip">Delete</span>🗑</button>'
+      +'</td>'
       +'</tr>';
   });
   document.getElementById('tsBody').innerHTML=rows;
 }
+
+function tipPos(btn,e){
+  var tip=btn.querySelector('.tip');if(!tip)return;
+  var r=btn.getBoundingClientRect();
+  tip.style.left=r.left+(r.width/2)+'px';
+  tip.style.top=(r.top-28)+'px';
+  tip.style.transform='translateX(-50%)';
+  tip.style.opacity='1';
+}
+function tipHide(btn){var tip=btn.querySelector('.tip');if(tip)tip.style.opacity='0';}
+
 
 /* SHOW LIST / DETAIL */
 function showList(){
@@ -847,6 +950,15 @@ function renderDetail(){
   document.getElementById('detStatus').value=s.status;
   var supersedeBtn=document.getElementById('supersedeBtn');
   supersedeBtn.style.display=isViewingLatest()?'':'none';
+
+  // Workflow tracker
+  renderWorkflowTracker(s);
+  // Show publish / discard draft buttons
+  var pub=isRevPublished(s);
+  document.getElementById('publishRevBtn').style.display=pub?'none':'';
+  document.getElementById('discardDraftBtn').style.display=pub?'none':'';
+  // Hide old status dropdown when workflow tracker is active
+  document.getElementById('detStatus').style.display=pub?'none':'';
 
   // Rev pills
   renderRevPills(s);
@@ -1229,6 +1341,7 @@ function createSubmission(){
     type:document.getElementById('f-type').value,
     clientDocNo:document.getElementById('f-clientdoc').value.trim(),
     status:'Draft',
+    statusHistory:[],
     revisions:[{
       rev:'Rev 01',
       date:document.getElementById('f-date').value,
@@ -1327,44 +1440,85 @@ function openEquipPicker(){
 }
 
 function renderEquipPickList(tab,currentLinked){
-  var rows=tab.rows||[];
+  var allRows=tab.rows||[];
   var list=document.getElementById('equipPickList');
   pickedEquipIds=currentLinked&&currentLinked.typeId===tab.id?(currentLinked.ids||[]).slice():[];
-  updatePickSelCount();
 
-  if(!rows.length){list.innerHTML='<div class="equip-pick-empty">No items in this equipment type.</div>';return;}
+  var mfFilter='';var mdFilter='';
 
-  list.innerHTML='';
+  function doRender(){
+    var rows=allRows.filter(function(r){
+      if(mfFilter&&(r.make||r.manufacturer||'').toLowerCase().indexOf(mfFilter.toLowerCase())<0)return false;
+      if(mdFilter&&(r.model||'').toLowerCase().indexOf(mdFilter.toLowerCase())<0)return false;
+      return true;
+    });
 
-  // Select All row
-  var allRow=document.createElement('div');allRow.className='equip-pick-row';allRow.style.background='var(--surface2)';
-  var allCb=document.createElement('input');allCb.type='checkbox';allCb.id='epk-all';
-  allCb.checked=rows.every(function(r){return pickedEquipIds.indexOf(r.id||r.tag)>=0;});
-  allCb.onchange=function(){
-    if(this.checked)pickedEquipIds=rows.map(function(r){return r.id||r.tag;});
-    else pickedEquipIds=[];
-    renderEquipPickList(tab,{typeId:tab.id,ids:pickedEquipIds});
-  };
-  var allLbl=document.createElement('label');allLbl.setAttribute('for','epk-all');allLbl.style.fontSize='12px';allLbl.style.color='var(--text2)';allLbl.style.cursor='pointer';allLbl.textContent='Select all ('+rows.length+' items)';
-  allRow.appendChild(allCb);allRow.appendChild(allLbl);
-  list.appendChild(allRow);
+    list.innerHTML='';
 
-  rows.forEach(function(r){
-    var rowId=r.id||r.tag||r.equipId;
-    var row=document.createElement('div');row.className='equip-pick-row';
-    var cb=document.createElement('input');cb.type='checkbox';cb.checked=pickedEquipIds.indexOf(rowId)>=0;
-    cb.onchange=(function(rid){return function(){
-      if(this.checked){if(pickedEquipIds.indexOf(rid)<0)pickedEquipIds.push(rid);}
-      else{pickedEquipIds=pickedEquipIds.filter(function(x){return x!==rid;});}
-      updatePickSelCount();
-      document.getElementById('epk-all').checked=rows.every(function(r2){return pickedEquipIds.indexOf(r2.id||r2.tag)>=0;});
-    };})(rowId);
-    var tag=document.createElement('span');tag.className='equip-pick-tag';tag.textContent=r.tag||r.equipId||rowId;
-    var desc=document.createElement('span');desc.className='equip-pick-desc';desc.textContent=r.description||r.desc||r.name||'—';
-    var loc=document.createElement('span');loc.className='equip-pick-loc';loc.textContent=r.location||r.loc||'';
-    row.appendChild(cb);row.appendChild(tag);row.appendChild(desc);row.appendChild(loc);
-    list.appendChild(row);
-  });
+    // Filter bar
+    var filterBar=document.createElement('div');
+    filterBar.style.cssText='display:flex;gap:8px;padding:8px;background:var(--surface3);border-bottom:1px solid var(--border)';
+    var mfInp=document.createElement('input');
+    mfInp.placeholder='Filter manufacturer…';mfInp.value=mfFilter;
+    mfInp.style.cssText='flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:12px;padding:5px 9px;outline:none';
+    mfInp.oninput=function(){mfFilter=this.value;doRender();};
+    var mdInp=document.createElement('input');
+    mdInp.placeholder='Filter model…';mdInp.value=mdFilter;
+    mdInp.style.cssText='flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:12px;padding:5px 9px;outline:none';
+    mdInp.oninput=function(){mdFilter=this.value;doRender();};
+    filterBar.appendChild(mfInp);filterBar.appendChild(mdInp);
+    list.appendChild(filterBar);
+
+    if(!rows.length){
+      var empty=document.createElement('div');empty.style.cssText='padding:16px;color:var(--muted);font-size:12px;text-align:center';
+      empty.textContent='No items match filters.';list.appendChild(empty);return;
+    }
+
+    // Column header
+    var hdr=document.createElement('div');
+    hdr.style.cssText='display:grid;grid-template-columns:32px 1fr 1fr 1fr;padding:6px 10px;background:var(--surface2);border-bottom:1px solid var(--border)';
+    ['','Equipment ID','Manufacturer','Model'].forEach(function(h){
+      var s=document.createElement('span');s.style.cssText='font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)';s.textContent=h;hdr.appendChild(s);
+    });
+    list.appendChild(hdr);
+
+    // Select All
+    var allRow=document.createElement('div');
+    allRow.style.cssText='display:grid;grid-template-columns:32px 1fr;padding:7px 10px;background:var(--surface3);border-bottom:1px solid var(--border);align-items:center;cursor:pointer';
+    var allCb=document.createElement('input');allCb.type='checkbox';allCb.style.cssText='accent-color:var(--accent);width:14px;height:14px;cursor:pointer';
+    allCb.checked=rows.every(function(r){return pickedEquipIds.indexOf(r.id||r.tag||r.equipId)>=0;});
+    allCb.onchange=function(){
+      if(this.checked)rows.forEach(function(r){var id=r.id||r.tag||r.equipId;if(pickedEquipIds.indexOf(id)<0)pickedEquipIds.push(id);});
+      else{var ids=rows.map(function(r){return r.id||r.tag||r.equipId;});pickedEquipIds=pickedEquipIds.filter(function(x){return ids.indexOf(x)<0;});}
+      updatePickSelCount();doRender();
+    };
+    var allLbl=document.createElement('span');allLbl.style.cssText='font-size:12px;color:var(--text2);cursor:pointer';allLbl.textContent='Select all ('+rows.length+' items)';
+    allLbl.onclick=function(){allCb.checked=!allCb.checked;allCb.onchange.call(allCb);};
+    allRow.appendChild(allCb);allRow.appendChild(allLbl);list.appendChild(allRow);
+
+    rows.forEach(function(r){
+      var rowId=r.id||r.tag||r.equipId;
+      var row=document.createElement('div');
+      row.style.cssText='display:grid;grid-template-columns:32px 1fr 1fr 1fr;padding:7px 10px;border-bottom:1px solid var(--border);align-items:center;transition:background .1s;cursor:pointer';
+      row.onmouseover=function(){this.style.background='var(--surface2)';};
+      row.onmouseout=function(){this.style.background='';};
+      var cb=document.createElement('input');cb.type='checkbox';cb.style.cssText='accent-color:var(--accent);width:14px;height:14px;cursor:pointer';
+      cb.checked=pickedEquipIds.indexOf(rowId)>=0;
+      cb.onchange=(function(rid){return function(){
+        if(this.checked){if(pickedEquipIds.indexOf(rid)<0)pickedEquipIds.push(rid);}
+        else{pickedEquipIds=pickedEquipIds.filter(function(x){return x!==rid;});}
+        updatePickSelCount();
+      };})(rowId);
+      row.onclick=function(e){if(e.target!==cb){cb.checked=!cb.checked;cb.onchange.call(cb);}};
+      var tag=document.createElement('span');tag.style.cssText='font-family:DM Mono,monospace;font-size:11px;color:var(--accent)';tag.textContent=r.tag||r.equipId||rowId;
+      var mf=document.createElement('span');mf.style.cssText='font-size:12px;color:var(--text2)';mf.textContent=r.make||r.manufacturer||'—';
+      var md=document.createElement('span');md.style.cssText='font-size:12px;color:var(--text2)';md.textContent=r.model||'—';
+      row.appendChild(cb);row.appendChild(tag);row.appendChild(mf);row.appendChild(md);
+      list.appendChild(row);
+    });
+    updatePickSelCount();
+  }
+  doRender();
 }
 
 function updatePickSelCount(){
@@ -1384,6 +1538,200 @@ function confirmEquipLink(){
 
 function closeEquipPicker(){document.getElementById('equipPickModal').classList.remove('open');}
 
+
+/* ── WORKFLOW ── */
+var WF_STEPS=[
+  {k:'Draft',    icon:'✏', label:'Draft'},
+  {k:'Submitted',icon:'📤',label:'Submitted'},
+  {k:'Approved', icon:'✓', label:'Approved'},
+  {k:'Rejected', icon:'✕', label:'Rejected'},
+  {k:'Revise & Resubmit',icon:'↩',label:'Revise & Resubmit'}
+];
+var WF_NEEDS_COMMENT=['Approved','Rejected','Revise & Resubmit','Submitted'];
+var WF_COMMENT_REQUIRED=['Rejected','Revise & Resubmit'];
+var _pendingStatus='';
+var _stChangeFiles=[];
+
+function isRevPublished(s){
+  // A submission is "published" (workflow active) when status is not Draft
+  return s&&s.status&&s.status!=='Draft';
+}
+
+function renderWorkflowTracker(s){
+  var el=document.getElementById('workflowTracker');if(!el)return;
+  var pub=isRevPublished(s);
+  if(!pub){
+    el.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:6px 0">'
+      +'<span style="background:var(--surface3);border:1px solid var(--border);border-radius:20px;font-family:DM Mono,monospace;font-size:10px;padding:4px 14px;color:var(--muted)">✏ Draft — publish revision to begin status tracking</span>'
+      +'</div>';
+    return;
+  }
+  var history=s.statusHistory||[];
+  var MAIN=['Submitted','Approved','Rejected','Revise & Resubmit'];
+  var html='<div class="wf-track">';
+  MAIN.forEach(function(step,i){
+    var entry=history.filter(function(h){return h.status===step;}).slice(-1)[0];
+    var isCurrent=s.status===step;
+    var isDone=!!entry;
+    var dotCls=isCurrent?(step==='Rejected'?'rejected':step==='Revise & Resubmit'?'warn':'active')
+               :isDone?(step==='Rejected'?'rejected':step==='Revise & Resubmit'?'warn':'done'):'draft-dot';
+    var icon=WF_STEPS.find(function(w){return w.k===step;})||{icon:'○'};
+    if(i>0)html+='<div class="wf-line'+(isDone?' done':'')+'"></div>';
+    html+='<div class="wf-step" onclick="openStatusChangeFor(\''+step+'\')" title="Set '+step+'">'
+      +'<div class="wf-dot '+dotCls+'">'+icon.icon+'</div>'
+      +'<div class="wf-lbl">'+step+'</div>'
+      +(entry?'<div class="wf-date">'+fmtDate(entry.date)+'</div>':'<div class="wf-date" style="opacity:.4">—</div>')
+      +'<div class="wf-change">Set →</div>'
+      +'</div>';
+  });
+  html+='</div>';
+  // Show feedback entries
+  var feedbacks=history.filter(function(h){return h.comment||(h.files&&h.files.length);});
+  if(feedbacks.length){
+    html+='<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">';
+    feedbacks.slice().reverse().forEach(function(h){
+      html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 14px">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 7px;border-radius:20px;background:var(--surface3);color:var(--muted)">'+escH(h.status)+'</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--text2)">'+fmtDate(h.date)+'</span>'
+        +'</div>'
+        +(h.comment?'<div style="font-size:12px;color:var(--text);line-height:1.5">'+escH(h.comment)+'</div>':'')
+        +((h.files&&h.files.length)?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+h.files.map(function(f){return '<span style="font-size:11px;color:var(--accent);font-family:DM Mono,monospace">📎 '+escH(f.name)+'</span>';}).join('')+'</div>':'')
+        +'</div>';
+    });
+    html+='</div>';
+  }
+  el.innerHTML=html;
+}
+
+function publishRevision(){
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  if(!confirm('Publish this revision? The workflow tracker will be activated and status tracking will begin.'))return;
+  s.status='Submitted';
+  s.statusHistory=s.statusHistory||[];
+  s.statusHistory.push({status:'Submitted',date:today(),comment:'',files:[]});
+  save();renderDetail();renderList();
+  showTsToast('✓ Revision published — status set to Submitted');
+}
+
+function discardDraft(){
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  if(!confirm('Discard this draft? The submission will be deleted.'))return;
+  submissions=submissions.filter(function(x){return x.id!==activeId;});
+  save();showList();
+  showTsToast('Draft discarded');
+}
+
+function openStatusChangeFor(status){
+  if(!isViewingLatest())return;
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  if(!isRevPublished(s)){showTsToast('Publish the revision first');return;}
+  _pendingStatus=status;_stChangeFiles=[];
+  var titles={Submitted:'Mark as Submitted',Approved:'Mark as Approved',Rejected:'Mark as Rejected','Revise & Resubmit':'Mark as Revise & Resubmit'};
+  var subs={Submitted:'Record the submission date.',Approved:'Record approval date and consultant notes.',Rejected:'Record rejection date and feedback.',
+    'Revise & Resubmit':'Record date and comments for resubmission.'};
+  document.getElementById('statusChangeMoTitle').textContent=titles[status]||status;
+  document.getElementById('statusChangeMoSub').textContent=subs[status]||'';
+  var lbl=document.getElementById('stChange-commentLbl');
+  lbl.textContent=WF_COMMENT_REQUIRED.includes(status)?'Comment *':'Comment';
+  document.getElementById('stChange-date').value=today();
+  document.getElementById('stChange-comment').value='';
+  document.getElementById('stChangeFileList').innerHTML='';
+  document.getElementById('statusChangeModal').classList.add('open');
+  setTimeout(function(){document.getElementById('stChange-comment').focus();},80);
+}
+
+function closeStatusChangeModal(){document.getElementById('statusChangeModal').classList.remove('open');_stChangeFiles=[];}
+
+function handleDropStChange(e){
+  e.preventDefault();document.getElementById('dropStChange').classList.remove('drag-over');
+  Array.from(e.dataTransfer.files).forEach(function(f){addStChangeFile(f);});
+}
+function handleStChangeFile(inp){Array.from(inp.files).forEach(function(f){addStChangeFile(f);});inp.value='';}
+function addStChangeFile(f){
+  _stChangeFiles.push({name:f.name,size:formatBytes(f.size)});
+  renderStChangeFiles();
+}
+function renderStChangeFiles(){
+  var el=document.getElementById('stChangeFileList');
+  el.innerHTML=_stChangeFiles.map(function(f,i){
+    return '<div class="file-row">'
+      +'<span class="file-icon">'+fileIcon(f.name)+'</span>'
+      +'<span class="file-name">'+escH(f.name)+'</span>'
+      +'<span class="file-size">'+f.size+'</span>'
+      +'<button class="file-del" onclick="_stChangeFiles.splice('+i+',1);renderStChangeFiles()">✕</button>'
+      +'</div>';
+  }).join('');
+}
+
+function confirmStatusChange(){
+  var comment=document.getElementById('stChange-comment').value.trim();
+  var date=document.getElementById('stChange-date').value;
+  if(WF_COMMENT_REQUIRED.includes(_pendingStatus)&&!comment){
+    alert('A comment is required for '+_pendingStatus+' status.');
+    document.getElementById('stChange-comment').focus();return;
+  }
+  if(!date){alert('Please select a date.');return;}
+  var s=submissions.find(function(x){return x.id===activeId;});if(!s)return;
+  s.status=_pendingStatus;
+  s.statusHistory=s.statusHistory||[];
+  s.statusHistory.push({status:_pendingStatus,date:date,comment:comment,files:_stChangeFiles.slice()});
+  save();
+  closeStatusChangeModal();
+  renderDetail();renderList();
+  showTsToast('✓ Status updated to '+_pendingStatus);
+}
+
+/* ── REV HISTORY MODAL ── */
+function openRevHistory(id){
+  var s=submissions.find(function(x){return x.id===id;});if(!s)return;
+  document.getElementById('revHistTitle').textContent=s.num+' — '+s.title;
+  var list=document.getElementById('revHistList');
+  if(!s.revisions||!s.revisions.length){list.innerHTML='<div style="padding:20px;color:var(--muted);font-size:13px">No revisions.</div>';
+  }else{
+    list.innerHTML=s.revisions.slice().reverse().map(function(rv,i){
+      var isLatest=i===0;
+      var chips=docChips(rv);
+      return '<div style="padding:14px 20px;border-bottom:1px solid var(--border)">'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+        +'<span style="font-family:DM Mono,monospace;font-size:12px;font-weight:700;color:var(--accent)">'+escH(rv.rev)+'</span>'
+        +(isLatest?'<span style="background:rgba(0,229,160,.1);color:#00e5a0;border:1px solid rgba(0,229,160,.2);border-radius:20px;font-size:9px;padding:1px 8px;font-family:DM Mono,monospace">CURRENT</span>':'<span style="background:var(--surface3);color:var(--muted);border:1px solid var(--border);border-radius:20px;font-size:9px;padding:1px 8px;font-family:DM Mono,monospace">SUPERSEDED</span>')
+        +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2);margin-left:auto">'+fmtDate(rv.date)+'</span>'
+        +'</div>'
+        +(chips?'<div style="margin-bottom:6px">'+chips+'</div>':'')
+        +(rv.leadTime?'<div style="font-size:11px;color:var(--text2)">Lead Time: '+escH(rv.leadTime)+' weeks</div>':'')
+        +((rv.warranty&&(rv.warranty.partsYears||rv.warranty.labourYears))?'<div style="font-size:11px;color:var(--text2)">Warranty: '+[rv.warranty.partsYears?'Parts '+rv.warranty.partsYears:'',rv.warranty.labourYears?'Labour '+rv.warranty.labourYears:''].filter(Boolean).join(' · ')+'</div>':'')
+        +(rv.supersedeReason?'<div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic">Superseded: '+escH(rv.supersedeReason)+'</div>':'')
+        +'</div>';
+    }).join('');
+  }
+  document.getElementById('revHistModal').classList.add('open');
+}
+function closeRevHist(){document.getElementById('revHistModal').classList.remove('open');}
+
+/* ── DELETE / DUPLICATE ── */
+function deleteSub(id){
+  var s=submissions.find(function(x){return x.id===id;});if(!s)return;
+  if(!confirm('Delete "'+s.num+' — '+s.title+'"?\n\nThis cannot be undone.'))return;
+  submissions=submissions.filter(function(x){return x.id!==id;});
+  save();renderList();
+  showTsToast('Submission deleted');
+}
+
+function duplicateSub(id){
+  var s=submissions.find(function(x){return x.id===id;});if(!s)return;
+  var copy=JSON.parse(JSON.stringify(s));
+  copy.id=nid();
+  copy.num=genSubNum();
+  copy.status='Draft';
+  copy.statusHistory=[];
+  // Reset each revision date
+  copy.revisions.forEach(function(rv){rv.date=today();rv.supersedeReason='';});
+  submissions.push(copy);
+  save();renderList();
+  showTsToast('✓ Copied as '+copy.num);
+}
+
 function unlinkEquip(){
   var s=submissions.find(function(x){return x.id===activeId;});
   if(!s||!confirm('Unlink the equipment schedule from this revision?'))return;
@@ -1392,7 +1740,7 @@ function unlinkEquip(){
   save();renderDetail();
 }
 
-/* EXPORT PDF */
+
 async function exportTsPdf(){
   var s=submissions.find(function(x){return x.id===activeId;});
   if(!s){alert('No submission open.');return;}
