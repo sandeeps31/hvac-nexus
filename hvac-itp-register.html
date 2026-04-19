@@ -151,7 +151,8 @@ select.mi{height:36px;appearance:auto}
         <option value="action">Action Required</option>
         <option value="closed">Closed</option>
       </select>
-      <select class="fi" id="filtType" onchange="render()"><option value="">All ITP types</option></select>
+      <select class="fi" id="filtCat" onchange="render()"><option value="">All Categories</option><option value="Installation">Installation</option><option value="Pre-Commissioning">Pre-Commissioning</option><option value="Commissioning">Commissioning</option></select>
+      <select class="fi" id="filtType" onchange="render()"><option value="">All ITP Types</option></select>
     </div>
     <div class="tbl-wrap">
       <table class="tbl">
@@ -215,17 +216,16 @@ function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[
 // ── LOAD DATA ──
 // ── COLUMNS DEFINITION ──
 var COLS=[
-  {key:'docNo',    label:'Client Doc No.',  def:true},
-  {key:'ref',      label:'ITP No.',         def:true},
-  {key:'ref',      label:'Ref No.',         def:true},
-  {key:'formNo',   label:'Form No.',        def:true},
-  {key:'itpType',  label:'ITP Type',        def:true},
-  {key:'equip',    label:'Equipment ID',    def:true},
-  {key:'building', label:'Building',        def:true},
-  {key:'location', label:'Location',        def:true},
-  {key:'subLocation',label:'Sub Location',  def:true},
-  {key:'status',   label:'Status',          def:true},
-  {key:'createdBy',label:'Created By',      def:true},
+  {key:'ref',        label:'ITP Ref',          def:true},
+  {key:'itpCategory',label:'Category',         def:true},
+  {key:'itpType',    label:'ITP Type',         def:true},
+  {key:'equip',      label:'Equipment ID',     def:true},
+  {key:'building',   label:'Building',         def:false},
+  {key:'location',   label:'Location',         def:true},
+  {key:'subLocation',label:'Sub Location',     def:false},
+  {key:'status',     label:'Status',           def:true},
+  {key:'docNo',      label:'Client Doc No.',   def:false},
+  {key:'createdBy',  label:'Created By',       def:false},
 ];
 // Load column visibility from localStorage
 var _colVis={};
@@ -288,6 +288,7 @@ async function loadAll(){
           ref:itp.ref||pin.ref||'',
           formNo:tmpl?tmpl.itpNo:(itp.itpNo||'—'),
           itpType:itp.itpType||pin.itpTypeLabel||'',
+          itpCategory:tmpl?tmpl.itpCategory||'':'',
           equip:equipId,
           docNo:resp.docNo||'',
           building:building,
@@ -314,15 +315,15 @@ async function loadAll(){
 
   var types=[...new Set(allItps.map(function(i){return i.itpType;}).filter(Boolean))].sort();
   var filtType=document.getElementById('filtType');
-  filtType.innerHTML='<option value="">All ITP types</option>'+types.map(function(t){return '<option value="'+escH(t)+'">'+escH(t)+'</option>';}).join('');
+  filtType.innerHTML='<option value="">All ITP Types</option>'+types.map(function(t){return '<option value="'+escH(t)+'">'+escH(t)+'</option>';}).join('');
 
   renderColHeaders();
   render(); // render calls renderStats with filtered data
 }
 
 function renderStats(filtered){
-  // Use filtered data if provided, else all live ITPs
-  var live=filtered?filtered.filter(function(i){return !i.deleted;}):allItps.filter(function(i){return !i.deleted;});
+  // Always use the filtered set passed in — stats reflect current filter state
+  var live=(filtered||allItps).filter(function(i){return !i.deleted;});
   var segments=[
     {key:'not-started', lbl:'Not Started', col:'#4a5a7a'},
     {key:'in-progress',  lbl:'In Progress', col:'#ffb830'},
@@ -379,15 +380,17 @@ function renderStats(filtered){
 function render(){
   var q=(document.getElementById('srch').value||'').toLowerCase();
   var fStatus=document.getElementById('filtStatus').value;
+  var fCat=(document.getElementById('filtCat')||{}).value||'';
   var fType=document.getElementById('filtType').value;
   var showDel=document.getElementById('showDeleted').checked;
 
   var filtered=allItps.filter(function(i){
     if(!showDel&&i.deleted)return false;
     if(fStatus&&i.status!==fStatus)return false;
+    if(fCat&&i.itpCategory!==fCat)return false;
     if(fType&&i.itpType!==fType)return false;
     if(q){
-      var hay=(i.ref+' '+i.itpType+' '+i.equip+' '+i.docNo+' '+i.building+' '+i.location).toLowerCase();
+      var hay=(i.ref+' '+i.itpType+' '+i.itpCategory+' '+i.equip+' '+i.docNo+' '+i.building+' '+i.location).toLowerCase();
       if(!hay.includes(q))return false;
     }
     return true;
@@ -407,7 +410,12 @@ function render(){
     var cells=vcols.map(function(c){
       var v='—';
       if(c.key==='ref')v=itp.ref||'—';
-      else if(c.key==='formNo')v=itp.formNo||'—';
+      else if(c.key==='itpCategory'){
+        var catCols={'Installation':'#00e5a0','Pre-Commissioning':'#ffb830','Commissioning':'#c4b5fd'};
+        var cat=itp.itpCategory||'';
+        if(cat)return '<td><span style="font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,.15);color:'+( catCols[cat]||'var(--muted)')+';border:1px solid '+(catCols[cat]||'var(--border)')+';opacity:.8;white-space:nowrap">'+escH(cat)+'</span></td>';
+        return '<td><span style="color:var(--muted)">—</span></td>';
+      }
       else if(c.key==='itpType')v=itp.itpType||'—';
       else if(c.key==='equip')v=itp.equip||'—';
       else if(c.key==='docNo')v=itp.docNo||'—';
@@ -416,7 +424,7 @@ function render(){
       else if(c.key==='subLocation')v=itp.subLocation||'—';
       else if(c.key==='status')return '<td><span class="badge '+badgeCls+'">'+escH(statusLbl)+'</span></td>';
       else if(c.key==='createdBy')v=itp.createdBy||'—';
-      var isMono=c.key==='ref'||c.key==='formNo'||c.key==='equip';
+      var isMono=c.key==='ref'||c.key==='equip';
       return '<td class="'+(isMono?'mono ref':'')+'">'+escH(v)+'</td>';
     }).join('');
     return '<tr class="'+(itp.deleted?'deleted':'')+'" onclick="openItp(\''+escH(itp.drawingId)+'\',\''+escH(itp.pinId)+'\',\''+escH(itp.itpNo||'')+'\',\''+escH(itp.ref||'')+'\')" title="'+(itp.deleted?'Deleted by '+escH(itp.deletedBy)+' on '+escH(itp.deletedDate):'Click to open ITP form')+'">'+cells+'</tr>';
