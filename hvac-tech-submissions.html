@@ -8,6 +8,7 @@
 <style>
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+@keyframes spin{to{transform:rotate(360deg)}}
 input[type=number]{-moz-appearance:textfield}
 input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.6;cursor:pointer}
 
@@ -928,6 +929,18 @@ function renderFileSection(type,rev){
     name.title=f.name;
     var size=document.createElement('span');size.className='file-size';size.textContent=f.size||'';
     row.appendChild(icon);row.appendChild(name);row.appendChild(size);
+    // Upload status indicator
+    if(f.uploading){
+      var upSpin=document.createElement('span');
+      upSpin.style.cssText='font-size:11px;color:var(--warn);font-family:DM Mono,monospace;margin-left:4px;animation:spin .8s linear infinite;display:inline-block';
+      upSpin.textContent='↻ uploading…';
+      row.appendChild(upSpin);
+    } else if(f.uploadError){
+      var errLbl=document.createElement('span');
+      errLbl.style.cssText='font-size:11px;color:var(--danger);font-family:DM Mono,monospace;margin-left:4px';
+      errLbl.textContent='⚠ upload failed';
+      row.appendChild(errLbl);
+    }
     // Mark Up button for PDFs with a URL
     if(f.url&&(f.name||'').toLowerCase().endsWith('.pdf')){
       var markBtn=document.createElement('button');
@@ -996,12 +1009,20 @@ async function processFiles(fileList,type){
   if(!rev.files[type])rev.files[type]=[];
   for(var i=0;i<fileList.length;i++){
     var f=fileList[i];
-    var fileEntry={name:f.name,size:formatBytes(f.size),added:today(),url:null,annotations:{}};
+    var fileEntry={name:f.name,size:formatBytes(f.size),added:today(),url:null,uploading:true,annotations:{}};
     rev.files[type].push(fileEntry);
-    // Upload to Supabase in background
-    (async function(entry,file){
-      try{entry.url=await uploadFileToSupabase(file,activeId,type);save();}catch(e){console.error('Upload failed:',e);}
-    })(fileEntry,f);
+    // Upload to Supabase — show uploading state, update on complete
+    (async function(entry,file,t){
+      try{
+        entry.url=await uploadFileToSupabase(file,activeId,t);
+        entry.uploading=false;
+      }catch(e){
+        console.error('Upload failed:',e);
+        entry.uploading=false;
+        entry.uploadError=true;
+      }
+      save();renderDetail();
+    })(fileEntry,f,type);
   }
   save();renderDetail();
 }
