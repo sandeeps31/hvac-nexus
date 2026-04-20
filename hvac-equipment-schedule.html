@@ -1857,42 +1857,60 @@ function buildAndDownloadTemplate(t,cols){
 function injectDataValidation(wbout,dvEntries,tabName,sheetName){
   function doInject(JSZip){
     function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';a.click();URL.revokeObjectURL(a.href);}
+
     new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
       var sheetKey=null;
       zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
       if(!sheetKey){fallback();return;}
-      zip.file(sheetKey).async('string').then(function(sheetXml){
-        // Patch alignment on all row 1 and row 2 cells (section headers + col headers)
-        // SheetJS free writes styles but omits <alignment> child element — patch it in
-        sheetXml=sheetXml.replace(/<c r="([A-Z]+)([12])"([^>]*)>/g,function(match,col,row,attrs){
-          return match;
-        });
-        // Inject alignment into <c> elements that already have a style attribute
-        // Row 1 = section headers (center), Row 2 = col headers (center)
-        sheetXml=sheetXml.replace(/(<c r="[A-Z]+[12]"[^>]*>)(\s*<v>[^<]*<\/v>)?(\s*<\/c>)/g,function(m,open,vTag,close){
-          // Add alignment as inline element after opening tag
-          var align='<alignment horizontal="center" vertical="center"/>';
-          if(vTag){
-            return open+'<is><t></t></is>'+vTag+close;
-          }
-          return open+close;
-        });
 
-        // Better approach — directly patch <c> elements in rows 1 and 2 to add alignment
-        // by wrapping their content with explicit alignment in the xf
-        // Since SheetJS writes s= attribute for styles, we patch those cells to include alignment
-        sheetXml=sheetXml.replace(/<row r="([12])"([^>]*)>([\s\S]*?)<\/row>/g,function(fullRow,rowNum,rowAttrs,rowContent){
-          // For each cell in this row, ensure it has an alignment element
-          var patched=rowContent.replace(/<c ([^>]*)>([\s\S]*?)<\/c>/g,function(cellMatch,cellAttrs,cellContent){
-            if(cellContent.indexOf('<alignment')<0){
-              // Insert alignment before closing </v> or at end of cell content
-              return '<c '+cellAttrs+'><alignment horizontal="center" vertical="center"/>'+cellContent+'</c>';
-            }
-            return cellMatch;
+      // Load both sheet XML and styles XML in parallel
+      Promise.all([
+        zip.file(sheetKey).async('string'),
+        zip.file('xl/styles.xml')?zip.file('xl/styles.xml').async('string'):Promise.resolve(null)
+      ]).then(function(results){
+        var sheetXml=results[0];
+        var stylesXml=results[1];
+
+        // ── PATCH styles.xml to add a centred bold style ──
+        // We add 2 new xf entries: one for section header (dark bg + white text + center)
+        // and reference them by index from the sheet
+        var centreStyleIdx=0;
+        if(stylesXml){
+          // Count existing xf entries to know what index our new ones will be
+          var xfMatch=stylesXml.match(/<cellXfs count="(\d+)"/);
+          var existingCount=xfMatch?parseInt(xfMatch[1]):0;
+          centreStyleIdx=existingCount; // our new style will be at this index
+
+          // New xf: bold white text, dark fill, centre alignment
+          var newXf='<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>';
+
+          // Insert new xf into cellXfs and increment count
+          stylesXml=stylesXml.replace(
+            /<cellXfs count="(\d+)">/,
+            function(m,n){return '<cellXfs count="'+(parseInt(n)+1)+'">';}
+          );
+          stylesXml=stylesXml.replace('</cellXfs>',newXf+'</cellXfs>');
+          zip.file('xl/styles.xml',stylesXml);
+        }
+
+        // ── PATCH sheet XML: fix s= attribute on section header row cells ──
+        // Find the first row that has a section header (row 1 for rev export, row 2 for template)
+        // and patch s= to point to our new centred style
+        if(centreStyleIdx>0){
+          // Patch rows 1 and 2 — section headers and column headers both need centre
+          sheetXml=sheetXml.replace(/<row r="([12])"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
+            var patched=content.replace(/<c r="([^"]+)" s="(\d+)"([^>]*)>/g,function(cm,ref,si,rest){
+              return '<c r="'+ref+'" s="'+centreStyleIdx+'"'+rest+'>';
+            });
+            // Also handle cells with no s= attribute
+            patched=patched.replace(/<c r="([^"]+)"(?![^>]*\bs=)([^>]*)>/g,function(cm,ref,rest){
+              return '<c r="'+ref+'" s="'+centreStyleIdx+'"'+rest+'>';
+            });
+            return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
           });
-          return '<row r="'+rowNum+'"'+rowAttrs+'>'+patched+'</row>';
-        });
+        }
 
+        // ── PATCH: data validations ──
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
         sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
         if(dvXml){
@@ -1902,6 +1920,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName){
             sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
           }
         }
+
         zip.file(sheetKey,sheetXml);
         zip.generateAsync({type:'arraybuffer'}).then(function(out){
           var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -1909,7 +1928,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName){
           a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';
           a.click();URL.revokeObjectURL(a.href);
         });
-      });
+      }).catch(function(e){console.warn('styles patch failed:',e);fallback();});
     }).catch(function(){fallback();});
   }
 
