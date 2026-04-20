@@ -1863,7 +1863,6 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName){
       zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
       if(!sheetKey){fallback();return;}
 
-      // Load both sheet XML and styles XML in parallel
       Promise.all([
         zip.file(sheetKey).async('string'),
         zip.file('xl/styles.xml')?zip.file('xl/styles.xml').async('string'):Promise.resolve(null)
@@ -1871,46 +1870,45 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName){
         var sheetXml=results[0];
         var stylesXml=results[1];
 
-        // ── PATCH styles.xml to add a centred bold style ──
-        // We add 2 new xf entries: one for section header (dark bg + white text + center)
-        // and reference them by index from the sheet
-        var centreStyleIdx=0;
+        // ── Step 1: Find which s= indices are used in rows 1 and 2 of the sheet ──
+        var headerStyleIndices={};
+        sheetXml.replace(/<row r="([12])"[^>]*>([\s\S]*?)<\/row>/g,function(m,rn,content){
+          content.replace(/<c r="[^"]+" s="(\d+)"/g,function(cm,si){headerStyleIndices[si]=true;});
+        });
+
+        // DEBUG — log styles.xml content to console
         if(stylesXml){
-          // Count existing xf entries to know what index our new ones will be
-          var xfMatch=stylesXml.match(/<cellXfs count="(\d+)"/);
-          var existingCount=xfMatch?parseInt(xfMatch[1]):0;
-          centreStyleIdx=existingCount; // our new style will be at this index
+          console.log('styles.xml cellXfs section:',stylesXml.match(/<cellXfs[\s\S]*?<\/cellXfs>/)?.[0]?.substring(0,500));
+          console.log('Header style indices found:',Object.keys(headerStyleIndices));
+        }
+        if(stylesXml&&Object.keys(headerStyleIndices).length){
+          var xfList=[];
+          stylesXml.replace(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/,function(m,inner){
+            var idx=0;
+            inner.replace(/<xf([^>]*)>([\s\S]*?)<\/xf>|<xf([^>]*)\/>/g,function(xfm,attrs1,body,attrs2){
+              xfList.push({idx:idx,full:xfm,attrs:attrs1||attrs2||'',body:body||''});
+              idx++;
+            });
+          });
 
-          // New xf: bold white text, dark fill, centre alignment
-          var newXf='<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>';
+          xfList.forEach(function(xf){
+            if(!headerStyleIndices[String(xf.idx)])return;
+            var newAttrs=xf.attrs;
+            // Set applyAlignment="1"
+            if(newAttrs.indexOf('applyAlignment')<0)newAttrs+=' applyAlignment="1"';
+            else newAttrs=newAttrs.replace(/applyAlignment="[^"]*"/,'applyAlignment="1"');
+            // Remove existing alignment child if any
+            var newBody=(xf.body||'').replace(/<alignment[^\/]*\/>/g,'').replace(/<alignment[^>]*>[\s\S]*?<\/alignment>/g,'');
+            // Add centre alignment
+            newBody+='<alignment horizontal="center" vertical="center"/>';
+            var replacement='<xf'+newAttrs+'>'+newBody+'</xf>';
+            stylesXml=stylesXml.replace(xf.full,replacement);
+          });
 
-          // Insert new xf into cellXfs and increment count
-          stylesXml=stylesXml.replace(
-            /<cellXfs count="(\d+)">/,
-            function(m,n){return '<cellXfs count="'+(parseInt(n)+1)+'">';}
-          );
-          stylesXml=stylesXml.replace('</cellXfs>',newXf+'</cellXfs>');
           zip.file('xl/styles.xml',stylesXml);
         }
 
-        // ── PATCH sheet XML: fix s= attribute on section header row cells ──
-        // Find the first row that has a section header (row 1 for rev export, row 2 for template)
-        // and patch s= to point to our new centred style
-        if(centreStyleIdx>0){
-          // Patch rows 1 and 2 — section headers and column headers both need centre
-          sheetXml=sheetXml.replace(/<row r="([12])"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
-            var patched=content.replace(/<c r="([^"]+)" s="(\d+)"([^>]*)>/g,function(cm,ref,si,rest){
-              return '<c r="'+ref+'" s="'+centreStyleIdx+'"'+rest+'>';
-            });
-            // Also handle cells with no s= attribute
-            patched=patched.replace(/<c r="([^"]+)"(?![^>]*\bs=)([^>]*)>/g,function(cm,ref,rest){
-              return '<c r="'+ref+'" s="'+centreStyleIdx+'"'+rest+'>';
-            });
-            return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
-          });
-        }
-
-        // ── PATCH: data validations ──
+        // ── Step 3: data validations ──
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
         sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
         if(dvXml){
@@ -1928,7 +1926,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName){
           a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';
           a.click();URL.revokeObjectURL(a.href);
         });
-      }).catch(function(e){console.warn('styles patch failed:',e);fallback();});
+      }).catch(function(e){console.warn('patch failed:',e);fallback();});
     }).catch(function(){fallback();});
   }
 
