@@ -1822,6 +1822,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
   var verticalMode=opts.verticalMode||false;
   var vertHeaderRow=opts.headerRow||1;
   var vertSecRows=opts.sectionRows||[];
+  var secColRanges=opts.secColRanges||[]; // [{start,end}] col indices with section name
   function doInject(JSZip){
     function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';a.click();URL.revokeObjectURL(a.href);}
     new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
@@ -1881,9 +1882,22 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           sheetXml=sheetXml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
             var rowNum=parseInt(rn);
             if(secHdrRows[rowNum]){
-              // Full row blue centred
-              var patched=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+secHdrStyle+'"'+rest+'>';});
-              return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
+              // For horizontal: only colour cells that belong to a named section
+              // For vertical: full row blue
+              if(verticalMode||!secColRanges.length){
+                var patched=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+secHdrStyle+'"'+rest+'>';});
+                return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
+              } else {
+                // Horizontal: only colour cells in section col ranges
+                var patched=content.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
+                  // Convert col letter to 0-based index
+                  var ci=0;for(var i=0;i<col.length;i++)ci=ci*26+(col.charCodeAt(i)-64);ci--;
+                  var inSec=secColRanges.some(function(r){return ci>=r.start&&ci<=r.end;});
+                  if(inSec)return '<c r="'+col+row+'" s="'+secHdrStyle+'"'+rest+'>';
+                  return cm;
+                });
+                return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
+              }
             }
             if(verticalMode){
               // Col A label style on ALL rows
@@ -2605,6 +2619,22 @@ function exportRevXLSX(){
       ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,16)};});
       ws['!freeze']={xSplit:1,ySplit:hdrRow+1,topLeftCell:colLetter(1)+(hdrRow+2),activePane:'bottomRight',state:'frozen'};
 
+      // Build section column ranges for styling — only cols with a real section name
+      var _secColRanges=[];
+      if(hasSections){
+        var _srs=null,_srn=null;
+        cols.forEach(function(c,ci){
+          var sn=c.sectionName||'';
+          if(sn!==_srn){
+            if(_srn)_secColRanges.push({start:_srs,end:ci-1});
+            _srs=ci;_srn=sn;
+          }
+        });
+        if(_srn)_secColRanges.push({start:_srs,end:cols.length-1});
+        // Keep only ranges with a real section name
+        _secColRanges=_secColRanges.filter(function(r,i){return cols[r.start].sectionName;});
+      }
+
       // Build merge ranges — only for columns that actually have a section name
       if(hasSections){
         var merges=ws['!merges']||[];
@@ -2678,14 +2708,14 @@ function exportRevXLSX(){
 
       if(dvEntries2.length){
         var wbout2=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-        injectDataValidation(wbout2,dvEntries2,sheetName,tabName,hasSections);
+        injectDataValidation(wbout2,dvEntries2,sheetName,tabName,hasSections,{secColRanges:_secColRanges});
         return;
       }
     }
 
     // Always run JSZip patch to apply alignment — even with no dropdowns
     var wboutFinal=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-    injectDataValidation(wboutFinal,[],sheetName,tabName,hasSections);
+    injectDataValidation(wboutFinal,[],sheetName,tabName,hasSections,{secColRanges:_secColRanges});
   }
 
   if(typeof XLSX==='undefined'){
