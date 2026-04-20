@@ -1769,12 +1769,15 @@ function buildAndDownloadTemplate(t,cols){
     cols.forEach(function(c,ci){
       var sn=c.sectionName||'';
       if(sn!==tplSecCur){
-        if(tplSecCur&&tplSecStart!==null&&ci-1>tplSecStart)tplMerges.push({s:{r:1,c:tplSecStart},e:{r:1,c:ci-1}});
+        if(tplSecCur!==null&&tplSecStart!==null&&ci-1>tplSecStart)tplMerges.push({s:{r:1,c:tplSecStart},e:{r:1,c:ci-1}});
         tplSecStart=ci;tplSecCur=sn;
       }
     });
-    if(tplSecCur&&tplSecStart!==null&&cols.length-1>tplSecStart)tplMerges.push({s:{r:1,c:tplSecStart},e:{r:1,c:cols.length-1}});
+    if(tplSecCur!==null&&tplSecStart!==null&&cols.length-1>tplSecStart)tplMerges.push({s:{r:1,c:tplSecStart},e:{r:1,c:cols.length-1}});
     if(tplMerges.length)ws['!merges']=tplMerges;
+    // Row height for section header row
+    ws['!rows']=ws['!rows']||[];
+    ws['!rows'][1]={hpt:20,hpx:20};
   }
 
   // Style rows: example=row0(italic grey), sections=row1(dark), headers=row1or2(dark), data starts after
@@ -1786,11 +1789,12 @@ function buildAndDownloadTemplate(t,cols){
     if(ws[exRef]&&ws[exRef].v!==undefined&&ws[exRef].v!==''){
       ws[exRef].s={font:{name:'Arial',sz:9,italic:true,color:{rgb:'999999'}},alignment:{horizontal:'left'}};
     }
-    // Section row (row 1 if hasSections) — style ALL cells including blank merged ones
+    // Section row (row 1 if hasSections) — create blank cells for merged range
     if(hasSections){
       var gRef=XLSX.utils.encode_cell({r:1,c:ci});
       var runSec2='';for(var si2=0;si2<=ci;si2++){if(rows[1][si2])runSec2=rows[1][si2];}
-      if(ws[gRef])ws[gRef].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:runSec2?'FFFFFF':'999999'}},fill:{fgColor:{rgb:runSec2?'1A2640':'0E1520'}},alignment:{horizontal:'center',vertical:'center'}};
+      if(!ws[gRef])ws[gRef]={t:'s',v:''};
+      ws[gRef].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:runSec2?'FFFFFF':'999999'}},fill:{fgColor:{rgb:runSec2?'1A2640':'0E1520'}},alignment:{horizontal:'center',vertical:'center',wrapText:false}};
     }
     // Header row
     var hRef=XLSX.utils.encode_cell({r:hdrRow,c:ci});
@@ -2595,33 +2599,32 @@ function exportRevXLSX(){
         cols.forEach(function(c,ci){
           var sn=c.sectionName||'';
           if(sn!==secName){
-            // Close previous merge if it spanned more than 1 col
-            if(secName&&secStart!==null&&ci-1>secStart){
+            if(secName!==null&&secStart!==null&&ci-1>secStart){
               merges.push({s:{r:0,c:secStart},e:{r:0,c:ci-1}});
             }
             secStart=ci;secName=sn;
           }
         });
-        // Close last group
-        if(secName&&secStart!==null&&cols.length-1>secStart){
+        if(secName!==null&&secStart!==null&&cols.length-1>secStart){
           merges.push({s:{r:0,c:secStart},e:{r:0,c:cols.length-1}});
         }
         if(merges.length)ws['!merges']=merges;
+        // Set row height for section header row
+        ws['!rows']=ws['!rows']||[];
+        ws['!rows'][0]={hpt:20,hpx:20};
       }
 
       // Styles — section header row
       for(var ci=0;ci<cols.length;ci++){
         if(hasSections){
           var gRef=colLetter(ci)+'1';
-          var secVal=(aoa[0][ci]||'');
-          // Style ALL cells in section row (even blank merged ones need styling)
-          var thisSec='';
           var runSec='';
           for(var si=0;si<=ci;si++){if(aoa[0][si])runSec=aoa[0][si];}
-          thisSec=runSec;
-          if(ws[gRef])ws[gRef].s={
-            font:{bold:true,name:'Arial',sz:10,color:{rgb:thisSec?'FFFFFF':'999999'}},
-            fill:{fgColor:{rgb:thisSec?'1A2640':'0E1520'}},
+          // Must create cell object for blank merged cells — SheetJS sparse model omits them
+          if(!ws[gRef])ws[gRef]={t:'s',v:''};
+          ws[gRef].s={
+            font:{bold:true,name:'Arial',sz:10,color:{rgb:runSec?'FFFFFF':'999999'}},
+            fill:{fgColor:{rgb:runSec?'1A2640':'0E1520'}},
             alignment:{horizontal:'center',vertical:'center',wrapText:false}
           };
         }
