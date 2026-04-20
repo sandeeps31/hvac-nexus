@@ -260,27 +260,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
           <div class="card-hdr-title">Project Areas</div>
           <div class="card-hdr-sub">Define the location hierarchy — used in equipment schedules, drawings and ITPs</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="bg bsm btn" onclick="showAreaPreview()" title="Preview all location paths">👁 Preview Paths</button>
-          <button class="bp bsm btn" onclick="addTopLevel()">＋ Add Building / Zone</button>
-        </div>
+        <button class="bg bsm btn" onclick="showAreaPreview()">👁 Preview Paths</button>
       </div>
-      <div class="card-body" style="padding:16px">
+      <div class="card-body" style="padding:0;overflow:hidden">
 
-        <!-- Level name config -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:16px">
-          <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Hierarchy Level Names</div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px" id="levelNameGrid">
-            <!-- rendered by renderLevelNames() -->
-          </div>
-          <div style="font-size:11px;color:var(--muted);margin-top:8px">Rename these to match your project — e.g. Precinct, Wing, Room</div>
+        <!-- Path bar -->
+        <div id="areaPathBar" style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);background:var(--surface2);min-height:34px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+          <span style="font-style:italic">Select an area to see full path</span>
         </div>
 
-        <!-- Tree -->
-        <div id="areaTree" style="display:flex;flex-direction:column;gap:4px"></div>
-        <div id="areaEmpty" style="text-align:center;padding:32px;color:var(--muted);font-size:13px;display:none">
-          No areas defined yet. Click "＋ Add Building / Zone" to start.
-        </div>
+        <!-- Column container -->
+        <div id="areaColsOuter" style="display:flex;overflow-x:auto;min-height:300px;border-bottom:1px solid var(--border)"></div>
+
       </div>
     </div>
 
@@ -405,7 +396,18 @@ var projects=[], proj={}, settings={}, team=[], subbies=[], contacts=[], areas=[
   try{var td=await dbGetProject('proj_settings',projectId+'_team');if(td)team=td;}catch(e){}
   try{var sd=await dbGetProject('proj_settings',projectId+'_subbies');if(sd)subbies=sd;}catch(e){}
   try{var cd=await dbGetCompanySettings();if(cd&&cd.contacts)contacts=cd.contacts;}catch(e){}
-  try{var ad=await dbGetProject('proj_settings',projectId+'_areas');if(ad)areas=ad;}catch(e){}
+  try{
+    var ad=await dbGetProject('proj_settings',projectId+'_areas');
+    if(ad){
+      // Migrate old flat string array to tree format
+      if(Array.isArray(ad)&&ad.length&&typeof ad[0]==='string'){
+        areas=ad.map(function(s){return{id:nidArea(),name:s,children:[]};});
+        saveAreas(); // save migrated format
+      } else {
+        areas=ad;
+      }
+    }
+  }catch(e){}
   loadFields();renderTeam();renderSubbies();renderAreas();
 })();
 
@@ -547,99 +549,176 @@ function saveAreas(){
   dbSetProject('proj_settings',projectId+'_areas',areas).catch(function(e){console.error(e);});
 }
 
-var DEFAULT_LEVEL_NAMES=['Building','Level','Zone','Room'];
-function getLevelNames(){
-  return (settings.areaLevelNames&&settings.areaLevelNames.length===4)?settings.areaLevelNames:DEFAULT_LEVEL_NAMES.slice();
-}
-function renderLevelNames(){
-  var ln=getLevelNames();
-  var grid=document.getElementById('levelNameGrid');if(!grid)return;
-  grid.innerHTML=ln.map(function(name,i){
-    return '<div>'
-      +'<label style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Level '+(i+1)+'</label>'
-      +'<input style="width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;padding:6px 10px;outline:none;box-sizing:border-box" '
-      +'value="'+escH(name)+'" placeholder="'+DEFAULT_LEVEL_NAMES[i]+'" '
-      +'oninput="updateLevelName('+i+',this.value)">'
-      +'</div>';
-  }).join('');
-}
-function updateLevelName(idx,val){
-  if(!settings.areaLevelNames)settings.areaLevelNames=getLevelNames();
-  settings.areaLevelNames[idx]=val||DEFAULT_LEVEL_NAMES[idx];
-  saveSettings();renderAreas();
-}
+// ── AREA HIERARCHY — Column UI ──
+var AREA_LABELS=['Area 1','Area 2','Area 3','Area 4'];
+var AREA_COLORS=[
+  {bg:'rgba(59,130,246,.1)',border:'rgba(59,130,246,.3)',text:'#3b82f6'},
+  {bg:'rgba(0,229,160,.1)',border:'rgba(0,229,160,.3)',text:'#00e5a0'},
+  {bg:'rgba(255,184,48,.1)',border:'rgba(255,184,48,.3)',text:'#ffb830'},
+  {bg:'rgba(167,139,250,.1)',border:'rgba(167,139,250,.3)',text:'#a78bfa'}
+];
+var _areaSelected=[];
+var _areaDragSrc=null,_areaDragDepth=null;
+
 function nidArea(){return 'a'+Date.now()+'_'+Math.random().toString(36).slice(2,5);}
-function addTopLevel(){
-  if(!Array.isArray(areas))areas=[];
-  areas.push({id:nidArea(),name:'',children:[]});
-  saveAreas();renderAreas();
-  setTimeout(function(){var inputs=document.querySelectorAll('.area-name-input');if(inputs.length)inputs[inputs.length-1].focus();},50);
-}
-function addChild(parentId){
-  function addTo(nodes){
-    for(var i=0;i<nodes.length;i++){
-      if(nodes[i].id===parentId){if(!nodes[i].children)nodes[i].children=[];nodes[i].children.push({id:nidArea(),name:'',children:[]});return true;}
-      if(nodes[i].children&&addTo(nodes[i].children))return true;
-    }
+
+function areaGetChildren(depth,path){
+  var nodes=areas;
+  for(var i=0;i<path.length;i++){
+    var f=nodes.find(function(n){return n.id===path[i];});
+    if(!f||!f.children)return [];
+    nodes=f.children;
   }
-  addTo(areas);saveAreas();renderAreas();
-  setTimeout(function(){var inputs=document.querySelectorAll('.area-name-input');if(inputs.length)inputs[inputs.length-1].focus();},50);
+  return nodes;
 }
-function deleteNode(nodeId){
-  function removeFrom(nodes){
-    for(var i=0;i<nodes.length;i++){
-      if(nodes[i].id===nodeId){nodes.splice(i,1);return true;}
-      if(nodes[i].children&&removeFrom(nodes[i].children))return true;
-    }
+
+function areaFindNode(id,nodes){
+  nodes=nodes||areas;
+  for(var i=0;i<nodes.length;i++){
+    if(nodes[i].id===id)return nodes[i];
+    if(nodes[i].children){var r=areaFindNode(id,nodes[i].children);if(r)return r;}
   }
-  removeFrom(areas);saveAreas();renderAreas();
+  return null;
 }
-function updateNodeName(nodeId,val){
-  function find(nodes){
-    for(var i=0;i<nodes.length;i++){
-      if(nodes[i].id===nodeId){nodes[i].name=val;return true;}
-      if(nodes[i].children&&find(nodes[i].children))return true;
-    }
+
+function areaRemoveNode(id,nodes){
+  nodes=nodes||areas;
+  for(var i=0;i<nodes.length;i++){
+    if(nodes[i].id===id){nodes.splice(i,1);return true;}
+    if(nodes[i].children&&areaRemoveNode(id,nodes[i].children))return true;
   }
-  find(areas);saveAreas();
+  return false;
 }
+
 function renderAreas(){
-  renderLevelNames();
-  var tree=document.getElementById('areaTree');
-  var empty=document.getElementById('areaEmpty');
-  if(!tree)return;
-  if(!Array.isArray(areas)||!areas.length){tree.innerHTML='';if(empty)empty.style.display='';return;}
-  if(empty)empty.style.display='none';
-  tree.innerHTML=renderNodes(areas,0,getLevelNames());
+  renderAreaPath();
+  renderAreaCols();
 }
-function renderNodes(nodes,depth,ln){
-  if(!nodes||!nodes.length)return '';
+
+function renderAreaPath(){
+  var segs=[];
+  _areaSelected.forEach(function(id){var n=areaFindNode(id);if(n)segs.push(n.name||'Unnamed');});
+  var pb=document.getElementById('areaPathBar');if(!pb)return;
+  if(!segs.length){
+    pb.innerHTML='<span style="font-style:italic;color:var(--muted)">Select an area to see full path</span>';
+    return;
+  }
+  pb.innerHTML='<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted);margin-right:4px">PATH</span>'
+    +segs.map(function(s,i){
+      return (i?'<span style="color:var(--muted);margin:0 3px">&rsaquo;</span>':'')
+        +'<span style="color:var(--accent);font-family:DM Mono,monospace;font-size:12px">'+escH(s)+'</span>';
+    }).join('');
+}
+
+function renderAreaCols(){
+  var outer=document.getElementById('areaColsOuter');if(!outer)return;
+  var numCols=Math.min(_areaSelected.length+1,4);
   var html='';
-  var colors=['#3b82f6','#00e5a0','#ffb830','#a78bfa'];
-  nodes.forEach(function(node){
-    var indent=depth*28;
-    var levelLabel=ln[depth]||('Level '+(depth+1));
-    var col=colors[depth]||'var(--accent)';
-    var canAdd=depth<3;
-    html+='<div style="margin-left:'+indent+'px;margin-bottom:2px">'
-      +'<div style="display:flex;align-items:center;gap:6px">'
-      +(depth>0?'<div style="width:14px;height:2px;background:var(--border);flex-shrink:0"></div>':'')
-      +'<span style="font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid '+col+';color:'+col+';white-space:nowrap;flex-shrink:0">'+escH(levelLabel)+'</span>'
-      +'<input class="area-name-input" data-id="'+node.id+'" value="'+escH(node.name||'')+'" placeholder="'+escH(levelLabel)+' name..." '
-        +'oninput="updateNodeName(\''+node.id+'\',this.value)" '
-        +'style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;padding:6px 10px;outline:none">'
-      +(canAdd?'<button onclick="addChild(\''+node.id+'\')" title="Add '+escH(ln[depth+1]||'sub-level')+'" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:12px;padding:3px 9px;flex-shrink:0;white-space:nowrap">+ '+escH(ln[depth+1]||'Sub')+'</button>':'')
-      +'<button onclick="if(confirm(\'Delete this and all sub-areas?\'))deleteNode(\''+node.id+'\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:17px;padding:0 4px;flex-shrink:0" onmouseover="this.style.color=\'#ff4d6d\'" onmouseout="this.style.color=\'var(--muted)\'">×</button>'
-      +'</div>'
-      +(node.children&&node.children.length?renderNodes(node.children,depth+1,ln):'')
+  for(var d=0;d<numCols;d++){
+    var path=_areaSelected.slice(0,d);
+    var nodes=areaGetChildren(d,path);
+    var selId=_areaSelected[d]||null;
+    var col=AREA_COLORS[d];
+    var lbl=AREA_LABELS[d];
+    html+='<div style="min-width:190px;width:190px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--surface)">';
+    // Header
+    html+='<div style="padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;min-height:36px">'
+      +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2);font-weight:500">'+lbl+'</span>'
+      +'<span style="font-size:10px;padding:1px 8px;border-radius:20px;border:1px solid '+col.border+';color:'+col.text+';background:'+col.bg+'">'+nodes.length+'</span>'
       +'</div>';
-  });
-  return html;
+    // Nodes
+    html+='<div style="flex:1;overflow-y:auto;padding:4px" id="areaColBody'+d+'">';
+    if(!nodes.length){
+      html+='<div style="padding:20px 8px;text-align:center;font-size:12px;color:var(--muted);line-height:1.5">No entries yet</div>';
+    } else {
+      nodes.forEach(function(node){
+        var hasKids=node.children&&node.children.length>0;
+        var isSel=node.id===selId;
+        var nodeBg=isSel?col.bg:'transparent';
+        var nodeBorder=isSel?col.border:'transparent';
+        var nodeColor=isSel?col.text:'var(--text)';
+        html+='<div style="display:flex;align-items:center;gap:5px;padding:7px 8px;border-radius:7px;cursor:pointer;border:1px solid '+nodeBorder+';background:'+nodeBg+';margin-bottom:2px;color:'+nodeColor+'" '
+          +'draggable="true" data-id="'+node.id+'" data-depth="'+d+'" onclick="areaSelectNode(this.dataset.id,'+d+')">'
+          +'<span style="cursor:grab;opacity:0.4;font-size:12px;flex-shrink:0;padding:0 2px" title="Drag to reorder">&#8942;</span>'
+          +'<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">'+escH(node.name||'Unnamed')+'</span>'
+          +(hasKids||d<3?'<span style="font-size:11px;opacity:0.5;flex-shrink:0">&#8250;</span>':'')
+          +'<button data-did="'+node.id+'" onclick="event.stopPropagation();areaDelNode(this.dataset.did)" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px;padding:0 2px;flex-shrink:0;line-height:1" onmouseover="this.style.color=\'#ff4d6d\'" onmouseout="this.style.color=\'var(--muted)\'">&#215;</button>'
+          +'</div>';
+      });
+    }
+    html+='</div>';
+    // Add input
+    html+='<div style="padding:6px 8px;display:flex;gap:6px;align-items:center;border-top:1px solid var(--border)">'
+      +'<input id="areaAddInput'+d+'" placeholder="Add '+lbl.toLowerCase()+'..." data-depth="'+d+'" '
+        +'onkeydown="if(event.key===\'Enter\'){event.preventDefault();areaAddFromInput('+d+')}" '
+        +'style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;padding:5px 8px;outline:none">'
+      +'<button onclick="areaAddFromInput('+d+')" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:13px;padding:3px 8px;flex-shrink:0">+</button>'
+      +'</div>';
+    html+='</div>';
+  }
+  outer.innerHTML=html;
+  areaAttachDrag();
 }
+
+function areaSelectNode(id,depth){
+  _areaSelected=_areaSelected.slice(0,depth);
+  _areaSelected[depth]=id;
+  renderAreas();
+}
+
+function areaAddFromInput(depth){
+  var inp=document.getElementById('areaAddInput'+depth);
+  if(!inp)return;
+  var val=inp.value.trim();if(!val)return;
+  var path=_areaSelected.slice(0,depth);
+  var nodes=areaGetChildren(depth,path);
+  nodes.push({id:nidArea(),name:val,children:[]});
+  if(depth===0)areas=nodes;
+  else{var p=areaFindNode(_areaSelected[depth-1]);if(p)p.children=nodes;}
+  inp.value='';
+  saveAreas();renderAreas();
+}
+
+function areaDelNode(id){
+  if(!confirm('Delete this area and all sub-areas?'))return;
+  areaRemoveNode(id);
+  _areaSelected=_areaSelected.filter(function(sid){return sid!==id;});
+  saveAreas();renderAreas();
+}
+
+function areaAttachDrag(){
+  var els=document.querySelectorAll('[data-id][draggable]');
+  els.forEach(function(el){
+    el.addEventListener('dragstart',function(e){
+      _areaDragSrc=el.dataset.id;_areaDragDepth=+el.dataset.depth;
+      setTimeout(function(){el.style.opacity='0.4';},0);
+      e.dataTransfer.effectAllowed='move';
+    });
+    el.addEventListener('dragend',function(){el.style.opacity='';_areaDragSrc=null;});
+    el.addEventListener('dragover',function(e){
+      e.preventDefault();
+      if(+el.dataset.depth===_areaDragDepth)el.style.outline='2px solid var(--accent)';
+    });
+    el.addEventListener('dragleave',function(){el.style.outline='';});
+    el.addEventListener('drop',function(e){
+      e.preventDefault();el.style.outline='';
+      if(!_areaDragSrc||_areaDragSrc===el.dataset.id||+el.dataset.depth!==_areaDragDepth)return;
+      var path=_areaSelected.slice(0,_areaDragDepth);
+      var siblings=areaGetChildren(_areaDragDepth,path);
+      var fi=siblings.findIndex(function(n){return n.id===_areaDragSrc;});
+      var ti=siblings.findIndex(function(n){return n.id===el.dataset.id;});
+      if(fi<0||ti<0)return;
+      var moved=siblings.splice(fi,1)[0];
+      siblings.splice(ti,0,moved);
+      saveAreas();renderAreas();
+    });
+  });
+}
+
 function getAllLocationPaths(){
   var paths=[];
   function walk(nodes,prefix){
-    nodes.forEach(function(node){
+    (nodes||[]).forEach(function(node){
       if(!node.name)return;
       var path=prefix?prefix+' > '+node.name:node.name;
       paths.push(path);
@@ -649,15 +728,21 @@ function getAllLocationPaths(){
   walk(areas,'');
   return paths;
 }
+
 function showAreaPreview(){
   var paths=getAllLocationPaths();
   var list=document.getElementById('areaPreviewList');
   if(!paths.length){list.innerHTML='<div style="color:var(--muted);font-size:13px">No areas defined yet.</div>';}
-  else{list.innerHTML=paths.map(function(p){var d=(p.match(/>/g)||[]).length;return '<div style="margin-left:'+(d*16)+'px;padding:5px 10px;background:var(--surface2);border-radius:6px;font-family:DM Mono,monospace;font-size:12px;color:var(--text2);margin-bottom:3px">'+(d?'<span style="color:var(--muted);margin-right:6px">&rsaquo;</span>':'')+escH(p)+'</div>';}).join('');}
+  else{list.innerHTML=paths.map(function(p){
+    var d=(p.match(/>/g)||[]).length;
+    return '<div style="margin-left:'+(d*16)+'px;padding:5px 10px;background:var(--surface2);border-radius:6px;font-family:DM Mono,monospace;font-size:12px;color:var(--text2);margin-bottom:3px">'
+      +(d?'<span style="color:var(--muted);margin-right:6px">&rsaquo;</span>':'')+escH(p)+'</div>';
+  }).join('');}
   document.getElementById('areaPreviewModal').classList.add('open');
 }
 function closeAreaPreview(){document.getElementById('areaPreviewModal').classList.remove('open');}
-function addArea(){addTopLevel();}
+function addArea(){areaAddFromInput(0);}
+
 
 
 function showToast(msg) {
