@@ -401,18 +401,11 @@ body.sb-sm{padding-left:var(--sb-sm)}
     <div class="mh3">Export Revision</div>
     <div class="msub" id="exportRevSubtitle"></div>
     <!-- Tracked changes toggle — only shown when a draft exists -->
-    <div id="exportTrackToggleWrap" style="display:none;margin:14px 0 4px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 14px">
-      <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Change Tracking</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-          <input type="radio" name="exportTrack" id="exportTrackYes" value="tracked" checked style="accent-color:var(--accent)">
-          <span><strong>With changes tracked</strong> — shows green/yellow/red highlights</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-          <input type="radio" name="exportTrack" id="exportTrackNo" value="clean">
-          <span><strong>Clean copy</strong> — no highlights, final presentation format</span>
-        </label>
-      </div>
+    <div id="exportTrackToggleWrap" style="display:none;margin:14px 0 4px">
+      <button id="exportTrackBtn" onclick="toggleExportTrack()" style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;width:100%;cursor:pointer;text-align:left">
+        <span id="exportTrackDot" style="width:10px;height:10px;border-radius:50%;background:#00e5a0;flex-shrink:0;box-shadow:0 0 6px rgba(0,229,160,.6)"></span>
+        <span id="exportTrackLabel" style="font-size:13px;color:var(--text)">Changes tracked</span>
+      </button>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin:14px 0">
       <button class="btn bp" onclick="exportRevPDF()" style="justify-content:center">📄 Export as PDF</button>
@@ -2628,10 +2621,11 @@ function openExportModal(){
   var hasDiff=(exportingRevIdx===-1)||(exportingRevIdx>=1)||(exportingRevIdx===null&&tr&&tr.revisions.length>1&&tr.draft);
   var wrap=document.getElementById('exportTrackToggleWrap');
   if(wrap)wrap.style.display=hasDiff?'':'none';
-  // Default to tracked if draft, clean if viewing published
-  var yes=document.getElementById('exportTrackYes');
-  var no=document.getElementById('exportTrackNo');
-  if(yes&&no){yes.checked=(exportingRevIdx===-1);no.checked=(exportingRevIdx!==-1);}
+  // Reset toggle to tracked-on each time modal opens
+  _exportTracked=true;
+  var dot=document.getElementById('exportTrackDot');var lbl=document.getElementById('exportTrackLabel');
+  if(dot){dot.style.background='#00e5a0';dot.style.boxShadow='0 0 6px rgba(0,229,160,.6)';}
+  if(lbl){lbl.style.color='var(--text)';lbl.textContent='Changes tracked';}
   document.getElementById('exportRevModal').classList.add('open');
 }
 function exportRevAtIdx(idx){
@@ -2641,9 +2635,10 @@ function exportRevAtIdx(idx){
   // Show toggle if this revision has a previous one to compare against
   var wrap=document.getElementById('exportTrackToggleWrap');
   if(wrap)wrap.style.display=idx>0?'':'none';
-  var yes=document.getElementById('exportTrackYes');
-  var no=document.getElementById('exportTrackNo');
-  if(yes&&no){yes.checked=idx>0;no.checked=idx===0;}
+  _exportTracked=idx>0;
+  var dot=document.getElementById('exportTrackDot');var lbl=document.getElementById('exportTrackLabel');
+  if(dot){dot.style.background=_exportTracked?'#00e5a0':'var(--muted)';dot.style.boxShadow=_exportTracked?'0 0 6px rgba(0,229,160,.6)':'none';}
+  if(lbl){lbl.style.color=_exportTracked?'var(--text)':'var(--muted)';lbl.textContent=_exportTracked?'Changes tracked':'Untracked';}
   document.getElementById('exportRevModal').classList.add('open');
 }
 function getExportRows(){
@@ -2653,10 +2648,17 @@ function getExportRows(){
   // Include _deleted rows so they show red strikethrough in PDF/Excel
   return tab?tab.rows:[];
 }
-function isTrackedExport(){
-  var yes=document.getElementById('exportTrackYes');
-  return yes&&yes.checked;
+var _exportTracked=true;
+function toggleExportTrack(){
+  _exportTracked=!_exportTracked;
+  var dot=document.getElementById('exportTrackDot');
+  var lbl=document.getElementById('exportTrackLabel');
+  if(dot)dot.style.background=_exportTracked?'#00e5a0':'var(--muted)';
+  if(dot)dot.style.boxShadow=_exportTracked?'0 0 6px rgba(0,229,160,.6)':'none';
+  if(lbl)lbl.style.color=_exportTracked?'var(--text)':'var(--muted)';
+  if(lbl)lbl.textContent=_exportTracked?'Changes tracked':'Untracked';
 }
+function isTrackedExport(){return _exportTracked;}
 function exportRevPDF(){
   closeM('exportRevModal');
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
