@@ -1817,81 +1817,88 @@ function buildAndDownloadTemplate(t,cols){
   XLSX.writeFile(wb,'HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx');
 }
 
-function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections){
+function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts){
+  opts=opts||{};
+  var verticalMode=opts.verticalMode||false;
+  var vertHeaderRow=opts.headerRow||1;
+  var vertSecRows=opts.sectionRows||[];
   function doInject(JSZip){
     function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';a.click();URL.revokeObjectURL(a.href);}
-
     new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
       var sheetKey=null;
       zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
       if(!sheetKey){fallback();return;}
-
       Promise.all([
         zip.file(sheetKey).async('string'),
         zip.file('xl/styles.xml')?zip.file('xl/styles.xml').async('string'):Promise.resolve(null)
       ]).then(function(results){
         var sheetXml=results[0];
         var stylesXml=results[1];
-
-        // SheetJS free writes NO s= attributes and only 1 default style.
-        // We must: 1) inject new styles into styles.xml, 2) add s= to header row cells
-
         if(stylesXml){
-          // Add bold+white font
-          stylesXml=stylesXml.replace(/<fonts count="(\d+)">/,function(m,n){return '<fonts count="'+(+n+1)+'">';});
-          stylesXml=stylesXml.replace('</fonts>','<font><b/><sz val="10"/><name val="Arial"/><color rgb="FFFFFFFF"/></font></fonts>');
-          // Add dark fills (need 2 extra to avoid index conflicts with Excel reserved fills 0,1)
+          // 2 fonts needed:
+          // fIdx+0 = bold dark blue (col A label)
+          // fIdx+1 = bold white sz9 (section header)
+          stylesXml=stylesXml.replace(/<fonts count="(\d+)">/,function(m,n){return '<fonts count="'+(+n+2)+'">';});
+          stylesXml=stylesXml.replace('</fonts>',
+            '<font><b/><sz val="10"/><name val="Arial"/><color rgb="FF1E3A5F"/></font>'
+            +'<font><b/><sz val="9"/><name val="Arial"/><color rgb="FFFFFFFF"/></font>'
+            +'</fonts>');
+          // 2 fills:
+          // flIdx+0 = subtle grey-blue (col A)
+          // flIdx+1 = medium blue (section header)
           stylesXml=stylesXml.replace(/<fills count="(\d+)">/,function(m,n){return '<fills count="'+(+n+2)+'">';});
           stylesXml=stylesXml.replace('</fills>',
-            '<fill><patternFill patternType="solid"><fgColor rgb="FF0E1520"/><bgColor indexed="64"/></patternFill></fill>'
-            +'<fill><patternFill patternType="solid"><fgColor rgb="FF1A2640"/><bgColor indexed="64"/></patternFill></fill>'
+            '<fill><patternFill patternType="solid"><fgColor rgb="FFE8EDF5"/><bgColor indexed="64"/></patternFill></fill>'
+            +'<fill><patternFill patternType="solid"><fgColor rgb="FF1E3A5F"/><bgColor indexed="64"/></patternFill></fill>'
             +'</fills>');
-          var fIdx=parseInt((stylesXml.match(/<fonts count="(\d+)">/)||[0,1])[1])-1;
-          var fillsCount=parseInt((stylesXml.match(/<fills count="(\d+)">/)||[0,4])[1]);
-          var colHdrFill=fillsCount-2; // dark fill for col header
-          var secHdrFill=fillsCount-1; // darker fill for section header
-          // Add 2 new xf entries: col header style + section header style
+          var fIdx=parseInt((stylesXml.match(/<fonts count="(\d+)">/)||[0,1])[1])-2;
+          var flIdx=parseInt((stylesXml.match(/<fills count="(\d+)">/)||[0,4])[1])-2;
+          // 2 xf styles:
+          // labelStyle = col A: subtle fill, bold dark blue, left
+          // secHdrStyle = section row: medium blue fill, bold white, left
           stylesXml=stylesXml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+2)+'">';});
           stylesXml=stylesXml.replace('</cellXfs>',
-            '<xf numFmtId="0" fontId="'+fIdx+'" fillId="'+colHdrFill+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
-            +'<xf numFmtId="0" fontId="'+fIdx+'" fillId="'+secHdrFill+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            '<xf numFmtId="0" fontId="'+fIdx+'" fillId="'+flIdx+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
+            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+(flIdx+1)+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
             +'</cellXfs>');
           var totalXf=parseInt((stylesXml.match(/<cellXfs count="(\d+)">/)||[0,3])[1]);
-          var colHdrStyle=totalXf-2;
-          var secHdrStyle=totalXf-1;
+          var labelStyle=totalXf-2;   // col A: subtle bg, bold dark
+          var secHdrStyle=totalXf-1;  // section row: blue bg, bold white
           zip.file('xl/styles.xml',stylesXml);
 
-          // Determine which rows are headers based on whether sheet has a section row
-          // hasSections is in outer scope — if true: row1=section, row2=col headers
-          // if false: row1=col headers only
-          var colHdrRow=hasSections?2:1;
-          var secHdrRow=hasSections?1:null;
+          // Determine section rows
+          var secHdrRows={};
+          if(verticalMode){
+            vertSecRows.forEach(function(r){secHdrRows[r]=true;});
+          } else {
+            if(hasSections)secHdrRows[1]=true;
+          }
 
+          // Patch cells:
+          // - Section header rows: entire row gets secHdrStyle
+          // - Vertical mode data rows: col A only gets labelStyle
+          // - Row 1 (eq ID header in vertical): no style — plain text
           sheetXml=sheetXml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
             var rowNum=parseInt(rn);
-            var styleIdx=null;
-            if(rowNum===colHdrRow)styleIdx=colHdrStyle;
-            else if(secHdrRow&&rowNum===secHdrRow)styleIdx=secHdrStyle;
-            if(styleIdx===null)return full;
-            // Fix: use a simple string replace — add s= after r="..." in each cell
-            var patched=content
-              .replace(/ s="\d+"/g,'')
-              .replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){
-                return '<c r="'+ref+'" s="'+styleIdx+'"'+rest+'>';
-              });
-            return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
+            if(secHdrRows[rowNum]){
+              // Full row blue
+              var patched=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+secHdrStyle+'"'+rest+'>';});
+              return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
+            }
+            if(verticalMode&&rowNum>vertHeaderRow&&!secHdrRows[rowNum]){
+              // Col A label style only
+              var patched2=content.replace(/<c r="(A\d+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+labelStyle+'"'+rest+'>';});
+              return '<row r="'+rn+'"'+ra+'>'+patched2+'</row>';
+            }
+            return full;
           });
         }
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
         sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
         if(dvXml){
-          if(sheetXml.indexOf('</sheetData>')>=0){
-            sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
-          } else {
-            sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
-          }
+          if(sheetXml.indexOf('</sheetData>')>=0)sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
+          else sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
         }
-
         zip.file(sheetKey,sheetXml);
         zip.generateAsync({type:'arraybuffer'}).then(function(out){
           var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -2510,78 +2517,52 @@ function exportRevXLSX(){
 
       // Field rows grouped by section
       var lastSec=null;
+      var sectionRowIndices=[]; // track which dataRows indices are section headers
       cols.forEach(function(c){
         if(c.k==='tag'||c.k==='equipment_id')return;
-        // Section header row
+        // Section header row — only add if section name is non-empty
         if(c.sectionName&&c.sectionName!==lastSec){
           lastSec=c.sectionName;
           var secRow=[c.sectionName];
           rows.forEach(function(){secRow.push('');});
+          sectionRowIndices.push(dataRows.length); // 0-based index
           dataRows.push(secRow);
         }
         // Field row: label | value per equipment
         var fieldRow=[c.l+(c.unit?' ('+c.unit+')':'')];
         rows.forEach(function(r){fieldRow.push(r[c.k]||'');});
         dataRows.push(fieldRow);
-        // For dropdowns in vertical: each equipment item column for this row needs validation
-        // Store: {rowIdx, colStart, colEnd, options}
         if(dropdownMap[c.k]){
           dvMap[dataRows.length-1]={options:dropdownMap[c.k],colStart:1,colEnd:rows.length};
         }
       });
 
       ws=XLSX.utils.aoa_to_sheet(dataRows);
-      // Col widths: label col wide, equipment cols fixed
       ws['!cols']=[{wch:28}].concat(rows.map(function(){return{wch:16};}));
-
-      // Styles: row 0 = header (dark), section rows = accent, other rows = normal
-      var sectionRowIdxs={};
-      var ri2=1;
-      var ls2=null;
-      cols.forEach(function(c){
-        if(c.k==='tag'||c.k==='equipment_id')return;
-        if(c.sectionName&&c.sectionName!==ls2){ls2=c.sectionName;sectionRowIdxs[ri2]=true;ri2++;}
-        ri2++;
-      });
-      // Style header row (row 0)
-      for(var ci=0;ci<=rows.length;ci++){
-        var ref=colLetter(ci)+'1';
-        if(ws[ref])ws[ref].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0E1520'}},alignment:{horizontal:'center',vertical:'center',wrapText:true}};
-      }
-      // Style section rows
-      Object.keys(sectionRowIdxs).forEach(function(ri){
-        var rowNum=parseInt(ri)+1;
-        for(var ci=0;ci<=rows.length;ci++){
-          var ref2=colLetter(ci)+rowNum;
-          if(ws[ref2])ws[ref2].s={font:{bold:true,name:'Arial',sz:9,color:{rgb:'00C8FF'}},fill:{fgColor:{rgb:'0A1628'}},alignment:{horizontal:'left'}};
-        }
-      });
-      // Freeze first column (field labels)
       ws['!freeze']={xSplit:1,ySplit:1,topLeftCell:'B2',activePane:'bottomRight',state:'frozen'};
 
       XLSX.utils.book_append_sheet(wb,ws,sheetName);
 
-      // Build DV entries for vertical layout (row-based validation)
+      // Build DV entries
       var dvEntries=[];
       Object.keys(dvMap).forEach(function(rowIdx){
         var dv=dvMap[rowIdx];
-        var excelRow=parseInt(rowIdx)+1; // 1-indexed
+        var excelRow=parseInt(rowIdx)+1;
         var formula1='"'+dv.options.slice(0,20).map(function(o){return o.replace(/[,"]/g,'');}).join(',').substring(0,250)+'"';
-        // Each equipment column at this row
         for(var ci=dv.colStart;ci<=dv.colEnd;ci++){
           var sqref=colLetter(ci)+excelRow;
           dvEntries.push('<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'"><formula1>'+formula1.replace(/"/g,'&quot;')+'</formula1></dataValidation>');
         }
       });
 
-      if(dvEntries.length){
-        var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-        injectDataValidation(wbout,dvEntries,sheetName,tabName,hasSections);
-        return;
-      }
-      // No dropdowns but still run JSZip to apply alignment
-      var wboutV=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-      injectDataValidation(wboutV,[],sheetName,tabName,false);
+      // Always run through JSZip to apply styles (section rows + header row)
+      var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
+      injectDataValidation(wbout,dvEntries,sheetName,tabName,false,{
+        verticalMode:true,
+        headerRow:1,
+        sectionRows:sectionRowIndices.map(function(i){return i+1;})
+      });
+      return;
 
     } else {
       // ── HORIZONTAL LAYOUT: rows=equipment, cols=fields ──
