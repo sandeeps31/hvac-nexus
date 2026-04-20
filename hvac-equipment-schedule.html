@@ -1804,52 +1804,15 @@ function buildAndDownloadTemplate(t,cols){
 
   XLSX.utils.book_append_sheet(wb,ws,tabName);
 
-  // ── Inject data validation XML for dropdown columns ──
-  // xlsx is a zip — we intercept writeFile and inject the dataValidations node
-  var hasDV=Object.keys(dropdownMap).length>0;
-  if(hasDV){
-    // Data rows start at hdrRow+2 (1-indexed), apply down 500 rows
-    var dataStartRow=hdrRow+2; // 1-indexed (hdrRow is 0-based, +1 for 1-based, +1 to skip header)
-    var dvEntries=[];
-    cols.forEach(function(col,ci){
-      var opts=dropdownMap[col.k];
-      if(!opts||!opts.length)return;
-      // Excel column letter
-      var colLetter=ci<26?String.fromCharCode(65+ci):(String.fromCharCode(64+Math.floor(ci/26))+String.fromCharCode(65+(ci%26)));
-      var sqref=colLetter+dataStartRow+':'+colLetter+'1000';
-      // Options as quoted comma-separated list, max 255 chars for formula1
-      var formula1='&quot;'+opts.slice(0,20).map(function(o){return o.replace(/[&<>"]/g,'');}).join(',').substring(0,250)+'&quot;';
-      dvEntries.push(
-        '<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'">'+
-        '<formula1>'+formula1+'</formula1>'+
-        '</dataValidation>'
-      );
-    });
-
-    if(dvEntries.length){
-      // Hook into SheetJS write process via sheet XML manipulation
-      if(!ws['!dataValidations'])ws['!dataValidations']=[];
-      // SheetJS free doesn't natively support dataValidations,
-      // so we patch the worksheet XML after generation
-      var origWrite=XLSX.write;
-      XLSX.write=function(wb2,opts2){
-        var result=origWrite.call(XLSX,wb2,opts2);
-        XLSX.write=origWrite; // restore
-        return result;
-      };
-
-      // No cell comments — dropdowns are handled via XML injection
-
-      // Try JSZip approach for real dropdown injection
-      try{
-        var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-        injectDataValidation(wbout,dvEntries,tabName,t.name);
-        return; // injectDataValidation handles the download
-      }catch(err){
-        console.warn('DV injection failed, falling back:',err);
-      }
-    }
+  // Always run JSZip to apply alignment + dropdowns
+  try{
+    var wboutT=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
+    injectDataValidation(wboutT,hasDV?dvEntries:[],tabName,t.name);
+    return;
+  }catch(err){
+    console.warn('template inject failed, falling back:',err);
   }
+  XLSX.writeFile(wb,'HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx');
 
   XLSX.writeFile(wb,'HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx');
 }
@@ -1870,42 +1833,37 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName){
         var sheetXml=results[0];
         var stylesXml=results[1];
 
-        // ── Step 1: Find which s= indices are used in rows 1 and 2 of the sheet ──
-        var headerStyleIndices={};
-        sheetXml.replace(/<row r="([12])"[^>]*>([\s\S]*?)<\/row>/g,function(m,rn,content){
-          content.replace(/<c r="[^"]+" s="(\d+)"/g,function(cm,si){headerStyleIndices[si]=true;});
-        });
+        // SheetJS free writes NO s= attributes and only 1 default style.
+        // We must: 1) inject new styles into styles.xml, 2) add s= to header row cells
 
-        // DEBUG — log styles.xml content to console
         if(stylesXml){
-          console.log('styles.xml cellXfs section:',stylesXml.match(/<cellXfs[\s\S]*?<\/cellXfs>/)?.[0]?.substring(0,500));
-          console.log('Header style indices found:',Object.keys(headerStyleIndices));
+          console.log('=== BEFORE PATCH ===');
+          console.log('fonts XML:',stylesXml.match(/<fonts[^>]*>[\s\S]*?<\/fonts>/)?.[0]);
+          console.log('fills XML:',stylesXml.match(/<fills[^>]*>[\s\S]*?<\/fills>/)?.[0]);
+          console.log('cellXfs XML:',stylesXml.match(/<cellXfs[^>]*>[\s\S]*?<\/cellXfs>/)?.[0]);
+          // Sample rows 1-3 from sheet
+          var rowSample=sheetXml.match(/<row r="[123]"[\s\S]*?<\/row>/g)||[];
+          console.log('Sheet rows 1-3:',rowSample.map(function(r){return r.substring(0,200);}));
         }
-        if(stylesXml&&Object.keys(headerStyleIndices).length){
-          var xfList=[];
-          stylesXml.replace(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/,function(m,inner){
-            var idx=0;
-            inner.replace(/<xf([^>]*)>([\s\S]*?)<\/xf>|<xf([^>]*)\/>/g,function(xfm,attrs1,body,attrs2){
-              xfList.push({idx:idx,full:xfm,attrs:attrs1||attrs2||'',body:body||''});
-              idx++;
-            });
-          });
-
-          xfList.forEach(function(xf){
-            if(!headerStyleIndices[String(xf.idx)])return;
-            var newAttrs=xf.attrs;
-            // Set applyAlignment="1"
-            if(newAttrs.indexOf('applyAlignment')<0)newAttrs+=' applyAlignment="1"';
-            else newAttrs=newAttrs.replace(/applyAlignment="[^"]*"/,'applyAlignment="1"');
-            // Remove existing alignment child if any
-            var newBody=(xf.body||'').replace(/<alignment[^\/]*\/>/g,'').replace(/<alignment[^>]*>[\s\S]*?<\/alignment>/g,'');
-            // Add centre alignment
-            newBody+='<alignment horizontal="center" vertical="center"/>';
-            var replacement='<xf'+newAttrs+'>'+newBody+'</xf>';
-            stylesXml=stylesXml.replace(xf.full,replacement);
-          });
-
+          // Add dark fill for section header
+          stylesXml=stylesXml.replace(/<fills count="(\d+)">/,function(m,n){return '<fills count="'+(+n+1)+'">';});
+          stylesXml=stylesXml.replace('</fills>','<fill><patternFill patternType="solid"><fgColor rgb="FF1A2640"/><bgColor indexed="64"/></patternFill></fill></fills>');
+          // Get new font/fill indices
+          var fIdx=parseInt((stylesXml.match(/<fonts count="(\d+)">/)||[0,1])[1])-1;
+          var flIdx=parseInt((stylesXml.match(/<fills count="(\d+)">/)||[0,2])[1])-1;
+          // Add new xf with centre alignment
+          stylesXml=stylesXml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+1)+'">';});
+          stylesXml=stylesXml.replace('</cellXfs>','<xf numFmtId="0" fontId="'+fIdx+'" fillId="'+flIdx+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs>');
+          var newStyleIdx=parseInt((stylesXml.match(/<cellXfs count="(\d+)">/)||[0,1])[1])-1;
           zip.file('xl/styles.xml',stylesXml);
+
+          // Apply new style to all cells in header rows (rows 1, 2, 3)
+          sheetXml=sheetXml.replace(/<row r="([123])"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
+            var patched=content
+              .replace(/ s="[^"]*"/g,'')
+              .replace(/<c r="([^"]+)"([^/>]*)(\/?>)/g,'<c r="$1" s="'+newStyleIdx+'"$2$3');
+            return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
+          });
         }
 
         // ── Step 3: data validations ──
@@ -2606,6 +2564,9 @@ function exportRevXLSX(){
         injectDataValidation(wbout,dvEntries,sheetName,tabName);
         return;
       }
+      // No dropdowns but still run JSZip to apply alignment
+      var wboutV=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
+      injectDataValidation(wboutV,[],sheetName,tabName);
 
     } else {
       // ── HORIZONTAL LAYOUT: rows=equipment, cols=fields ──
@@ -2719,9 +2680,9 @@ function exportRevXLSX(){
       }
     }
 
-    // Fallback: no dropdowns, just download directly
-    XLSX.writeFile(wb,'HVAC_Nexus_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+revLabel.replace(/[^a-zA-Z0-9]/g,'')+'.xlsx');
-    closeM('exportRevModal');
+    // Always run JSZip patch to apply alignment — even with no dropdowns
+    var wboutFinal=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
+    injectDataValidation(wboutFinal,[],sheetName,tabName);
   }
 
   if(typeof XLSX==='undefined'){
