@@ -1854,12 +1854,12 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           var fIdx=parseInt((stylesXml.match(/<fonts count="(\d+)">/)||[0,1])[1])-2;
           var flIdx=parseInt((stylesXml.match(/<fills count="(\d+)">/)||[0,4])[1])-2;
           // 2 xf styles:
-          // labelStyle = col A: subtle fill, bold dark blue, left
-          // secHdrStyle = section row: medium blue fill, bold white, left
+          // labelStyle = col A / col headers: subtle fill, bold dark blue, left
+          // secHdrStyle = section row: medium blue fill, bold white, CENTRE
           stylesXml=stylesXml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+2)+'">';});
           stylesXml=stylesXml.replace('</cellXfs>',
             '<xf numFmtId="0" fontId="'+fIdx+'" fillId="'+flIdx+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
-            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+(flIdx+1)+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
+            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+(flIdx+1)+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
             +'</cellXfs>');
           var totalXf=parseInt((stylesXml.match(/<cellXfs count="(\d+)">/)||[0,3])[1]);
           var labelStyle=totalXf-2;   // col A: subtle bg, bold dark
@@ -1875,26 +1875,25 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           }
 
           // Patch cells:
-          // - Section header rows: entire row gets secHdrStyle
-          // - Vertical mode: col A always gets labelStyle (including row 1 Equipment ID)
-          // - Horizontal mode: row 1 (col headers) col A gets labelStyle, rest plain
+          // - Section header rows: entire row gets secHdrStyle (blue, white bold, centre)
+          // - Vertical mode: col A always gets labelStyle (including row 1)
+          // - Horizontal mode: entire col header row gets labelStyle
           sheetXml=sheetXml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
             var rowNum=parseInt(rn);
             if(secHdrRows[rowNum]){
-              // Full row blue
+              // Full row blue centred
               var patched=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+secHdrStyle+'"'+rest+'>';});
               return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
             }
             if(verticalMode){
-              // Col A gets label style on ALL rows (including row 1 = Equipment ID)
+              // Col A label style on ALL rows
               var patched2=content.replace(/<c r="(A\d+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+labelStyle+'"'+rest+'>';});
               return '<row r="'+rn+'"'+ra+'>'+patched2+'</row>';
-            }
-            if(!verticalMode){
-              // Horizontal: col A on header row(s) gets label style
-              var hdrRowNum=hasSections?2:1;
-              if(rowNum===hdrRowNum||rowNum===1){
-                var patched3=content.replace(/<c r="(A\d+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+labelStyle+'"'+rest+'>';});
+            } else {
+              // Horizontal: entire col header row gets label style
+              var colHdrRowNum=hasSections?2:1;
+              if(rowNum===colHdrRowNum){
+                var patched3=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+labelStyle+'"'+rest+'>';});
                 return '<row r="'+rn+'"'+ra+'>'+patched3+'</row>';
               }
             }
