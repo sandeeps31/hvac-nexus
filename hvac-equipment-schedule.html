@@ -1812,9 +1812,9 @@ function buildAndDownloadTemplate(t,cols){
   }catch(err){
     console.warn('template inject failed, falling back:',err);
   }
-  XLSX.writeFile(wb,'HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx');
+  XLSX.writeFile(wb,tabName.trim()+' Schedule '+revLabel+'.xlsx');
 
-  XLSX.writeFile(wb,'HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx');
+  XLSX.writeFile(wb,tabName.trim()+' Schedule '+revLabel+'.xlsx');
 }
 
 function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts){
@@ -1824,7 +1824,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
   var vertSecRows=opts.sectionRows||[];
   var secColRanges=opts.secColRanges||[]; // [{start,end}] col indices with section name
   function doInject(JSZip){
-    function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';a.click();URL.revokeObjectURL(a.href);}
+    function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=tabName.trim()+' Schedule '+sheetName.replace(tabName,'').trim()+'.xlsx';a.click();URL.revokeObjectURL(a.href);}
     new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
       var sheetKey=null;
       zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
@@ -1981,7 +1981,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
         zip.generateAsync({type:'arraybuffer'}).then(function(out){
           var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
           var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-          a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';
+          a.download=tabName.trim()+' Schedule '+sheetName.replace(tabName,'').trim()+'.xlsx';
           a.click();URL.revokeObjectURL(a.href);
         });
       }).catch(function(e){console.warn('patch failed:',e);fallback();});
@@ -2415,6 +2415,7 @@ function getExportRows(){
   return tab?tab.rows:[];
 }
 function exportRevPDF(){
+  closeM('exportRevModal');
   var tabId=activeId;var tab=tabs.find(function(t){return t.id===tabId;});
   var tr=getTabRev(tabId);
   // Use viewingRevIdx if set (viewing a specific rev), else use draft state
@@ -2505,7 +2506,7 @@ function exportRevPDF(){
         pdf.addImage(imgData,'PNG',margin,margin-(y-margin),imgW,imgH);
         y+=pageH-margin*2;
       }
-      var fname='HVAC_Nexus_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+revLabel.replace(/[^a-zA-Z0-9]/g,'')+'.pdf';
+      var fname=tabName.replace(/[^a-zA-Z0-9 ]/g,'').trim()+' Schedule '+revLabel+'.pdf';
       pdf.save(fname);
       closeM('exportRevModal');
     });
@@ -2520,6 +2521,7 @@ function exportRevPDF(){
   else tryRender();
 }
 function exportRevXLSX(){
+  closeM('exportRevModal');
   var tabId=activeId;
   var tab=tabs.find(function(t){return t.id===tabId;});
   if(!tab)return;
@@ -2754,7 +2756,7 @@ function exportRevXLSX(){
 
       // Build DV entries for horizontal layout
       var dvEntries2=[];
-      var dataStartRow=hdrRow+2; // 1-indexed
+      var dataStartRow=hdrRow+1; // hdrRow is 1-based Excel row of col header, data starts next row
       cols.forEach(function(col,ci){
         var opts=dropdownMap[col.k];
         if(!opts||!opts.length)return;
