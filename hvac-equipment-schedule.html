@@ -1837,38 +1837,55 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName){
         // We must: 1) inject new styles into styles.xml, 2) add s= to header row cells
 
         if(stylesXml){
-          console.log('=== BEFORE PATCH ===');
-          console.log('fonts XML:',stylesXml.match(/<fonts[^>]*>[\s\S]*?<\/fonts>/)?.[0]);
-          console.log('fills XML:',stylesXml.match(/<fills[^>]*>[\s\S]*?<\/fills>/)?.[0]);
-          console.log('cellXfs XML:',stylesXml.match(/<cellXfs[^>]*>[\s\S]*?<\/cellXfs>/)?.[0]);
-          var rowSample=sheetXml.match(/<row r="[123]"[\s\S]*?<\/row>/g)||[];
-          console.log('Sheet rows 1-3:',rowSample.map(function(r){return r.substring(0,200);}));
-
           // Add bold+white font
           stylesXml=stylesXml.replace(/<fonts count="(\d+)">/,function(m,n){return '<fonts count="'+(+n+1)+'">';});
           stylesXml=stylesXml.replace('</fonts>','<font><b/><sz val="10"/><name val="Arial"/><color rgb="FFFFFFFF"/></font></fonts>');
-          // Add dark fill for section header
-          stylesXml=stylesXml.replace(/<fills count="(\d+)">/,function(m,n){return '<fills count="'+(+n+1)+'">';});
-          stylesXml=stylesXml.replace('</fills>','<fill><patternFill patternType="solid"><fgColor rgb="FF1A2640"/><bgColor indexed="64"/></patternFill></fill></fills>');
-          // Get new font/fill indices
+          // Add dark fills (need 2 extra to avoid index conflicts with Excel reserved fills 0,1)
+          stylesXml=stylesXml.replace(/<fills count="(\d+)">/,function(m,n){return '<fills count="'+(+n+2)+'">';});
+          stylesXml=stylesXml.replace('</fills>',
+            '<fill><patternFill patternType="solid"><fgColor rgb="FF0E1520"/><bgColor indexed="64"/></patternFill></fill>'
+            +'<fill><patternFill patternType="solid"><fgColor rgb="FF1A2640"/><bgColor indexed="64"/></patternFill></fill>'
+            +'</fills>');
           var fIdx=parseInt((stylesXml.match(/<fonts count="(\d+)">/)||[0,1])[1])-1;
-          var flIdx=parseInt((stylesXml.match(/<fills count="(\d+)">/)||[0,2])[1])-1;
-          // Add new xf with centre alignment
-          stylesXml=stylesXml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+1)+'">';});
-          stylesXml=stylesXml.replace('</cellXfs>','<xf numFmtId="0" fontId="'+fIdx+'" fillId="'+flIdx+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs>');
-          var newStyleIdx=parseInt((stylesXml.match(/<cellXfs count="(\d+)">/)||[0,1])[1])-1;
+          var fillsCount=parseInt((stylesXml.match(/<fills count="(\d+)">/)||[0,4])[1]);
+          var colHdrFill=fillsCount-2; // dark fill for col header
+          var secHdrFill=fillsCount-1; // darker fill for section header
+          // Add 2 new xf entries: col header style + section header style
+          stylesXml=stylesXml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+2)+'">';});
+          stylesXml=stylesXml.replace('</cellXfs>',
+            '<xf numFmtId="0" fontId="'+fIdx+'" fillId="'+colHdrFill+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            +'<xf numFmtId="0" fontId="'+fIdx+'" fillId="'+secHdrFill+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            +'</cellXfs>');
+          var totalXf=parseInt((stylesXml.match(/<cellXfs count="(\d+)">/)||[0,3])[1]);
+          var colHdrStyle=totalXf-2;
+          var secHdrStyle=totalXf-1;
           zip.file('xl/styles.xml',stylesXml);
 
-          // Apply new style to all cells in header rows (rows 1, 2, 3)
-          sheetXml=sheetXml.replace(/<row r="([123])"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
+          // Determine which rows are headers based on whether sheet has a section row
+          // hasSections is in outer scope — if true: row1=section, row2=col headers
+          // if false: row1=col headers only
+          var colHdrRow=hasSections?2:1;
+          var secHdrRow=hasSections?1:null;
+
+          sheetXml=sheetXml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
+            var rowNum=parseInt(rn);
+            var styleIdx=null;
+            if(rowNum===colHdrRow)styleIdx=colHdrStyle;
+            else if(secHdrRow&&rowNum===secHdrRow)styleIdx=secHdrStyle;
+            if(styleIdx===null)return full;
+            // Fix: use a simple string replace — add s= after r="..." in each cell
             var patched=content
-              .replace(/ s="[^"]*"/g,'')
-              .replace(/<c r="([^"]+)"([^/>]*)(\/?>)/g,'<c r="$1" s="'+newStyleIdx+'"$2$3');
+              .replace(/ s="\d+"/g,'')
+              .replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){
+                return '<c r="'+ref+'" s="'+styleIdx+'"'+rest+'>';
+              });
             return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
           });
+          console.log('=== AFTER PATCH ===');
+          console.log('colHdrRow:',colHdrRow,'secHdrRow:',secHdrRow,'colHdrStyle:',colHdrStyle,'secHdrStyle:',secHdrStyle);
+          console.log('patched row 1:',sheetXml.match(/<row r="1"[\s\S]*?<\/row>/)?.[0]?.substring(0,300));
+          console.log('cellXfs after:',stylesXml.match(/<cellXfs[^>]*>[\s\S]*?<\/cellXfs>/)?.[0]?.substring(0,500));
         }
-
-        // ── Step 3: data validations ──
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
         sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
         if(dvXml){
