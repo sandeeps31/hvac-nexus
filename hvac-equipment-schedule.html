@@ -1743,9 +1743,14 @@ function buildAndDownloadTemplate(t,cols){
   var rows=[];
   // Row 0: example (shown above header as reference)
   rows.push(example);
-  // Row 1: section group headers (if any)
+  // Row 1: section group headers — only first cell of each group has value, rest blank for merge
   if(hasSections){
-    rows.push(cols.map(function(c){return c.sectionName||'';}));
+    var tplSecRow=[];var tplLastSec=null;
+    cols.forEach(function(c){
+      if(c.sectionName&&c.sectionName!==tplLastSec){tplSecRow.push(c.sectionName);tplLastSec=c.sectionName;}
+      else{tplSecRow.push('');}
+    });
+    rows.push(tplSecRow);
   }
   // Row 2/1: column headers
   rows.push(cols.map(function(c){return c.l;}));
@@ -1757,19 +1762,35 @@ function buildAndDownloadTemplate(t,cols){
   var ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,16)};});
 
+  // Add merge ranges for section header row (row index 1)
+  if(hasSections){
+    var tplMerges=ws['!merges']||[];
+    var tplSecStart=null;var tplSecCur=null;
+    cols.forEach(function(c,ci){
+      var sn=c.sectionName||'';
+      if(sn!==tplSecCur){
+        if(tplSecCur&&tplSecStart!==null&&ci-1>tplSecStart)tplMerges.push({s:{r:1,c:tplSecStart},e:{r:1,c:ci-1}});
+        tplSecStart=ci;tplSecCur=sn;
+      }
+    });
+    if(tplSecCur&&tplSecStart!==null&&cols.length-1>tplSecStart)tplMerges.push({s:{r:1,c:tplSecStart},e:{r:1,c:cols.length-1}});
+    if(tplMerges.length)ws['!merges']=tplMerges;
+  }
+
   // Style rows: example=row0(italic grey), sections=row1(dark), headers=row1or2(dark), data starts after
   // Row 0 = example (italic, light grey background)
   var hdrRow=hasSections?2:1; // header row index (0-based)
   for(var ci=0;ci<cols.length;ci++){
-    // Example row (row 0) - grey italic (SheetJS free supports font but not fill)
+    // Example row (row 0) - grey italic
     var exRef=XLSX.utils.encode_cell({r:0,c:ci});
     if(ws[exRef]&&ws[exRef].v!==undefined&&ws[exRef].v!==''){
       ws[exRef].s={font:{name:'Arial',sz:9,italic:true,color:{rgb:'999999'}},alignment:{horizontal:'left'}};
     }
-    // Section row (row 1 if hasSections)
+    // Section row (row 1 if hasSections) — style ALL cells including blank merged ones
     if(hasSections){
       var gRef=XLSX.utils.encode_cell({r:1,c:ci});
-      if(ws[gRef]&&ws[gRef].v)ws[gRef].s={font:{bold:true,name:'Arial',sz:9,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1A2640'}},alignment:{horizontal:'center'}};
+      var runSec2='';for(var si2=0;si2<=ci;si2++){if(rows[1][si2])runSec2=rows[1][si2];}
+      if(ws[gRef])ws[gRef].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:runSec2?'FFFFFF':'999999'}},fill:{fgColor:{rgb:runSec2?'1A2640':'0E1520'}},alignment:{horizontal:'center',vertical:'center'}};
     }
     // Header row
     var hRef=XLSX.utils.encode_cell({r:hdrRow,c:ci});
@@ -2539,9 +2560,20 @@ function exportRevXLSX(){
       var aoa=[];
       var hdrRow=hasSections?2:1; // 0-based index of the column header row
 
-      // Row 0: section group headers (merged spans shown as repeated values — Excel merges via styling)
+      // Row 0: section group headers — only put value in FIRST cell of each group, rest blank
+      // This is required for Excel merges to work correctly
       if(hasSections){
-        aoa.push(cols.map(function(c){return c.sectionName||'';}));
+        var secRow=[];
+        var lastSecName=null;
+        cols.forEach(function(c){
+          if(c.sectionName&&c.sectionName!==lastSecName){
+            secRow.push(c.sectionName);
+            lastSecName=c.sectionName;
+          } else {
+            secRow.push(''); // blank for merge
+          }
+        });
+        aoa.push(secRow);
       }
 
       // Row 1 (or 0): column headers
@@ -2556,12 +2588,42 @@ function exportRevXLSX(){
       ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,16)};});
       ws['!freeze']={xSplit:1,ySplit:hdrRow+1,topLeftCell:colLetter(1)+(hdrRow+2),activePane:'bottomRight',state:'frozen'};
 
-      // Styles
+      // Build merge ranges for section header row
+      if(hasSections){
+        var merges=ws['!merges']||[];
+        var secStart=null;var secName=null;
+        cols.forEach(function(c,ci){
+          var sn=c.sectionName||'';
+          if(sn!==secName){
+            // Close previous merge if it spanned more than 1 col
+            if(secName&&secStart!==null&&ci-1>secStart){
+              merges.push({s:{r:0,c:secStart},e:{r:0,c:ci-1}});
+            }
+            secStart=ci;secName=sn;
+          }
+        });
+        // Close last group
+        if(secName&&secStart!==null&&cols.length-1>secStart){
+          merges.push({s:{r:0,c:secStart},e:{r:0,c:cols.length-1}});
+        }
+        if(merges.length)ws['!merges']=merges;
+      }
+
+      // Styles — section header row
       for(var ci=0;ci<cols.length;ci++){
         if(hasSections){
           var gRef=colLetter(ci)+'1';
           var secVal=(aoa[0][ci]||'');
-          if(ws[gRef])ws[gRef].s={font:{bold:true,name:'Arial',sz:9,color:{rgb:secVal?'FFFFFF':'888888'}},fill:{fgColor:{rgb:secVal?'1A2640':'0E1520'}},alignment:{horizontal:'center'}};
+          // Style ALL cells in section row (even blank merged ones need styling)
+          var thisSec='';
+          var runSec='';
+          for(var si=0;si<=ci;si++){if(aoa[0][si])runSec=aoa[0][si];}
+          thisSec=runSec;
+          if(ws[gRef])ws[gRef].s={
+            font:{bold:true,name:'Arial',sz:10,color:{rgb:thisSec?'FFFFFF':'999999'}},
+            fill:{fgColor:{rgb:thisSec?'1A2640':'0E1520'}},
+            alignment:{horizontal:'center',vertical:'center',wrapText:false}
+          };
         }
         var hRef=colLetter(ci)+(hdrRow+1);
         if(ws[hRef])ws[hRef].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0E1520'}},alignment:{horizontal:'center',vertical:'center',wrapText:true}};
