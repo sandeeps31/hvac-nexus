@@ -344,7 +344,6 @@ body.sb-sm{padding-left:var(--sb-sm)}
 </div>
 <!-- VIEW BANNER -->
 <div class="view-banner" id="viewBanner" style="display:none">
-  <span id="viewBannerIcon">👁️</span>
   <span id="viewBannerText"></span>
   <span style="flex:1"></span>
   <button class="btn bg bsm" id="viewBannerBtn" style="display:none" onclick="viewRevision(null)">← Return to Current</button>
@@ -409,12 +408,6 @@ body.sb-sm{padding-left:var(--sb-sm)}
 </div>
 <div class="abar" id="abar" style="display:none">
   <div class="sbox" style="flex:1;min-width:0"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search equipment ID, description, location…" oninput="renderTable();updateHeaderMeta()"/></div>
-  <select class="fsel" id="stfil" onchange="renderTable()">
-    <option value="">All Statuses</option>
-    <option>Not Started</option><option>Procurement</option><option>Delivered</option>
-    <option>Installation In Progress</option><option>Installed</option>
-    <option>Commissioned</option><option>Complete</option>
-  </select>
   <select class="fsel" id="locfil" onchange="renderTable();updateHeaderMeta()"><option value="">All Locations</option></select>
   <div class="abtns">
     <div style="display:flex;align-items:center;gap:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;overflow:hidden;font-family:'DM Mono',monospace;font-size:11px" id="layoutToggle">
@@ -1395,16 +1388,17 @@ function confirmAdd(){
   setTimeout(function(){startDraftAndEdit(tabId);},100);
 }
 
-var eCols=[],dragI=null;
+var eCols=[],dragI=null,_ceIsVert=false;
+
+// Locked built-in field keys that cannot be edited or deleted
+var LOCKED_KEYS=['tag','location','sublocation','manufacturer','model','building','desc','qty'];
 
 function openColEditor(){
   var t=aTab();if(!t)return;
   var d=defn(t.type)||{name:t.name||t.type,cols:[]};
-  // Build flat eCols from sections structure, inserting section header rows
   eCols=[];
-  var isVert=t.layout==='vertical';
+  _ceIsVert=t.layout==='vertical';
   var allC=allCols(t);
-  // Group by sectionName
   var seen={};
   allC.forEach(function(c){
     if(c.key){eCols.push(Object.assign({},c,{_type:'col'}));return;}
@@ -1414,19 +1408,31 @@ function openColEditor(){
   });
   var titleEl=document.getElementById('ceTitle');
   var subEl=document.getElementById('ceSub');
-  if(titleEl)titleEl.textContent=isVert?'Row Settings':'Column Settings';
-  if(subEl)subEl.textContent=(t.name||d.name||'')+' — drag to reorder · toggle · rename · add column or section';
+  if(titleEl)titleEl.textContent=_ceIsVert?'Row Settings':'Column Settings';
+  if(subEl)subEl.textContent=(t.name||d.name||'')+' — drag to reorder · toggle · rename · add';
   var newColName=document.getElementById('newColName');
-  if(newColName)newColName.placeholder=isVert?'New row name…':'New column name…';
-  rCeList();document.getElementById('ceModal').classList.add('open');
+  if(newColName)newColName.placeholder=_ceIsVert?'New row name…':'New column name…';
+  // Update add type options based on layout
+  rCeAddOpts();
+  rCeList();
+  document.getElementById('ceModal').classList.add('open');
+}
+
+function rCeAddOpts(){
+  var sel=document.getElementById('newColType');if(!sel)return;
+  var hdrLabel=_ceIsVert?'Row Header':'Column Header';
+  sel.innerHTML='<option value="section">Section Header</option>'
+    +'<option value="text">'+hdrLabel+' · Text</option>'
+    +'<option value="num">'+hdrLabel+' · Number</option>'
+    +'<option value="dropdown">'+hdrLabel+' · Dropdown</option>';
 }
 
 function rCeList(){
   var curSection=null;
   var html='';
   eCols.forEach(function(c,i){
+    var isLocked=c.key||LOCKED_KEYS.indexOf(c.k)>=0;
     if(c._type==='section'){
-      // Close previous section
       if(curSection!==null)html+='</div>';
       curSection=i;
       html+='<div class="ce-section-group">';
@@ -1440,11 +1446,13 @@ function rCeList(){
       var indent=c.sectionName?'margin-left:20px;':'';
       html+='<div class="cerow" id="cer_'+i+'" draggable="true" ondragstart="cdS('+i+')" ondragover="cdO(event,'+i+')" ondragend="cdE()" ondrop="cdD('+i+')" style="'+indent+'">'
         +'<span class="cedrag">⠿</span>'
-        +'<input type="checkbox" class="cevis"'+(c.hidden?'':' checked')+' onchange="eCols['+i+'].hidden=!this.checked">'
-        +'<input class="cein" value="'+X(c.l)+'" onchange="eCols['+i+'].l=this.value"'+(c.key?' readonly style="color:var(--accent)"':'')+'/>'
+        +'<input type="checkbox" class="cevis"'+(c.hidden?'':' checked')+' onchange="eCols['+i+'].hidden=!this.checked"'+(c.key?' disabled':'')+'>'
+        +'<input class="cein" value="'+X(c.l)+'" onchange="eCols['+i+'].l=this.value"'+(isLocked?' readonly style="color:var(--muted)"':'')+'/>'
         +(c.key?'<span class="cekey">Key</span>':'')
-        +(!c.key?'<select class="cetyp" onchange="ceTy('+i+',this.value)"><option value="text"'+(!c.sel&&!c.num&&!c.date?' selected':'')+'>Text</option><option value="num"'+(c.num?' selected':'')+'>Number</option><option value="dropdown"'+(c.sel?' selected':'')+'>Dropdown</option><option value="date"'+(c.date?' selected':'')+'>Date</option></select>':'')
-        +(!c.key?'<button class="cedel" onclick="ceD('+i+')">✕</button>':'')
+        // Locked fields: show "Text" label instead of dropdown; custom fields: show type selector
+        +(isLocked&&!c.key?'<span class="cetyp" style="color:var(--muted);font-size:12px;padding:0 8px">Text</span>':'')
+        +(!isLocked?'<select class="cetyp" onchange="ceTy('+i+',this.value)"><option value="text"'+(!c.sel&&!c.num?' selected':'')+'>Text</option><option value="num"'+(c.num?' selected':'')+'>Number</option><option value="dropdown"'+(c.sel?' selected':'')+'>Dropdown</option></select>':'')
+        +(!isLocked?'<button class="cedel" onclick="ceD('+i+')">✕</button>':'')
         +'</div>';
     }
   });
@@ -1452,12 +1460,12 @@ function rCeList(){
   document.getElementById('celist').innerHTML=html;
 }
 
-function ceTy(i,v){eCols[i].sel=v==='dropdown';eCols[i].num=v==='num';eCols[i].date=v==='date';}
+function ceTy(i,v){eCols[i].sel=v==='dropdown';eCols[i].num=v==='num';eCols[i].date=false;}
 
 function ceD(i){
   if(eCols[i].key){alert("Tag column can't be removed.");return;}
+  if(LOCKED_KEYS.indexOf(eCols[i].k)>=0){alert("This field is locked and can't be removed.");return;}
   if(eCols[i]._type==='section'){
-    // Remove section and un-nest its columns
     var sn=eCols[i].l;
     eCols.splice(i,1);
     eCols.forEach(function(c){if(c.sectionName===sn)c.sectionName=null;});
@@ -1473,21 +1481,32 @@ function cdO(e,i){e.preventDefault();document.querySelectorAll('.cerow').forEach
 
 function cdD(ti){
   if(dragI===null||dragI===ti)return;
+  var adj=ti>dragI?ti-1:ti; // adjust index after splice
   var moved=eCols.splice(dragI,1)[0];
-  // If dropped onto a section header, nest the column under it
-  var target=eCols[ti>dragI?ti-1:ti];
-  if(moved._type==='col'&&target&&target._type==='section'){
-    moved.sectionName=target.l;
-    // Insert after the section header
-    eCols.splice(ti>dragI?ti:ti+1,0,moved);
-  } else {
-    // If dropped after a col that has a sectionName, inherit it
-    if(moved._type==='col'&&target&&target._type==='col'&&target.sectionName){
-      moved.sectionName=target.sectionName;
-    } else if(moved._type==='col'&&target&&target._type==='col'&&!target.sectionName){
-      moved.sectionName=null;
+  var target=eCols[adj];
+
+  if(moved._type==='col'){
+    // Dropped on a section header → nest under it
+    if(target&&target._type==='section'){
+      moved.sectionName=target.l;
+      eCols.splice(adj+1,0,moved); // insert right after section header
+    } else {
+      // Inherit section from neighbour
+      if(target&&target._type==='col'){
+        moved.sectionName=target.sectionName||null;
+      } else {
+        moved.sectionName=null;
+      }
+      var insertAt=ti>dragI?ti-1:ti;
+      eCols.splice(insertAt,0,moved);
     }
-    eCols.splice(ti>dragI?ti:ti,0,moved);
+  } else {
+    // Moving a section header — bring its children with it
+    var children=[];
+    var j=adj;
+    // Remove children that follow the old position (already removed from array)
+    // Re-insert section then children
+    eCols.splice(adj,0,moved);
   }
   dragI=null;
   rCeList();
@@ -1499,7 +1518,7 @@ function addCol(){
   if(tp==='section'){
     eCols.push({_type:'section',l:n,_id:'sec_'+Date.now()});
   } else {
-    eCols.push({_type:'col',k:'c'+Date.now(),l:n,sel:tp==='dropdown',num:tp==='num',date:tp==='date',custom:true,sectionName:null});
+    eCols.push({_type:'col',k:'c'+Date.now(),l:n,sel:tp==='dropdown',num:tp==='num',custom:true,sectionName:null});
   }
   document.getElementById('newColName').value='';
   rCeList();
@@ -1507,7 +1526,6 @@ function addCol(){
 
 function saveCols(){
   var t=aTab();if(!t)return;
-  // Convert flat eCols back to sections structure
   var sections=[];
   var curSec={name:'__none__',fields:[]};
   sections.push(curSec);
@@ -1518,17 +1536,15 @@ function saveCols(){
     } else if(c._type==='col'&&!c.key){
       curSec.fields.push({
         key:c.k,label:c.l,
-        type:c.sel?'dropdown':c.num?'number':c.date?'date':'text',
+        type:c.sel?'dropdown':c.num?'number':'text',
         hidden:c.hidden||false,
         options:c.options||null,
         custom:c.custom||false
       });
     }
   });
-  // Remove empty sections
   sections=sections.filter(function(s){return s.fields.length>0;});
   t.sections=sections;
-  // Also update t.cc for backward compat
   t.cc=eCols.filter(function(c){return c._type==='col';}).map(function(c){return Object.assign({},c);});
   closeM('ceModal');nrVis=false;renderStrip();saveEquip();
 }
@@ -2316,7 +2332,6 @@ function renderRevBar(){
   var banner=document.getElementById('viewBanner');
   var bannerText=document.getElementById('viewBannerText');
   var bannerBtn=document.getElementById('viewBannerBtn');
-  var bannerIcon=document.getElementById('viewBannerIcon');
   if(!banner)return;
 
   if(viewingRevIdx!==null){
@@ -2330,7 +2345,7 @@ function renderRevBar(){
     bannerBtn.style.display='none';
   } else if(!hasDraft){
     banner.style.display='flex';bannerIcon.textContent='\uD83D\uDC41\uFE0F';
-    bannerText.textContent='View-only — click Edit to make changes.';
+    bannerText.textContent='Read only — click Edit to make changes.';
     bannerBtn.style.display='none';
   } else {
     banner.style.display='none';
