@@ -846,6 +846,19 @@ function renderVerticalTable(t,rows){
   var roStyle=ro?' readonly style="opacity:.65;cursor:default"':'';
   var roSel=ro?'disabled style="opacity:.65;cursor:default"':'';
 
+  // ── Compute diff for draft highlighting ──
+  var diffChangedIds={};var diffAdded=[];var diffDeleted=[];
+  var tr=getTabRev(t.id);
+  if(tr&&_editingTabId===t.id){
+    var prevRevs=(tr.revisions||[]).filter(function(r){return r.snapshot&&r.snapshot.length>0;});
+    var baseSnap=prevRevs.length?prevRevs[prevRevs.length-1].snapshot||[]:[];
+    var d=computeDiff(baseSnap,t.rows);
+    diffChangedIds=d.changedIds;diffAdded=d.added;diffDeleted=d.deleted;
+  } else if(viewingRevIdx!==null&&tr&&viewingRevIdx>0){
+    var d=computeDiff(tr.revisions[viewingRevIdx-1].snapshot||[],tr.revisions[viewingRevIdx].snapshot||[]);
+    diffChangedIds=d.changedIds;diffAdded=d.added;diffDeleted=d.deleted;
+  }
+
   // ── STYLES ──
   // Label column: auto-width (shrink to content), sticky left, frozen
   var LS='width:1%;white-space:nowrap;position:sticky;left:0;z-index:3;background:var(--surface2);border-right:2px solid var(--border)';
@@ -860,7 +873,8 @@ function renderVerticalTable(t,rows){
   html+='<thead style="position:sticky;top:0;z-index:10"><tr>'
     +'<th style="'+LS+';'+LP+';font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);position:sticky;left:0;top:0;z-index:12;background:var(--surface3)">FIELD</th>';
    rows.forEach(function(row){
-     var colHdrBg=row._importDeleted?'background:rgba(255,77,109,.15)':row._importNew?'background:rgba(0,229,160,.12)':row._importChanged?'background:rgba(255,184,48,.10)':'';
+     var rk=rowKey(row);
+     var colHdrBg=row._importDeleted||diffDeleted.indexOf(rk)>=0?'background:rgba(255,77,109,.15)':row._importNew||diffAdded.indexOf(rk)>=0?'background:rgba(0,229,160,.12)':row._importChanged?'background:rgba(255,184,48,.10)':diffChangedIds[rk]?'background:rgba(255,184,48,.10)':'';
      var colHdrStyle=EQH+(colHdrBg?';'+colHdrBg:'');
      if(canEdit){
        html+='<th style="position:sticky;top:0;z-index:9;'+colHdrStyle+'"><input class="ci tag" value="'+X(row.tag||'')+'" placeholder="EQ-001"'         +' style="text-align:center;width:100%;min-width:110px;background:transparent;border:none;font-family:DM Mono,monospace;font-size:11px;font-weight:700;color:var(--accent)"'         +' onchange="updR(\''+t.id+'\',\''+row.id+'\',\'tag\',this.value)" onblur="saveEquip()"/></th>';
@@ -900,9 +914,11 @@ function renderVerticalTable(t,rows){
     rows.forEach(function(row){
       // Diff highlight for this cell
       var cellBg='';
-      if(row._importDeleted)cellBg='background:rgba(255,77,109,.10)';
-      else if(row._importNew)cellBg='background:rgba(0,229,160,.08)';
+      var rk=rowKey(row);
+      if(row._importDeleted||diffDeleted.indexOf(rk)>=0)cellBg='background:rgba(255,77,109,.10)';
+      else if(row._importNew||diffAdded.indexOf(rk)>=0)cellBg='background:rgba(0,229,160,.08)';
       else if(row._importChanged&&(row._importChangedCols||[]).indexOf(c.k)>=0)cellBg='background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)';
+      else if(diffChangedIds[rk]&&diffChangedIds[rk].indexOf(c.k)>=0)cellBg='background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)';
       var tdStyle='padding:3px 6px;border-right:1px solid var(--border);'+(cellBg?cellBg+';':'');
       var delStyle=row._importDeleted?'text-decoration:line-through;opacity:.6;':'';
       if(c.sel){
@@ -2219,16 +2235,17 @@ function applyDiffHighlights(){
     viewRows=tr.revisions[viewingRevIdx].snapshot||[];
     diff=computeDiff(baseRows,viewRows);
   } else if(tr.draft&&_editingTabId===tabId){
-    // Only show highlights if there's a previous published revision to compare against
     var prevRevisions=tr.revisions.filter(function(r){return r.snapshot&&r.snapshot.length>0;});
     if(!prevRevisions.length){
-      // No baseline yet — first draft, no highlights
-      trs.forEach(function(el){el.className=el.className.replace(/tr-added|tr-deleted/g,'').trim();el.querySelectorAll('.cell-changed').forEach(function(c){c.classList.remove('cell-changed');});});
-      return;
+      // No baseline — all current rows are "new", show as added
+      baseRows=[];
+      viewRows=tab.rows;
+      diff=computeDiff(baseRows,viewRows);
+    } else {
+      baseRows=prevRevisions[prevRevisions.length-1].snapshot||[];
+      viewRows=tab.rows;
+      diff=computeDiff(baseRows,viewRows);
     }
-    baseRows=prevRevisions[prevRevisions.length-1].snapshot||[];
-    viewRows=tab.rows;
-    diff=computeDiff(baseRows,viewRows);
   } else {
     // No draft, no viewingRevIdx = clean published state, no highlights
     trs.forEach(function(el){el.className=el.className.replace(/tr-added|tr-deleted/g,'').trim();el.querySelectorAll('.cell-changed').forEach(function(c){c.classList.remove('cell-changed');});});
