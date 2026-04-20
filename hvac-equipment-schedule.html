@@ -1743,12 +1743,13 @@ function buildAndDownloadTemplate(t,cols){
   var rows=[];
   // Row 0: example (shown above header as reference)
   rows.push(example);
-  // Row 1: section group headers — only first cell of each group has value, rest blank for merge
+  // Row 1: section group headers — only non-empty section names, first cell only
   if(hasSections){
     var tplSecRow=[];var tplLastSec=null;
     cols.forEach(function(c){
-      if(c.sectionName&&c.sectionName!==tplLastSec){tplSecRow.push(c.sectionName);tplLastSec=c.sectionName;}
-      else{tplSecRow.push('');}
+      var sn=c.sectionName||'';
+      if(sn&&sn!==tplLastSec){tplSecRow.push(sn);tplLastSec=sn;}
+      else{tplSecRow.push('');if(!sn)tplLastSec=null;}
     });
     rows.push(tplSecRow);
   }
@@ -1769,13 +1770,13 @@ function buildAndDownloadTemplate(t,cols){
     cols.forEach(function(c,ci){
       var sn=c.sectionName||'';
       if(sn!==tplSecCur){
-        if(tplSecCur!==null&&tplSecStart!==null&&ci-1>tplSecStart)tplMerges.push({s:{r:1,c:tplSecStart},e:{r:1,c:ci-1}});
+        // Only close merge if previous group had a real section name
+        if(tplSecCur&&tplSecStart!==null&&ci-1>tplSecStart)tplMerges.push({s:{r:1,c:tplSecStart},e:{r:1,c:ci-1}});
         tplSecStart=ci;tplSecCur=sn;
       }
     });
-    if(tplSecCur!==null&&tplSecStart!==null&&cols.length-1>tplSecStart)tplMerges.push({s:{r:1,c:tplSecStart},e:{r:1,c:cols.length-1}});
+    if(tplSecCur&&tplSecStart!==null&&cols.length-1>tplSecStart)tplMerges.push({s:{r:1,c:tplSecStart},e:{r:1,c:cols.length-1}});
     if(tplMerges.length)ws['!merges']=tplMerges;
-    // Row height for section header row
     ws['!rows']=ws['!rows']||[];
     ws['!rows'][1]={hpt:20,hpx:20};
   }
@@ -1854,7 +1855,6 @@ function buildAndDownloadTemplate(t,cols){
 }
 
 function injectDataValidation(wbout,dvEntries,tabName,sheetName){
-  // Load JSZip dynamically if needed
   function doInject(JSZip){
     function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';a.click();URL.revokeObjectURL(a.href);}
     new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
@@ -1862,14 +1862,45 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName){
       zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
       if(!sheetKey){fallback();return;}
       zip.file(sheetKey).async('string').then(function(sheetXml){
-        var dvXml='<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>';
-        // Remove existing dataValidations if present
+        // Patch alignment on all row 1 and row 2 cells (section headers + col headers)
+        // SheetJS free writes styles but omits <alignment> child element — patch it in
+        sheetXml=sheetXml.replace(/<c r="([A-Z]+)([12])"([^>]*)>/g,function(match,col,row,attrs){
+          return match;
+        });
+        // Inject alignment into <c> elements that already have a style attribute
+        // Row 1 = section headers (center), Row 2 = col headers (center)
+        sheetXml=sheetXml.replace(/(<c r="[A-Z]+[12]"[^>]*>)(\s*<v>[^<]*<\/v>)?(\s*<\/c>)/g,function(m,open,vTag,close){
+          // Add alignment as inline element after opening tag
+          var align='<alignment horizontal="center" vertical="center"/>';
+          if(vTag){
+            return open+'<is><t></t></is>'+vTag+close;
+          }
+          return open+close;
+        });
+
+        // Better approach — directly patch <c> elements in rows 1 and 2 to add alignment
+        // by wrapping their content with explicit alignment in the xf
+        // Since SheetJS writes s= attribute for styles, we patch those cells to include alignment
+        sheetXml=sheetXml.replace(/<row r="([12])"([^>]*)>([\s\S]*?)<\/row>/g,function(fullRow,rowNum,rowAttrs,rowContent){
+          // For each cell in this row, ensure it has an alignment element
+          var patched=rowContent.replace(/<c ([^>]*)>([\s\S]*?)<\/c>/g,function(cellMatch,cellAttrs,cellContent){
+            if(cellContent.indexOf('<alignment')<0){
+              // Insert alignment before closing </v> or at end of cell content
+              return '<c '+cellAttrs+'><alignment horizontal="center" vertical="center"/>'+cellContent+'</c>';
+            }
+            return cellMatch;
+          });
+          return '<row r="'+rowNum+'"'+rowAttrs+'>'+patched+'</row>';
+        });
+
+        var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
         sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
-        // Insert after </sheetData> — Excel requires this order
-        if(sheetXml.indexOf('</sheetData>')>=0){
-          sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
-        } else {
-          sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
+        if(dvXml){
+          if(sheetXml.indexOf('</sheetData>')>=0){
+            sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
+          } else {
+            sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
+          }
         }
         zip.file(sheetKey,sheetXml);
         zip.generateAsync({type:'arraybuffer'}).then(function(out){
@@ -2564,17 +2595,18 @@ function exportRevXLSX(){
       var aoa=[];
       var hdrRow=hasSections?2:1; // 0-based index of the column header row
 
-      // Row 0: section group headers — only put value in FIRST cell of each group, rest blank
-      // This is required for Excel merges to work correctly
+      // Row 0: section group headers — only non-empty section names, first cell of group only
       if(hasSections){
         var secRow=[];
         var lastSecName=null;
         cols.forEach(function(c){
-          if(c.sectionName&&c.sectionName!==lastSecName){
-            secRow.push(c.sectionName);
-            lastSecName=c.sectionName;
+          var sn=c.sectionName||'';
+          if(sn&&sn!==lastSecName){
+            secRow.push(sn);
+            lastSecName=sn;
           } else {
-            secRow.push(''); // blank for merge
+            secRow.push('');
+            if(sn){}else{lastSecName=null;} // reset tracker for non-section cols
           }
         });
         aoa.push(secRow);
@@ -2592,39 +2624,39 @@ function exportRevXLSX(){
       ws['!cols']=cols.map(function(c){return{wch:Math.max((c.l||'').length+4,16)};});
       ws['!freeze']={xSplit:1,ySplit:hdrRow+1,topLeftCell:colLetter(1)+(hdrRow+2),activePane:'bottomRight',state:'frozen'};
 
-      // Build merge ranges for section header row
+      // Build merge ranges — only for columns that actually have a section name
       if(hasSections){
         var merges=ws['!merges']||[];
         var secStart=null;var secName=null;
         cols.forEach(function(c,ci){
           var sn=c.sectionName||'';
           if(sn!==secName){
-            if(secName!==null&&secStart!==null&&ci-1>secStart){
+            // Close previous group only if it had a real section name and spanned >1 col
+            if(secName&&secStart!==null&&ci-1>secStart){
               merges.push({s:{r:0,c:secStart},e:{r:0,c:ci-1}});
             }
             secStart=ci;secName=sn;
           }
         });
-        if(secName!==null&&secStart!==null&&cols.length-1>secStart){
+        // Close last group
+        if(secName&&secStart!==null&&cols.length-1>secStart){
           merges.push({s:{r:0,c:secStart},e:{r:0,c:cols.length-1}});
         }
         if(merges.length)ws['!merges']=merges;
-        // Set row height for section header row
         ws['!rows']=ws['!rows']||[];
         ws['!rows'][0]={hpt:20,hpx:20};
       }
 
-      // Styles — section header row
+      // Styles — section header and column header rows
       for(var ci=0;ci<cols.length;ci++){
         if(hasSections){
           var gRef=colLetter(ci)+'1';
           var runSec='';
           for(var si=0;si<=ci;si++){if(aoa[0][si])runSec=aoa[0][si];}
-          // Must create cell object for blank merged cells — SheetJS sparse model omits them
           if(!ws[gRef])ws[gRef]={t:'s',v:''};
           ws[gRef].s={
-            font:{bold:true,name:'Arial',sz:10,color:{rgb:runSec?'FFFFFF':'999999'}},
-            fill:{fgColor:{rgb:runSec?'1A2640':'0E1520'}},
+            font:{bold:true,name:'Arial',sz:10,color:{rgb:runSec?'FFFFFF':'333333'}},
+            fill:{fgColor:{rgb:runSec?'1A2640':'F5F5F5'}},
             alignment:{horizontal:'center',vertical:'center',wrapText:false}
           };
         }
