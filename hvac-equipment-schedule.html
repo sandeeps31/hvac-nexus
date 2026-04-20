@@ -115,6 +115,8 @@ tr:hover .delr{opacity:1}.delr:hover{color:var(--danger)}
 .etc-nm{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text2);line-height:1.2}
 .etc.sel .etc-nm{color:var(--accent)}
 .celist{display:flex;flex-direction:column;gap:4px;max-height:320px;overflow-y:auto;margin-bottom:12px}
+.ce-section-group{display:flex;flex-direction:column;gap:3px;border-left:2px solid var(--accent);padding-left:6px;margin-bottom:4px}
+.ce-section-hdr{background:var(--surface2)!important;border-color:var(--accent)!important}
 .cerow{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;cursor:grab;transition:border-color .12s}
 .cerow:hover{border-color:var(--muted)}
 .cerow.dragging{opacity:.3}
@@ -488,7 +490,11 @@ body.sb-sm{padding-left:var(--sb-sm)}
     <div class="ceadd">
       <input class="cename-in" id="newColName" placeholder="New column name…" onkeydown="if(event.key==='Enter')addCol()">
       <select class="fsel" id="newColType" style="font-size:12px">
-        <option value="text">Text</option><option value="num">Number</option><option value="dropdown">Dropdown</option><option value="date">Date</option>
+        <option value="text">Column · Text</option>
+        <option value="num">Column · Number</option>
+        <option value="dropdown">Column · Dropdown</option>
+        <option value="date">Column · Date</option>
+        <option value="section">── Section Header</option>
       </select>
       <button class="btn bp bsm" onclick="addCol()">＋ Add</button>
     </div>
@@ -1390,40 +1396,142 @@ function confirmAdd(){
 }
 
 var eCols=[],dragI=null;
+
 function openColEditor(){
   var t=aTab();if(!t)return;
   var d=defn(t.type)||{name:t.name||t.type,cols:[]};
-  eCols=JSON.parse(JSON.stringify(allCols(t)));
+  // Build flat eCols from sections structure, inserting section header rows
+  eCols=[];
   var isVert=t.layout==='vertical';
+  var allC=allCols(t);
+  // Group by sectionName
+  var seen={};
+  allC.forEach(function(c){
+    if(c.key){eCols.push(Object.assign({},c,{_type:'col'}));return;}
+    var sn=c.sectionName||null;
+    if(sn&&!seen[sn]){seen[sn]=true;eCols.push({_type:'section',l:sn,_id:'sec_'+Date.now()+'_'+Math.random().toString(36).slice(2,5)});}
+    eCols.push(Object.assign({},c,{_type:'col',sectionName:sn}));
+  });
   var titleEl=document.getElementById('ceTitle');
   var subEl=document.getElementById('ceSub');
   if(titleEl)titleEl.textContent=isVert?'Row Settings':'Column Settings';
-  if(subEl)subEl.textContent=(t.name||d.name||'')+(isVert?' — drag to reorder rows · toggle · rename':' — drag to reorder · toggle · rename · add custom');
-  // For vertical layout the "add column" section label changes
+  if(subEl)subEl.textContent=(t.name||d.name||'')+' — drag to reorder · toggle · rename · add column or section';
   var newColName=document.getElementById('newColName');
   if(newColName)newColName.placeholder=isVert?'New row name…':'New column name…';
   rCeList();document.getElementById('ceModal').classList.add('open');
 }
+
 function rCeList(){
-  document.getElementById('celist').innerHTML=eCols.map(function(c,i){
-    return'<div class="cerow" id="cer_'+i+'" draggable="true" ondragstart="cdS('+i+')" ondragover="cdO(event,'+i+')" ondragend="cdE()" ondrop="cdD('+i+')">'
-      +'<span class="cedrag">⠿</span>'
-      +'<input type="checkbox" class="cevis"'+(c.hidden?'':' checked')+' onchange="eCols['+i+'].hidden=!this.checked">'
-      +'<input class="cein" value="'+X(c.l)+'" onchange="eCols['+i+'].l=this.value"'+(c.key?' readonly style="color:var(--accent)"':'')+'/>'
-      +(c.key?'<span class="cekey">Key</span>':'')
-      +(!c.key?'<select class="cetyp" onchange="ceTy('+i+',this.value)"><option value="text"'+(!c.sel&&!c.num&&!c.date?' selected':'')+'>Text</option><option value="num"'+(c.num?' selected':'')+'>Number</option><option value="dropdown"'+(c.sel?' selected':'')+'>Dropdown</option><option value="date"'+(c.date?' selected':'')+'>Date</option></select>':'')
-      +(!c.key?'<button class="cedel" onclick="ceD('+i+')">✕</button>':'')
-      +'</div>';
-  }).join('');
+  var curSection=null;
+  var html='';
+  eCols.forEach(function(c,i){
+    if(c._type==='section'){
+      // Close previous section
+      if(curSection!==null)html+='</div>';
+      curSection=i;
+      html+='<div class="ce-section-group">';
+      html+='<div class="cerow ce-section-hdr" id="cer_'+i+'" draggable="true" ondragstart="cdS('+i+')" ondragover="cdO(event,'+i+')" ondragend="cdE()" ondrop="cdD('+i+')">'
+        +'<span class="cedrag">⠿</span>'
+        +'<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:var(--accent);color:#080c12;font-weight:700;margin-right:6px;flex-shrink:0">Section</span>'
+        +'<input class="cein" value="'+X(c.l)+'" onchange="eCols['+i+'].l=this.value" placeholder="Section name…" style="font-weight:600;color:var(--accent)"/>'
+        +'<button class="cedel" onclick="ceD('+i+')">✕</button>'
+        +'</div>';
+    } else {
+      var indent=c.sectionName?'margin-left:20px;':'';
+      html+='<div class="cerow" id="cer_'+i+'" draggable="true" ondragstart="cdS('+i+')" ondragover="cdO(event,'+i+')" ondragend="cdE()" ondrop="cdD('+i+')" style="'+indent+'">'
+        +'<span class="cedrag">⠿</span>'
+        +'<input type="checkbox" class="cevis"'+(c.hidden?'':' checked')+' onchange="eCols['+i+'].hidden=!this.checked">'
+        +'<input class="cein" value="'+X(c.l)+'" onchange="eCols['+i+'].l=this.value"'+(c.key?' readonly style="color:var(--accent)"':'')+'/>'
+        +(c.key?'<span class="cekey">Key</span>':'')
+        +(!c.key?'<select class="cetyp" onchange="ceTy('+i+',this.value)"><option value="text"'+(!c.sel&&!c.num&&!c.date?' selected':'')+'>Text</option><option value="num"'+(c.num?' selected':'')+'>Number</option><option value="dropdown"'+(c.sel?' selected':'')+'>Dropdown</option><option value="date"'+(c.date?' selected':'')+'>Date</option></select>':'')
+        +(!c.key?'<button class="cedel" onclick="ceD('+i+')">✕</button>':'')
+        +'</div>';
+    }
+  });
+  if(curSection!==null)html+='</div>';
+  document.getElementById('celist').innerHTML=html;
 }
+
 function ceTy(i,v){eCols[i].sel=v==='dropdown';eCols[i].num=v==='num';eCols[i].date=v==='date';}
-function ceD(i){if(eCols[i].key){alert("Tag column can't be removed.");return;}eCols.splice(i,1);rCeList();}
+
+function ceD(i){
+  if(eCols[i].key){alert("Tag column can't be removed.");return;}
+  if(eCols[i]._type==='section'){
+    // Remove section and un-nest its columns
+    var sn=eCols[i].l;
+    eCols.splice(i,1);
+    eCols.forEach(function(c){if(c.sectionName===sn)c.sectionName=null;});
+  } else {
+    eCols.splice(i,1);
+  }
+  rCeList();
+}
+
 function cdS(i){dragI=i;var el=document.getElementById('cer_'+i);if(el)el.classList.add('dragging');}
 function cdE(){document.querySelectorAll('.cerow').forEach(function(r){r.classList.remove('dragging','dragover');});}
 function cdO(e,i){e.preventDefault();document.querySelectorAll('.cerow').forEach(function(r){r.classList.remove('dragover');});var el=document.getElementById('cer_'+i);if(el)el.classList.add('dragover');}
-function cdD(ti){if(dragI===null||dragI===ti)return;var m=eCols.splice(dragI,1)[0];eCols.splice(ti,0,m);dragI=null;rCeList();}
-function addCol(){var n=document.getElementById('newColName').value.trim();if(!n)return;var tp=document.getElementById('newColType').value;eCols.push({k:'c'+Date.now(),l:n,sel:tp==='sel',num:tp==='num',custom:true});document.getElementById('newColName').value='';rCeList();}
-function saveCols(){var t=aTab();if(!t)return;t.cc=JSON.parse(JSON.stringify(eCols));closeM('ceModal');nrVis=false;renderStrip();saveEquip();}
+
+function cdD(ti){
+  if(dragI===null||dragI===ti)return;
+  var moved=eCols.splice(dragI,1)[0];
+  // If dropped onto a section header, nest the column under it
+  var target=eCols[ti>dragI?ti-1:ti];
+  if(moved._type==='col'&&target&&target._type==='section'){
+    moved.sectionName=target.l;
+    // Insert after the section header
+    eCols.splice(ti>dragI?ti:ti+1,0,moved);
+  } else {
+    // If dropped after a col that has a sectionName, inherit it
+    if(moved._type==='col'&&target&&target._type==='col'&&target.sectionName){
+      moved.sectionName=target.sectionName;
+    } else if(moved._type==='col'&&target&&target._type==='col'&&!target.sectionName){
+      moved.sectionName=null;
+    }
+    eCols.splice(ti>dragI?ti:ti,0,moved);
+  }
+  dragI=null;
+  rCeList();
+}
+
+function addCol(){
+  var n=document.getElementById('newColName').value.trim();if(!n)return;
+  var tp=document.getElementById('newColType').value;
+  if(tp==='section'){
+    eCols.push({_type:'section',l:n,_id:'sec_'+Date.now()});
+  } else {
+    eCols.push({_type:'col',k:'c'+Date.now(),l:n,sel:tp==='dropdown',num:tp==='num',date:tp==='date',custom:true,sectionName:null});
+  }
+  document.getElementById('newColName').value='';
+  rCeList();
+}
+
+function saveCols(){
+  var t=aTab();if(!t)return;
+  // Convert flat eCols back to sections structure
+  var sections=[];
+  var curSec={name:'__none__',fields:[]};
+  sections.push(curSec);
+  eCols.forEach(function(c){
+    if(c._type==='section'){
+      curSec={name:c.l,fields:[]};
+      sections.push(curSec);
+    } else if(c._type==='col'&&!c.key){
+      curSec.fields.push({
+        key:c.k,label:c.l,
+        type:c.sel?'dropdown':c.num?'number':c.date?'date':'text',
+        hidden:c.hidden||false,
+        options:c.options||null,
+        custom:c.custom||false
+      });
+    }
+  });
+  // Remove empty sections
+  sections=sections.filter(function(s){return s.fields.length>0;});
+  t.sections=sections;
+  // Also update t.cc for backward compat
+  t.cc=eCols.filter(function(c){return c._type==='col';}).map(function(c){return Object.assign({},c);});
+  closeM('ceModal');nrVis=false;renderStrip();saveEquip();
+}
 
 function doImport(e){
   var f=e.target.files[0]; if(!f) return;
