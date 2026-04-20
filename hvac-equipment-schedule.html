@@ -1481,34 +1481,36 @@ function cdO(e,i){e.preventDefault();document.querySelectorAll('.cerow').forEach
 
 function cdD(ti){
   if(dragI===null||dragI===ti)return;
-  var adj=ti>dragI?ti-1:ti; // adjust index after splice
-  var moved=eCols.splice(dragI,1)[0];
-  var target=eCols[adj];
+  var from=dragI;var to=ti;
+  dragI=null;
+
+  // Work on a copy — remove item from source, insert at target
+  var arr=eCols.slice();
+  var moved=arr.splice(from,1)[0];
+
+  // Recalculate target index after removal
+  var insertAt=from<to?to-1:to;
+  var target=arr[insertAt];
 
   if(moved._type==='col'){
-    // Dropped on a section header → nest under it
     if(target&&target._type==='section'){
+      // Dropped ON a section header — nest under it, insert right after header
       moved.sectionName=target.l;
-      eCols.splice(adj+1,0,moved); // insert right after section header
+      arr.splice(insertAt+1,0,moved);
+    } else if(target&&target._type==='col'){
+      // Inherit the section of the neighbour we're landing next to
+      moved.sectionName=target.sectionName||null;
+      arr.splice(insertAt,0,moved);
     } else {
-      // Inherit section from neighbour
-      if(target&&target._type==='col'){
-        moved.sectionName=target.sectionName||null;
-      } else {
-        moved.sectionName=null;
-      }
-      var insertAt=ti>dragI?ti-1:ti;
-      eCols.splice(insertAt,0,moved);
+      moved.sectionName=null;
+      arr.splice(insertAt,0,moved);
     }
   } else {
-    // Moving a section header — bring its children with it
-    var children=[];
-    var j=adj;
-    // Remove children that follow the old position (already removed from array)
-    // Re-insert section then children
-    eCols.splice(adj,0,moved);
+    // Moving a section — just reorder, no nesting logic needed
+    arr.splice(insertAt,0,moved);
   }
-  dragI=null;
+
+  eCols=arr;
   rCeList();
 }
 
