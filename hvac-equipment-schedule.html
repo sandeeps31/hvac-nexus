@@ -1824,7 +1824,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
   var vertSecRows=opts.sectionRows||[];
   var secColRanges=opts.secColRanges||[]; // [{start,end}] col indices with section name
   function doInject(JSZip){
-    function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=tabName.trim()+' Schedule '+sheetName.replace(tabName,'').trim()+'.xlsx';a.click();URL.revokeObjectURL(a.href);}
+    function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';a.click();URL.revokeObjectURL(a.href);}
     new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
       var sheetKey=null;
       zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
@@ -1981,7 +1981,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
         zip.generateAsync({type:'arraybuffer'}).then(function(out){
           var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
           var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-          a.download=tabName.trim()+' Schedule '+sheetName.replace(tabName,'').trim()+'.xlsx';
+          a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';
           a.click();URL.revokeObjectURL(a.href);
         });
       }).catch(function(e){console.warn('patch failed:',e);fallback();});
@@ -2458,7 +2458,7 @@ function exportRevPDF(){
   var proj=dbGetCurrentProject();
   var projName=proj?proj.name:'[Project Name]';
   var projNum=proj?proj.num:'';
-  var tabName=tab?tab.name||tab.type:'Equipment';
+  var tabName=tab?(tab.name||(tab.type?tab.type.charAt(0).toUpperCase()+tab.type.slice(1):'Equipment')):'Equipment';
   var hasDiff=baseRows.length>0;
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'    +'<title>'+tabName+' — '+revLabel+'</title>'    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:9px;color:#1a1a1a;background:#fff}'    +'@page{size:A3 landscape;margin:12mm}'    +'.co-hdr{background:#f4f4f4;border:1px solid #ddd;border-bottom:none;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}'    +'.co-name{font-size:13px;font-weight:bold}.co-logo{width:110px;height:34px;border:1px dashed #bbb;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:7.5px;border-radius:2px}'    +'.proj-block{display:grid;grid-template-columns:1fr 1fr 1fr 150px;border:1px solid #ddd;margin-bottom:10px}'    +'.pb{padding:7px 12px;border-right:1px solid #ddd}.pb:last-child{border-right:none}'    +'.pb-lbl{font-size:7px;text-transform:uppercase;letter-spacing:.8px;color:#999;margin-bottom:2px}'    +'.pb-val{font-size:10px;font-weight:bold}'    +'.legend{display:flex;gap:14px;margin-bottom:7px;padding:4px 0;border-bottom:1px solid #eee;font-size:8px;color:#555}'    +'.ls{display:flex;align-items:center;gap:4px}.lsw{width:10px;height:10px;border-radius:2px;border:1px solid}'    +'table{width:100%;border-collapse:collapse}'    +'th{background:#0e1520;color:#fff;padding:5px 7px;text-align:left;font-size:7.5px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-right:1px solid #1e3050}'    +'td{padding:4px 7px;border-bottom:1px solid #ebebeb;border-right:1px solid #f4f4f4;vertical-align:middle}'    +'tr.r-added td{background-color:#c8f7c5!important}tr.r-deleted td{background-color:#ffcccc!important;text-decoration:line-through;color:#cc0000!important}td.c-chg{background-color:#fff176!important}'    +'tr:nth-child(even):not(.r-added):not(.r-deleted) td{filter:brightness(.975)}</style></head><body>';
   html+='<div class="co-hdr"><div><div class="co-name">[Company Name]</div><div style="font-size:8px;color:#888;margin-top:2px">[Address · Phone · Email]</div></div><div class="co-logo">COMPANY LOGO</div></div>';
@@ -2547,7 +2547,8 @@ function exportRevXLSX(){
 
   var cols=getCols(tab);
   var isVert=(tab.layout==='vertical');
-  var tabName=(tab.name||tab.type||'Schedule').replace(/[^a-zA-Z0-9 ]/g,'').substring(0,28);
+  // Filename: use tab name if set, else capitalise type (e.g. "dampers" → "Damper")
+  var tabName=(tab.name||(tab.type?tab.type.charAt(0).toUpperCase()+tab.type.slice(1):'Schedule')).replace(/[^a-zA-Z0-9 ]/g,'').trim().substring(0,28);
   var sheetName=(tabName+' '+revLabel).substring(0,31);
   var hasSections=cols.some(function(c){return c.sectionName;});
 
