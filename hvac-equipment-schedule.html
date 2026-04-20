@@ -1807,7 +1807,7 @@ function buildAndDownloadTemplate(t,cols){
   // Always run JSZip to apply alignment + dropdowns
   try{
     var wboutT=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-    injectDataValidation(wboutT,hasDV?dvEntries:[],tabName,t.name);
+    injectDataValidation(wboutT,hasDV?dvEntries:[],tabName,t.name,hasSections);
     return;
   }catch(err){
     console.warn('template inject failed, falling back:',err);
@@ -1817,7 +1817,7 @@ function buildAndDownloadTemplate(t,cols){
   XLSX.writeFile(wb,'HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx');
 }
 
-function injectDataValidation(wbout,dvEntries,tabName,sheetName){
+function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections){
   function doInject(JSZip){
     function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='HVAC_NEXUS_'+tabName.replace(/[^a-zA-Z0-9]/g,'_')+'_Template.xlsx';a.click();URL.revokeObjectURL(a.href);}
 
@@ -2580,12 +2580,12 @@ function exportRevXLSX(){
 
       if(dvEntries.length){
         var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-        injectDataValidation(wbout,dvEntries,sheetName,tabName);
+        injectDataValidation(wbout,dvEntries,sheetName,tabName,hasSections);
         return;
       }
       // No dropdowns but still run JSZip to apply alignment
       var wboutV=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-      injectDataValidation(wboutV,[],sheetName,tabName);
+      injectDataValidation(wboutV,[],sheetName,tabName,false);
 
     } else {
       // ── HORIZONTAL LAYOUT: rows=equipment, cols=fields ──
@@ -2694,14 +2694,14 @@ function exportRevXLSX(){
 
       if(dvEntries2.length){
         var wbout2=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-        injectDataValidation(wbout2,dvEntries2,sheetName,tabName);
+        injectDataValidation(wbout2,dvEntries2,sheetName,tabName,hasSections);
         return;
       }
     }
 
     // Always run JSZip patch to apply alignment — even with no dropdowns
     var wboutFinal=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-    injectDataValidation(wboutFinal,[],sheetName,tabName);
+    injectDataValidation(wboutFinal,[],sheetName,tabName,hasSections);
   }
 
   if(typeof XLSX==='undefined'){
