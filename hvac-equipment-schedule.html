@@ -397,10 +397,24 @@ body.sb-sm{padding-left:var(--sb-sm)}
 </div>
 <!-- EXPORT REV MODAL -->
 <div class="mo" id="exportRevModal">
-  <div class="modal" style="width:400px">
+  <div class="modal" style="width:420px">
     <div class="mh3">Export Revision</div>
     <div class="msub" id="exportRevSubtitle"></div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin:16px 0">
+    <!-- Tracked changes toggle — only shown when a draft exists -->
+    <div id="exportTrackToggleWrap" style="display:none;margin:14px 0 4px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 14px">
+      <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Change Tracking</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="radio" name="exportTrack" id="exportTrackYes" value="tracked" checked style="accent-color:var(--accent)">
+          <span><strong>With changes tracked</strong> — shows green/yellow/red highlights</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="radio" name="exportTrack" id="exportTrackNo" value="clean">
+          <span><strong>Clean copy</strong> — no highlights, final presentation format</span>
+        </label>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin:14px 0">
       <button class="btn bp" onclick="exportRevPDF()" style="justify-content:center">📄 Export as PDF</button>
       <button class="btn bsm" style="background:var(--green);color:#080c12;justify-content:center;padding:6px 14px;font-size:13px" onclick="exportRevXLSX()">📊 Export as Excel</button>
     </div>
@@ -848,16 +862,16 @@ function renderVerticalTable(t,rows){
   var roSel=ro?'disabled style="opacity:.65;cursor:default"':'';
 
   // ── Compute diff for draft highlighting ──
-  var diffChangedIds={};var diffAdded=[];var diffDeleted=[];
+  var diffChangedIds={};var diffAdded=[];var diffDeleted=[];var diffClearedValues={};
   var tr=getTabRev(t.id);
   if(tr&&tr.draft){
     var prevRevs=(tr.revisions||[]).filter(function(r){return r.snapshot&&r.snapshot.length>0;});
     var baseSnap=prevRevs.length?prevRevs[prevRevs.length-1].snapshot||[]:[];
     var d=computeDiff(baseSnap,t.rows);
-    diffChangedIds=d.changedIds;diffAdded=d.added;diffDeleted=d.deleted;
+    diffChangedIds=d.changedIds;diffAdded=d.added;diffDeleted=d.deleted;diffClearedValues=d.clearedValues||{};
   } else if(viewingRevIdx!==null&&tr&&viewingRevIdx>0){
     var d=computeDiff(tr.revisions[viewingRevIdx-1].snapshot||[],tr.revisions[viewingRevIdx].snapshot||[]);
-    diffChangedIds=d.changedIds;diffAdded=d.added;diffDeleted=d.deleted;
+    diffChangedIds=d.changedIds;diffAdded=d.added;diffDeleted=d.deleted;diffClearedValues=d.clearedValues||{};
   }
 
   // ── STYLES ──
@@ -916,17 +930,24 @@ function renderVerticalTable(t,rows){
       // Diff highlight for this cell
       var cellBg='';
       var rk=rowKey(row);
+      var clearedVal=null;
       if(row._importDeleted||diffDeleted.indexOf(rk)>=0)cellBg='background:rgba(255,77,109,.10)';
       else if(row._importNew||diffAdded.indexOf(rk)>=0)cellBg='background:rgba(0,229,160,.08)';
       else if(row._importChanged&&(row._importChangedCols||[]).indexOf(c.k)>=0)cellBg='background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)';
-      else if(diffChangedIds[rk]&&diffChangedIds[rk].indexOf(c.k)>=0)cellBg='background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)';
-      var tdStyle='padding:3px 6px;border-right:1px solid var(--border);'+(cellBg?cellBg+';':'');
+      else if(diffChangedIds[rk]&&diffChangedIds[rk].indexOf(c.k)>=0){
+        var _cv=diffClearedValues[rk]&&diffClearedValues[rk][c.k];
+        if(_cv!==undefined&&String(_cv).trim()!==''){clearedVal=_cv;cellBg='background:rgba(255,77,109,.18);outline:1px solid rgba(255,77,109,.5)';}
+        else cellBg='background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)';
+      }
+      var tdStyle='padding:3px 6px;border-right:1px solid var(--border);position:relative;'+(cellBg?cellBg+';':'');
       var delStyle=row._importDeleted?'text-decoration:line-through;opacity:.6;':'';
+      // Cleared overlay — shown when a previously-filled field is now blank
+      var clearedOverlay=clearedVal!==null?'<div style="position:absolute;top:50%;left:6px;transform:translateY(-50%);color:rgba(255,77,109,.9);font-size:12px;text-decoration:line-through;pointer-events:none;white-space:nowrap;z-index:1">'+X(clearedVal)+'</div>':'';
       if(c.sel){
-        if(ro)html+='<td style="'+tdStyle+'"><span style="font-size:12px;'+delStyle+'">'+X(row[c.k]||'—')+'</span></td>';
-        else html+='<td style="'+tdStyle+'"><select class="csel" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+        if(ro)html+='<td style="'+tdStyle+'">'+clearedOverlay+'<span style="font-size:12px;'+delStyle+(clearedVal!==null?';opacity:0':'')+'">'+X(row[c.k]||'—')+'</span></td>';
+        else html+='<td style="'+tdStyle+'">'+clearedOverlay+'<select class="csel" style="'+(clearedVal!==null?'opacity:0':'')+';" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
       } else {
-        html+='<td style="'+tdStyle+'"><input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly':'')+' style="'+(ro?'opacity:.65;cursor:default;':'')+delStyle+'"\x3e\x3c/td>';
+        html+='<td style="'+tdStyle+'">'+clearedOverlay+'<input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" placeholder="…" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly':'')+' style="'+(ro?'opacity:.65;cursor:default;':'')+delStyle+(clearedVal!==null?';opacity:0':'')+'">\x3c/td>';
       }
     });
     if(canEdit)html+='<td></td>';
@@ -2210,17 +2231,29 @@ function rowKey(r){return r.tag||r.id||'';}
 function computeDiff(baseRows,draftRows){
   var baseMap={};baseRows.forEach(function(r){baseMap[rowKey(r)]=r;});
   var draftMap={};draftRows.filter(function(r){return !r._deleted;}).forEach(function(r){draftMap[rowKey(r)]=r;});
-  var added=[],deleted=[],changedIds={};
+  var added=[],deleted=[],changedIds={},clearedValues={};
   draftRows.forEach(function(r){if(!r._deleted&&!baseMap[rowKey(r)])added.push(rowKey(r));});
   baseRows.forEach(function(r){if(!draftMap[rowKey(r)])deleted.push(rowKey(r));});
   draftRows.forEach(function(r){
     if(r._deleted)return;
     var bRow=baseMap[rowKey(r)];if(!bRow)return;
     var cf=[];
-    Object.keys(r).forEach(function(k){if(k==='id'||k==='_deleted')return;if(String(r[k]||'')!==String(bRow[k]||''))cf.push(k);});
-    if(cf.length)changedIds[rowKey(r)]=cf;
+    var rk=rowKey(r);
+    if(!clearedValues[rk])clearedValues[rk]={};
+    Object.keys(bRow).forEach(function(k){
+      if(k==='id'||k==='_deleted')return;
+      var oldVal=String(bRow[k]||'').trim();
+      var newVal=String(r[k]||'').trim();
+      if(oldVal===newVal)return;
+      cf.push(k);
+      // If new value is blank/whitespace but old had content — store old value for strikethrough
+      if(newVal===''&&oldVal!==''){
+        clearedValues[rk][k]=bRow[k];
+      }
+    });
+    if(cf.length)changedIds[rk]=cf;
   });
-  return{added:added,deleted:deleted,changedIds:changedIds};
+  return{added:added,deleted:deleted,changedIds:changedIds,clearedValues:clearedValues};
 }
 
 function applyDiffHighlights(){
@@ -2266,9 +2299,35 @@ function applyDiffHighlights(){
       trEl.classList.add('tr-added');
     } else {
       var cf=diff.changedIds[key]||[];
+      var cleared=diff.clearedValues&&diff.clearedValues[key]||{};
       if(cf.length){
         var tds=trEl.querySelectorAll('td');
-        cols.forEach(function(c,ci){var td=tds[ci];if(td&&cf.indexOf(c.k)>=0)td.classList.add('cell-changed');});
+        cols.forEach(function(c,ci){
+          var td=tds[ci];if(!td)return;
+          if(cf.indexOf(c.k)<0)return;
+          if(cleared[c.k]!==undefined){
+            // Cleared field — red bg, show old value with strikethrough
+            td.classList.remove('cell-changed');
+            td.style.background='rgba(255,77,109,.18)';
+            td.style.outline='1px solid rgba(255,77,109,.5)';
+            // Find the input/span inside and overlay the old value
+            var inp=td.querySelector('input,select,span');
+            if(inp){
+              inp.style.opacity='0';
+              // Add strikethrough overlay if not already there
+              if(!td.querySelector('.cleared-overlay')){
+                var ov=document.createElement('div');
+                ov.className='cleared-overlay';
+                ov.style.cssText='position:absolute;top:50%;left:6px;transform:translateY(-50%);color:rgba(255,77,109,.9);font-size:12px;text-decoration:line-through;pointer-events:none;white-space:nowrap';
+                ov.textContent=cleared[c.k];
+                td.style.position='relative';
+                td.appendChild(ov);
+              }
+            }
+          } else {
+            td.classList.add('cell-changed');
+          }
+        });
       }
     }
   });
@@ -2548,24 +2607,35 @@ function openRevHistory(){
 function openExportModal(){
   var tr=getTabRev(activeId);
   if(viewingRevIdx!==null){
-    // Viewing a specific published revision
     exportingRevIdx=viewingRevIdx;
   } else if(tr&&tr.draft){
-    // In active draft - use -1 as draft sentinel
     exportingRevIdx=-1;
   } else {
-    // No draft, show last published
     exportingRevIdx=null;
   }
   var rv=exportingRevIdx>=0?tr.revisions[exportingRevIdx]:tr.revisions[tr.revisions.length-1];
   var label=exportingRevIdx===-1?'Draft (current changes)':rv?rv.rev:'current';
   document.getElementById('exportRevSubtitle').textContent='Exporting: '+label;
+  // Show tracked changes toggle only when exporting a draft or a revision that has a previous one
+  var hasDiff=(exportingRevIdx===-1)||(exportingRevIdx>=1)||(exportingRevIdx===null&&tr&&tr.revisions.length>1&&tr.draft);
+  var wrap=document.getElementById('exportTrackToggleWrap');
+  if(wrap)wrap.style.display=hasDiff?'':'none';
+  // Default to tracked if draft, clean if viewing published
+  var yes=document.getElementById('exportTrackYes');
+  var no=document.getElementById('exportTrackNo');
+  if(yes&&no){yes.checked=(exportingRevIdx===-1);no.checked=(exportingRevIdx!==-1);}
   document.getElementById('exportRevModal').classList.add('open');
 }
 function exportRevAtIdx(idx){
   closeM('revHistModal');exportingRevIdx=idx;
   var tr=getTabRev(activeId);var rv=tr.revisions[idx];
   document.getElementById('exportRevSubtitle').textContent='Exporting: '+(rv?rv.rev:'revision');
+  // Show toggle if this revision has a previous one to compare against
+  var wrap=document.getElementById('exportTrackToggleWrap');
+  if(wrap)wrap.style.display=idx>0?'':'none';
+  var yes=document.getElementById('exportTrackYes');
+  var no=document.getElementById('exportTrackNo');
+  if(yes&&no){yes.checked=idx>0;no.checked=idx===0;}
   document.getElementById('exportRevModal').classList.add('open');
 }
 function getExportRows(){
@@ -2574,6 +2644,10 @@ function getExportRows(){
   var tab=tabs.find(function(t){return t.id===tabId;});
   // Include _deleted rows so they show red strikethrough in PDF/Excel
   return tab?tab.rows:[];
+}
+function isTrackedExport(){
+  var yes=document.getElementById('exportTrackYes');
+  return yes&&yes.checked;
 }
 function exportRevPDF(){
   closeM('exportRevModal');
@@ -2605,7 +2679,7 @@ function exportRevPDF(){
   } else {
     snapRows=tr.revisions.length?tr.revisions[tr.revisions.length-1].snapshot||[]:[];
   }
-  var diff=computeDiff(baseRows,snapRows);
+  var diff=isTrackedExport()?computeDiff(baseRows,snapRows):{added:[],deleted:[],changedIds:{},clearedValues:{}};
   var rows=snapRows.slice();
   // For draft exports: only show live rows (no deleted from base)
   if(hasDiff&&!isDraftExport){
@@ -2700,7 +2774,8 @@ function exportRevXLSX(){
   else if(isDraftExport){snapRows=tab.rows.filter(function(r){return!r._deleted&&!r._importDeleted;});}
   else if(viewingRevIdx!==null){snapRows=tr.revisions[viewingRevIdx]?tr.revisions[viewingRevIdx].snapshot||[]:[];}
   else{snapRows=tr.revisions.length?tr.revisions[tr.revisions.length-1].snapshot||[]:[];}
-  var diff=computeDiff(baseRows,snapRows);
+  var hasDiff2=isTrackedExport()&&baseRows.length>0;
+  var diff=hasDiff2?computeDiff(baseRows,snapRows):{added:[],deleted:[],changedIds:{},clearedValues:{}};
   var rows=snapRows.slice();
   if(hasDiff&&!isDraftExport){
     baseRows.forEach(function(br){if(diff.deleted.indexOf(rowKey(br))>=0)rows.push(Object.assign({},br,{_exportDeleted:true}));});
