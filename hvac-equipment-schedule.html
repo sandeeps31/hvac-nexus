@@ -1836,35 +1836,80 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
         var sheetXml=results[0];
         var stylesXml=results[1];
         if(stylesXml){
-          // 2 fonts needed:
-          // fIdx+0 = bold dark blue (col A label)
-          // fIdx+1 = bold white sz9 (section header)
+          // ── Fonts: 2 new ──
+          // fIdx+0 = bold dark (col headers, col A)
+          // fIdx+1 = bold dark (section header — same, dark text on grey)
           stylesXml=stylesXml.replace(/<fonts count="(\d+)">/,function(m,n){return '<fonts count="'+(+n+2)+'">';});
           stylesXml=stylesXml.replace('</fonts>',
-            '<font><b/><sz val="10"/><name val="Arial"/><color rgb="FF1E3A5F"/></font>'
-            +'<font><b/><sz val="9"/><name val="Arial"/><color rgb="FFFFFFFF"/></font>'
+            '<font><b/><sz val="10"/><name val="Arial"/></font>'
+            +'<font><b/><sz val="10"/><name val="Arial"/></font>'
             +'</fonts>');
-          // 2 fills:
-          // flIdx+0 = subtle grey-blue (col A)
-          // flIdx+1 = medium blue (section header)
-          stylesXml=stylesXml.replace(/<fills count="(\d+)">/,function(m,n){return '<fills count="'+(+n+2)+'">';});
+
+          // ── Fills: 1 new ──
+          // flIdx+0 = light grey #BFBFBF (section header only)
+          stylesXml=stylesXml.replace(/<fills count="(\d+)">/,function(m,n){return '<fills count="'+(+n+1)+'">';});
           stylesXml=stylesXml.replace('</fills>',
-            '<fill><patternFill patternType="solid"><fgColor rgb="FFE8EDF5"/><bgColor indexed="64"/></patternFill></fill>'
-            +'<fill><patternFill patternType="solid"><fgColor rgb="FF1E3A5F"/><bgColor indexed="64"/></patternFill></fill>'
+            '<fill><patternFill patternType="solid"><fgColor rgb="FFBFBFBF"/><bgColor indexed="64"/></patternFill></fill>'
             +'</fills>');
+
+          // ── Borders: 4 new ──
+          // bdIdx+0 = all 4 thin (data cells, col headers, col A)
+          // bdIdx+1 = top+left+right only, no bottom (section header first cell)
+          // bdIdx+2 = top only (section header middle merged cells)
+          // bdIdx+3 = top+right only (section header last cell)
+          var thinEdge='<color rgb="FF000000"/>';
+          var thin='<border>'
+            +'<left style="thin">'+thinEdge+'</left>'
+            +'<right style="thin">'+thinEdge+'</right>'
+            +'<top style="thin">'+thinEdge+'</top>'
+            +'<bottom style="thin">'+thinEdge+'</bottom>'
+            +'</border>';
+          var thinNoBot='<border>'
+            +'<left style="thin">'+thinEdge+'</left>'
+            +'<right style="thin">'+thinEdge+'</right>'
+            +'<top style="thin">'+thinEdge+'</top>'
+            +'<bottom/></border>';
+          var thinTopOnly='<border><left/><right/>'
+            +'<top style="thin">'+thinEdge+'</top>'
+            +'<bottom/></border>';
+          var thinTopRight='<border><left/>'
+            +'<right style="thin">'+thinEdge+'</right>'
+            +'<top style="thin">'+thinEdge+'</top>'
+            +'<bottom/></border>';
+          stylesXml=stylesXml.replace(/<borders count="(\d+)">/,function(m,n){return '<borders count="'+(+n+4)+'">';});
+          stylesXml=stylesXml.replace('</borders>',thin+thinNoBot+thinTopOnly+thinTopRight+'</borders>');
+
           var fIdx=parseInt((stylesXml.match(/<fonts count="(\d+)">/)||[0,1])[1])-2;
-          var flIdx=parseInt((stylesXml.match(/<fills count="(\d+)">/)||[0,4])[1])-2;
-          // 2 xf styles:
-          // labelStyle = col A / col headers: subtle fill, bold dark blue, left
-          // secHdrStyle = section row: medium blue fill, bold white, CENTRE
-          stylesXml=stylesXml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+2)+'">';});
+          var flIdx=parseInt((stylesXml.match(/<fills count="(\d+)">/)||[0,4])[1])-1;
+          var bdCount=parseInt((stylesXml.match(/<borders count="(\d+)">/)||[0,1])[1]);
+          var bdAll=bdCount-4;      // all 4 borders
+          var bdNoBot=bdCount-3;    // top+left+right (section first cell)
+          var bdTopOnly=bdCount-2;  // top only (section merged middle)
+          var bdTopRight=bdCount-1; // top+right (section last cell)
+
+          // ── xf styles: 4 new ──
+          // s0 = colHdrStyle:  no fill, bold, all borders, left align
+          // s1 = secHdrStyle:  grey fill, bold, noBot borders, centre — first cell of section
+          // s2 = secMidStyle:  grey fill, bold, topOnly border — merged middle cells
+          // s3 = secLastStyle: grey fill, bold, topRight border — last cell of section
+          // s4 = dataStyle:    no fill, normal, all borders
+          // s5 = secHdrVert:   grey fill, bold, all borders (vertical full row)
+          stylesXml=stylesXml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+6)+'">';});
           stylesXml=stylesXml.replace('</cellXfs>',
-            '<xf numFmtId="0" fontId="'+fIdx+'" fillId="'+flIdx+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
-            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+(flIdx+1)+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            '<xf numFmtId="0" fontId="'+fIdx+'" fillId="0" borderId="'+bdAll+'" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
+            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+flIdx+'" borderId="'+bdNoBot+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+flIdx+'" borderId="'+bdTopOnly+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+flIdx+'" borderId="'+bdTopRight+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            +'<xf numFmtId="0" fontId="0" fillId="0" borderId="'+bdAll+'" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
+            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+flIdx+'" borderId="'+bdAll+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
             +'</cellXfs>');
-          var totalXf=parseInt((stylesXml.match(/<cellXfs count="(\d+)">/)||[0,3])[1]);
-          var labelStyle=totalXf-2;   // col A: subtle bg, bold dark
-          var secHdrStyle=totalXf-1;  // section row: blue bg, bold white
+          var totalXf=parseInt((stylesXml.match(/<cellXfs count="(\d+)">/)||[0,7])[1]);
+          var colHdrStyle=totalXf-6;   // bold, no fill, all borders
+          var secFirstStyle=totalXf-5; // grey, bold, top+left+right
+          var secMidStyle=totalXf-4;   // grey, bold, top only
+          var secLastStyle=totalXf-3;  // grey, bold, top+right
+          var dataStyle=totalXf-2;     // no fill, normal, all borders
+          var secVertStyle=totalXf-1;  // grey, bold, all borders (vertical)
           zip.file('xl/styles.xml',stylesXml);
 
           // Determine section rows
@@ -1874,43 +1919,55 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           } else {
             if(hasSections)secHdrRows[1]=true;
           }
+          var colHdrRowNum=verticalMode?0:(hasSections?2:1);
 
-          // Patch cells:
-          // - Section header rows: entire row gets secHdrStyle (blue, white bold, centre)
-          // - Vertical mode: col A always gets labelStyle (including row 1)
-          // - Horizontal mode: entire col header row gets labelStyle
+          function colLetterToIdx(col){var ci=0;for(var i=0;i<col.length;i++)ci=ci*26+(col.charCodeAt(i)-64);return ci-1;}
+
           sheetXml=sheetXml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
             var rowNum=parseInt(rn);
+
+            // ── Section header row ──
             if(secHdrRows[rowNum]){
-              // For horizontal: only colour cells that belong to a named section
-              // For vertical: full row blue
-              if(verticalMode||!secColRanges.length){
-                var patched=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+secHdrStyle+'"'+rest+'>';});
-                return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
+              if(verticalMode){
+                // Full row grey, bold, all borders
+                var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+secVertStyle+'"'+rest+'>';});
+                return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
               } else {
-                // Horizontal: only colour cells in section col ranges
-                var patched=content.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
-                  // Convert col letter to 0-based index
-                  var ci=0;for(var i=0;i<col.length;i++)ci=ci*26+(col.charCodeAt(i)-64);ci--;
-                  var inSec=secColRanges.some(function(r){return ci>=r.start&&ci<=r.end;});
-                  if(inSec)return '<c r="'+col+row+'" s="'+secHdrStyle+'"'+rest+'>';
-                  return cm;
+                // Horizontal: section cells get grey with border treatment; non-section cells untouched
+                var p=content.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
+                  var ci=colLetterToIdx(col);
+                  var range=null;
+                  for(var ri=0;ri<secColRanges.length;ri++){if(ci>=secColRanges[ri].start&&ci<=secColRanges[ri].end){range=secColRanges[ri];break;}}
+                  if(!range)return cm;
+                  var sty=ci===range.start?secFirstStyle:ci===range.end?secLastStyle:secMidStyle;
+                  return '<c r="'+col+row+'" s="'+sty+'"'+rest+'>';
                 });
-                return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
+                return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
               }
             }
+
+            // ── Col header row ──
+            if(!verticalMode&&rowNum===colHdrRowNum){
+              var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+colHdrStyle+'"'+rest+'>';});
+              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
+            }
+
+            // ── Vertical: col A bold all borders, row 1 eq ID row all borders, data cells all borders ──
             if(verticalMode){
-              // Col A label style on ALL rows
-              var patched2=content.replace(/<c r="(A\d+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+labelStyle+'"'+rest+'>';});
-              return '<row r="'+rn+'"'+ra+'>'+patched2+'</row>';
-            } else {
-              // Horizontal: entire col header row gets label style
-              var colHdrRowNum=hasSections?2:1;
-              if(rowNum===colHdrRowNum){
-                var patched3=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+labelStyle+'"'+rest+'>';});
-                return '<row r="'+rn+'"'+ra+'>'+patched3+'</row>';
-              }
+              var p=content.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
+                var ci=colLetterToIdx(col);
+                var sty=ci===0?colHdrStyle:dataStyle;
+                return '<c r="'+col+row+'" s="'+sty+'"'+rest+'>';
+              });
+              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
             }
+
+            // ── Horizontal data rows: all borders ──
+            if(!verticalMode&&rowNum>colHdrRowNum){
+              var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+dataStyle+'"'+rest+'>';});
+              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
+            }
+
             return full;
           });
         }
