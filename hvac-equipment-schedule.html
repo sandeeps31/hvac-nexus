@@ -1876,8 +1876,8 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
 
           // Patch cells:
           // - Section header rows: entire row gets secHdrStyle
-          // - Vertical mode data rows: col A only gets labelStyle
-          // - Row 1 (eq ID header in vertical): no style — plain text
+          // - Vertical mode: col A always gets labelStyle (including row 1 Equipment ID)
+          // - Horizontal mode: row 1 (col headers) col A gets labelStyle, rest plain
           sheetXml=sheetXml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
             var rowNum=parseInt(rn);
             if(secHdrRows[rowNum]){
@@ -1885,10 +1885,18 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
               var patched=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+secHdrStyle+'"'+rest+'>';});
               return '<row r="'+rn+'"'+ra+'>'+patched+'</row>';
             }
-            if(verticalMode&&rowNum>vertHeaderRow&&!secHdrRows[rowNum]){
-              // Col A label style only
+            if(verticalMode){
+              // Col A gets label style on ALL rows (including row 1 = Equipment ID)
               var patched2=content.replace(/<c r="(A\d+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+labelStyle+'"'+rest+'>';});
               return '<row r="'+rn+'"'+ra+'>'+patched2+'</row>';
+            }
+            if(!verticalMode){
+              // Horizontal: col A on header row(s) gets label style
+              var hdrRowNum=hasSections?2:1;
+              if(rowNum===hdrRowNum||rowNum===1){
+                var patched3=content.replace(/<c r="(A\d+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+labelStyle+'"'+rest+'>';});
+                return '<row r="'+rn+'"'+ra+'>'+patched3+'</row>';
+              }
             }
             return full;
           });
