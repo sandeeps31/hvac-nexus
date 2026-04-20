@@ -213,7 +213,8 @@ body.sb-sm{padding-left:var(--sb-sm)}
 #main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 
 /* ── REVISION / LOCK / DIFF SYSTEM ── */
-.rev-bar{padding:7px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.btn.danger-outline{border-color:var(--danger);color:var(--danger);background:none}
+.btn.danger-outline:hover{background:rgba(255,77,109,.12)}
 .rev-pill-strip{display:flex;gap:5px;flex-wrap:wrap;flex:1;align-items:center}
 .rpill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-family:'DM Mono',monospace;font-size:10px;color:var(--text2);transition:all .13s;white-space:nowrap}
 .rpill:hover{border-color:var(--accent);color:var(--accent)}
@@ -849,7 +850,7 @@ function renderVerticalTable(t,rows){
   // ── Compute diff for draft highlighting ──
   var diffChangedIds={};var diffAdded=[];var diffDeleted=[];
   var tr=getTabRev(t.id);
-  if(tr&&_editingTabId===t.id){
+  if(tr&&tr.draft){
     var prevRevs=(tr.revisions||[]).filter(function(r){return r.snapshot&&r.snapshot.length>0;});
     var baseSnap=prevRevs.length?prevRevs[prevRevs.length-1].snapshot||[]:[];
     var d=computeDiff(baseSnap,t.rows);
@@ -2234,7 +2235,7 @@ function applyDiffHighlights(){
     baseRows=tr.revisions[viewingRevIdx-1].snapshot||[];
     viewRows=tr.revisions[viewingRevIdx].snapshot||[];
     diff=computeDiff(baseRows,viewRows);
-  } else if(tr.draft&&_editingTabId===tabId){
+  } else if(tr.draft){
     var prevRevisions=tr.revisions.filter(function(r){return r.snapshot&&r.snapshot.length>0;});
     if(!prevRevisions.length){
       // No baseline — all current rows are "new", show as added
@@ -2340,6 +2341,7 @@ function renderRevBar(){
     addBtn('📋 Revision History','bg',openRevHistory);
     addBtn('💾 Save & Release','bp',function(){saveAndRelease(tabId);});
     addBtn('↑ Publish','bg',openPublishModal);
+    addBtn('🗑 Discard Draft','danger-outline',function(){discardDraft(tabId);});
   } else {
     // Draft exists but not currently editing — show Edit and Publish
     addBtn('📋 Revision History','bg',openRevHistory);
@@ -2442,6 +2444,26 @@ function startDraftAndEdit(tabId){
   viewingRevIdx=null;
   renderRevBar();renderTable();
   showToast('✏️ Editing — click Save & Release when done');
+}
+function discardDraft(tabId){
+  if(!confirm('Discard draft?\n\nAll changes made since the last published revision will be permanently lost. This cannot be undone.'))return;
+  var t=tabs.find(function(x){return x.id===tabId;});if(!t)return;
+  var tr=getTabRev(tabId);if(!tr)return;
+  // Restore rows from last published snapshot
+  var prevRevs=(tr.revisions||[]).filter(function(r){return r.snapshot&&r.snapshot.length>0;});
+  if(prevRevs.length){
+    t.rows=JSON.parse(JSON.stringify(prevRevs[prevRevs.length-1].snapshot));
+  } else {
+    t.rows=[];
+  }
+  // Clear draft
+  tr.draft=null;
+  _editingTabId=null;
+  viewingRevIdx=null;
+  clearLock(tabId);
+  saveEquip();saveRevData();
+  renderRevBar();renderTable();
+  showToast('Draft discarded — restored to last published revision');
 }
 function saveAndRelease(tabId){
   saveEquip();
