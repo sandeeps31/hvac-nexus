@@ -524,7 +524,8 @@ function addSubbieRow() {
 // AREAS - loaded in async init above
 var _areasPlaceholder=null;
 function saveAreas(){
-  dbSetProject('proj_settings',projectId+'_areas',areas).catch(function(e){console.error(e);});
+  var _save=function(){dbSetProject('proj_settings',projectId+'_areas',areas).catch(function(e){console.error(e);});};
+  if(typeof dbReady!=='undefined')dbReady.then(_save);else _save();
 }
 function nidArea(){return 'a'+Date.now()+'_'+Math.random().toString(36).slice(2,5);}
 function renderAreas(){
@@ -556,11 +557,12 @@ function areaUpdateName(id,val){function find(nodes){for(var i=0;i<nodes.length;
 function areaDelete(id){function remove(nodes){for(var i=0;i<nodes.length;i++){if(nodes[i].id===id){nodes.splice(i,1);return true;}if(nodes[i].children&&remove(nodes[i].children))return true;}}remove(areas);saveAreas();renderAreas();}
 function areaAddRoot(){
   var inp=document.getElementById('areaAddInput');var val=inp?(inp.value.trim()):'';
+  if(!val)return;
   if(!Array.isArray(areas))areas=[];
   areas.push({id:nidArea(),name:val,children:[]});
   if(inp)inp.value='';
   saveAreas();renderAreas();
-  setTimeout(function(){var inputs=document.querySelectorAll('#areaTree input[data-id]');if(inputs.length)inputs[inputs.length-1].focus();},50);
+  setTimeout(function(){var addInp=document.getElementById('areaAddInput');if(addInp)addInp.focus();},50);
 }
 function areaAddChild(parentId){
   function add(nodes){for(var i=0;i<nodes.length;i++){if(nodes[i].id===parentId){if(!nodes[i].children)nodes[i].children=[];nodes[i].children.push({id:nidArea(),name:'',children:[]});return true;}if(nodes[i].children&&add(nodes[i].children))return true;}}
