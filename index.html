@@ -196,7 +196,7 @@ function nid(){return 'p'+(++_uid)+Date.now();}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function save(){
   // Save each project as its own row — never overwrites other projects
-  return Promise.all(projects.map(p => dbSetProject_single(p))).catch(function(e){console.error('saveProjects:',e);});
+  return dbSetProjects(projects).catch(function(e){console.error('saveProjects:',e);});
 }
 async function load(){
   try{
@@ -207,7 +207,7 @@ async function load(){
     if(legacy && Array.isArray(legacy) && legacy.length){
       projects = legacy;
       // Migrate: save each as its own row
-      await Promise.all(projects.map(p => dbSetProject_single(p)));
+      await dbSetProjects(projects);
       console.log('Migrated', projects.length, 'projects to individual rows');
       return;
     }
@@ -343,11 +343,11 @@ function saveProject(){
   if(_editingId){
     var p=projects.find(function(x){return x.id===_editingId;});
     if(p)Object.assign(p,data);
-    dbSetProject_single(p).catch(function(e){console.error('saveProject:',e);});
+    dbSetProjects(projects).catch(function(e){console.error('saveProject:',e);});
   } else {
     data.id=nid();data.created=today;
     projects.push(data);
-    dbSetProject_single(data).catch(function(e){console.error('saveProject:',e);});
+    dbSetProjects(projects).catch(function(e){console.error('saveProject:',e);});
   }
   renderProjects();
   closeModal();
