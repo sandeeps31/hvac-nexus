@@ -290,6 +290,25 @@ body.sb-sm{padding-left:var(--sb-sm)}
 .scan-result-row{padding:12px 16px;border-bottom:1px solid var(--border)}
 .scan-conflict{background:rgba(255,184,48,.08);border:1px solid rgba(255,184,48,.3);border-radius:6px;padding:6px 10px;margin-top:4px;font-size:11px;color:var(--warn)}
 
+/* ── CASCADING LOCATION PICKER ── */
+.loc-cell{display:flex;align-items:center;gap:4px;cursor:pointer;min-width:120px;padding:3px 6px;border:1px solid transparent;border-radius:5px;transition:border-color .15s;font-size:12px;color:var(--text2);font-family:'DM Mono',monospace}
+.loc-cell:hover{border-color:var(--border)}
+.loc-cell.active{border-color:var(--accent)}
+.loc-cell.readonly{cursor:default;pointer-events:none;opacity:.65}
+.loc-val{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.loc-pick{position:fixed;z-index:8000;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.6);width:240px;max-height:320px;display:flex;flex-direction:column;overflow:hidden}
+.loc-pick-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.loc-pick-back{background:none;border:none;color:var(--accent);cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0}
+.loc-pick-title{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loc-pick-clear{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0}
+.loc-pick-clear:hover{color:var(--danger)}
+.loc-pick-list{overflow-y:auto;flex:1}
+.loc-pick-item{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:1px solid rgba(30,48,80,.4);transition:background .1s}
+.loc-pick-item:last-child{border-bottom:none}
+.loc-pick-item:hover{background:var(--surface2)}
+.loc-pick-item.has-children{color:var(--text)}
+.loc-pick-drill{font-size:11px;color:var(--muted);flex-shrink:0}
+
 </style>
 <script src="head-common.js"></script>
 <script src="db.js"></script>
@@ -576,6 +595,7 @@ var _editingTabId=null; // tracks which tab is currently in edit mode
 var _eqProj=dbGetCurrentProject();
 var _eqPNum=_eqProj.num||_eqProj.number||'GCT001';
 var _locationPaths=[];
+var _locationTree=[];
 
 function _flattenAreas(nodes,prefix){
   var paths=[];
@@ -594,8 +614,9 @@ async function loadLocationPaths(){
     var areas=await dbGetProject('proj_settings',pId+'_areas');
     if(areas&&Array.isArray(areas)&&areas.length){
       _locationPaths=_flattenAreas(areas,'');
+      _locationTree=areas;
     }
-  }catch(e){_locationPaths=[];}
+  }catch(e){_locationPaths=[];_locationTree=[];}
 }
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
@@ -638,6 +659,120 @@ function tplCols(t){
   // Status column removed — not required on template-based tabs
   return cols;
 }
+// ── CASCADING LOCATION PICKER ──
+var _locPickTid=null,_locPickRid=null,_locPickKey=null;
+var _locPickPath=[]; // stack of {nodes, label} for back navigation
+var _locPickCurrentNodes=null;
+
+function isLocCol(k){return k==='location'||k==='sublocation'||k==='area';}
+
+function locCellHtml(tid,rid,colKey,currentVal,readonly){
+  var displayVal=currentVal?X(currentVal):'<span style="color:var(--muted);font-size:11px">—</span>';
+  if(readonly){
+    return'<div class="loc-cell readonly"><span class="loc-val">'+displayVal+'</span></div>';
+  }
+  return'<div class="loc-cell" onclick="openLocPicker(event,\''+tid+'\',\''+rid+'\',\''+colKey+'\')" title="'+(currentVal?X(currentVal):'')+'">'
+    +'<span class="loc-val">'+displayVal+'</span>'
+    +'<span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span>'
+    +'</div>';
+}
+
+function openLocPicker(e,tid,rid,key){
+  e.stopPropagation();
+  _locPickTid=tid;_locPickRid=rid;_locPickKey=key;
+  _locPickPath=[];
+  _locPickCurrentNodes=_locationTree||[];
+  renderLocPicker('Select Location');
+  var pick=document.getElementById('locPicker');
+  pick.style.display='flex';
+  // Position near clicked element
+  var rect=e.currentTarget.getBoundingClientRect();
+  var pw=240,ph=320;
+  var left=rect.left;var top=rect.bottom+4;
+  if(left+pw>window.innerWidth)left=window.innerWidth-pw-8;
+  if(top+ph>window.innerHeight)top=rect.top-ph-4;
+  pick.style.left=left+'px';pick.style.top=top+'px';
+  // Mark cell active
+  document.querySelectorAll('.loc-cell').forEach(function(el){el.classList.remove('active');});
+  e.currentTarget.classList.add('active');
+}
+
+function renderLocPicker(title){
+  document.getElementById('locPickTitle').textContent=title;
+  document.getElementById('locPickBack').style.visibility=_locPickPath.length?'visible':'hidden';
+  var list=document.getElementById('locPickList');
+  var nodes=_locPickCurrentNodes||[];
+  // Build current full path prefix
+  var prefix=_locPickPath.map(function(p){return p.label;}).join(' > ');
+
+  var html='';
+  // "Select this level" option when drilled in
+  if(_locPickPath.length>0){
+    html+='<div class="loc-pick-item" style="color:var(--accent);font-size:12px;border-bottom:2px solid var(--border)" onclick="locPickSelect(\''+X(prefix)+'\')">'
+      +'<span>✓ Select "'+X(_locPickPath[_locPickPath.length-1].label)+'"</span>'
+      +'</div>';
+  }
+  nodes.forEach(function(node){
+    if(!node.name)return;
+    var fullPath=prefix?(prefix+' > '+node.name):node.name;
+    var hasKids=node.children&&node.children.length>0;
+    html+='<div class="loc-pick-item'+(hasKids?' has-children':'')+'" '
+      +'onclick="'+(hasKids?'locPickDrill(\''+X(node.name)+'\','+JSON.stringify(node.children).replace(/"/g,'&quot;')+')':'locPickSelect(\''+X(fullPath)+'\')')+'">'
+      +'<span>'+X(node.name)+'</span>'
+      +(hasKids?'<span class="loc-pick-drill">›</span>':'')
+      +'</div>';
+  });
+  if(!nodes.length)html='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">No areas defined</div>';
+  list.innerHTML=html;
+}
+
+function locPickDrill(label,children){
+  _locPickPath.push({label:label,nodes:_locPickCurrentNodes});
+  _locPickCurrentNodes=children;
+  renderLocPicker(label);
+}
+
+function locPickBack(){
+  if(!_locPickPath.length)return;
+  var prev=_locPickPath.pop();
+  _locPickCurrentNodes=prev.nodes;
+  var title=_locPickPath.length?_locPickPath[_locPickPath.length-1].label:'Select Location';
+  renderLocPicker(title);
+}
+
+function locPickSelect(fullPath){
+  if(_locPickTid&&_locPickRid&&_locPickKey){
+    updR(_locPickTid,_locPickRid,_locPickKey,fullPath);
+    // Update the cell display
+    var cells=document.querySelectorAll('[data-loc-tid="'+_locPickTid+'"][data-loc-rid="'+_locPickRid+'"][data-loc-key="'+_locPickKey+'"]');
+    cells.forEach(function(cell){
+      var val=cell.querySelector('.loc-val');
+      if(val)val.innerHTML=X(fullPath);
+      cell.title=fullPath;
+    });
+  }
+  closeLocPicker();
+}
+
+function locPickClear(){
+  if(_locPickTid&&_locPickRid&&_locPickKey){
+    updR(_locPickTid,_locPickRid,_locPickKey,'');
+  }
+  closeLocPicker();
+}
+
+function closeLocPicker(){
+  var pick=document.getElementById('locPicker');
+  if(pick)pick.style.display='none';
+  document.querySelectorAll('.loc-cell').forEach(function(el){el.classList.remove('active');});
+  _locPickTid=null;_locPickRid=null;_locPickKey=null;
+}
+
+document.addEventListener('click',function(e){
+  var pick=document.getElementById('locPicker');
+  if(pick&&pick.style.display!=='none'&&!pick.contains(e.target))closeLocPicker();
+});
+
 function getCols(t){
   return tplCols(t).filter(function(c){return!c.hidden;}).map(function(c){
     // Dynamically mark location/sublocation as dropdown when project areas exist
@@ -863,6 +998,15 @@ function renderTable(){
         :cellChanged?'style="background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)"':'';
       var clearedOv=isCleared?'<div style="position:absolute;top:50%;left:6px;right:4px;transform:translateY(-50%);color:rgba(255,77,109,.95);font-size:12px;text-decoration:line-through;pointer-events:none;white-space:nowrap;overflow:hidden;z-index:2;font-family:inherit">'+X(importCleared[c.k])+'</div>':'';
       if(c.sel){
+        // Location column — use cascading picker
+        if(isLocCol(c.k)&&_locationTree&&_locationTree.length){
+          if(ro2)return'<td '+cellStyle+'>'+clearedOv+'<div class="loc-cell readonly"><span class="loc-val">'+(row[c.k]?X(row[c.k]):'<span style="color:var(--muted);font-size:11px">—</span>')+'</span></div></td>';
+          return'<td '+cellStyle+' data-loc-tid="'+t.id+'" data-loc-rid="'+row.id+'" data-loc-key="'+c.k+'">'+clearedOv
+            +'<div class="loc-cell" data-loc-tid="'+t.id+'" data-loc-rid="'+row.id+'" data-loc-key="'+c.k+'" onclick="openLocPicker(event,\''+t.id+'\',\''+row.id+'\',\''+c.k+'\')" title="'+(row[c.k]?X(row[c.k]):'')+'">'
+            +'<span class="loc-val">'+(row[c.k]?X(row[c.k]):'<span style="color:var(--muted);font-size:11px">—</span>')+'</span>'
+            +'<span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span>'
+            +'</div></td>';
+        }
         if(ro2)return'<td '+cellStyle+'>'+clearedOv+'<span style="font-size:12px'+(isCleared?';padding-top:13px;display:block':'')+'">'+X(row[c.k]||'—')+'</span></td>';
         return'<td '+cellStyle+'>'+clearedOv+'<select class="csel" style="'+(isCleared?'padding-top:13px':'')+';" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
       }
@@ -977,8 +1121,19 @@ function renderVerticalTable(t,rows){
       // Cleared overlay — shown when a previously-filled field is now blank
       var clearedOverlay=clearedVal!==null?'<div style="position:absolute;top:50%;left:6px;right:4px;transform:translateY(-50%);color:rgba(255,77,109,.95);font-size:12px;text-decoration:line-through;pointer-events:none;white-space:nowrap;overflow:hidden;z-index:2;font-family:inherit">'+X(clearedVal)+'</div>':'';
       if(c.sel){
-        if(ro)html+='<td style="'+tdStyle+'">'+clearedOverlay+'<span style="font-size:12px;'+delStyle+(clearedVal!==null?';visibility:hidden':'')+'">'+X(row[c.k]||'—')+'</span></td>';
-        else html+='<td style="'+tdStyle+'">'+clearedOverlay+'<select class="csel" style="'+(clearedVal!==null?'opacity:0':'')+';" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+        // Location column — use cascading picker
+        if(isLocCol(c.k)&&_locationTree&&_locationTree.length){
+          if(ro)html+='<td style="'+tdStyle+'">'+clearedOverlay+'<div class="loc-cell readonly"><span class="loc-val">'+(row[c.k]?X(row[c.k]):'<span style="color:var(--muted);font-size:11px">—</span>')+'</span></div></td>';
+          else html+='<td style="'+tdStyle+'" data-loc-tid="'+t.id+'" data-loc-rid="'+row.id+'" data-loc-key="'+c.k+'">'+clearedOverlay
+            +'<div class="loc-cell" data-loc-tid="'+t.id+'" data-loc-rid="'+row.id+'" data-loc-key="'+c.k+'" onclick="openLocPicker(event,\''+t.id+'\',\''+row.id+'\',\''+c.k+'\')" title="'+(row[c.k]?X(row[c.k]):'')+'">'
+            +'<span class="loc-val">'+(row[c.k]?X(row[c.k]):'<span style="color:var(--muted);font-size:11px">—</span>')+'</span>'
+            +'<span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span>'
+            +'</div></td>';
+        } else if(ro){
+          html+='<td style="'+tdStyle+'">'+clearedOverlay+'<span style="font-size:12px;'+delStyle+(clearedVal!==null?';visibility:hidden':'')+'">'+X(row[c.k]||'—')+'</span></td>';
+        } else {
+          html+='<td style="'+tdStyle+'">'+clearedOverlay+'<select class="csel" style="'+(clearedVal!==null?'opacity:0':'')+';" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
+        }
       } else {
         html+='<td style="'+tdStyle+'">'+clearedOverlay+'<input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly':'')+' style="'+(ro?'opacity:.65;cursor:default;':'')+delStyle+(clearedVal!==null?';visibility:hidden':'')+'">\x3c/td>';
       }
@@ -3604,6 +3759,14 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   </div>
 </div>
 
+<div id="locPicker" class="loc-pick" style="display:none">
+  <div class="loc-pick-hdr">
+    <button class="loc-pick-back" id="locPickBack" onclick="locPickBack()">‹</button>
+    <span class="loc-pick-title" id="locPickTitle">Select Location</span>
+    <button class="loc-pick-clear" onclick="locPickClear()" title="Clear">✕</button>
+  </div>
+  <div class="loc-pick-list" id="locPickList"></div>
+</div>
 <div id="colFilterPopover">
   <div class="cfp-hdr"><span id="cfpTitle">Filter</span><button onclick="closeCFP()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1">×</button></div>
   <div class="cfp-list" id="cfpList"></div>
