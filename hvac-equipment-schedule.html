@@ -401,10 +401,12 @@ body.sb-sm{padding-left:var(--sb-sm)}
     <div class="msub" id="exportRevSubtitle"></div>
     <!-- Tracked changes toggle — only shown when a draft exists -->
     <div id="exportTrackToggleWrap" style="display:none;margin:14px 0 4px">
-      <button id="exportTrackBtn" onclick="toggleExportTrack()" style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;width:100%;cursor:pointer;text-align:left">
-        <span id="exportTrackDot" style="width:10px;height:10px;border-radius:50%;background:#00e5a0;flex-shrink:0;box-shadow:0 0 6px rgba(0,229,160,.6)"></span>
+      <div onclick="toggleExportTrack()" style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
+        <div id="exportTrackSwitch" style="width:42px;height:24px;border-radius:12px;background:#00e5a0;position:relative;transition:background .2s;flex-shrink:0">
+          <div id="exportTrackThumb" style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:3px;left:21px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>
+        </div>
         <span id="exportTrackLabel" style="font-size:13px;color:var(--text)">Changes tracked</span>
-      </button>
+      </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin:14px 0">
       <button class="btn bp" onclick="exportRevPDF()" style="justify-content:center">📄 Export as PDF</button>
@@ -571,7 +573,27 @@ var _editingTabId=null; // tracks which tab is currently in edit mode
 
 // applySB called in sidebar init
 
-var _eqProj=dbGetCurrentProject();
+var _locationPaths=[];
+
+function _flattenAreas(nodes,prefix){
+  var paths=[];
+  (nodes||[]).forEach(function(node){
+    if(!node.name)return;
+    var path=prefix?prefix+' > '+node.name:node.name;
+    paths.push(path);
+    if(node.children&&node.children.length)paths=paths.concat(_flattenAreas(node.children,path));
+  });
+  return paths;
+}
+
+async function loadLocationPaths(){
+  try{
+    var areas=await dbGetProject('proj_settings',_eqPNum+'_areas');
+    if(areas&&Array.isArray(areas)&&areas.length){
+      _locationPaths=_flattenAreas(areas,'');
+    }
+  }catch(e){_locationPaths=[];}
+}
 var _eqPNum=_eqProj.num||_eqProj.number||'GCT001';
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
@@ -614,8 +636,20 @@ function tplCols(t){
   // Status column removed — not required on template-based tabs
   return cols;
 }
-function getCols(t){return tplCols(t).filter(function(c){return!c.hidden;});}
+function getCols(t){
+  return tplCols(t).filter(function(c){return!c.hidden;}).map(function(c){
+    // Dynamically mark location/sublocation as dropdown when project areas exist
+    if(_locationPaths&&_locationPaths.length&&(c.k==='location'||c.k==='sublocation'||c.k==='area')){
+      return Object.assign({},c,{sel:true});
+    }
+    return c;
+  });
+}
 function colOptions(c,t){
+  // Location columns — use project areas if available
+  if((c.k==='location'||c.k==='sublocation'||c.k==='area')&&_locationPaths&&_locationPaths.length){
+    return _locationPaths;
+  }
   if(c.options&&c.options.length)return c.options;
   // Try to find options from tab sections
   if(t){
@@ -2182,6 +2216,7 @@ document.getElementById('ceModal').addEventListener('click',function(e){if(e.tar
     var ok=await loadEquip();
     if(ok)await loadRevData();
   }catch(e){console.warn('equip load failed:',e);}
+  try{await loadLocationPaths();}catch(e){}
   try{var d=await dbGetEqsTemplates();_addModalTemplates=Array.isArray(d)?d:[];}catch(e){_addModalTemplates=[];}
   renderStrip();
   setTimeout(function(){if(activeId&&typeof ensureRevInit==='function'){ensureRevInit(activeId);renderRevBar();}},0);
@@ -2619,10 +2654,7 @@ function openExportModal(){
   var wrap=document.getElementById('exportTrackToggleWrap');
   if(wrap)wrap.style.display='';
   // Reset toggle to tracked-on each time modal opens
-  _exportTracked=true;
-  var dot=document.getElementById('exportTrackDot');var lbl=document.getElementById('exportTrackLabel');
-  if(dot){dot.style.background='#00e5a0';dot.style.boxShadow='0 0 6px rgba(0,229,160,.6)';}
-  if(lbl){lbl.style.color='var(--text)';lbl.textContent='Changes tracked';}
+  _exportTracked=true;_applyExportTrack();
   document.getElementById('exportRevModal').classList.add('open');
 }
 function exportRevAtIdx(idx){
@@ -2631,10 +2663,7 @@ function exportRevAtIdx(idx){
   document.getElementById('exportRevSubtitle').textContent='Exporting: '+(rv?rv.rev:'revision');
   var wrap=document.getElementById('exportTrackToggleWrap');
   if(wrap)wrap.style.display='';
-  _exportTracked=idx>0;
-  var dot=document.getElementById('exportTrackDot');var lbl=document.getElementById('exportTrackLabel');
-  if(dot){dot.style.background=_exportTracked?'#00e5a0':'var(--muted)';dot.style.boxShadow=_exportTracked?'0 0 6px rgba(0,229,160,.6)':'none';}
-  if(lbl){lbl.style.color=_exportTracked?'var(--text)':'var(--muted)';lbl.textContent=_exportTracked?'Changes tracked':'Untracked';}
+  _exportTracked=idx>0;_applyExportTrack();
   document.getElementById('exportRevModal').classList.add('open');
 }
 function getExportRows(){
@@ -2645,15 +2674,15 @@ function getExportRows(){
   return tab?tab.rows:[];
 }
 var _exportTracked=true;
-function toggleExportTrack(){
-  _exportTracked=!_exportTracked;
-  var dot=document.getElementById('exportTrackDot');
+function _applyExportTrack(){
+  var sw=document.getElementById('exportTrackSwitch');
+  var th=document.getElementById('exportTrackThumb');
   var lbl=document.getElementById('exportTrackLabel');
-  if(dot)dot.style.background=_exportTracked?'#00e5a0':'var(--muted)';
-  if(dot)dot.style.boxShadow=_exportTracked?'0 0 6px rgba(0,229,160,.6)':'none';
-  if(lbl)lbl.style.color=_exportTracked?'var(--text)':'var(--muted)';
-  if(lbl)lbl.textContent=_exportTracked?'Changes tracked':'Untracked';
+  if(sw)sw.style.background=_exportTracked?'#00e5a0':'var(--surface3)';
+  if(th)th.style.left=_exportTracked?'21px':'3px';
+  if(lbl){lbl.textContent=_exportTracked?'Changes tracked':'Untracked';lbl.style.color=_exportTracked?'var(--text)':'var(--muted)';}
 }
+function toggleExportTrack(){_exportTracked=!_exportTracked;_applyExportTrack();}
 function isTrackedExport(){return _exportTracked;}
 function exportRevPDF(){
   closeM('exportRevModal');
@@ -2807,16 +2836,10 @@ function exportRevXLSX(){
   (tab.cc||[]).forEach(function(c){if(c.sel&&c.options&&c.options.length)dropdownMap[c.k]=c.options.slice();});
   cols.forEach(function(c){if(c.sel&&!dropdownMap[c.k])dropdownMap[c.k]=STATUSES.slice();});
 
-  // Load locations from project settings if available
-  var locationOptions=[];
-  try{
-    var ps=JSON.parse(localStorage.getItem('hvacnexus_project_settings_'+_eqPNum)||'{}');
-    if(ps.locations&&ps.locations.length)locationOptions=ps.locations;
-  }catch(e){}
-  if(locationOptions.length){
-    // Apply to any location/sublocation column
+  // Load locations from project areas
+  if(_locationPaths&&_locationPaths.length){
     cols.forEach(function(c){
-      if(c.k==='location'||c.k==='sublocation'||c.k==='area')dropdownMap[c.k]=locationOptions;
+      if(c.k==='location'||c.k==='sublocation'||c.k==='area')dropdownMap[c.k]=_locationPaths;
     });
   }
 
