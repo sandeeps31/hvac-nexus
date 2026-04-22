@@ -2168,16 +2168,15 @@ function buildAndDownloadTemplate(t,cols){
   XLSX.utils.book_append_sheet(wb,ws,tabName);
 
   // Always run JSZip to apply alignment + dropdowns
+  var tplRevLabel='Template';
   try{
     var wboutT=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-    injectDataValidation(wboutT,hasDV?dvEntries:[],tabName,t.name,hasSections,{},revLabel);
+    injectDataValidation(wboutT,hasDV?dvEntries:[],tabName,t.name,hasSections,{},tplRevLabel);
     return;
   }catch(err){
     console.warn('template inject failed, falling back:',err);
   }
-  XLSX.writeFile(wb,tabName.trim()+' Schedule '+revLabel+'.xlsx');
-
-  XLSX.writeFile(wb,tabName.trim()+' Schedule '+revLabel+'.xlsx');
+  XLSX.writeFile(wb,tabName.trim()+' Schedule Template.xlsx');
 }
 
 function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts,revLabel){
@@ -2358,7 +2357,11 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
     s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
     s.onload=function(){doInject(JSZip);};
     s.onerror=function(){
-      fallbackDownload();
+      // fallback: download without JSZip styling
+      var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';
+      a.click();URL.revokeObjectURL(a.href);
     };
     document.head.appendChild(s);
   }
