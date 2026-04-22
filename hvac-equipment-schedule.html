@@ -2180,134 +2180,14 @@ function buildAndDownloadTemplate(t,cols){
 }
 
 function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts,revLabel){
-  opts=opts||{};revLabel=revLabel||'Draft';
-  var verticalMode=opts.verticalMode||false;
-  var vertHeaderRow=opts.headerRow||1;
-  var vertSecRows=opts.sectionRows||[];
-  var secColRanges=opts.secColRanges||[]; // [{start,end}] col indices with section name
-  function doInject(JSZip){
-    function fallback(){var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';a.click();URL.revokeObjectURL(a.href);}
-    new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
-      var sheetKey=null;
-      zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
-      if(!sheetKey){fallback();return;}
-      Promise.all([
-        zip.file(sheetKey).async('string'),
-        zip.file('xl/styles.xml')?zip.file('xl/styles.xml').async('string'):Promise.resolve(null)
-      ]).then(function(results){
-        var sheetXml=results[0];
-        var stylesXml=results[1];
-        if(stylesXml){try{
-          // ── Fonts: 2 new ──
-          // fIdx+0 = bold dark (col headers, col A)
-          // fIdx+1 = bold dark (section header — same, dark text on grey)
-          stylesXml=stylesXml.replace(/<fonts count="(\d+)">/,function(m,n){return '<fonts count="'+(+n+2)+'">';});
-          stylesXml=stylesXml.replace('</fonts>',
-            '<font><b/><sz val="10"/><name val="Arial"/></font>'
-            +'<font><b/><sz val="10"/><name val="Arial"/></font>'
-            +'</fonts>');
-
-          // ── Fills: 1 new ──
-          // flIdx+0 = light grey #BFBFBF (section header only)
-          stylesXml=stylesXml.replace(/<fills count="(\d+)">/,function(m,n){return '<fills count="'+(+n+1)+'">';});
-          stylesXml=stylesXml.replace('</fills>',
-            '<fill><patternFill patternType="solid"><fgColor rgb="FFBFBFBF"/><bgColor indexed="64"/></patternFill></fill>'
-            +'</fills>');
-
-          // ── Borders: 4 new ──
-          // bdIdx+0 = all 4 thin (data cells, col headers, col A)
-          // bdIdx+1 = top+left+right only, no bottom (section header first cell)
-          // bdIdx+2 = top only (section header middle merged cells)
-          // bdIdx+3 = top+right only (section header last cell)
-          var thinEdge='<color rgb="FF000000"/>';
-          var thin='<border>'
-            +'<left style="thin">'+thinEdge+'</left>'
-            +'<right style="thin">'+thinEdge+'</right>'
-            +'<top style="thin">'+thinEdge+'</top>'
-            +'<bottom style="thin">'+thinEdge+'</bottom>'
-            +'</border>';
-          var thinNoBot='<border>'
-            +'<left style="thin">'+thinEdge+'</left>'
-            +'<right style="thin">'+thinEdge+'</right>'
-            +'<top style="thin">'+thinEdge+'</top>'
-            +'<bottom/></border>';
-          var thinTopOnly='<border><left/><right/>'
-            +'<top style="thin">'+thinEdge+'</top>'
-            +'<bottom/></border>';
-          var thinTopRight='<border><left/>'
-            +'<right style="thin">'+thinEdge+'</right>'
-            +'<top style="thin">'+thinEdge+'</top>'
-            +'<bottom/></border>';
-          stylesXml=stylesXml.replace(/<borders count="(\d+)">/,function(m,n){return '<borders count="'+(+n+4)+'">';});
-          stylesXml=stylesXml.replace('</borders>',thin+thinNoBot+thinTopOnly+thinTopRight+'</borders>');
-
-          var fIdx=parseInt((stylesXml.match(/<fonts count="(\d+)">/)||[0,1])[1])-2;
-          var flIdx=parseInt((stylesXml.match(/<fills count="(\d+)">/)||[0,4])[1])-1;
-          var bdCount=parseInt((stylesXml.match(/<borders count="(\d+)">/)||[0,1])[1]);
-          var bdAll=bdCount-4;      // all 4 borders
-          var bdNoBot=bdCount-3;    // top+left+right (section first cell)
-          var bdTopOnly=bdCount-2;  // top only (section merged middle)
-          var bdTopRight=bdCount-1; // top+right (section last cell)
-
-          // ── xf styles: 4 new ──
-          // s0 = colHdrStyle:  no fill, bold, all borders, left align
-          // s1 = secHdrStyle:  grey fill, bold, noBot borders, centre — first cell of section
-          // s2 = secMidStyle:  grey fill, bold, topOnly border — merged middle cells
-          // s3 = secLastStyle: grey fill, bold, topRight border — last cell of section
-          // s4 = dataStyle:    no fill, normal, all borders
-          // s5 = secHdrVert:   grey fill, bold, all borders (vertical full row)
-          stylesXml=stylesXml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+6)+'">';});
-          stylesXml=stylesXml.replace('</cellXfs>',
-            '<xf numFmtId="0" fontId="'+fIdx+'" fillId="0" borderId="'+bdAll+'" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
-            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+flIdx+'" borderId="'+bdNoBot+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
-            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+flIdx+'" borderId="'+bdTopOnly+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
-            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+flIdx+'" borderId="'+bdTopRight+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
-            +'<xf numFmtId="0" fontId="0" fillId="0" borderId="'+bdAll+'" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
-            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+flIdx+'" borderId="'+bdAll+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
-            +'</cellXfs>');
-          var totalXf=parseInt((stylesXml.match(/<cellXfs count="(\d+)">/)||[0,7])[1]);
-          var colHdrStyle=totalXf-6;   // bold, no fill, all borders
-          var secFirstStyle=totalXf-5; // grey, bold, top+left+right
-          var secMidStyle=totalXf-4;   // grey, bold, top only
-          var secLastStyle=totalXf-3;  // grey, bold, top+right
-          var dataStyle=totalXf-2;     // no fill, normal, all borders
-          var secVertStyle=totalXf-1;  // grey, bold, all borders (vertical)
-          zip.file('xl/styles.xml',stylesXml);
-          }catch(stylesErr){console.warn('styles inject failed:',stylesErr);}
-        } // end if(stylesXml)
-
-        var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
-        sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
-        if(dvXml){
-          if(sheetXml.indexOf('</sheetData>')>=0)sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
-          else sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
-        }
-        zip.file(sheetKey,sheetXml);
-        zip.generateAsync({type:'arraybuffer'}).then(function(out){
-          var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-          var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-          a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';
-          a.click();URL.revokeObjectURL(a.href);
-        });
-      }).catch(function(e){console.warn('patch failed:',e);fallback();});
-    }).catch(function(){fallback();});
-  }
-
-  if(typeof JSZip!=='undefined'){
-    doInject(JSZip);
-  } else {
-    var s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-    s.onload=function(){doInject(JSZip);};
-    s.onerror=function(){
-      // fallback: download without JSZip styling
-      var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-      var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-      a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';
-      a.click();URL.revokeObjectURL(a.href);
-    };
-    document.head.appendChild(s);
-  }
+  revLabel=revLabel||'Draft';
+  // Direct download — no XML patching to avoid corruption
+  var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 
