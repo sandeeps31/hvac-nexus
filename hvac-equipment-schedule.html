@@ -2251,11 +2251,9 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           var colHdrRowNum=verticalMode?0:(hasSections?2:1);
           function colLetterToIdx(col){var ci=0;for(var i=0;i<col.length;i++)ci=ci*26+(col.charCodeAt(i)-64);return ci-1;}
 
-          // Only patch header rows — NO data row patching (causes corruption on large sheets)
+          // Patch all rows — header rows get fill/bold, data rows get borders
           sheetXml=sheetXml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
             var rowNum=parseInt(rn);
-            // Only process header/section rows
-            if(!secHdrRows[rowNum]&&rowNum!==colHdrRowNum)return full;
             if(secHdrRows[rowNum]){
               if(verticalMode){
                 var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+secVertStyle+'"'+rest+'>';});
@@ -2274,6 +2272,19 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
             }
             if(!verticalMode&&rowNum===colHdrRowNum){
               var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+colHdrStyle+'"'+rest+'>';});
+              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
+            }
+            // Vertical: col A bold+borders, data cells borders only
+            if(verticalMode){
+              var p=content.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
+                var ci=colLetterToIdx(col);
+                return '<c r="'+col+row+'" s="'+(ci===0?colHdrStyle:dataStyle)+'"'+rest+'>';
+              });
+              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
+            }
+            // Horizontal data rows: borders only
+            if(!verticalMode&&rowNum>colHdrRowNum){
+              var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+dataStyle+'"'+rest+'>';});
               return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
             }
             return full;
