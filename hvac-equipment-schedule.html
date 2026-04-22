@@ -615,6 +615,7 @@ async function loadLocationPaths(){
     if(areas&&Array.isArray(areas)&&areas.length){
       _locationPaths=_flattenAreas(areas,'');
       _locationTree=areas;
+      _locNodeMap={};_buildLocNodeMap(areas);
     }
   }catch(e){_locationPaths=[];_locationTree=[];}
 }
@@ -663,19 +664,16 @@ function tplCols(t){
 var _locPickTid=null,_locPickRid=null,_locPickKey=null;
 var _locPickPath=[]; // stack of {nodes, label} for back navigation
 var _locPickCurrentNodes=null;
+var _locNodeMap={}; // id -> node, built from _locationTree
+
+function _buildLocNodeMap(nodes){
+  (nodes||[]).forEach(function(n){
+    _locNodeMap[n.id]=n;
+    if(n.children&&n.children.length)_buildLocNodeMap(n.children);
+  });
+}
 
 function isLocCol(k){return k==='location'||k==='sublocation'||k==='area';}
-
-function locCellHtml(tid,rid,colKey,currentVal,readonly){
-  var displayVal=currentVal?X(currentVal):'<span style="color:var(--muted);font-size:11px">—</span>';
-  if(readonly){
-    return'<div class="loc-cell readonly"><span class="loc-val">'+displayVal+'</span></div>';
-  }
-  return'<div class="loc-cell" onclick="openLocPicker(event,\''+tid+'\',\''+rid+'\',\''+colKey+'\')" title="'+(currentVal?X(currentVal):'')+'">'
-    +'<span class="loc-val">'+displayVal+'</span>'
-    +'<span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span>'
-    +'</div>';
-}
 
 function openLocPicker(e,tid,rid,key){
   e.stopPropagation();
@@ -685,14 +683,12 @@ function openLocPicker(e,tid,rid,key){
   renderLocPicker('Select Location');
   var pick=document.getElementById('locPicker');
   pick.style.display='flex';
-  // Position near clicked element
   var rect=e.currentTarget.getBoundingClientRect();
   var pw=240,ph=320;
   var left=rect.left;var top=rect.bottom+4;
   if(left+pw>window.innerWidth)left=window.innerWidth-pw-8;
   if(top+ph>window.innerHeight)top=rect.top-ph-4;
   pick.style.left=left+'px';pick.style.top=top+'px';
-  // Mark cell active
   document.querySelectorAll('.loc-cell').forEach(function(el){el.classList.remove('active');});
   e.currentTarget.classList.add('active');
 }
@@ -702,22 +698,20 @@ function renderLocPicker(title){
   document.getElementById('locPickBack').style.visibility=_locPickPath.length?'visible':'hidden';
   var list=document.getElementById('locPickList');
   var nodes=_locPickCurrentNodes||[];
-  // Build current full path prefix
   var prefix=_locPickPath.map(function(p){return p.label;}).join(' > ');
-
   var html='';
-  // "Select this level" option when drilled in
   if(_locPickPath.length>0){
-    html+='<div class="loc-pick-item" style="color:var(--accent);font-size:12px;border-bottom:2px solid var(--border)" onclick="locPickSelect(\''+X(prefix)+'\')">'
-      +'<span>✓ Select "'+X(_locPickPath[_locPickPath.length-1].label)+'"</span>'
+    html+='<div class="loc-pick-item" style="color:var(--accent);font-size:12px;border-bottom:2px solid var(--border)" onclick="locPickSelect(\''+escH(prefix)+'\')">'
+      +'<span>✓ Select "'+escH(_locPickPath[_locPickPath.length-1].label)+'"</span>'
       +'</div>';
   }
   nodes.forEach(function(node){
     if(!node.name)return;
     var fullPath=prefix?(prefix+' > '+node.name):node.name;
     var hasKids=node.children&&node.children.length>0;
-    html+='<div class="loc-pick-item'+(hasKids?' has-children':'')+'" '
-      +'onclick="'+(hasKids?'locPickDrill(\''+X(node.name)+'\','+JSON.stringify(node.children).replace(/"/g,'&quot;')+')':'locPickSelect(\''+X(fullPath)+'\')')+'">'
+    html+='<div class="loc-pick-item" onclick="'
+      +(hasKids?'locPickDrillId(\''+escH(node.id)+'\',\''+escH(node.name)+'\')':'locPickSelect(\''+escH(fullPath)+'\')')
+      +'">'
       +'<span>'+X(node.name)+'</span>'
       +(hasKids?'<span class="loc-pick-drill">›</span>':'')
       +'</div>';
@@ -726,9 +720,11 @@ function renderLocPicker(title){
   list.innerHTML=html;
 }
 
-function locPickDrill(label,children){
+function locPickDrillId(nodeId,label){
+  var node=_locNodeMap[nodeId];
+  if(!node)return;
   _locPickPath.push({label:label,nodes:_locPickCurrentNodes});
-  _locPickCurrentNodes=children;
+  _locPickCurrentNodes=node.children||[];
   renderLocPicker(label);
 }
 
@@ -743,12 +739,9 @@ function locPickBack(){
 function locPickSelect(fullPath){
   if(_locPickTid&&_locPickRid&&_locPickKey){
     updR(_locPickTid,_locPickRid,_locPickKey,fullPath);
-    // Update the cell display
-    var cells=document.querySelectorAll('[data-loc-tid="'+_locPickTid+'"][data-loc-rid="'+_locPickRid+'"][data-loc-key="'+_locPickKey+'"]');
-    cells.forEach(function(cell){
-      var val=cell.querySelector('.loc-val');
-      if(val)val.innerHTML=X(fullPath);
-      cell.title=fullPath;
+    // Update cell display without full re-render
+    document.querySelectorAll('[data-loc-tid="'+_locPickTid+'"][data-loc-rid="'+_locPickRid+'"][data-loc-key="'+_locPickKey+'"] .loc-val').forEach(function(el){
+      el.innerHTML=X(fullPath);
     });
   }
   closeLocPicker();
@@ -757,6 +750,9 @@ function locPickSelect(fullPath){
 function locPickClear(){
   if(_locPickTid&&_locPickRid&&_locPickKey){
     updR(_locPickTid,_locPickRid,_locPickKey,'');
+    document.querySelectorAll('[data-loc-tid="'+_locPickTid+'"][data-loc-rid="'+_locPickRid+'"][data-loc-key="'+_locPickKey+'"] .loc-val').forEach(function(el){
+      el.innerHTML='<span style="color:var(--muted);font-size:11px">—</span>';
+    });
   }
   closeLocPicker();
 }
@@ -994,9 +990,9 @@ function renderTable(){
       var isCleared=row._importChanged&&importCleared[c.k]!==undefined;
       var cellChanged=row._importChanged&&changedCols.indexOf(c.k)>=0&&!isCleared;
       var cellStyle=isCleared
-        ?'style="background:rgba(255,77,109,.18);outline:1px solid rgba(255,77,109,.5);position:relative"'
+        ?'style="background:rgba(255,184,48,.20);outline:1px solid rgba(255,184,48,.45);position:relative"'
         :cellChanged?'style="background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)"':'';
-      var clearedOv=isCleared?'<div style="position:absolute;top:50%;left:6px;right:4px;transform:translateY(-50%);color:rgba(255,77,109,.95);font-size:12px;text-decoration:line-through;pointer-events:none;white-space:nowrap;overflow:hidden;z-index:2;font-family:inherit">'+X(importCleared[c.k])+'</div>':'';
+      var clearedOv=isCleared?'<div style="position:absolute;top:50%;left:6px;right:4px;transform:translateY(-50%);color:rgba(255,184,48,.95);font-size:12px;text-decoration:line-through;pointer-events:none;white-space:nowrap;overflow:hidden;z-index:2;font-family:inherit">'+X(importCleared[c.k])+'</div>':'';
       if(c.sel){
         // Location column — use cascading picker
         if(isLocCol(c.k)&&_locationTree&&_locationTree.length){
@@ -1113,13 +1109,13 @@ function renderVerticalTable(t,rows){
       else if(row._importChanged&&(row._importChangedCols||[]).indexOf(c.k)>=0)cellBg='background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)';
       else if(diffChangedIds[rk]&&diffChangedIds[rk].indexOf(c.k)>=0){
         var _cv=diffClearedValues[rk]&&diffClearedValues[rk][c.k];
-        if(_cv!==undefined&&String(_cv).trim()!==''){clearedVal=_cv;cellBg='background:rgba(255,77,109,.18);outline:1px solid rgba(255,77,109,.5)';}
+        if(_cv!==undefined&&String(_cv).trim()!==''){clearedVal=_cv;cellBg='background:rgba(255,184,48,.20);outline:1px solid rgba(255,184,48,.45)';}
         else cellBg='background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)';
       }
       var tdStyle='padding:3px 6px;border-right:1px solid var(--border);position:relative;'+(cellBg?cellBg+';':'');
       var delStyle=row._importDeleted?'text-decoration:line-through;opacity:.6;':'';
       // Cleared overlay — shown when a previously-filled field is now blank
-      var clearedOverlay=clearedVal!==null?'<div style="position:absolute;top:50%;left:6px;right:4px;transform:translateY(-50%);color:rgba(255,77,109,.95);font-size:12px;text-decoration:line-through;pointer-events:none;white-space:nowrap;overflow:hidden;z-index:2;font-family:inherit">'+X(clearedVal)+'</div>':'';
+      var clearedOverlay=clearedVal!==null?'<div style="position:absolute;top:50%;left:6px;right:4px;transform:translateY(-50%);color:rgba(255,184,48,.95);font-size:12px;text-decoration:line-through;pointer-events:none;white-space:nowrap;overflow:hidden;z-index:2;font-family:inherit">'+X(clearedVal)+'</div>':'';
       if(c.sel){
         // Location column — use cascading picker
         if(isLocCol(c.k)&&_locationTree&&_locationTree.length){
@@ -2503,13 +2499,13 @@ function applyDiffHighlights(){
           if(cleared[c.k]!==undefined){
             // Cleared field — red bg, show old value with strikethrough above input
             td.classList.remove('cell-changed');
-            td.style.background='rgba(255,77,109,.18)';
-            td.style.outline='1px solid rgba(255,77,109,.5)';
+            td.style.background='rgba(255,184,48,.20)';
+            td.style.outline='1px solid rgba(255,184,48,.45)';
             td.style.position='relative';
             if(!td.querySelector('.cleared-overlay')){
               var ov=document.createElement('div');
               ov.className='cleared-overlay';
-              ov.style.cssText='position:absolute;top:1px;left:4px;right:4px;color:rgba(255,77,109,.95);font-size:11px;text-decoration:line-through;pointer-events:none;white-space:nowrap;overflow:hidden;z-index:2;background:inherit;font-family:DM Mono,monospace';
+              ov.style.cssText='position:absolute;top:1px;left:4px;right:4px;color:rgba(255,184,48,.95);font-size:11px;text-decoration:line-through;pointer-events:none;white-space:nowrap;overflow:hidden;z-index:2;background:inherit;font-family:DM Mono,monospace';
               ov.textContent=cleared[c.k];
               td.appendChild(ov);
               // Push input down slightly so overlay is visible
