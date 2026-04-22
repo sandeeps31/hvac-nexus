@@ -2273,67 +2273,9 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           var dataStyle=totalXf-2;     // no fill, normal, all borders
           var secVertStyle=totalXf-1;  // grey, bold, all borders (vertical)
           zip.file('xl/styles.xml',stylesXml);
+          }catch(stylesErr){console.warn('styles inject failed:',stylesErr);}
+        } // end if(stylesXml)
 
-          // Determine section rows
-          var secHdrRows={};
-          if(verticalMode){
-            vertSecRows.forEach(function(r){secHdrRows[r]=true;});
-          } else {
-            if(hasSections)secHdrRows[1]=true;
-          }
-          var colHdrRowNum=verticalMode?0:(hasSections?2:1);
-
-          function colLetterToIdx(col){var ci=0;for(var i=0;i<col.length;i++)ci=ci*26+(col.charCodeAt(i)-64);return ci-1;}
-
-          sheetXml=sheetXml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
-            var rowNum=parseInt(rn);
-
-            // ── Section header row ──
-            if(secHdrRows[rowNum]){
-              if(verticalMode){
-                // Full row grey, bold, all borders
-                var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+secVertStyle+'"'+rest+'>';});
-                return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
-              } else {
-                // Horizontal: section cells get grey with border treatment; non-section cells untouched
-                var p=content.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
-                  var ci=colLetterToIdx(col);
-                  var range=null;
-                  for(var ri=0;ri<secColRanges.length;ri++){if(ci>=secColRanges[ri].start&&ci<=secColRanges[ri].end){range=secColRanges[ri];break;}}
-                  if(!range)return cm;
-                  var sty=ci===range.start?secFirstStyle:ci===range.end?secLastStyle:secMidStyle;
-                  return '<c r="'+col+row+'" s="'+sty+'"'+rest+'>';
-                });
-                return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
-              }
-            }
-
-            // ── Col header row ──
-            if(!verticalMode&&rowNum===colHdrRowNum){
-              var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+colHdrStyle+'"'+rest+'>';});
-              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
-            }
-
-            // ── Vertical: col A bold all borders, row 1 eq ID row all borders, data cells all borders ──
-            if(verticalMode){
-              var p=content.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
-                var ci=colLetterToIdx(col);
-                var sty=ci===0?colHdrStyle:dataStyle;
-                return '<c r="'+col+row+'" s="'+sty+'"'+rest+'>';
-              });
-              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
-            }
-
-            // ── Horizontal data rows: all borders ──
-            if(!verticalMode&&rowNum>colHdrRowNum){
-              var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+dataStyle+'"'+rest+'>';});
-              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
-            }
-
-            return full;
-          });
-          }catch(sheetPatchErr){console.warn('sheet patch failed:',sheetPatchErr);}
-        }
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
         sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
         if(dvXml){
