@@ -596,6 +596,7 @@ var _eqProj=dbGetCurrentProject();
 var _eqPNum=_eqProj.num||_eqProj.number||'GCT001';
 var _locationPaths=[];
 var _locationTree=[];
+var _locNodeMap={};
 
 function _flattenAreas(nodes,prefix){
   var paths=[];
@@ -664,8 +665,6 @@ function tplCols(t){
 var _locPickTid=null,_locPickRid=null,_locPickKey=null;
 var _locPickPath=[]; // stack of {nodes, label} for back navigation
 var _locPickCurrentNodes=null;
-var _locNodeMap={}; // id -> node, built from _locationTree
-
 function _buildLocNodeMap(nodes){
   (nodes||[]).forEach(function(n){
     _locNodeMap[n.id]=n;
@@ -992,7 +991,7 @@ function renderTable(){
       var cellStyle=isCleared
         ?'style="background:rgba(255,184,48,.20);outline:1px solid rgba(255,184,48,.45);position:relative"'
         :cellChanged?'style="background:rgba(255,184,48,.25);outline:1px solid rgba(255,184,48,.5)"':'';
-      var clearedOv=isCleared?'<div style="position:absolute;top:50%;left:6px;right:4px;transform:translateY(-50%);color:rgba(255,184,48,.95);font-size:12px;text-decoration:line-through;pointer-events:none;white-space:nowrap;overflow:hidden;z-index:2;font-family:inherit">'+X(importCleared[c.k])+'</div>':'';
+      var clearedOv='';
       if(c.sel){
         // Location column — use cascading picker
         if(isLocCol(c.k)&&_locationTree&&_locationTree.length){
@@ -1115,7 +1114,7 @@ function renderVerticalTable(t,rows){
       var tdStyle='padding:3px 6px;border-right:1px solid var(--border);position:relative;'+(cellBg?cellBg+';':'');
       var delStyle=row._importDeleted?'text-decoration:line-through;opacity:.6;':'';
       // Cleared overlay — shown when a previously-filled field is now blank
-      var clearedOverlay=clearedVal!==null?'<div style="position:absolute;top:50%;left:6px;right:4px;transform:translateY(-50%);color:rgba(255,184,48,.95);font-size:12px;text-decoration:line-through;pointer-events:none;white-space:nowrap;overflow:hidden;z-index:2;font-family:inherit">'+X(clearedVal)+'</div>':'';
+      var clearedOverlay='';
       if(c.sel){
         // Location column — use cascading picker
         if(isLocCol(c.k)&&_locationTree&&_locationTree.length){
@@ -1126,12 +1125,12 @@ function renderVerticalTable(t,rows){
             +'<span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span>'
             +'</div></td>';
         } else if(ro){
-          html+='<td style="'+tdStyle+'">'+clearedOverlay+'<span style="font-size:12px;'+delStyle+(clearedVal!==null?';visibility:hidden':'')+'">'+X(row[c.k]||'—')+'</span></td>';
+          html+='<td style="'+tdStyle+'">'+clearedOverlay+'<span style="font-size:12px;'+delStyle+'">'+X(row[c.k]||'—')+'</span></td>';
         } else {
           html+='<td style="'+tdStyle+'">'+clearedOverlay+'<select class="csel" style="'+(clearedVal!==null?'opacity:0':'')+';" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)">'+colOptions(c,t).map(function(s){return'<option'+(s===row[c.k]?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td>';
         }
       } else {
-        html+='<td style="'+tdStyle+'">'+clearedOverlay+'<input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly':'')+' style="'+(ro?'opacity:.65;cursor:default;':'')+delStyle+(clearedVal!==null?';visibility:hidden':'')+'">\x3c/td>';
+        html+='<td style="'+tdStyle+'">'+clearedOverlay+'<input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(row[c.k]||'')+'" onchange="updR(\''+t.id+'\',\''+row.id+'\',\''+c.k+'\',this.value)"'+(ro?' readonly':'')+' style="'+(ro?'opacity:.65;cursor:default;':'')+delStyle+'">\x3c/td>';
       }
     });
     if(canEdit)html+='<td></td>';
