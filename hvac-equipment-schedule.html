@@ -2192,8 +2192,100 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
       var sheetKey=null;
       zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
       if(!sheetKey){fallback();return;}
-      zip.file(sheetKey).async('string').then(function(sheetXml){
-        // Only inject data validation — no row patching to avoid corruption
+      Promise.all([
+        zip.file(sheetKey).async('string'),
+        zip.file('xl/styles.xml')?zip.file('xl/styles.xml').async('string'):Promise.resolve(null)
+      ]).then(function(results){
+        var sheetXml=results[0];
+        var stylesXml=results[1];
+        // SheetJS free only writes 1 default style — inject manually
+        if(stylesXml){
+          // ── Fonts: bold white (col hdr), bold dark (sec hdr) ──
+          stylesXml=stylesXml.replace(/<fonts count="(\d+)">/,function(m,n){return '<fonts count="'+(+n+2)+'">';});
+          stylesXml=stylesXml.replace('</fonts>',
+            '<font><b/><sz val="10"/><name val="Arial"/><color rgb="FFFFFFFF"/></font>'
+            +'<font><b/><sz val="9"/><name val="Arial"/><color rgb="FF1A1A1A"/></font>'
+            +'</fonts>');
+          // ── Fills: dark (col hdr), grey #BFBFBF (sec hdr) ──
+          stylesXml=stylesXml.replace(/<fills count="(\d+)">/,function(m,n){return '<fills count="'+(+n+2)+'">';});
+          stylesXml=stylesXml.replace('</fills>',
+            '<fill><patternFill patternType="solid"><fgColor rgb="FF0E1520"/><bgColor indexed="64"/></patternFill></fill>'
+            +'<fill><patternFill patternType="solid"><fgColor rgb="FFBFBFBF"/><bgColor indexed="64"/></patternFill></fill>'
+            +'</fills>');
+          // ── Borders: thin all-4 ──
+          var thinE='<color rgb="FF999999"/>';
+          var thin4='<border><left style="thin">'+thinE+'</left><right style="thin">'+thinE+'</right><top style="thin">'+thinE+'</top><bottom style="thin">'+thinE+'</bottom></border>';
+          stylesXml=stylesXml.replace(/<borders count="(\d+)">/,function(m,n){return '<borders count="'+(+n+1)+'">';});
+          stylesXml=stylesXml.replace('</borders>',thin4+'</borders>');
+          var fIdx=parseInt((stylesXml.match(/<fonts count="(\d+)">/)||[0,2])[1])-2;
+          var flIdx=parseInt((stylesXml.match(/<fills count="(\d+)">/)||[0,4])[1])-2;
+          var bdIdx=parseInt((stylesXml.match(/<borders count="(\d+)">/)||[0,2])[1])-1;
+          // ── xf styles: colHdr, secHdr, data, secNone (no fill no border for non-sec cells in row 1) ──
+          stylesXml=stylesXml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+4)+'">';});
+          stylesXml=stylesXml.replace('</cellXfs>',
+            // colHdrStyle: dark fill, bold white, all borders, centre
+            '<xf numFmtId="0" fontId="'+fIdx+'" fillId="'+flIdx+'" borderId="'+bdIdx+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            // secHdrStyle: grey fill, bold dark, all borders, centre
+            +'<xf numFmtId="0" fontId="'+(fIdx+1)+'" fillId="'+(flIdx+1)+'" borderId="'+bdIdx+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            // dataStyle: no fill, all borders, left-aligned
+            +'<xf numFmtId="0" fontId="0" fillId="0" borderId="'+bdIdx+'" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
+            // blankStyle: no fill, no border (non-section cells in section header row)
+            +'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+            +'</cellXfs>');
+          var totalXf=parseInt((stylesXml.match(/<cellXfs count="(\d+)">/)||[0,5])[1]);
+          var colHdrStyle=totalXf-4;
+          var secHdrStyle=totalXf-3;
+          var dataStyle=totalXf-2;
+          var blankStyle=totalXf-1;
+          zip.file('xl/styles.xml',stylesXml);
+
+          // ── Patch rows using indexOf (safe, no greedy [\s\S]*?) ──
+          function patchRow(xml,rowNum,styleIdx){
+            var rowStart='<row r="'+rowNum+'"';
+            var si=xml.indexOf(rowStart);if(si<0)return xml;
+            var ei=xml.indexOf('</row>',si);if(ei<0)return xml;
+            var rowContent=xml.substring(si,ei+6);
+            var patched=rowContent
+              .replace(/ s="\d+"/g,'')
+              .replace(/<c r="([^"]+)"([^/]*)(\/?>)/g,'<c r="$1" s="'+styleIdx+'"$2$3');
+            return xml.substring(0,si)+patched+xml.substring(ei+6);
+          }
+
+          // Horizontal: row 1=section hdr (if hasSections), row 2 (or 1)=col hdr, rows 3+=data
+          // Vertical: row 1=eq ID hdr, data rows
+          var colHdrRow=hasSections?2:1;
+          sheetXml=patchRow(sheetXml,colHdrRow,colHdrStyle);
+          if(hasSections){
+            // Section header row: patch only cells that have a section name (non-blank value)
+            // Blank cells in section row get blankStyle
+            var rowStart='<row r="1"';
+            var si=sheetXml.indexOf(rowStart);
+            if(si>=0){
+              var ei=sheetXml.indexOf('</row>',si);
+              if(ei>=0){
+                var rowContent=sheetXml.substring(si,ei+6);
+                var patched=rowContent
+                  .replace(/ s="\d+"/g,'')
+                  .replace(/<c r="([^"]+)"([^/]*)(\/?>)/g,'<c r="$1" s="'+secHdrStyle+'"$2$3');
+                sheetXml=sheetXml.substring(0,si)+patched+sheetXml.substring(ei+6);
+              }
+            }
+          }
+          // Patch all data rows
+          var dataRowStart=hasSections?3:2;
+          var sheetDataStart=sheetXml.indexOf('<sheetData');
+          var sheetDataEnd=sheetXml.indexOf('</sheetData>');
+          if(sheetDataStart>=0&&sheetDataEnd>=0){
+            var sheetData=sheetXml.substring(sheetDataStart,sheetDataEnd+12);
+            var patched=sheetData.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
+              if(parseInt(rn)<dataRowStart)return full;
+              var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^/]*)(\/?>)/g,'<c r="$1" s="'+dataStyle+'"$2$3');
+              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
+            });
+            sheetXml=sheetXml.substring(0,sheetDataStart)+patched+sheetXml.substring(sheetDataEnd+12);
+          }
+        }
+        // Inject data validations
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
         sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
         if(dvXml){
@@ -2207,7 +2299,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';
           a.click();URL.revokeObjectURL(a.href);
         });
-      }).catch(function(){fallback();});
+      }).catch(function(e){console.warn('inject failed:',e);fallback();});
     }).catch(function(){fallback();});
   }
   if(typeof JSZip!=='undefined'){doInject(JSZip);}
@@ -2921,7 +3013,7 @@ function exportRevXLSX(){
 
       // Always run through JSZip to apply styles (section rows + header row)
       var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-      injectDataValidation(wbout,dvEntries,sheetName,tabName,false,{
+      injectDataValidation(wbout,dvEntries,tabName,sheetName,false,{
         verticalMode:true,
         headerRow:1,
         sectionRows:sectionRowIndices.map(function(i){return i+1;})
@@ -3063,14 +3155,14 @@ function exportRevXLSX(){
 
       if(dvEntries2.length){
         var wbout2=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-        injectDataValidation(wbout2,dvEntries2,sheetName,tabName,hasSections,{secColRanges:_secColRanges},revLabel);
+        injectDataValidation(wbout2,dvEntries2,tabName,sheetName,hasSections,{secColRanges:_secColRanges},revLabel);
         return;
       }
     }
 
     // Always run JSZip patch to apply alignment — even with no dropdowns
     var wboutFinal=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-    injectDataValidation(wboutFinal,[],sheetName,tabName,hasSections,{secColRanges:_secColRanges},revLabel);
+    injectDataValidation(wboutFinal,[],tabName,sheetName,hasSections,{secColRanges:_secColRanges},revLabel);
   }
 
   if(typeof XLSX==='undefined'){
