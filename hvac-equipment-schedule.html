@@ -2170,7 +2170,7 @@ function buildAndDownloadTemplate(t,cols){
   // Always run JSZip to apply alignment + dropdowns
   try{
     var wboutT=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-    injectDataValidation(wboutT,hasDV?dvEntries:[],tabName,t.name,hasSections);
+    injectDataValidation(wboutT,hasDV?dvEntries:[],tabName,t.name,hasSections,{},revLabel);
     return;
   }catch(err){
     console.warn('template inject failed, falling back:',err);
@@ -2180,8 +2180,8 @@ function buildAndDownloadTemplate(t,cols){
   XLSX.writeFile(wb,tabName.trim()+' Schedule '+revLabel+'.xlsx');
 }
 
-function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts){
-  opts=opts||{};
+function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts,revLabel){
+  opts=opts||{};revLabel=revLabel||'Draft';
   var verticalMode=opts.verticalMode||false;
   var vertHeaderRow=opts.headerRow||1;
   var vertSecRows=opts.sectionRows||[];
@@ -3069,7 +3069,7 @@ function exportRevXLSX(){
         verticalMode:true,
         headerRow:1,
         sectionRows:sectionRowIndices.map(function(i){return i+1;})
-      });
+      },revLabel);
       return;
 
     } else {
@@ -3195,14 +3195,14 @@ function exportRevXLSX(){
 
       if(dvEntries2.length){
         var wbout2=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-        injectDataValidation(wbout2,dvEntries2,sheetName,tabName,hasSections,{secColRanges:_secColRanges});
+        injectDataValidation(wbout2,dvEntries2,sheetName,tabName,hasSections,{secColRanges:_secColRanges},revLabel);
         return;
       }
     }
 
     // Always run JSZip patch to apply alignment — even with no dropdowns
     var wboutFinal=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-    injectDataValidation(wboutFinal,[],sheetName,tabName,hasSections,{secColRanges:_secColRanges});
+    injectDataValidation(wboutFinal,[],sheetName,tabName,hasSections,{secColRanges:_secColRanges},revLabel);
   }
 
   if(typeof XLSX==='undefined'){
