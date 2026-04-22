@@ -700,23 +700,33 @@ function renderLocPicker(title){
   var prefix=_locPickPath.map(function(p){return p.label;}).join(' > ');
   var html='';
   if(_locPickPath.length>0){
-    html+='<div class="loc-pick-item" style="color:var(--accent);font-size:12px;border-bottom:2px solid var(--border)" onclick="locPickSelect(\''+escH(prefix)+'\')">'
-      +'<span>✓ Select "'+escH(_locPickPath[_locPickPath.length-1].label)+'"</span>'
+    var selLabel=_locPickPath[_locPickPath.length-1].label;
+    html+='<div class="loc-pick-item" style="color:var(--accent);font-size:12px;border-bottom:2px solid var(--border)" data-loc-action="select" data-loc-val="'+X(prefix)+'">'
+      +'<span>✓ Select "'+X(selLabel)+'"</span>'
       +'</div>';
   }
   nodes.forEach(function(node){
     if(!node.name)return;
     var fullPath=prefix?(prefix+' > '+node.name):node.name;
     var hasKids=node.children&&node.children.length>0;
-    html+='<div class="loc-pick-item" onclick="'
-      +(hasKids?'locPickDrillId(\''+escH(node.id)+'\',\''+escH(node.name)+'\')':'locPickSelect(\''+escH(fullPath)+'\')')
-      +'">'
+    html+='<div class="loc-pick-item" '
+      +(hasKids?'data-loc-action="drill" data-loc-id="'+X(node.id)+'" data-loc-label="'+X(node.name)+'"':'data-loc-action="select" data-loc-val="'+X(fullPath)+'"')
+      +'>'
       +'<span>'+X(node.name)+'</span>'
       +(hasKids?'<span class="loc-pick-drill">›</span>':'')
       +'</div>';
   });
   if(!nodes.length)html='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">No areas defined</div>';
   list.innerHTML=html;
+  // Attach click handlers via JS (no inline onclick)
+  list.querySelectorAll('.loc-pick-item').forEach(function(el){
+    el.addEventListener('click',function(e){
+      e.stopPropagation();
+      var action=el.dataset.locAction;
+      if(action==='select'){locPickSelect(el.dataset.locVal);}
+      else if(action==='drill'){locPickDrillId(el.dataset.locId,el.dataset.locLabel);}
+    });
+  });
 }
 
 function locPickDrillId(nodeId,label){
