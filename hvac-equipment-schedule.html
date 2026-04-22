@@ -2271,20 +2271,27 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
               }
             }
           }
-          // Patch all data rows safely - process line by line, not with greedy regex
+          // Patch data rows safely - find each <row> by position, not regex
+          // SheetJS writes single-line XML so split('\n') won't work
           var dataRowStart=hasSections?3:2;
-          var lines=sheetXml.split('\n');
-          var inDataRow=false;
-          var curRowNum=0;
-          sheetXml=lines.map(function(line){
-            var rowMatch=line.match(/<row r="(\d+)"/);
-            if(rowMatch){curRowNum=parseInt(rowMatch[1]);inDataRow=curRowNum>=dataRowStart;}
-            if(inDataRow&&line.indexOf('</row>')>=0)inDataRow=false;
-            if(curRowNum>=dataRowStart){
-              return line.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^/]*)(\/?>)/g,'<c r="$1" s="'+dataStyle+'"$2$3');
+          var pos=0;
+          var result='';
+          while(pos<sheetXml.length){
+            var rowOpen=sheetXml.indexOf('<row r="',pos);
+            if(rowOpen<0){result+=sheetXml.substring(pos);break;}
+            result+=sheetXml.substring(pos,rowOpen);
+            var rowClose=sheetXml.indexOf('</row>',rowOpen);
+            if(rowClose<0){result+=sheetXml.substring(rowOpen);break;}
+            var rowFull=sheetXml.substring(rowOpen,rowClose+6);
+            var rnMatch=rowFull.match(/<row r="(\d+)"/);
+            var rn=rnMatch?parseInt(rnMatch[1]):0;
+            if(rn>=dataRowStart){
+              rowFull=rowFull.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^/]*)(\/?>)/g,'<c r="$1" s="'+dataStyle+'"$2$3');
             }
-            return line;
-          }).join('\n');
+            result+=rowFull;
+            pos=rowClose+6;
+          }
+          sheetXml=result;
         }
         // Inject data validations
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
