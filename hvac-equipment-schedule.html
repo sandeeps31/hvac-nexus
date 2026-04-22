@@ -2181,13 +2181,43 @@ function buildAndDownloadTemplate(t,cols){
 
 function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts,revLabel){
   revLabel=revLabel||'Draft';
-  // Direct download — no XML patching to avoid corruption
-  var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  var a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';
-  a.click();
-  URL.revokeObjectURL(a.href);
+  function fallback(){
+    var blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';
+    a.click();URL.revokeObjectURL(a.href);
+  }
+  function doInject(JSZip){
+    new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
+      var sheetKey=null;
+      zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
+      if(!sheetKey){fallback();return;}
+      zip.file(sheetKey).async('string').then(function(sheetXml){
+        // Only inject data validation — no row patching to avoid corruption
+        var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
+        sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
+        if(dvXml){
+          if(sheetXml.indexOf('</sheetData>')>=0)sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
+          else sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
+        }
+        zip.file(sheetKey,sheetXml);
+        zip.generateAsync({type:'arraybuffer'}).then(function(out){
+          var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+          var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+          a.download=tabName.trim()+' Schedule '+revLabel+'.xlsx';
+          a.click();URL.revokeObjectURL(a.href);
+        });
+      }).catch(function(){fallback();});
+    }).catch(function(){fallback();});
+  }
+  if(typeof JSZip!=='undefined'){doInject(JSZip);}
+  else{
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload=function(){doInject(JSZip);};
+    s.onerror=fallback;
+    document.head.appendChild(s);
+  }
 }
 
 
@@ -2972,6 +3002,8 @@ function exportRevXLSX(){
       }
 
       // Styles — section header and column header rows
+      var thinBorder={style:'thin',color:{rgb:'CCCCCC'}};
+      var allBorders={top:thinBorder,bottom:thinBorder,left:thinBorder,right:thinBorder};
       for(var ci=0;ci<cols.length;ci++){
         if(hasSections){
           var gRef=colLetter(ci)+'1';
@@ -2981,12 +3013,22 @@ function exportRevXLSX(){
           ws[gRef].s={
             font:{bold:true,name:'Arial',sz:10,color:{rgb:runSec?'FFFFFF':'333333'}},
             fill:{fgColor:{rgb:runSec?'1A2640':'F5F5F5'}},
-            alignment:{horizontal:'center',vertical:'center',wrapText:false}
+            alignment:{horizontal:'center',vertical:'center',wrapText:false},
+            border:allBorders
           };
         }
         var hRef=colLetter(ci)+(hdrRow+1);
-        if(ws[hRef])ws[hRef].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0E1520'}},alignment:{horizontal:'center',vertical:'center',wrapText:true}};
+        if(ws[hRef])ws[hRef].s={font:{bold:true,name:'Arial',sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0E1520'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:allBorders};
       }
+      // Add borders to all data cells
+      var dataRowStart=hdrRow+2;
+      rows.forEach(function(r,ri){
+        cols.forEach(function(c,ci){
+          var ref=colLetter(ci)+( dataRowStart+ri);
+          if(ws[ref]){ws[ref].s=Object.assign({},ws[ref].s||{},{border:allBorders});}
+          else{ws[ref]={t:'s',v:'',s:{border:allBorders}};}
+        });
+      });
 
       // Diff colouring on data rows
       if(hasDiff){
