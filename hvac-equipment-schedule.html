@@ -2251,44 +2251,50 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           var colHdrRowNum=verticalMode?0:(hasSections?2:1);
           function colLetterToIdx(col){var ci=0;for(var i=0;i<col.length;i++)ci=ci*26+(col.charCodeAt(i)-64);return ci-1;}
 
-          // Patch all rows — header rows get fill/bold, data rows get borders
-          sheetXml=sheetXml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
-            var rowNum=parseInt(rn);
-            if(secHdrRows[rowNum]){
-              if(verticalMode){
+          // Vertical: use regex on all rows (safe - rows are short)
+          // Horizontal: use safe indexOf-based patchRow for header rows only
+          if(verticalMode){
+            sheetXml=sheetXml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
+              var rowNum=parseInt(rn);
+              if(secHdrRows[rowNum]){
                 var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+secVertStyle+'"'+rest+'>';});
                 return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
-              } else {
-                var p=content.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
-                  var ci=colLetterToIdx(col);
-                  var range=null;
-                  for(var ri=0;ri<secColRanges.length;ri++){if(ci>=secColRanges[ri].start&&ci<=secColRanges[ri].end){range=secColRanges[ri];break;}}
-                  if(!range)return cm;
-                  var sty=ci===range.start?secFirstStyle:ci===range.end?secLastStyle:secMidStyle;
-                  return '<c r="'+col+row+'" s="'+sty+'"'+rest+'>';
-                });
-                return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
               }
-            }
-            if(!verticalMode&&rowNum===colHdrRowNum){
-              var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+colHdrStyle+'"'+rest+'>';});
-              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
-            }
-            // Vertical: col A bold+borders, data cells borders only
-            if(verticalMode){
+              // Col A bold+borders, data cells borders
               var p=content.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
                 var ci=colLetterToIdx(col);
                 return '<c r="'+col+row+'" s="'+(ci===0?colHdrStyle:dataStyle)+'"'+rest+'>';
               });
               return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
+            });
+          } else {
+            // Horizontal: patch header rows safely by position
+            function patchRowByPos(xml,rowNum,styleIdx){
+              var tag='<row r="'+rowNum+'"';
+              var si=xml.indexOf(tag);if(si<0)return xml;
+              var ei=xml.indexOf('</row>',si);if(ei<0)return xml;
+              var rowContent=xml.substring(si,ei+6);
+              var patched=rowContent.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+styleIdx+'"'+rest+'>';});
+              return xml.substring(0,si)+patched+xml.substring(ei+6);
             }
-            // Horizontal data rows: borders only
-            if(!verticalMode&&rowNum>colHdrRowNum){
-              var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+dataStyle+'"'+rest+'>';});
-              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
+            function patchSecRowByPos(xml){
+              var tag='<row r="1"';
+              var si=xml.indexOf(tag);if(si<0)return xml;
+              var ei=xml.indexOf('</row>',si);if(ei<0)return xml;
+              var rowContent=xml.substring(si,ei+6);
+              var patched=rowContent.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
+                var ci=colLetterToIdx(col);
+                var range=null;
+                for(var ri=0;ri<secColRanges.length;ri++){if(ci>=secColRanges[ri].start&&ci<=secColRanges[ri].end){range=secColRanges[ri];break;}}
+                if(!range)return cm;
+                var sty=ci===range.start?secFirstStyle:ci===range.end?secLastStyle:secMidStyle;
+                return '<c r="'+col+row+'" s="'+sty+'"'+rest+'>';
+              });
+              return xml.substring(0,si)+patched+xml.substring(ei+6);
             }
-            return full;
-          });
+            if(hasSections)sheetXml=patchSecRowByPos(sheetXml);
+            sheetXml=patchRowByPos(sheetXml,hasSections?2:1,colHdrStyle);
+          }
         }
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
         sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
