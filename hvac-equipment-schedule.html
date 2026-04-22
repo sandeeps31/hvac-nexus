@@ -2271,19 +2271,20 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
               }
             }
           }
-          // Patch all data rows
+          // Patch all data rows safely - process line by line, not with greedy regex
           var dataRowStart=hasSections?3:2;
-          var sheetDataStart=sheetXml.indexOf('<sheetData');
-          var sheetDataEnd=sheetXml.indexOf('</sheetData>');
-          if(sheetDataStart>=0&&sheetDataEnd>=0){
-            var sheetData=sheetXml.substring(sheetDataStart,sheetDataEnd+12);
-            var patched=sheetData.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(full,rn,ra,content){
-              if(parseInt(rn)<dataRowStart)return full;
-              var p=content.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^/]*)(\/?>)/g,'<c r="$1" s="'+dataStyle+'"$2$3');
-              return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
-            });
-            sheetXml=sheetXml.substring(0,sheetDataStart)+patched+sheetXml.substring(sheetDataEnd+12);
-          }
+          var lines=sheetXml.split('\n');
+          var inDataRow=false;
+          var curRowNum=0;
+          sheetXml=lines.map(function(line){
+            var rowMatch=line.match(/<row r="(\d+)"/);
+            if(rowMatch){curRowNum=parseInt(rowMatch[1]);inDataRow=curRowNum>=dataRowStart;}
+            if(inDataRow&&line.indexOf('</row>')>=0)inDataRow=false;
+            if(curRowNum>=dataRowStart){
+              return line.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^/]*)(\/?>)/g,'<c r="$1" s="'+dataStyle+'"$2$3');
+            }
+            return line;
+          }).join('\n');
         }
         // Inject data validations
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
