@@ -2255,22 +2255,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           // Vertical: row 1=eq ID hdr, data rows
           var colHdrRow=hasSections?2:1;
           sheetXml=patchRow(sheetXml,colHdrRow,colHdrStyle);
-          if(hasSections){
-            // Section header row: patch only cells that have a section name (non-blank value)
-            // Blank cells in section row get blankStyle
-            var rowStart='<row r="1"';
-            var si=sheetXml.indexOf(rowStart);
-            if(si>=0){
-              var ei=sheetXml.indexOf('</row>',si);
-              if(ei>=0){
-                var rowContent=sheetXml.substring(si,ei+6);
-                var patched=rowContent
-                  .replace(/ s="\d+"/g,'')
-                  .replace(/<c r="([^"]+)"( [^>]*)?(>|\/?>)/g,function(m,ref,attrs,close){return '<c r="'+ref+'" s="'+secHdrStyle+'"'+(attrs||'')+close;});
-                sheetXml=sheetXml.substring(0,si)+patched+sheetXml.substring(ei+6);
-              }
-            }
-          }
+          // Skip section header row patching for now - hasSections handled via SheetJS styles only
           // Patch data rows safely - find each <row> by position, not regex
           // SheetJS writes single-line XML so split('\n') won't work
           var dataRowStart=hasSections?3:2;
