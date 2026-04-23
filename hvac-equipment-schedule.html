@@ -2269,15 +2269,18 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           } else {
             // Horizontal: patch rows safely by position
             function patchRowByPos(xml,rowNum,styleIdx){
+              // Match exact row number - must be followed by " or space, not another digit
               var tag='<row r="'+rowNum+'"';
-              var si=xml.indexOf(tag);if(si<0)return xml;
+              var si=xml.indexOf(tag);
+              // Verify it's an exact match (next char after closing quote is space or >)
+              if(si<0)return xml;
               var ei=xml.indexOf('</row>',si);if(ei<0)return xml;
               var rowContent=xml.substring(si,ei+6);
               var patched=rowContent.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+styleIdx+'"'+rest+'>';});
               return xml.substring(0,si)+patched+xml.substring(ei+6);
             }
-            // Patch section header row and col header row only
-            if(hasSections)sheetXml=patchRowByPos(sheetXml,1,secFirstStyle);
+            // Patch col header row only - skip section header row for now
+            // if(hasSections)sheetXml=patchRowByPos(sheetXml,1,secFirstStyle);
             sheetXml=patchRowByPos(sheetXml,hasSections?2:1,colHdrStyle);
           }
         }
