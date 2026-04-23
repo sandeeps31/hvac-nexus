@@ -707,7 +707,7 @@ function renderLocPicker(title){
   }
   nodes.forEach(function(node){
     if(!node.name)return;
-    var fullPath=prefix?(prefix+' > '+node.name):node.name;
+    var fullPath=prefix?(prefix+' - '+node.name):node.name;
     var hasKids=node.children&&node.children.length>0;
     html+='<div class="loc-pick-item" '
       +(hasKids?'data-loc-action="drill" data-loc-id="'+X(node.id)+'" data-loc-label="'+X(node.name)+'"':'data-loc-action="select" data-loc-val="'+X(fullPath)+'"')
@@ -2275,7 +2275,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
             // Horizontal: row patching causes corruption - styles applied via SheetJS .s properties only
           }
         }
-        var dvXml=dvEntries.length&&!(!verticalMode&&hasSections)?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
+        var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
         sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
         if(dvXml){
           if(sheetXml.indexOf('</sheetData>')>=0)sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
@@ -2993,7 +2993,7 @@ function exportRevXLSX(){
       Object.keys(dvMap).forEach(function(rowIdx){
         var dv=dvMap[rowIdx];
         var excelRow=parseInt(rowIdx)+1;
-        var formula1='"'+dv.options.slice(0,20).map(function(o){return o.replace(/[,"]/g,'');}).join(',').substring(0,250)+'"';
+        var formula1='"'+dv.options.slice(0,20).map(function(o){return o.replace(/[,"<]/g,'').replace(/>/g,'-');}).join(',').substring(0,250)+'"';
         for(var ci=dv.colStart;ci<=dv.colEnd;ci++){
           var sqref=colLetter(ci)+excelRow;
           dvEntries.push('<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'"><formula1>'+formula1+'</formula1></dataValidation>');
@@ -3138,7 +3138,7 @@ function exportRevXLSX(){
         var opts=dropdownMap[col.k];
         if(!opts||!opts.length)return;
         var sqref=colLetter(ci)+dataStartRow+':'+colLetter(ci)+'2000';
-        var formula1='"'+opts.slice(0,20).map(function(o){return o.replace(/[,"]/g,'');}).join(',').substring(0,250)+'"';
+        var formula1='"'+opts.slice(0,20).map(function(o){return o.replace(/[,"<]/g,'').replace(/>/g,'-');}).join(',').substring(0,250)+'"';
         dvEntries2.push('<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'"><formula1>'+formula1+'</formula1></dataValidation>');
       });
 
