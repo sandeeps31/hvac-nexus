@@ -2276,27 +2276,9 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
               var patched=rowContent.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+styleIdx+'"'+rest+'>';});
               return xml.substring(0,si)+patched+xml.substring(ei+6);
             }
-            // Patch section header row and col header row
+            // Patch section header row and col header row only
             if(hasSections)sheetXml=patchRowByPos(sheetXml,1,secFirstStyle);
             sheetXml=patchRowByPos(sheetXml,hasSections?2:1,colHdrStyle);
-            // Patch data rows using position-based loop
-            var dataRowStart=hasSections?3:2;
-            var pos=0;var out='';
-            while(pos<sheetXml.length){
-              var ro=sheetXml.indexOf('<row r="',pos);
-              if(ro<0){out+=sheetXml.substring(pos);break;}
-              out+=sheetXml.substring(pos,ro);
-              var rc=sheetXml.indexOf('</row>',ro);
-              if(rc<0){out+=sheetXml.substring(ro);break;}
-              var rowFull=sheetXml.substring(ro,rc+6);
-              var rnM=rowFull.match(/<row r="(\d+)"/);
-              var rn=rnM?parseInt(rnM[1]):0;
-              if(rn>=dataRowStart){
-                rowFull=rowFull.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+dataStyle+'"'+rest+'>';});
-              }
-              out+=rowFull;pos=rc+6;
-            }
-            sheetXml=out;
           }
         }
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
