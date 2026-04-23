@@ -2277,9 +2277,8 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
               var patched=rowContent.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+styleIdx+'"'+rest+'>';});
               return xml.substring(0,si)+patched+xml.substring(ei+6);
             }
-            if(hasSections){sheetXml=patchRowByPos(sheetXml,1,secFirstStyle);console.log('[P1 done] len:',sheetXml.length);}
+            if(hasSections){sheetXml=patchRowByPos(sheetXml,1,secFirstStyle);}
             sheetXml=patchRowByPos(sheetXml,hasSections?2:1,colHdrStyle);
-            console.log('[P2 done] len:',sheetXml.length);
           }
         }
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
@@ -2288,6 +2287,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           if(sheetXml.indexOf('</sheetData>')>=0)sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
           else sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
         }
+        console.log('[FINAL] sheetXml ends:',sheetXml.substring(sheetXml.length-60));
         zip.file(sheetKey,sheetXml);
         zip.generateAsync({type:'arraybuffer'}).then(function(out){
           var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
