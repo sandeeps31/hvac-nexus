@@ -2201,10 +2201,21 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
       if(!sheetKey){fallback();return;}
       Promise.all([
         zip.file(sheetKey).async('string'),
-        zip.file('xl/styles.xml').async('string')
+        zip.file('xl/styles.xml').async('string'),
+        zip.file('xl/metadata.xml')?zip.file('xl/metadata.xml').async('string'):Promise.resolve(null),
+        zip.file('[Content_Types].xml').async('string'),
+        zip.file('xl/_rels/workbook.xml.rels').async('string')
       ]).then(function(results){
         var sheetXml=results[0];
         var stylesXml=results[1];
+        // Remove metadata.xml and clean up references
+        if(results[2]){
+          zip.remove('xl/metadata.xml');
+          var ct=results[3].replace(/<Override[^>]*metadata[^>]*\/>/g,'');
+          zip.file('[Content_Types].xml',ct);
+          var wr=results[4].replace(/<Relationship[^>]*metadata[^>]*\/>/g,'');
+          zip.file('xl/_rels/workbook.xml.rels',wr);
+        }
         if(stylesXml){
           // Fonts: 2 new bold fonts
           stylesXml=stylesXml.replace(/<fonts count="(\d+)">/,function(m,n){return '<fonts count="'+(+n+2)+'">';});
@@ -2288,22 +2299,6 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
         if(dvXml){
           if(sheetXml.indexOf('</sheetData>')>=0)sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
           else sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
-        }
-        // Remove metadata.xml and its references - causes corruption when repackaging
-        if(zip.file('xl/metadata.xml')){
-          zip.remove('xl/metadata.xml');
-          // Remove from Content_Types
-          var ct=zip.file('[Content_Types].xml');
-          if(ct){ct.async('string').then(function(s){
-            s=s.replace(/<Override[^/]*metadata[^/]*\/>/g,'');
-            zip.file('[Content_Types].xml',s);
-          });}
-          // Remove from workbook rels
-          var wr=zip.file('xl/_rels/workbook.xml.rels');
-          if(wr){wr.async('string').then(function(s){
-            s=s.replace(/<Relationship[^/]*metadata[^/]*\/>/g,'');
-            zip.file('xl/_rels/workbook.xml.rels',s);
-          });}
         }
         console.log('[FINAL] sheetXml ends:',sheetXml.substring(sheetXml.length-60));
         console.log('[FINAL STYLES] len:',stylesXml?stylesXml.length:0,'ends:',stylesXml?stylesXml.substring(stylesXml.length-60):'null');
