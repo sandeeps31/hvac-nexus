@@ -2244,9 +2244,6 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           var dataStyle=totalXf-2;
           var secVertStyle=totalXf-1;
           zip.file('xl/styles.xml',stylesXml);
-          console.log('[STYLES OK] fonts:',stylesXml.match(/<fonts count="(\d+)">/)?.[1],'fills:',stylesXml.match(/<fills count="(\d+)">/)?.[1],'borders:',stylesXml.match(/<borders count="(\d+)">/)?.[1],'xfs:',stylesXml.match(/<cellXfs count="(\d+)">/)?.[1]);
-          console.log('[BORDERS XML]',stylesXml.match(/<borders[^>]*>[\s\S]*?<\/borders>/)?.[0]?.substring(0,500));
-          console.log('[FULL STYLES]',stylesXml);
 
           var secHdrRows={};
           if(verticalMode){vertSecRows.forEach(function(r){secHdrRows[r]=true;});}
@@ -2283,24 +2280,19 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
             if(hasSections){
               var r1start=sheetXml.indexOf('<row r="1"');
               var r1end=sheetXml.indexOf('</row>',r1start)+6;
-              console.log('[R1 BEFORE]',sheetXml.substring(r1start,r1start+200));
               // TEMPORARILY DISABLED to test
               // sheetXml=patchRowByPos(sheetXml,1,secFirstStyle);
-              console.log('[R1 AFTER - SKIPPED]');
             }
             sheetXml=patchRowByPos(sheetXml,hasSections?2:1,colHdrStyle);
           }
         }
-        var dvXml=''; // TEMPORARILY DISABLED
-        // var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
-        console.log('[DV] entries:',dvEntries.length,'dvXml length:',dvXml.length,'first 300:',dvXml.substring(0,300));
+        var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
         sheetXml=sheetXml.replace(/<dataValidations[^>]*>[\s\S]*?<\/dataValidations>/,'');
         if(dvXml){
           if(sheetXml.indexOf('</sheetData>')>=0)sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
           else sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
         }
         zip.file(sheetKey,sheetXml);
-        console.log('[SHEET] length:',sheetXml.length,'ends:',sheetXml.substring(sheetXml.length-80));
         zip.generateAsync({type:'arraybuffer'}).then(function(out){
           var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
           var a=document.createElement('a');a.href=URL.createObjectURL(blob);
@@ -3015,7 +3007,7 @@ function exportRevXLSX(){
         var formula1='"'+dv.options.slice(0,20).map(function(o){return o.replace(/[,"]/g,'');}).join(',').substring(0,250)+'"';
         for(var ci=dv.colStart;ci<=dv.colEnd;ci++){
           var sqref=colLetter(ci)+excelRow;
-          dvEntries.push('<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'"><formula1>'+formula1.replace(/"/g,'&quot;')+'</formula1></dataValidation>');
+          dvEntries.push('<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'"><formula1>'+formula1+'</formula1></dataValidation>');
         }
       });
 
@@ -3158,7 +3150,7 @@ function exportRevXLSX(){
         if(!opts||!opts.length)return;
         var sqref=colLetter(ci)+dataStartRow+':'+colLetter(ci)+'2000';
         var formula1='"'+opts.slice(0,20).map(function(o){return o.replace(/[,"]/g,'');}).join(',').substring(0,250)+'"';
-        dvEntries2.push('<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'"><formula1>'+formula1.replace(/"/g,'&quot;')+'</formula1></dataValidation>');
+        dvEntries2.push('<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'"><formula1>'+formula1+'</formula1></dataValidation>');
       });
 
       if(dvEntries2.length){
