@@ -2277,22 +2277,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
               var patched=rowContent.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+styleIdx+'"'+rest+'>';});
               return xml.substring(0,si)+patched+xml.substring(ei+6);
             }
-            function patchSecRowByPos(xml){
-              var tag='<row r="1"';
-              var si=xml.indexOf(tag);if(si<0)return xml;
-              var ei=xml.indexOf('</row>',si);if(ei<0)return xml;
-              var rowContent=xml.substring(si,ei+6);
-              var patched=rowContent.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
-                var ci=colLetterToIdx(col);
-                var range=null;
-                for(var ri=0;ri<secColRanges.length;ri++){if(ci>=secColRanges[ri].start&&ci<=secColRanges[ri].end){range=secColRanges[ri];break;}}
-                if(!range)return cm;
-                var sty=ci===range.start?secFirstStyle:ci===range.end?secLastStyle:secMidStyle;
-                return '<c r="'+col+row+'" s="'+sty+'"'+rest+'>';
-              });
-              return xml.substring(0,si)+patched+xml.substring(ei+6);
-            }
-            if(hasSections)sheetXml=patchSecRowByPos(sheetXml);
+            if(hasSections)sheetXml=patchRowByPos(sheetXml,1,secFirstStyle);
             sheetXml=patchRowByPos(sheetXml,hasSections?2:1,colHdrStyle);
           }
         }
