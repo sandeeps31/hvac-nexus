@@ -2272,7 +2272,17 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
               return '<row r="'+rn+'"'+ra+'>'+p+'</row>';
             });
           } else {
-            // Horizontal: row patching causes corruption - styles applied via SheetJS .s properties only
+            // Horizontal: patch rows safely by position
+            function patchRowByPos(xml,rowNum,styleIdx){
+              var tag='<row r="'+rowNum+'"';
+              var si=xml.indexOf(tag);if(si<0)return xml;
+              var ei=xml.indexOf('</row>',si);if(ei<0)return xml;
+              var rowContent=xml.substring(si,ei+6);
+              var patched=rowContent.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+styleIdx+'"'+rest+'>';});
+              return xml.substring(0,si)+patched+xml.substring(ei+6);
+            }
+            if(hasSections)sheetXml=patchRowByPos(sheetXml,1,secFirstStyle);
+            sheetXml=patchRowByPos(sheetXml,hasSections?2:1,colHdrStyle);
           }
         }
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
