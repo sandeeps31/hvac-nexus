@@ -2194,12 +2194,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
   function doInject(JSZip){
     new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
       var sheetKey=null;
-      var allFiles=[];
-      zip.forEach(function(path){
-        allFiles.push(path);
-        if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;
-      });
-      console.log('[ZIP FILES]',allFiles.join(', '));
+      zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
       if(!sheetKey){fallback();return;}
       Promise.all([
         zip.file(sheetKey).async('string'),
@@ -2207,11 +2202,6 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
       ]).then(function(results){
         var sheetXml=results[0];
         var stylesXml=results[1];
-        // Skip all patching for horizontal with sections - direct download
-        if(hasSections && !verticalMode){
-          fallback();
-          return;
-        }
         if(stylesXml){
           // Fonts: 2 new bold fonts
           stylesXml=stylesXml.replace(/<fonts count="(\d+)">/,function(m,n){return '<fonts count="'+(+n+2)+'">';});
@@ -2253,7 +2243,6 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           var secLastStyle=totalXf-3;
           var dataStyle=totalXf-2;
           var secVertStyle=totalXf-1;
-          console.log('[STYLES] totalXf:',totalXf,'colHdr:',colHdrStyle,'secFirst:',secFirstStyle,'data:',dataStyle);
           zip.file('xl/styles.xml',stylesXml);
 
           var secHdrRows={};
