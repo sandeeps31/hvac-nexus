@@ -2216,6 +2216,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           var wr=results[4].replace(/<Relationship[^>]*metadata[^>]*\/>/g,'');
           zip.file('xl/_rels/workbook.xml.rels',wr);
           console.log('[META REMOVED] metadata.xml still in zip:',!!zip.file('xl/metadata.xml'));
+          console.log('[WB RELS after]',wr.substring(0,300));
         }
         if(stylesXml){
           // Fonts: 2 new bold fonts
@@ -2301,6 +2302,9 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           if(sheetXml.indexOf('</sheetData>')>=0)sheetXml=sheetXml.replace('</sheetData>','</sheetData>'+dvXml);
           else sheetXml=sheetXml.replace('</worksheet>',dvXml+'</worksheet>');
         }
+        // Remove ignoredErrors - can cause validation issues after patching
+        sheetXml=sheetXml.replace(/<ignoredErrors[^>]*>[\s\S]*?<\/ignoredErrors>/g,'');
+        sheetXml=sheetXml.replace(/<ignoredErrors[^>]*\/>/g,'');
         console.log('[FINAL] sheetXml ends:',sheetXml.substring(sheetXml.length-60));
         console.log('[FINAL STYLES] len:',stylesXml?stylesXml.length:0,'ends:',stylesXml?stylesXml.substring(stylesXml.length-60):'null');
         zip.file(sheetKey,sheetXml);
