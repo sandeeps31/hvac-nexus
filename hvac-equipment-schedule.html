@@ -2195,9 +2195,7 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
   function doInject(JSZip){
     new JSZip().loadAsync(new Uint8Array(wbout)).then(function(zip){
       var sheetKey=null;
-      var allFiles=[];
-      zip.forEach(function(path){allFiles.push(path);if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
-      console.log('[ZIP]',allFiles.join('|'));
+      zip.forEach(function(path){if(/xl\/worksheets\/sheet\d+\.xml$/.test(path)&&!sheetKey)sheetKey=path;});
       if(!sheetKey){fallback();return;}
       Promise.all([
         zip.file(sheetKey).async('string'),
@@ -2215,8 +2213,6 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
           zip.file('[Content_Types].xml',ct);
           var wr=results[4].replace(/<Relationship[^>]*metadata[^>]*\/>/g,'');
           zip.file('xl/_rels/workbook.xml.rels',wr);
-          console.log('[META REMOVED] metadata.xml still in zip:',!!zip.file('xl/metadata.xml'));
-          console.log('[WB RELS after]',wr.substring(0,300));
         }
         if(stylesXml){
           // Fonts: 2 new bold fonts
@@ -2304,8 +2300,6 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
         // Remove ignoredErrors - can cause validation issues after patching
         sheetXml=sheetXml.replace(/<ignoredErrors[^>]*>[\s\S]*?<\/ignoredErrors>/g,'');
         sheetXml=sheetXml.replace(/<ignoredErrors[^>]*\/>/g,'');
-        console.log('[FINAL] sheetXml ends:',sheetXml.substring(sheetXml.length-60));
-        console.log('[FINAL STYLES] len:',stylesXml?stylesXml.length:0,'ends:',stylesXml?stylesXml.substring(stylesXml.length-60):'null');
         zip.file(sheetKey,sheetXml);
         zip.generateAsync({type:'arraybuffer'}).then(function(out){
           var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
