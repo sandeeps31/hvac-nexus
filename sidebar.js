@@ -82,6 +82,7 @@
       <div class="sb-group-items" id="gitems-commissioning">
         <div class="sb-item" onclick="navTo('hvac-commissioning-plan.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning plan</span></div>
         <div class="sb-item" onclick="navTo('hvac-precommissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span></div>
+        <div class="sb-item sb-item-disabled" style="opacity:.4;cursor:default"><span class="sb-item-icon">👁️</span><span class="sb-item-label">Witness testing</span></div>
         <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span></div>
       </div>
     </div>
