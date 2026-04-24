@@ -2288,8 +2288,42 @@ function injectDataValidation(wbout,dvEntries,tabName,sheetName,hasSections,opts
               var patched=rowContent.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+styleIdx+'"'+rest+'>';});
               return xml.substring(0,si)+patched+xml.substring(ei+6);
             }
-            if(hasSections){sheetXml=patchRowByPos(sheetXml,1,secFirstStyle);}
+            if(hasSections){
+              // Row 1: section cells get secFirstStyle, non-section cells get blankStyle
+              var tag='<row r="1"';
+              var si=sheetXml.indexOf(tag);
+              if(si>=0){
+                var ei=sheetXml.indexOf('</row>',si);
+                if(ei>=0){
+                  var rowContent=sheetXml.substring(si,ei+6);
+                  var patched=rowContent.replace(/ s="\d+"/g,'').replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g,function(cm,col,row,rest){
+                    var ci=colLetterToIdx(col);
+                    var inSec=secColRanges.some(function(r){return ci>=r.start&&ci<=r.end;});
+                    return '<c r="'+col+row+'" s="'+(inSec?secFirstStyle:blankStyle)+'"'+rest+'>';
+                  });
+                  sheetXml=sheetXml.substring(0,si)+patched+sheetXml.substring(ei+6);
+                }
+              }
+            }
             sheetXml=patchRowByPos(sheetXml,hasSections?2:1,colHdrStyle);
+            // Data rows: all cells get dataStyle (borders)
+            var dataRowStart=hasSections?3:2;
+            var pos=0;var out='';
+            while(pos<sheetXml.length){
+              var ro=sheetXml.indexOf('<row r="',pos);
+              if(ro<0){out+=sheetXml.substring(pos);break;}
+              out+=sheetXml.substring(pos,ro);
+              var rc=sheetXml.indexOf('</row>',ro);
+              if(rc<0){out+=sheetXml.substring(ro);break;}
+              var rowFull=sheetXml.substring(ro,rc+6);
+              var rnM=rowFull.match(/<row r="(\d+)"/);
+              var rn=rnM?parseInt(rnM[1]):0;
+              if(rn>=dataRowStart){
+                rowFull=rowFull.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(cm,ref,rest){return '<c r="'+ref+'" s="'+dataStyle+'"'+rest+'>';});
+              }
+              out+=rowFull;pos=rc+6;
+            }
+            sheetXml=out;
           }
         }
         var dvXml=dvEntries.length?'<dataValidations count="'+dvEntries.length+'">'+dvEntries.join('')+'</dataValidations>':'';
