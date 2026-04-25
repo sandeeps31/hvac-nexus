@@ -92,7 +92,8 @@ select.ci{cursor:pointer}
 .form-inp{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;width:100%;box-sizing:border-box;transition:border-color .15s}
 .form-inp:focus{border-color:var(--accent)}
 .modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
-.emptyp{text-align:center;padding:60px 20px;color:var(--muted)}
+.cedbtn{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;cursor:pointer;font-family:'DM Mono',monospace;transition:all .13s}
+.cedbtn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 .placeholder-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:12px;color:var(--muted);text-align:center}
 .placeholder-tab h3{font-size:18px;color:var(--text2);margin:0}
 </style>
@@ -111,10 +112,11 @@ select.ci{cursor:pointer}
     <span class="bcs">›</span>
     <span class="bcc">Boards Schedule</span>
   </div>
-  <div style="display:flex;gap:8px">
-    <button class="btn bg" id="btnImport" onclick="triggerImport()" style="display:none">⬆ Import</button>
-    <button class="btn bg" id="btnExport" onclick="exportXLSX()" style="display:none">⬇ Export</button>
-    <button class="btn bp" id="btnAddBoard" onclick="openAddBoardModal()" style="display:none">+ Add Board</button>
+  <div style="display:flex;gap:8px" id="topbarBtns" style="display:none">
+    <button class="btn bg" id="btnTemplate" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3);display:none">⬇ Template</button>
+    <button class="btn bg" id="btnImport" onclick="triggerImport()">⬆ Import</button>
+    <button class="btn bg" id="btnExport" onclick="exportXLSX()">⬇ Export</button>
+    <button class="btn bp" id="btnAddBoard" onclick="openAddBoardModal()">+ Add Board</button>
   </div>
 </div>
 
@@ -125,6 +127,8 @@ select.ci{cursor:pointer}
 <div class="abar" id="abar" style="display:none">
   <button class="btn bg" id="btnPublish" onclick="publishRev()">Publish Rev</button>
   <button class="btn bg" id="btnExportDraft" onclick="doExportDraft()">Export Draft</button>
+  <div style="flex:1"></div>
+  <button class="cedbtn" id="colSettingsBtn" onclick="openColSettings()">⚙ Columns</button>
 </div>
 
 <div class="rev-bar" id="revBar" style="display:none"></div>
@@ -151,10 +155,52 @@ select.ci{cursor:pointer}
   </div>
 </div>
 
+<!-- Column Settings Modal -->
+<div class="modal-overlay" id="colModal">
+  <div class="modal" style="min-width:340px;max-width:420px">
+    <h3>Column Settings</h3>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">Toggle columns on/off</p>
+    <div id="colList" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto"></div>
+    <div class="modal-btns">
+      <button class="btn bg" onclick="resetCols()">Reset All</button>
+      <button class="btn bp" onclick="closeColSettings()">Done</button>
+    </div>
+  </div>
+</div>
+
 <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="handleImport(event)">
 
 <script>
 function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'»':'«';}
+
+// ── Column visibility ──
+var _colVis={};
+function getVisibleCols(){return COLS.filter(function(c){return _colVis[c.k]!==false;});}
+function openColSettings(){
+  var list=document.getElementById('colList');
+  list.innerHTML=COLS.map(function(c){
+    var checked=_colVis[c.k]!==false;
+    return '<label style="display:flex;align-items:center;gap:10px;padding:7px 0;cursor:pointer;border-bottom:1px solid var(--border)">'
+      +'<input type="checkbox"'+(checked?' checked':'')+' onchange="toggleCol(\''+c.k+'\',this.checked)" style="accent-color:var(--accent);width:15px;height:15px">'
+      +'<span style="font-size:13px">'+X(c.l)+'</span></label>';
+  }).join('');
+  document.getElementById('colModal').classList.add('open');
+}
+function toggleCol(key,visible){_colVis[key]=visible;renderBoards();saveBoards();}
+function resetCols(){_colVis={};openColSettings();renderBoards();saveBoards();}
+function closeColSettings(){document.getElementById('colModal').classList.remove('open');}
+function hasAnyData(){
+  return _boards.some(function(b){
+    return (b.units||[]).some(function(u){
+      return COLS.some(function(c){return c.k!=='unitNum'&&String(u[c.k]||'').trim()!=='';});
+    });
+  });
+}
+function updateTemplateBtnVisibility(){
+  var btn=document.getElementById('btnTemplate');if(!btn)return;
+  var revs=_revData.mssb||[];
+  btn.style.display=(revs.length===0&&!hasAnyData())?'inline-flex':'none';
+}
 
 // ── Constants ──
 var STARTER_TYPES=['VSD','EC','DOL','Star Delta','Soft Starter'];
@@ -199,12 +245,12 @@ function fla(v){return parseFloat(v)||0;}
 // ── DB ──
 function saveBoards(){
   if(!_dataLoaded)return;
-  dbSetProject('boards_schedule',_pNum+'_boards',{boards:_boards,revData:_revData}).catch(function(e){console.error('saveBoards:',e);});
+  dbSetProject('boards_schedule',_pNum+'_boards',{boards:_boards,revData:_revData,colVis:_colVis}).catch(function(e){console.error('saveBoards:',e);});
 }
 async function loadBoards(){
   try{
     var d=await dbGetProject('boards_schedule',_pNum+'_boards');
-    if(d&&d.boards){_boards=d.boards;_revData=d.revData||{};return true;}
+    if(d&&d.boards){_boards=d.boards;_revData=d.revData||{};_colVis=d.colVis||{};return true;}
   }catch(e){}
   return false;
 }
@@ -239,13 +285,10 @@ function switchTab(id){
 
 function renderActive(){
   var isMssb=_activeTab==='mssb';
-  document.getElementById('btnImport').style.display=isMssb?'inline-flex':'none';
-  document.getElementById('btnExport').style.display=isMssb?'inline-flex':'none';
-  document.getElementById('btnAddBoard').style.display=isMssb?'inline-flex':'none';
-  if(isMssb){renderRevBar();renderBoards();}
+  document.getElementById('abar').style.display=isMssb?'flex':'none';
+  if(isMssb){renderRevBar();renderBoards();updateTemplateBtnVisibility();}
   else{
     document.getElementById('revBar').style.display='none';
-    document.getElementById('abar').style.display='none';
     document.getElementById('mainContent').innerHTML='<div class="placeholder-tab"><div style="font-size:48px;opacity:.3">🔌</div><h3>DCP Schedule</h3><p style="font-size:13px;max-width:300px">Distribution Control Panels — coming soon.</p></div>';
   }
 }
@@ -298,6 +341,7 @@ function renderBoards(readonly,overrideBoards){
   var mc=document.getElementById('mainContent');
   var bds=overrideBoards||_boards;
   readonly=readonly||false;
+  var vcols=getVisibleCols();
 
   if(!bds||!bds.length){
     mc.innerHTML='<div class="emptyp"><div style="font-size:40px;opacity:.3;margin-bottom:12px">⚡</div><div>No boards yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>+ Add Board</strong> to get started, or <strong>⬆ Import</strong> to import from Excel.</div></div>';
@@ -328,13 +372,13 @@ function renderBoards(readonly,overrideBoards){
 
     // Body
     html+='<div class="board-body"><table class="btbl"><thead><tr>';
-    COLS.forEach(function(c){html+='<th style="min-width:'+c.w+'">'+X(c.l)+'</th>';});
+    cols.forEach(function(c){html+='<th style="min-width:'+c.w+'">'+X(c.l)+'</th>';});
     if(!readonly)html+='<th style="width:28px"></th>';
     html+='</tr></thead><tbody>';
 
     units.forEach(function(unit){
       html+='<tr id="ur_'+unit.id+'">';
-      COLS.forEach(function(c){
+      vcols.forEach(function(c){
         var val=unit[c.k]||'';
         html+='<td>';
         if(readonly){
@@ -355,7 +399,7 @@ function renderBoards(readonly,overrideBoards){
 
     // Totals row
     html+='<tr class="totals-row">';
-    COLS.forEach(function(c,i){
+    vcols.forEach(function(c,i){
       if(i===0)html+='<td colspan="9" class="fla-label">Total FLA per Board</td>';
       else if(i<9)return;
       else if(c.k==='ph1')html+='<td class="fla-total" id="ft1_'+board.id+'">'+ph1.toFixed(1)+' A</td>';
@@ -463,7 +507,22 @@ function deleteUnit(boardId,unitId){
   renderBoards();saveBoards();
 }
 
-// ── Export XLSX ──
+function downloadTemplate(){
+  // Build empty xlsx with headers only
+  var hdrRow=['MSSB Reference','MSSB Location'].concat(COLS.map(function(c){return c.l;}));
+  var aoa=[hdrRow,['Example-MSSB-001','Level 00 - Plantroom'].concat(COLS.map(function(){return '';}))];
+  if(typeof XLSX==='undefined'){
+    var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=function(){_doTemplateDownload(aoa);};document.head.appendChild(s);
+  } else {_doTemplateDownload(aoa);}
+}
+function _doTemplateDownload(aoa){
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:30},{wch:20}].concat(COLS.map(function(c){return {wch:parseInt(c.w)||16};}));
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'MSSB Schedule');
+  XLSX.writeFile(wb,'MSSB Schedule Template.xlsx');
+}
 function exportXLSX(bds,revLabel){
   bds=bds||_boards;
   if(!revLabel){
@@ -626,6 +685,7 @@ function parseImport(file){
       _boards=boardOrder.map(function(r){return boardMap[r];});
       _revData.mssb_draft=true;
       renderBoards();renderRevBar();saveBoards();
+      updateTemplateBtnVisibility();
       alert('Imported '+boardOrder.length+' boards successfully.');
     }catch(err){alert('Import failed: '+err.message);}
   };
