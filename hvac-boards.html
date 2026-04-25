@@ -88,6 +88,43 @@ select.ci{cursor:pointer}
 .del-btn:hover{background:rgba(255,77,109,.15);color:var(--danger)}
 .add-unit-btn{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:5px;border:1px dashed var(--border);background:transparent;color:var(--muted);font-size:11px;cursor:pointer;transition:all .13s;font-family:'DM Sans',sans-serif}
 .add-unit-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+/* View mode toggle */
+.view-toggle{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--surface2)}
+.vt-btn{background:transparent;border:none;color:var(--text2);padding:6px 14px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .12s;border-right:1px solid var(--border)}
+.vt-btn:last-child{border-right:none}
+.vt-btn:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.vt-btn.active{background:var(--accent);color:#0a0a0a;font-weight:600}
+/* Track-changes toggle */
+.tc-wrap{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2);user-select:none}
+.tc-wrap input{cursor:pointer}
+/* Diff highlights */
+.btbl tr.tr-added td{background:rgba(0,229,160,.10) !important}
+.btbl tr.tr-added td.board-cell{border-left-color:var(--green) !important}
+.btbl tr.tr-deleted td{background:rgba(255,77,109,.10) !important;color:var(--muted) !important;text-decoration:line-through;text-decoration-color:rgba(255,77,109,.6)}
+.btbl tr.tr-deleted td.board-cell{border-left-color:var(--danger) !important;color:var(--muted) !important}
+.btbl tr.tr-deleted .ci{text-decoration:line-through;color:var(--muted) !important}
+.btbl td.cell-changed{background:rgba(255,184,48,.18) !important;outline:1px solid rgba(255,184,48,.45);outline-offset:-1px;position:relative}
+.btbl td.cell-cleared{background:rgba(255,184,48,.10) !important;position:relative}
+.cell-cleared-old{position:absolute;top:2px;left:6px;right:6px;font-size:10px;color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(255,77,109,.6);pointer-events:none;font-family:'DM Mono',monospace;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Print stylesheet for PDF export via window.print() */
+@media print{
+  body{background:#fff !important;color:#000 !important}
+  .topbar,.sb,.tstrip-outer,.abar,.rev-bar,.del-btn,.add-unit-btn,.bc-actions,.add-unit-row{display:none !important}
+  .mainwrap{margin-left:0 !important;padding:0 !important}
+  .sched-hdr-wrap{position:static !important;background:#fff !important;padding:0 !important;margin:0 !important}
+  .sched-scroll{padding:0 !important;overflow:visible !important}
+  .sched-hdr th,.btbl th{background:#e8e8e8 !important;color:#000 !important;border:1px solid #999 !important;font-size:8px !important}
+  .btbl td{border:1px solid #999 !important;color:#000 !important;font-size:9px !important;padding:3px 4px !important}
+  .btbl td.board-cell{background:#f5f5f5 !important;color:#000 !important;border-left:2px solid #000 !important}
+  .btbl tr.totals-row td{background:#f0f0f0 !important;color:#000 !important;font-weight:700 !important}
+  .btbl tr.totals-row td.fla-total{color:#006633 !important}
+  .ci,.csel,select.ci{background:transparent !important;border:none !important;color:#000 !important;-webkit-appearance:none;appearance:none;font-size:9px !important}
+  .board-sep td{background:#fff !important;border:none !important}
+  /* Diff in print */
+  .btbl tr.tr-added td{background:#e8f7ee !important}
+  .btbl tr.tr-deleted td{background:#fde7eb !important;text-decoration:line-through}
+  .btbl td.cell-changed{background:#fff5d9 !important;outline:1px solid #c89a2e !important}
+}
 /* Modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center}
 .modal-overlay.open{display:flex}
@@ -127,12 +164,24 @@ select.ci{cursor:pointer}
 
 <div class="abar" id="abar">
   <button class="btn bg" id="btnPublish" onclick="publishRev()" style="display:none">Publish Rev</button>
+  <button class="btn bg" id="btnDiscard" onclick="discardDraft()" style="display:none;color:var(--danger);border-color:rgba(255,77,109,.3)">🗑 Discard Draft</button>
   <button class="btn bg" id="btnExportDraft" onclick="doExportDraft()" style="display:none">Export Draft</button>
+  <!-- View mode toggle -->
+  <div class="view-toggle" id="viewToggle" style="margin-left:8px">
+    <button class="vt-btn active" id="vtList" onclick="setViewMode('list')">List View</button>
+    <button class="vt-btn" id="vtGrouped" onclick="setViewMode('grouped')">Grouped View</button>
+  </div>
+  <!-- Track changes toggle (only when draft exists) -->
+  <label class="tc-wrap" id="tcWrap" style="display:none;margin-left:10px">
+    <input type="checkbox" id="tcChk" onchange="renderBoards()">
+    <span>Track changes</span>
+  </label>
   <div style="flex:1"></div>
   <button class="btn bg" id="btnTemplate" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3);display:none">⬇ Template</button>
   <button class="cedbtn" id="colSettingsBtn" onclick="openColSettings()">⚙ Columns</button>
   <button class="btn bg" id="btnImport" onclick="triggerImport()">⬆ Import</button>
-  <button class="btn bg" id="btnExport" onclick="exportXLSX()">⬇ Export</button>
+  <button class="btn bg" onclick="exportXLSX()">⬇ Excel</button>
+  <button class="btn bg" onclick="exportPDF()">⬇ PDF</button>
   <button class="btn bp" id="btnAddBoard" onclick="openAddBoardModal()">+ Add Board</button>
 </div>
 
@@ -240,12 +289,85 @@ var _revData={};
 var _viewRevIdx=null; // null=live, -1=draft, >=0=published
 var _editBoardId=null;
 var _uidN=0;
+var _viewMode='list'; // 'list' or 'grouped'
 
 function nid(){return 'b'+(++_uidN)+'_'+Math.random().toString(36).slice(2,6);}
 function X(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function fmtD(d){if(!d)return '';var p=String(d).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
 function fla(v){return parseFloat(v)||0;}
+
+// ── View mode ──
+function setViewMode(m){
+  if(m!==_viewMode){
+    _viewMode=m;
+    document.getElementById('vtList').classList.toggle('active',m==='list');
+    document.getElementById('vtGrouped').classList.toggle('active',m==='grouped');
+    renderBoards();
+  }
+}
+
+// ── Track-changes diff ──
+// Builds a flat unit map keyed by board.id+unit.id, with denormalised board fields
+function flattenBoards(bds){
+  var out={};
+  (bds||[]).forEach(function(b){
+    (b.units||[]).forEach(function(u){
+      out[b.id+'::'+u.id]={boardId:b.id,unitId:u.id,boardRef:b.ref||'',boardLoc:b.loc||'',
+        unitNum:u.unitNum||'',unitDesc:u.unitDesc||'',suppFrom:u.suppFrom||'',suppLoc:u.suppLoc||'',
+        level:u.level||'',duty:u.duty||'',starter:u.starter||'',lamps:u.lamps||'',power:u.power||'',
+        ph1:u.ph1||'',ph2:u.ph2||'',ph3:u.ph3||'',meterRef:u.meterRef||'',ctrlSw:u.ctrlSw||''};
+    });
+  });
+  return out;
+}
+// Returns {addedKeys:Set, deletedKeys:Set, deletedRows:[{key,row}], changed:{key:{col:[old,new]}}, boardChanges:{boardId:{ref?:[],loc?:[]}}}
+function computeBoardsDiff(baseBoards,curBoards){
+  var baseFlat=flattenBoards(baseBoards);
+  var curFlat=flattenBoards(curBoards);
+  var added={},deleted={},changed={},boardChanges={};
+  Object.keys(curFlat).forEach(function(k){if(!baseFlat[k])added[k]=true;});
+  Object.keys(baseFlat).forEach(function(k){if(!curFlat[k])deleted[k]=baseFlat[k];});
+  // Board-level changes (ref/loc) for boards present in both
+  var baseBoardMap={};(baseBoards||[]).forEach(function(b){baseBoardMap[b.id]=b;});
+  (curBoards||[]).forEach(function(b){
+    var bb=baseBoardMap[b.id];
+    if(!bb)return;
+    var bc={};
+    if((bb.ref||'')!==(b.ref||''))bc.ref=[bb.ref||'',b.ref||''];
+    if((bb.loc||'')!==(b.loc||''))bc.loc=[bb.loc||'',b.loc||''];
+    if(Object.keys(bc).length)boardChanges[b.id]=bc;
+  });
+  // Unit-level cell changes
+  var unitCols=['unitNum','unitDesc','suppFrom','suppLoc','level','duty','starter','lamps','power','ph1','ph2','ph3','meterRef','ctrlSw'];
+  Object.keys(curFlat).forEach(function(k){
+    var b=baseFlat[k],c=curFlat[k];if(!b)return;
+    var diffs={};
+    unitCols.forEach(function(col){
+      var ov=String(b[col]||'').trim(),nv=String(c[col]||'').trim();
+      if(ov!==nv)diffs[col]=[b[col]||'',c[col]||''];
+    });
+    if(Object.keys(diffs).length)changed[k]=diffs;
+  });
+  return{added:added,deleted:deleted,changed:changed,boardChanges:boardChanges};
+}
+// Decide which baseline to diff against given current view state
+function getDiffBaseline(){
+  var revs=_revData.mssb||[];
+  if(_viewRevIdx!==null&&_viewRevIdx>=0){
+    // Viewing a published rev — compare against previous rev (or empty if rev 0)
+    if(_viewRevIdx===0)return null;
+    return revs[_viewRevIdx-1].boards||[];
+  }
+  // Live or draft — compare against last published
+  if(!revs.length)return null;
+  return revs[revs.length-1].boards||[];
+}
+function shouldShowDiff(){
+  var chk=document.getElementById('tcChk');
+  if(!chk||!chk.checked)return false;
+  return getDiffBaseline()!==null;
+}
 
 // ── DB ──
 function saveBoards(){
@@ -292,10 +414,13 @@ function renderActive(){
   var isMssb=_activeTab==='mssb';
   document.getElementById('abar').style.display='flex';
   // Hide MSSB-only elements when on DCP
-  ['btnPublish','btnExportDraft','btnTemplate','colSettingsBtn','btnImport','btnExport','btnAddBoard'].forEach(function(id){
+  ['btnPublish','btnDiscard','btnExportDraft','btnTemplate','colSettingsBtn','btnImport','btnAddBoard','viewToggle','tcWrap'].forEach(function(id){
     var el=document.getElementById(id);
-    if(el)el.style.display=isMssb?(id==='btnPublish'||id==='btnExportDraft'?'none':'inline-flex'):'none';
+    if(el)el.style.display=isMssb?(id==='btnPublish'||id==='btnDiscard'||id==='btnExportDraft'||id==='tcWrap'?'none':'inline-flex'):'none';
   });
+  // Excel/PDF export buttons (no IDs)
+  var expBtns=document.querySelectorAll('.abar button[onclick="exportXLSX()"], .abar button[onclick="exportPDF()"]');
+  expBtns.forEach(function(b){b.style.display=isMssb?'inline-flex':'none';});
   if(isMssb){renderRevBar();renderBoards();updateTemplateBtnVisibility();}
   else{
     document.getElementById('revBar').style.display='none';
@@ -313,8 +438,13 @@ function renderRevBar(){
   // Control publish/draft export buttons based on draft state
   var btnP=document.getElementById('btnPublish');
   var btnD=document.getElementById('btnExportDraft');
+  var btnDD=document.getElementById('btnDiscard');
   if(btnP)btnP.style.display=hasDraft?'inline-flex':'none';
   if(btnD)btnD.style.display=hasDraft?'inline-flex':'none';
+  if(btnDD)btnDD.style.display=hasDraft?'inline-flex':'none';
+  // Track-changes toggle: show when there's at least one revision to compare against
+  var tcw=document.getElementById('tcWrap');
+  if(tcw)tcw.style.display=revs.length?'inline-flex':'none';
 
   var html='';
   if(hasDraft){
@@ -331,9 +461,13 @@ function renderRevBar(){
 function viewRev(idx){
   _viewRevIdx=idx;
   renderRevBar();
-  if(idx===null||idx===undefined)renderBoards();
-  else if(idx===-1)renderBoards(true,null);
-  else{var rv=(_revData.mssb||[])[idx];if(rv)renderBoards(true,rv.boards);}
+  if(idx===null||idx===undefined||idx===-1){
+    // null = live, -1 = draft (which IS the live state — editable)
+    _viewRevIdx=(idx===-1)?-1:null;
+    renderBoards();
+  } else {
+    var rv=(_revData.mssb||[])[idx];if(rv)renderBoards(true,rv.boards);
+  }
 }
 
 function publishRev(){
@@ -348,9 +482,31 @@ function publishRev(){
   renderBoards();
 }
 
+function discardDraft(){
+  if(!_revData.mssb_draft){return;}
+  var revs=_revData.mssb||[];
+  var msg=revs.length
+    ? 'Discard draft?\n\nAll changes since the last published revision ('+revs[revs.length-1].rev+') will be permanently lost. This cannot be undone.'
+    : 'Discard draft?\n\nThere is no published revision to fall back on — discarding will clear all boards. This cannot be undone.';
+  if(!confirm(msg))return;
+  // Restore from last published snapshot, or clear if none exists
+  if(revs.length){
+    _boards=JSON.parse(JSON.stringify(revs[revs.length-1].boards||[]));
+  } else {
+    _boards=[];
+  }
+  delete _revData.mssb_draft;
+  _viewRevIdx=null;
+  saveBoards();
+  renderRevBar();
+  renderBoards();
+  // Toast feedback if available, otherwise alert
+  if(typeof showToast==='function')showToast('✓ Draft discarded — restored to '+(revs.length?revs[revs.length-1].rev:'empty state'));
+}
+
 function doExportDraft(){var revs=_revData.mssb||[];var lbl='Rev '+String(revs.length+1).padStart(2,'0')+' Draft';exportXLSX(_boards,lbl);}
 
-// ── Render boards ──
+// ── Render boards (dispatcher) ──
 function renderBoards(readonly,overrideBoards){
   var mc=document.getElementById('mainContent');
   var bds=overrideBoards||_boards;
@@ -362,8 +518,140 @@ function renderBoards(readonly,overrideBoards){
     return;
   }
 
-  // Shared <colgroup> — both sticky header and every board body use this exact width set
-  // Shared <colgroup> — Board ID + MSSB Location are fixed as cols 1 & 2, then user-visible data cols, then optional delete
+  // Determine diff state — applies to both views
+  var diff=null;
+  if(shouldShowDiff()){
+    var base=getDiffBaseline();
+    if(base)diff=computeBoardsDiff(base,bds);
+  }
+
+  if(_viewMode==='list')renderListView(mc,bds,vcols,readonly,diff);
+  else renderGroupedView(mc,bds,vcols,readonly,diff);
+
+  // Adjust sticky column-header offset based on rev-bar visibility
+  var revBar=document.getElementById('revBar');
+  var hdrWrap=mc.querySelector('.sched-hdr-wrap');
+  if(hdrWrap){
+    var revVisible=revBar&&revBar.style.display!=='none'&&revBar.offsetHeight>0;
+    hdrWrap.style.top=revVisible?'188px':'140px';
+  }
+}
+
+// Helper — render an editable cell for a unit, applying cell-changed highlight if applicable
+function renderUnitCell(c,unit,boardId,readonly,diffEntry){
+  var val=unit[c.k]||'';
+  var changed=diffEntry&&diffEntry[c.k];
+  var cellCls='';
+  var clearedOverlay='';
+  if(changed){
+    var oldV=changed[0]||'',newV=changed[1]||'';
+    if(newV===''&&oldV!==''){
+      cellCls=' class="cell-cleared"';
+      clearedOverlay='<span class="cell-cleared-old">'+X(oldV)+'</span>';
+    } else {
+      cellCls=' class="cell-changed"';
+    }
+  }
+  var inner;
+  if(readonly){
+    inner='<span style="font-size:12px;padding:2px 6px;display:block">'+X(val)+'</span>';
+  } else if(c.sel){
+    inner='<select class="ci" onchange="updUnit(\''+boardId+'\',\''+unit.id+'\',\''+c.k+'\',this.value)">';
+    inner+='<option value="">—</option>';
+    c.sel.forEach(function(o){inner+='<option value="'+X(o)+'"'+(o===val?' selected':'')+'>'+X(o)+'</option>';});
+    inner+='</select>';
+  } else {
+    inner='<input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(val)+'"'+(c.num?' min="0" step="0.1"':'')+' onchange="updUnit(\''+boardId+'\',\''+unit.id+'\',\''+c.k+'\',this.value)">';
+  }
+  return '<td'+cellCls+'>'+clearedOverlay+inner+'</td>';
+}
+
+// ── List View — flat, one row per unit (matches Excel template) ──
+function renderListView(mc,bds,vcols,readonly,diff){
+  var BOARD_W='180px',LOC_W='130px';
+  var colgroupHtml='<colgroup>';
+  colgroupHtml+='<col style="width:'+BOARD_W+'">';
+  colgroupHtml+='<col style="width:'+LOC_W+'">';
+  vcols.forEach(function(c){colgroupHtml+='<col style="width:'+c.w+'">';});
+  if(!readonly)colgroupHtml+='<col style="width:36px">';
+  colgroupHtml+='</colgroup>';
+
+  var headerHtml='<div class="sched-hdr-wrap"><table class="sched-hdr">'+colgroupHtml+'<thead><tr>';
+  headerHtml+='<th>MSSB Reference</th><th>MSSB Location</th>';
+  vcols.forEach(function(c){headerHtml+='<th>'+X(c.l)+'</th>';});
+  if(!readonly)headerHtml+='<th></th>';
+  headerHtml+='</tr></thead></table></div>';
+
+  var html='<div class="sched-scroll">'+headerHtml;
+  html+='<table class="btbl">'+colgroupHtml+'<tbody>';
+
+  var dataColSpan=vcols.length+(readonly?0:1);
+  var totalCols=2+vcols.length+(readonly?0:1);
+
+  bds.forEach(function(board){
+    var units=board.units||[];
+    var bChange=(diff&&diff.boardChanges&&diff.boardChanges[board.id])||null;
+    var refCellCls=bChange&&bChange.ref?' class="cell-changed"':'';
+    var locCellCls=bChange&&bChange.loc?' class="cell-changed"':'';
+    var refOv=bChange&&bChange.ref&&bChange.ref[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.ref[0])+'</span>':'';
+    var locOv=bChange&&bChange.loc&&bChange.loc[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.loc[0])+'</span>':'';
+
+    if(units.length){
+      units.forEach(function(unit){
+        var key=board.id+'::'+unit.id;
+        var rowCls='unit-row';
+        if(diff){
+          if(diff.added[key])rowCls+=' tr-added';
+        }
+        var diffEntry=diff?diff.changed[key]:null;
+        html+='<tr id="ur_'+unit.id+'" class="'+rowCls+'" data-board="'+board.id+'">';
+        html+='<td'+refCellCls+' style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600">'+refOv+X(board.ref)+'</td>';
+        html+='<td'+locCellCls+' style="font-size:11px;color:var(--text2)">'+locOv+X(board.loc||'—')+'</td>';
+        vcols.forEach(function(c){html+=renderUnitCell(c,unit,board.id,readonly,diffEntry);});
+        if(!readonly)html+='<td><button class="del-btn" onclick="deleteUnit(\''+board.id+'\',\''+unit.id+'\')">✕</button></td>';
+        html+='</tr>';
+      });
+    } else {
+      // Empty board — show one "no units" row that still carries board ref/loc
+      html+='<tr class="unit-row" data-board="'+board.id+'">';
+      html+='<td'+refCellCls+' style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600">'+refOv+X(board.ref)+'</td>';
+      html+='<td'+locCellCls+' style="font-size:11px;color:var(--text2)">'+locOv+X(board.loc||'—')+'</td>';
+      html+='<td colspan="'+dataColSpan+'" style="padding:10px;text-align:center;color:var(--muted);font-size:11px;font-style:italic">No units'+(!readonly?' — <a href="#" onclick="event.preventDefault();addUnit(\''+board.id+'\')" style="color:var(--accent);text-decoration:none">+ Add Unit</a>':'')+'</td>';
+      html+='</tr>';
+    }
+  });
+
+  // Render deleted rows (only if diffing)
+  if(diff){
+    Object.keys(diff.deleted).forEach(function(key){
+      var d=diff.deleted[key];
+      html+='<tr class="tr-deleted">';
+      html+='<td style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:600">'+X(d.boardRef)+'</td>';
+      html+='<td style="font-size:11px">'+X(d.boardLoc||'—')+'</td>';
+      vcols.forEach(function(c){html+='<td style="font-size:12px;padding:4px 6px">'+X(d[c.k]||'')+'</td>';});
+      if(!readonly)html+='<td></td>';
+      html+='</tr>';
+    });
+  }
+
+  // Bottom action row — add board / add unit shortcuts (live mode only)
+  if(!readonly&&_viewRevIdx===null){
+    html+='<tr class="add-unit-row"><td colspan="'+totalCols+'" style="padding:10px 14px;text-align:left">';
+    html+='<button class="add-unit-btn" onclick="openAddBoardModal()">+ Add Board</button> ';
+    if(bds.length){
+      html+='<select class="ci" onchange="if(this.value){addUnit(this.value);this.value=&quot;&quot;;}" style="display:inline-block;width:auto;padding:4px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);margin-left:8px"><option value="">+ Add Unit to…</option>';
+      bds.forEach(function(b){html+='<option value="'+b.id+'">'+X(b.ref)+'</option>';});
+      html+='</select>';
+    }
+    html+='</td></tr>';
+  }
+
+  html+='</tbody></table></div>';
+  mc.innerHTML=html;
+}
+
+// ── Grouped View — original rowspan layout with totals row per board ──
+function renderGroupedView(mc,bds,vcols,readonly,diff){
   var BOARD_W='160px',LOC_W='140px';
   var colgroupHtml='<colgroup>';
   colgroupHtml+='<col style="width:'+BOARD_W+'">';
@@ -372,20 +660,15 @@ function renderBoards(readonly,overrideBoards){
   if(!readonly)colgroupHtml+='<col style="width:36px">';
   colgroupHtml+='</colgroup>';
 
-  // Sticky header
   var headerHtml='<div class="sched-hdr-wrap"><table class="sched-hdr">'+colgroupHtml+'<thead><tr>';
-  headerHtml+='<th>MSSB Ref</th>';
-  headerHtml+='<th>Location</th>';
+  headerHtml+='<th>MSSB Ref</th><th>Location</th>';
   vcols.forEach(function(c){headerHtml+='<th>'+X(c.l)+'</th>';});
   if(!readonly)headerHtml+='<th></th>';
   headerHtml+='</tr></thead></table></div>';
 
   var html='<div class="sched-scroll">'+headerHtml;
-
-  // Single flat body table
   html+='<table class="btbl">'+colgroupHtml+'<tbody>';
 
-  // Number of data columns per unit row (excludes the 2 Board cells — those are rowspan'd)
   var dataColSpan=vcols.length+(readonly?0:1);
 
   bds.forEach(function(board,boardIdx){
@@ -393,79 +676,62 @@ function renderBoards(readonly,overrideBoards){
     var ph1=0,ph2=0,ph3=0;
     units.forEach(function(u){ph1+=fla(u.ph1);ph2+=fla(u.ph2);ph3+=fla(u.ph3);});
 
-    // Separator row BEFORE each board except the first
     if(boardIdx>0){
       html+='<tr class="board-sep"><td colspan="'+(2+dataColSpan)+'"></td></tr>';
     }
 
     var altClass=(boardIdx%2===1)?' board-alt':'';
-    // How many body rows will this board span? Max of (units, 1) + 1 for totals row.
-    // Empty board -> 1 placeholder row + 1 totals row = 2
-    // N units    -> N unit rows + 1 totals row = N+1
     var unitRowCount=Math.max(units.length,1);
     var boardSpanRows=unitRowCount+1;
 
-    // Build the board cell content (with edit/delete buttons)
-    var boardCellContent=X(board.ref);
+    var bChange=(diff&&diff.boardChanges&&diff.boardChanges[board.id])||null;
+    var refOv=bChange&&bChange.ref&&bChange.ref[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.ref[0])+'</span>':'';
+    var locOv=bChange&&bChange.loc&&bChange.loc[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.loc[0])+'</span>':'';
+    var boardCellExtra=(bChange&&bChange.ref)?' cell-changed':'';
+    var locCellExtra=(bChange&&bChange.loc)?' cell-changed':'';
+
+    var boardCellContent=refOv+X(board.ref);
     if(!readonly){
       boardCellContent+='<div class="bc-actions">'
         +'<button class="bc-btn" onclick="editBoard(\''+board.id+'\')" title="Edit board">✏</button>'
         +'<button class="bc-btn bc-del" onclick="deleteBoard(\''+board.id+'\')" title="Delete board">✕</button>'
         +'</div>';
     }
-    var locCellContent=X(board.loc||'—');
-
-    // First row of this board: includes the rowspan'd Board + Location cells
-    var firstRowStarted=false;
+    var locCellContent=locOv+X(board.loc||'—');
 
     if(units.length){
       units.forEach(function(unit,unitIdx){
-        html+='<tr id="ur_'+unit.id+'" class="unit-row'+altClass+'" data-board="'+board.id+'">';
+        var key=board.id+'::'+unit.id;
+        var rowCls='unit-row'+altClass;
+        if(diff&&diff.added[key])rowCls+=' tr-added';
+        var diffEntry=diff?diff.changed[key]:null;
+        html+='<tr id="ur_'+unit.id+'" class="'+rowCls+'" data-board="'+board.id+'">';
         if(unitIdx===0){
-          html+='<td class="board-cell" rowspan="'+boardSpanRows+'" id="bcell_'+board.id+'">'+boardCellContent+'</td>';
-          html+='<td class="board-cell" rowspan="'+boardSpanRows+'" style="font-family:\'DM Sans\',sans-serif;font-weight:400;color:var(--text2);border-left:none !important">'+locCellContent+'</td>';
-          firstRowStarted=true;
+          html+='<td class="board-cell'+boardCellExtra+'" rowspan="'+boardSpanRows+'" id="bcell_'+board.id+'">'+boardCellContent+'</td>';
+          html+='<td class="board-cell'+locCellExtra+'" rowspan="'+boardSpanRows+'" style="font-family:\'DM Sans\',sans-serif;font-weight:400;color:var(--text2);border-left:none !important">'+locCellContent+'</td>';
         }
-        vcols.forEach(function(c){
-          var val=unit[c.k]||'';
-          html+='<td>';
-          if(readonly){
-            html+='<span style="font-size:12px;padding:2px 6px;display:block">'+X(val)+'</span>';
-          } else if(c.sel){
-            html+='<select class="ci" onchange="updUnit(\''+board.id+'\',\''+unit.id+'\',\''+c.k+'\',this.value)">';
-            html+='<option value="">—</option>';
-            c.sel.forEach(function(o){html+='<option value="'+X(o)+'"'+(o===val?' selected':'')+'>'+X(o)+'</option>';});
-            html+='</select>';
-          } else {
-            html+='<input class="ci'+(c.num?' num':'')+'" type="'+(c.num?'number':'text')+'" value="'+X(val)+'"'+(c.num?' min="0" step="0.1"':'')+' onchange="updUnit(\''+board.id+'\',\''+unit.id+'\',\''+c.k+'\',this.value)">';
-          }
-          html+='</td>';
-        });
+        vcols.forEach(function(c){html+=renderUnitCell(c,unit,board.id,readonly,diffEntry);});
         if(!readonly)html+='<td><button class="del-btn" onclick="deleteUnit(\''+board.id+'\',\''+unit.id+'\')">✕</button></td>';
         html+='</tr>';
       });
     } else {
-      // Empty board — single placeholder row, still carries the rowspan'd cells
       html+='<tr class="unit-row'+altClass+'" data-board="'+board.id+'">';
-      html+='<td class="board-cell" rowspan="'+boardSpanRows+'" id="bcell_'+board.id+'">'+boardCellContent+'</td>';
-      html+='<td class="board-cell" rowspan="'+boardSpanRows+'" style="font-family:\'DM Sans\',sans-serif;font-weight:400;color:var(--text2);border-left:none !important">'+locCellContent+'</td>';
+      html+='<td class="board-cell'+boardCellExtra+'" rowspan="'+boardSpanRows+'" id="bcell_'+board.id+'">'+boardCellContent+'</td>';
+      html+='<td class="board-cell'+locCellExtra+'" rowspan="'+boardSpanRows+'" style="font-family:\'DM Sans\',sans-serif;font-weight:400;color:var(--text2);border-left:none !important">'+locCellContent+'</td>';
       html+='<td colspan="'+dataColSpan+'" style="padding:14px;text-align:center;color:var(--muted);font-size:12px;font-style:italic">No units yet'+(!readonly?' — click + Add Unit below':'')+'</td>';
       html+='</tr>';
     }
 
-    // Totals row — always rendered (0.0 A for empty boards)
+    // Totals row
     var ph1ColIdx=vcols.findIndex(function(c){return c.k==='ph1';});
     var ph2ColIdx=vcols.findIndex(function(c){return c.k==='ph2';});
     var ph3ColIdx=vcols.findIndex(function(c){return c.k==='ph3';});
     var firstPhIdx=[ph1ColIdx,ph2ColIdx,ph3ColIdx].filter(function(x){return x>=0;}).sort(function(a,b){return a-b;})[0];
     html+='<tr class="totals-row'+altClass+'">';
-    // No rowspan cells here — they're already covering this row
     if(firstPhIdx===undefined){
       html+='<td colspan="'+vcols.length+'" class="fla-label">Total FLA per Board (hidden — enable Phase columns)</td>';
     } else {
-      if(firstPhIdx>0){
-        html+='<td colspan="'+firstPhIdx+'" class="fla-label">Total FLA per Board</td>';
-      }
+      if(firstPhIdx>0){html+='<td colspan="'+firstPhIdx+'" class="fla-label">Total FLA per Board</td>';}
       for(var vi=firstPhIdx;vi<vcols.length;vi++){
         var vc=vcols[vi];
         if(vc.k==='ph1')html+='<td class="fla-total" id="ft1_'+board.id+'">'+ph1.toFixed(1)+' A</td>';
@@ -477,22 +743,27 @@ function renderBoards(readonly,overrideBoards){
     if(!readonly)html+='<td></td>';
     html+='</tr>';
 
-    // + Add Unit row (immediately after totals, inside the same table, doesn't carry rowspan)
     if(!readonly){
       html+='<tr class="add-unit-row"><td></td><td></td><td colspan="'+dataColSpan+'" style="text-align:left;padding:6px 14px"><button class="add-unit-btn" onclick="addUnit(\''+board.id+'\')">+ Add Unit</button></td></tr>';
     }
   });
 
-  html+='</tbody></table></div>'; // close btbl + sched-scroll
-  mc.innerHTML=html;
-
-  // Adjust sticky column-header offset depending on whether rev-bar is visible
-  var revBar=document.getElementById('revBar');
-  var hdrWrap=mc.querySelector('.sched-hdr-wrap');
-  if(hdrWrap){
-    var revVisible=revBar&&revBar.style.display!=='none'&&revBar.offsetHeight>0;
-    hdrWrap.style.top=revVisible?'188px':'140px';
+  // Deleted rows (when diffing, append at end, no rowspan)
+  if(diff){
+    Object.keys(diff.deleted).forEach(function(key){
+      var d=diff.deleted[key];
+      html+='<tr class="board-sep"><td colspan="'+(2+dataColSpan)+'"></td></tr>';
+      html+='<tr class="tr-deleted">';
+      html+='<td class="board-cell" style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:600">'+X(d.boardRef)+'</td>';
+      html+='<td class="board-cell" style="font-size:11px;font-family:\'DM Sans\',sans-serif;font-weight:400;border-left:none !important">'+X(d.boardLoc||'—')+'</td>';
+      vcols.forEach(function(c){html+='<td>'+X(d[c.k]||'')+'</td>';});
+      if(!readonly)html+='<td></td>';
+      html+='</tr>';
+    });
   }
+
+  html+='</tbody></table></div>';
+  mc.innerHTML=html;
 }
 
 // ── Board CRUD ──
@@ -725,6 +996,43 @@ function buildXLSX(bds,revLabel){
 
   if(typeof JSZip!=='undefined'){inject(JSZip);}
   else{var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';s.onload=function(){inject(JSZip);};s.onerror=function(){dl(wbout);};document.head.appendChild(s);}
+}
+
+// ── Export PDF (uses browser print → "Save as PDF") ──
+function exportPDF(){
+  // Make sure Track Changes state and current view are reflected. The print stylesheet
+  // (in <style>) hides toolbars/sidebars, lays out the table for paper, and preserves
+  // diff highlighting if Track Changes is on.
+  var revs=_revData.mssb||[];
+  var revLabel;
+  if(_viewRevIdx===null||_viewRevIdx===undefined){
+    revLabel=_revData.mssb_draft?('Rev '+String(revs.length+1).padStart(2,'0')+' Draft'):(revs.length?revs[revs.length-1].rev:'Draft');
+  } else if(_viewRevIdx===-1){
+    revLabel='Rev '+String(revs.length+1).padStart(2,'0')+' Draft';
+  } else {
+    revLabel=(revs[_viewRevIdx]&&revs[_viewRevIdx].rev)||'Revision';
+  }
+  var viewLabel=_viewMode==='list'?'List View':'Grouped View';
+  var projName=(_proj&&(_proj.name||_proj.projectName))||'Project';
+  var docTitle='MSSB Schedule — '+projName+' — '+viewLabel+' — '+revLabel;
+  // Inject print header banner (pulled out after print)
+  var banner=document.createElement('div');
+  banner.id='__printBanner';
+  banner.style.cssText='display:none';
+  banner.innerHTML='<style>@media print{#__printBanner{display:block !important;padding:8px 0 14px;border-bottom:1.5px solid #000;margin-bottom:14px;font-family:Arial,sans-serif}#__printBanner h1{margin:0;font-size:14pt;color:#000}#__printBanner .pb-meta{margin-top:4px;font-size:9pt;color:#444}@page{size:A3 landscape;margin:12mm}}</style>'
+    +'<h1>MSSB Schedule</h1>'
+    +'<div class="pb-meta">Project: '+X(projName)+' &nbsp;&middot;&nbsp; View: '+X(viewLabel)+' &nbsp;&middot;&nbsp; Revision: '+X(revLabel)+' &nbsp;&middot;&nbsp; Date: '+todayStr()+'</div>';
+  var mc=document.getElementById('mainContent');
+  mc.parentNode.insertBefore(banner,mc);
+  var prevTitle=document.title;
+  document.title=docTitle;
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){
+      var b=document.getElementById('__printBanner');if(b)b.parentNode.removeChild(b);
+      document.title=prevTitle;
+    },500);
+  },120);
 }
 
 // ── Import XLSX ──
