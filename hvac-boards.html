@@ -64,10 +64,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .btbl tr.board-alt td.board-cell{background:rgba(0,200,255,.03)}
 .btbl tr.add-unit-row td{background:transparent !important;padding:3px 6px !important;border-top:none !important}
 /* Table */
-.sched-scroll{overflow-x:auto;overflow-y:clip;padding:0 16px 16px}
+.sched-scroll{overflow-x:auto;padding:0 16px 16px}
 .btbl{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
-.btbl thead th{padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;position:sticky;z-index:50;box-shadow:0 1px 0 var(--border)}
+.btbl thead th{padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap}
 .btbl thead th:last-child{border-right:none}
+/* JS-positioned floating header clone — fixed to viewport, kept in sync with the real <thead> */
+.sched-hdr-clone{position:fixed;z-index:75;background:var(--bg);overflow:hidden;display:none;pointer-events:none}
+.sched-hdr-clone.active{display:block}
+.sched-hdr-clone table{border-collapse:separate;border-spacing:0;table-layout:fixed;margin:0}
+.sched-hdr-clone th{padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap}
+.sched-hdr-clone th:last-child{border-right:none}
 .btbl td{padding:4px 6px;vertical-align:middle;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--bg)}
 .btbl tr:hover td{background:rgba(255,255,255,.02)}
 .btbl tr:hover td.board-cell{background:var(--surface)}
@@ -600,23 +606,92 @@ function renderBoards(readonly,overrideBoards){
   requestAnimationFrame(adjustStickyHdr);
 }
 
-// Measure cumulative height of all sticky elements above the column header.
-// Sets `top` on each <thead> <th> so the header pins below the entire toolbar stack.
-function adjustStickyHdr(){
-  var ths=document.querySelectorAll('.btbl thead th');
-  if(!ths.length)return;
+// JS-driven sticky header (CSS sticky is trapped by .sched-scroll's overflow-x:auto)
+// Strategy: clone the real <thead> into a position:fixed element above the table, kept
+// in sync with column widths and horizontal scroll. The clone shows when the real header
+// scrolls past the toolbar stack and hides when the table's top edge is back in view.
+var _hdrClone=null;
+var _hdrSyncRAF=null;
+
+function ensureHdrClone(){
+  if(_hdrClone&&document.body.contains(_hdrClone))return _hdrClone;
+  _hdrClone=document.createElement('div');
+  _hdrClone.className='sched-hdr-clone';
+  document.body.appendChild(_hdrClone);
+  return _hdrClone;
+}
+
+function getStackedTopOffset(){
   var topbar=document.querySelector('.topbar');
   var tstrip=document.querySelector('.tstrip-outer');
   var abar=document.getElementById('abar');
   var revBar=document.getElementById('revBar');
   var stackedTop=0;
   [topbar,tstrip,abar].forEach(function(el){if(el&&el.offsetHeight)stackedTop+=el.offsetHeight;});
-  if(revBar&&revBar.style.display!=='none'&&revBar.offsetHeight>0){
-    stackedTop+=revBar.offsetHeight;
-  }
-  ths.forEach(function(th){th.style.top=stackedTop+'px';});
+  if(revBar&&revBar.style.display!=='none'&&revBar.offsetHeight>0)stackedTop+=revBar.offsetHeight;
+  return stackedTop;
 }
-window.addEventListener('resize',function(){adjustStickyHdr();});
+
+function syncHdrClone(){
+  var clone=ensureHdrClone();
+  var realTbl=document.querySelector('.btbl');
+  var realThead=realTbl&&realTbl.querySelector('thead');
+  var scroll=document.querySelector('.sched-scroll');
+  if(!realThead||!scroll){clone.classList.remove('active');return;}
+
+  var stackedTop=getStackedTopOffset();
+  var scrollRect=scroll.getBoundingClientRect();
+  var theadRect=realThead.getBoundingClientRect();
+
+  // Show the clone when the real thead has scrolled above the toolbar stack
+  var shouldShow=theadRect.top<stackedTop&&scrollRect.bottom>stackedTop;
+  if(!shouldShow){clone.classList.remove('active');return;}
+
+  // Position: fixed at viewport, top = bottom of toolbar stack, left = scroll-wrap left edge
+  clone.style.top=stackedTop+'px';
+  clone.style.left=scrollRect.left+'px';
+  clone.style.width=scrollRect.width+'px';
+
+  // Build clone table with same colgroup widths as real table, mirroring horizontal scroll
+  var realCols=realTbl.querySelectorAll('colgroup col');
+  var realThs=realThead.querySelectorAll('th');
+  // Total natural width of the real table (= sum of col widths)
+  var totalW=0;
+  var widths=[];
+  realCols.forEach(function(col){var w=col.offsetWidth||parseFloat(col.style.width)||0;widths.push(w);totalW+=w;});
+
+  // Build inner HTML: a table the SAME width as the real table, translated by -scrollLeft
+  var inner='<div style="position:relative;width:100%;height:100%;overflow:hidden">';
+  inner+='<table style="margin-left:'+(-scroll.scrollLeft)+'px;width:'+totalW+'px;table-layout:fixed;border-collapse:separate;border-spacing:0"><colgroup>';
+  widths.forEach(function(w){inner+='<col style="width:'+w+'px">';});
+  inner+='</colgroup><thead><tr>';
+  realThs.forEach(function(th){inner+='<th>'+th.innerHTML+'</th>';});
+  inner+='</tr></thead></table></div>';
+  clone.innerHTML=inner;
+  clone.classList.add('active');
+}
+
+function scheduleHdrSync(){
+  if(_hdrSyncRAF)return;
+  _hdrSyncRAF=requestAnimationFrame(function(){_hdrSyncRAF=null;syncHdrClone();});
+}
+
+// Bind global listeners once
+(function bindHdrListeners(){
+  if(window._hdrListenersBound)return;
+  window._hdrListenersBound=true;
+  window.addEventListener('scroll',scheduleHdrSync,{passive:true});
+  window.addEventListener('resize',scheduleHdrSync,{passive:true});
+  // Catch horizontal scroll on the table wrapper too
+  document.addEventListener('scroll',function(e){
+    if(e.target&&e.target.classList&&e.target.classList.contains('sched-scroll')){
+      scheduleHdrSync();
+    }
+  },true);
+})();
+
+// Backwards-compat shim — older code calls adjustStickyHdr() after render
+function adjustStickyHdr(){scheduleHdrSync();}
 
 // Helper — render an editable cell for a unit, applying cell-changed highlight if applicable
 function renderUnitCell(c,unit,boardId,readonly,diffEntry){
