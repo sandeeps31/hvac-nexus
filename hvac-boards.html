@@ -529,13 +529,29 @@ function renderBoards(readonly,overrideBoards){
   else renderGroupedView(mc,bds,vcols,readonly,diff);
 
   // Adjust sticky column-header offset based on rev-bar visibility
-  var revBar=document.getElementById('revBar');
-  var hdrWrap=mc.querySelector('.sched-hdr-wrap');
-  if(hdrWrap){
-    var revVisible=revBar&&revBar.style.display!=='none'&&revBar.offsetHeight>0;
-    hdrWrap.style.top=revVisible?'188px':'140px';
-  }
+  adjustStickyHdr();
+  // Run again after the browser has flushed layout (handles cases where elements
+  // haven't reflowed by the time we measure synchronously).
+  requestAnimationFrame(adjustStickyHdr);
 }
+
+// Measure cumulative height of all sticky elements above the column header.
+// Hard-coded offsets break when the action bar grows (e.g. extra buttons or wrapping).
+function adjustStickyHdr(){
+  var hdrWrap=document.querySelector('.sched-hdr-wrap');
+  if(!hdrWrap)return;
+  var topbar=document.querySelector('.topbar');
+  var tstrip=document.querySelector('.tstrip-outer');
+  var abar=document.getElementById('abar');
+  var revBar=document.getElementById('revBar');
+  var stackedTop=0;
+  [topbar,tstrip,abar].forEach(function(el){if(el&&el.offsetHeight)stackedTop+=el.offsetHeight;});
+  if(revBar&&revBar.style.display!=='none'&&revBar.offsetHeight>0){
+    stackedTop+=revBar.offsetHeight;
+  }
+  hdrWrap.style.top=stackedTop+'px';
+}
+window.addEventListener('resize',function(){adjustStickyHdr();});
 
 // Helper — render an editable cell for a unit, applying cell-changed highlight if applicable
 function renderUnitCell(c,unit,boardId,readonly,diffEntry){
