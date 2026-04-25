@@ -352,7 +352,7 @@ function renderBoards(readonly,overrideBoards){
   var vcols=getVisibleCols();
 
   if(!bds||!bds.length){
-    mc.innerHTML='<div class="emptyp"><div style="font-size:40px;opacity:.3;margin-bottom:12px">⚡</div><div>No boards yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>+ Add Board</strong> to get started, or <strong>⬆ Import</strong> to import from Excel.</div></div>';
+    mc.innerHTML='<div class="emptyp" style="text-align:center;padding:60px 20px;color:var(--muted)"><div style="font-size:40px;opacity:.3;margin-bottom:12px">⚡</div><div>No boards yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>+ Add Board</strong> to get started, or <strong>⬆ Import</strong> to import from Excel.</div></div>';
     return;
   }
 
@@ -405,19 +405,42 @@ function renderBoards(readonly,overrideBoards){
       html+='</tr>';
     });
 
-    // Totals row
-    var ph1ColIdx=vcols.findIndex(function(c){return c.k==='ph1';});
-    html+='<tr class="totals-row">';
-    vcols.forEach(function(c,i){
-      if(i===0)html+='<td colspan="'+(ph1ColIdx>0?ph1ColIdx:9)+'" class="fla-label">Total FLA per Board</td>';
-      else if(i<ph1ColIdx)return;
-      else if(c.k==='ph1')html+='<td class="fla-total" id="ft1_'+board.id+'">'+ph1.toFixed(1)+' A</td>';
-      else if(c.k==='ph2')html+='<td class="fla-total" id="ft2_'+board.id+'">'+ph2.toFixed(1)+' A</td>';
-      else if(c.k==='ph3')html+='<td class="fla-total" id="ft3_'+board.id+'">'+ph3.toFixed(1)+' A</td>';
-      else html+='<td></td>';
-    });
-    if(!readonly)html+='<td></td>';
-    html+='</tr>';
+    // Empty body hint (board with no units) — headers still show above
+    if(!units.length){
+      var emptySpan=vcols.length+(readonly?0:1);
+      html+='<tr><td colspan="'+emptySpan+'" style="padding:14px;text-align:center;color:var(--muted);font-size:12px;font-style:italic">No units yet'+(!readonly?' — click + Add Unit below':'')+'</td></tr>';
+    }
+
+    // Totals row — only when there are units (skip for empty boards)
+    if(units.length){
+      var ph1ColIdx=vcols.findIndex(function(c){return c.k==='ph1';});
+      var ph2ColIdx=vcols.findIndex(function(c){return c.k==='ph2';});
+      var ph3ColIdx=vcols.findIndex(function(c){return c.k==='ph3';});
+      // Label spans from col 0 up to (but not including) the first phase column visible.
+      // If no phase columns are visible, the label spans the entire row.
+      var firstPhIdx=[ph1ColIdx,ph2ColIdx,ph3ColIdx].filter(function(x){return x>=0;}).sort(function(a,b){return a-b;})[0];
+      html+='<tr class="totals-row">';
+      if(firstPhIdx===undefined){
+        // No phase cols visible — single full-width label, no totals cells
+        html+='<td colspan="'+vcols.length+'" class="fla-label">Total FLA per Board (hidden — enable Phase columns)</td>';
+      } else {
+        if(firstPhIdx>0){
+          html+='<td colspan="'+firstPhIdx+'" class="fla-label">Total FLA per Board</td>';
+        } else {
+          // Phase col is the first visible — put label inline (no colspan cell)
+          // Nothing to prepend; totals cells handle themselves below
+        }
+        for(var vi=firstPhIdx;vi<vcols.length;vi++){
+          var vc=vcols[vi];
+          if(vc.k==='ph1')html+='<td class="fla-total" id="ft1_'+board.id+'">'+ph1.toFixed(1)+' A</td>';
+          else if(vc.k==='ph2')html+='<td class="fla-total" id="ft2_'+board.id+'">'+ph2.toFixed(1)+' A</td>';
+          else if(vc.k==='ph3')html+='<td class="fla-total" id="ft3_'+board.id+'">'+ph3.toFixed(1)+' A</td>';
+          else html+='<td></td>';
+        }
+      }
+      if(!readonly)html+='<td></td>';
+      html+='</tr>';
+    }
 
     html+='</tbody></table>';
     if(!readonly)html+='<div class="board-actions"><button class="add-unit-btn" onclick="addUnit(\''+board.id+'\')">+ Add Unit</button></div>';
@@ -607,28 +630,51 @@ function buildXLSX(bds,revLabel){
           zip.file('xl/_rels/workbook.xml.rels',r[4].replace(/<Relationship[^>]*metadata[^>]*\/>/g,''));
         }
         if(stxml){
-          stxml=stxml.replace(/<fonts count="(\d+)">/,function(m,n){return '<fonts count="'+(+n+1)+'">';});
-          stxml=stxml.replace('</fonts>','<font><b/><sz val="10"/><name val="Arial"/><color rgb="FFFFFFFF"/></font></fonts>');
-          stxml=stxml.replace(/<fills count="(\d+)">/,function(m,n){return '<fills count="'+(+n+1)+'">';});
-          stxml=stxml.replace('</fills>','<fill><patternFill patternType="solid"><fgColor rgb="FF0E1520"/><bgColor indexed="64"/></patternFill></fill></fills>');
+          // Add 1 new font (bold white) + 1 new font (bold black for totals)
+          stxml=stxml.replace(/<fonts count="(\d+)">/,function(m,n){return '<fonts count="'+(+n+2)+'">';});
+          stxml=stxml.replace('</fonts>','<font><b/><sz val="10"/><name val="Arial"/><color rgb="FFFFFFFF"/></font><font><b/><sz val="10"/><name val="Arial"/><color rgb="FF000000"/></font></fonts>');
+          // Add 2 new fills: dark header + light-grey totals
+          stxml=stxml.replace(/<fills count="(\d+)">/,function(m,n){return '<fills count="'+(+n+2)+'">';});
+          stxml=stxml.replace('</fills>','<fill><patternFill patternType="solid"><fgColor rgb="FF0E1520"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8F4EA"/><bgColor indexed="64"/></patternFill></fill></fills>');
+          // Add 1 new border (thin grey all sides)
           var te='<color rgb="FF999999"/>';
           var b4='<border><left style="thin">'+te+'</left><right style="thin">'+te+'</right><top style="thin">'+te+'</top><bottom style="thin">'+te+'</bottom></border>';
           stxml=stxml.replace(/<borders count="(\d+)">/,function(m,n){return '<borders count="'+(+n+1)+'">';});
           stxml=stxml.replace('</borders>',b4+'</borders>');
-          var fi=parseInt((stxml.match(/<fonts count="(\d+)">/)||[0,2])[1])-1;
-          var fli=parseInt((stxml.match(/<fills count="(\d+)">/)||[0,4])[1])-1;
+          // Compute indices of newly added items (last ones)
+          var fontsCount=parseInt((stxml.match(/<fonts count="(\d+)">/)||[0,2])[1]);
+          var fillsCount=parseInt((stxml.match(/<fills count="(\d+)">/)||[0,4])[1]);
           var bdi=parseInt((stxml.match(/<borders count="(\d+)">/)||[0,2])[1])-1;
-          stxml=stxml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+2)+'">';});
+          var fiHdr=fontsCount-2;   // bold white (header)
+          var fiTot=fontsCount-1;   // bold black (totals)
+          var fliHdr=fillsCount-2;  // dark
+          var fliTot=fillsCount-1;  // light green
+          // Add 3 new cellXfs: header, data, totals
+          stxml=stxml.replace(/<cellXfs count="(\d+)">/,function(m,n){return '<cellXfs count="'+(+n+3)+'">';});
           stxml=stxml.replace('</cellXfs>',
-            '<xf numFmtId="0" fontId="'+fi+'" fillId="'+fli+'" borderId="'+bdi+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            '<xf numFmtId="0" fontId="'+fiHdr+'" fillId="'+fliHdr+'" borderId="'+bdi+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
             +'<xf numFmtId="0" fontId="0" fillId="0" borderId="'+bdi+'" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf>'
+            +'<xf numFmtId="0" fontId="'+fiTot+'" fillId="'+fliTot+'" borderId="'+bdi+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
             +'</cellXfs>');
           var tx=parseInt((stxml.match(/<cellXfs count="(\d+)">/)||[0,3])[1]);
-          var hs=tx-2;var ds=tx-1;
+          var hs=tx-3;  // header style index
+          var ds=tx-2;  // data style index
+          var ts=tx-1;  // totals style index
           zip.file('xl/styles.xml',stxml);
-          // Patch header row 1
-          var si=sxml.indexOf('<row r="1"');
-          if(si>=0){var ei=sxml.indexOf('</row>',si);if(ei>=0){var rc=sxml.substring(si,ei+6);var pc=rc.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(m,ref,rest){return '<c r="'+ref+'" s="'+hs+'"'+rest+'>';});sxml=sxml.substring(0,si)+pc+sxml.substring(ei+6);}}
+          // Patch ALL rows — apply header style to row 1, totals style to any row whose B cell contains "TOTAL FLA", data style to the rest.
+          sxml=sxml.replace(/<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,function(m,rowNum,rowAttrs,rowBody){
+            var isHeader=(rowNum==='1');
+            // Is this a totals row? column B inlineStr contains "TOTAL FLA"
+            var isTotals=/<c r="B\d+"[^>]*t="str"[^>]*><f>[\s\S]*?<\/f><v>TOTAL FLA<\/v><\/c>/.test(rowBody)
+              ||/<c r="B\d+"[^>]*t="str"[^>]*>\s*<v>TOTAL FLA<\/v>\s*<\/c>/.test(rowBody)
+              ||/<c r="B\d+"[^>]*><is><t>TOTAL FLA<\/t><\/is><\/c>/.test(rowBody)
+              ||rowBody.indexOf('>TOTAL FLA<')>=0;
+            var styleToApply=isHeader?hs:(isTotals?ts:ds);
+            var newBody=rowBody.replace(/ s="\d+"/g,'').replace(/<c r="([^"]+)"([^>]*)>/g,function(mm,ref,rest){
+              return '<c r="'+ref+'" s="'+styleToApply+'"'+rest+'>';
+            });
+            return '<row r="'+rowNum+'"'+rowAttrs+'>'+newBody+'</row>';
+          });
         }
         sxml=sxml.replace(/<ignoredErrors[^>]*>[\s\S]*?<\/ignoredErrors>/g,'').replace(/<ignoredErrors[^>]*\/>/g,'');
         zip.file(sk,sxml);
