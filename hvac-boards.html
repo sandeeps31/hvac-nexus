@@ -65,15 +65,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .btbl tr.add-unit-row td{background:transparent !important;padding:3px 6px !important;border-top:none !important}
 /* Table */
 .sched-scroll{overflow-x:auto;padding:0 16px 16px}
-.sched-hdr-wrap{position:sticky;top:188px;z-index:85;background:var(--bg);padding-top:4px;margin:0 -16px;padding-left:16px;padding-right:16px}
-.sched-hdr{width:100%;border-collapse:collapse;table-layout:fixed}
-.sched-hdr thead tr{background:var(--surface2)}
-.sched-hdr th{padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;background:var(--surface2)}
-.sched-hdr th:last-child{border-right:none}
-.btbl{width:100%;border-collapse:collapse;table-layout:fixed}
-.btbl thead tr{background:var(--surface2)}
-.btbl th{padding:7px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
-.btbl td{padding:4px 6px;vertical-align:middle;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btbl{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.btbl thead th{padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;position:sticky;z-index:50;box-shadow:0 1px 0 var(--border)}
+.btbl thead th:last-child{border-right:none}
+.btbl td{padding:4px 6px;vertical-align:middle;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--bg)}
 .btbl tr:hover td{background:rgba(255,255,255,.02)}
 .btbl tr:hover td.board-cell{background:var(--surface)}
 .btbl tr.board-alt:hover td.board-cell{background:rgba(0,200,255,.03)}
@@ -111,9 +106,8 @@ select.ci{cursor:pointer}
   body{background:#fff !important;color:#000 !important}
   .topbar,.sb,.tstrip-outer,.abar,.rev-bar,.del-btn,.add-unit-btn,.bc-actions,.add-unit-row{display:none !important}
   .mainwrap{margin-left:0 !important;padding:0 !important}
-  .sched-hdr-wrap{position:static !important;background:#fff !important;padding:0 !important;margin:0 !important}
   .sched-scroll{padding:0 !important;overflow:visible !important}
-  .sched-hdr th,.btbl th{background:#e8e8e8 !important;color:#000 !important;border:1px solid #999 !important;font-size:8px !important}
+  .btbl thead th{background:#e8e8e8 !important;color:#000 !important;border:1px solid #999 !important;font-size:8px !important;position:static !important;box-shadow:none !important}
   .btbl td{border:1px solid #999 !important;color:#000 !important;font-size:9px !important;padding:3px 4px !important}
   .btbl td.board-cell{background:#f5f5f5 !important;color:#000 !important;border-left:2px solid #000 !important}
   .btbl tr.totals-row td{background:#f0f0f0 !important;color:#000 !important;font-weight:700 !important}
@@ -536,10 +530,10 @@ function renderBoards(readonly,overrideBoards){
 }
 
 // Measure cumulative height of all sticky elements above the column header.
-// Hard-coded offsets break when the action bar grows (e.g. extra buttons or wrapping).
+// Sets `top` on each <thead> <th> so the header pins below the entire toolbar stack.
 function adjustStickyHdr(){
-  var hdrWrap=document.querySelector('.sched-hdr-wrap');
-  if(!hdrWrap)return;
+  var ths=document.querySelectorAll('.btbl thead th');
+  if(!ths.length)return;
   var topbar=document.querySelector('.topbar');
   var tstrip=document.querySelector('.tstrip-outer');
   var abar=document.getElementById('abar');
@@ -549,7 +543,7 @@ function adjustStickyHdr(){
   if(revBar&&revBar.style.display!=='none'&&revBar.offsetHeight>0){
     stackedTop+=revBar.offsetHeight;
   }
-  hdrWrap.style.top=stackedTop+'px';
+  ths.forEach(function(th){th.style.top=stackedTop+'px';});
 }
 window.addEventListener('resize',function(){adjustStickyHdr();});
 
@@ -592,14 +586,14 @@ function renderListView(mc,bds,vcols,readonly,diff){
   if(!readonly)colgroupHtml+='<col style="width:36px">';
   colgroupHtml+='</colgroup>';
 
-  var headerHtml='<div class="sched-hdr-wrap"><table class="sched-hdr">'+colgroupHtml+'<thead><tr>';
-  headerHtml+='<th>MSSB Reference</th><th>MSSB Location</th>';
-  vcols.forEach(function(c){headerHtml+='<th>'+X(c.l)+'</th>';});
-  if(!readonly)headerHtml+='<th></th>';
-  headerHtml+='</tr></thead></table></div>';
-
-  var html='<div class="sched-scroll">'+headerHtml;
-  html+='<table class="btbl">'+colgroupHtml+'<tbody>';
+  var html='<div class="sched-scroll"><table class="btbl">'+colgroupHtml;
+  // Sticky header — inside the same table so columns ALWAYS align
+  html+='<thead><tr>';
+  html+='<th>MSSB Reference</th><th>MSSB Location</th>';
+  vcols.forEach(function(c){html+='<th>'+X(c.l)+'</th>';});
+  if(!readonly)html+='<th></th>';
+  html+='</tr></thead>';
+  html+='<tbody>';
 
   var dataColSpan=vcols.length+(readonly?0:1);
   var totalCols=2+vcols.length+(readonly?0:1);
@@ -628,7 +622,6 @@ function renderListView(mc,bds,vcols,readonly,diff){
         html+='</tr>';
       });
     } else {
-      // Empty board — show one "no units" row that still carries board ref/loc
       html+='<tr class="unit-row" data-board="'+board.id+'">';
       html+='<td'+refCellCls+' style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600">'+refOv+X(board.ref)+'</td>';
       html+='<td'+locCellCls+' style="font-size:11px;color:var(--text2)">'+locOv+X(board.loc||'—')+'</td>';
@@ -676,14 +669,14 @@ function renderGroupedView(mc,bds,vcols,readonly,diff){
   if(!readonly)colgroupHtml+='<col style="width:36px">';
   colgroupHtml+='</colgroup>';
 
-  var headerHtml='<div class="sched-hdr-wrap"><table class="sched-hdr">'+colgroupHtml+'<thead><tr>';
-  headerHtml+='<th>MSSB Ref</th><th>Location</th>';
-  vcols.forEach(function(c){headerHtml+='<th>'+X(c.l)+'</th>';});
-  if(!readonly)headerHtml+='<th></th>';
-  headerHtml+='</tr></thead></table></div>';
-
-  var html='<div class="sched-scroll">'+headerHtml;
-  html+='<table class="btbl">'+colgroupHtml+'<tbody>';
+  var html='<div class="sched-scroll"><table class="btbl">'+colgroupHtml;
+  // Sticky header — inside the same table so columns ALWAYS align
+  html+='<thead><tr>';
+  html+='<th>MSSB Ref</th><th>Location</th>';
+  vcols.forEach(function(c){html+='<th>'+X(c.l)+'</th>';});
+  if(!readonly)html+='<th></th>';
+  html+='</tr></thead>';
+  html+='<tbody>';
 
   var dataColSpan=vcols.length+(readonly?0:1);
 
