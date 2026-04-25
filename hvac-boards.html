@@ -64,7 +64,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .btbl tr.board-alt td.board-cell{background:rgba(0,200,255,.03)}
 .btbl tr.add-unit-row td{background:transparent !important;padding:3px 6px !important;border-top:none !important}
 /* Table */
-.sched-scroll{overflow-x:auto;padding:0 16px 16px}
+.sched-scroll{overflow-x:auto;overflow-y:clip;padding:0 16px 16px}
 .btbl{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .btbl thead th{padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;position:sticky;z-index:50;box-shadow:0 1px 0 var(--border)}
 .btbl thead th:last-child{border-right:none}
@@ -157,7 +157,10 @@ select.ci{cursor:pointer}
 </div>
 
 <div class="abar" id="abar">
-  <button class="btn bg" id="btnPublish" onclick="publishRev()" style="display:none">Publish Rev</button>
+  <button class="btn bp" id="btnStartDraft" onclick="startDraft()" style="display:none">✏ Start New Draft</button>
+  <button class="btn bp" id="btnEditDraft" onclick="editDraft()" style="display:none">✏ Edit Draft</button>
+  <button class="btn bp" id="btnSave" onclick="saveDraft()" style="display:none">💾 Save</button>
+  <button class="btn bg" id="btnPublish" onclick="publishRev()" style="display:none">↑ Publish Rev</button>
   <button class="btn bg" id="btnDiscard" onclick="discardDraft()" style="display:none;color:var(--danger);border-color:rgba(255,77,109,.3)">🗑 Discard Draft</button>
   <button class="btn bg" id="btnExportDraft" onclick="doExportDraft()" style="display:none">Export Draft</button>
   <!-- View mode toggle -->
@@ -284,6 +287,7 @@ var _viewRevIdx=null; // null=live, -1=draft, >=0=published
 var _editBoardId=null;
 var _uidN=0;
 var _viewMode='list'; // 'list' or 'grouped'
+var _editing=false; // true when user is actively editing a draft (table is interactive)
 
 function nid(){return 'b'+(++_uidN)+'_'+Math.random().toString(36).slice(2,6);}
 function X(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -408,9 +412,14 @@ function renderActive(){
   var isMssb=_activeTab==='mssb';
   document.getElementById('abar').style.display='flex';
   // Hide MSSB-only elements when on DCP
-  ['btnPublish','btnDiscard','btnExportDraft','btnTemplate','colSettingsBtn','btnImport','btnAddBoard','viewToggle','tcWrap'].forEach(function(id){
+  ['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnExportDraft','btnTemplate','colSettingsBtn','btnImport','btnAddBoard','viewToggle','tcWrap'].forEach(function(id){
     var el=document.getElementById(id);
-    if(el)el.style.display=isMssb?(id==='btnPublish'||id==='btnDiscard'||id==='btnExportDraft'||id==='tcWrap'?'none':'inline-flex'):'none';
+    if(!el)return;
+    if(!isMssb){el.style.display='none';return;}
+    // On MSSB tab — let renderRevBar manage workflow buttons; show others
+    var workflowBtns=['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnExportDraft','tcWrap'];
+    if(workflowBtns.indexOf(id)>=0)return; // managed elsewhere
+    el.style.display='inline-flex';
   });
   // Excel/PDF export buttons (no IDs)
   var expBtns=document.querySelectorAll('.abar button[onclick="exportXLSX()"], .abar button[onclick="exportPDF()"]');
@@ -429,13 +438,26 @@ function renderRevBar(){
   var hasDraft=!!_revData.mssb_draft;
   var rb=document.getElementById('revBar');
   rb.style.display='flex';
-  // Control publish/draft export buttons based on draft state
-  var btnP=document.getElementById('btnPublish');
-  var btnD=document.getElementById('btnExportDraft');
-  var btnDD=document.getElementById('btnDiscard');
-  if(btnP)btnP.style.display=hasDraft?'inline-flex':'none';
-  if(btnD)btnD.style.display=hasDraft?'inline-flex':'none';
-  if(btnDD)btnDD.style.display=hasDraft?'inline-flex':'none';
+  // Button visibility based on state machine:
+  //   - viewing a published rev (read-only) → hide all edit controls
+  //   - no draft → show "Start New Draft"
+  //   - has draft, NOT in edit mode → show "Edit Draft", "Publish", "Discard"
+  //   - has draft, IN edit mode → show "Save", "Publish", "Discard"
+  var viewingPub=_viewRevIdx!==null&&_viewRevIdx>=0;
+  var setBtn=function(id,show){var el=document.getElementById(id);if(el)el.style.display=show?'inline-flex':'none';};
+  if(viewingPub){
+    setBtn('btnStartDraft',false);setBtn('btnEditDraft',false);setBtn('btnSave',false);
+    setBtn('btnPublish',false);setBtn('btnDiscard',false);setBtn('btnExportDraft',false);
+  } else if(!hasDraft){
+    setBtn('btnStartDraft',true);setBtn('btnEditDraft',false);setBtn('btnSave',false);
+    setBtn('btnPublish',false);setBtn('btnDiscard',false);setBtn('btnExportDraft',false);
+  } else if(_editing){
+    setBtn('btnStartDraft',false);setBtn('btnEditDraft',false);setBtn('btnSave',true);
+    setBtn('btnPublish',true);setBtn('btnDiscard',true);setBtn('btnExportDraft',true);
+  } else {
+    setBtn('btnStartDraft',false);setBtn('btnEditDraft',true);setBtn('btnSave',false);
+    setBtn('btnPublish',true);setBtn('btnDiscard',true);setBtn('btnExportDraft',true);
+  }
   // Track-changes toggle: show when there's at least one revision to compare against
   var tcw=document.getElementById('tcWrap');
   if(tcw)tcw.style.display=revs.length?'inline-flex':'none';
@@ -464,12 +486,53 @@ function viewRev(idx){
   }
 }
 
+// ── Edit-mode helpers ──
+// True when the user is actively editing an open draft. Determines whether the
+// table renders editable inputs or read-only spans.
+function isEditable(){
+  return _editing && _viewRevIdx===null;
+}
+
+// ── Draft lifecycle ──
+// Start a brand new draft from the last published revision (or empty state).
+// Does NOT enter edit mode automatically — same flow as Start New Draft + Edit Draft separately.
+function startDraft(){
+  if(_revData.mssb_draft){alert('A draft already exists. Click Edit Draft to continue.');return;}
+  _revData.mssb_draft=true;
+  _editing=true;
+  _viewRevIdx=null;
+  saveBoards();
+  renderRevBar();
+  renderBoards();
+  if(typeof showToast==='function')showToast('✏ Draft started — table is now editable');
+}
+
+// Re-enter edit mode for an existing draft.
+function editDraft(){
+  if(!_revData.mssb_draft){startDraft();return;}
+  _editing=true;
+  _viewRevIdx=null;
+  renderRevBar();
+  renderBoards();
+}
+
+// Exit edit mode. Data is auto-saved on every change so this is essentially "lock the table".
+function saveDraft(){
+  _editing=false;
+  // Latest writes are already in Supabase via auto-save in updUnit / addUnit / etc.
+  saveBoards();
+  renderRevBar();
+  renderBoards();
+  if(typeof showToast==='function')showToast('💾 Saved');
+}
+
 function publishRev(){
   var revs=_revData.mssb||[];
   var snap=JSON.parse(JSON.stringify(_boards));
   revs.push({rev:'Rev '+String(revs.length+1).padStart(2,'0'),date:todayStr(),boards:snap});
   _revData.mssb=revs;
   delete _revData.mssb_draft;
+  _editing=false;
   _viewRevIdx=null;
   saveBoards();
   renderRevBar();
@@ -483,18 +546,17 @@ function discardDraft(){
     ? 'Discard draft?\n\nAll changes since the last published revision ('+revs[revs.length-1].rev+') will be permanently lost. This cannot be undone.'
     : 'Discard draft?\n\nThere is no published revision to fall back on — discarding will clear all boards. This cannot be undone.';
   if(!confirm(msg))return;
-  // Restore from last published snapshot, or clear if none exists
   if(revs.length){
     _boards=JSON.parse(JSON.stringify(revs[revs.length-1].boards||[]));
   } else {
     _boards=[];
   }
   delete _revData.mssb_draft;
+  _editing=false;
   _viewRevIdx=null;
   saveBoards();
   renderRevBar();
   renderBoards();
-  // Toast feedback if available, otherwise alert
   if(typeof showToast==='function')showToast('✓ Draft discarded — restored to '+(revs.length?revs[revs.length-1].rev:'empty state'));
 }
 
@@ -504,11 +566,20 @@ function doExportDraft(){var revs=_revData.mssb||[];var lbl='Rev '+String(revs.l
 function renderBoards(readonly,overrideBoards){
   var mc=document.getElementById('mainContent');
   var bds=overrideBoards||_boards;
-  readonly=readonly||false;
+  // If readonly not explicitly passed, derive from edit-mode state
+  if(readonly===undefined||readonly===null){readonly=!isEditable();}
   var vcols=getVisibleCols();
 
   if(!bds||!bds.length){
-    mc.innerHTML='<div class="emptyp" style="text-align:center;padding:60px 20px;color:var(--muted)"><div style="font-size:40px;opacity:.3;margin-bottom:12px">⚡</div><div>No boards yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>+ Add Board</strong> to get started, or <strong>⬆ Import</strong> to import from Excel.</div></div>';
+    var emptyMsg;
+    if(isEditable()){
+      emptyMsg='<div>No boards yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>+ Add Board</strong> to get started, or <strong>⬆ Import</strong> to import from Excel.</div>';
+    } else if(_revData.mssb_draft){
+      emptyMsg='<div>No boards yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>✏ Edit Draft</strong> above to add boards.</div>';
+    } else {
+      emptyMsg='<div>No boards yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>✏ Start New Draft</strong> above to begin.</div>';
+    }
+    mc.innerHTML='<div class="emptyp" style="text-align:center;padding:60px 20px;color:var(--muted)"><div style="font-size:40px;opacity:.3;margin-bottom:12px">⚡</div>'+emptyMsg+'</div>';
     return;
   }
 
@@ -1045,7 +1116,18 @@ function exportPDF(){
 }
 
 // ── Import XLSX ──
-function triggerImport(){document.getElementById('importFile').click();}
+function triggerImport(){
+  if(!isEditable()){
+    if(_revData.mssb_draft){
+      if(!confirm('You need to be in edit mode to import.\n\nClick OK to enter edit mode, or Cancel.'))return;
+      editDraft();
+    } else {
+      if(!confirm('Importing will start a new draft. Continue?'))return;
+      startDraft();
+    }
+  }
+  document.getElementById('importFile').click();
+}
 
 function handleImport(e){
   var file=e.target.files[0];if(!file)return;e.target.value='';
