@@ -112,23 +112,22 @@ select.ci{cursor:pointer}
     <span class="bcs">›</span>
     <span class="bcc">Boards Schedule</span>
   </div>
-  <div style="display:flex;gap:8px" id="topbarBtns" style="display:none">
-    <button class="btn bg" id="btnTemplate" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3);display:none">⬇ Template</button>
-    <button class="btn bg" id="btnImport" onclick="triggerImport()">⬆ Import</button>
-    <button class="btn bg" id="btnExport" onclick="exportXLSX()">⬇ Export</button>
-    <button class="btn bp" id="btnAddBoard" onclick="openAddBoardModal()">+ Add Board</button>
-  </div>
+
 </div>
 
 <div class="tstrip-outer">
   <div class="tstrip" id="tabStrip"></div>
 </div>
 
-<div class="abar" id="abar" style="display:none">
-  <button class="btn bg" id="btnPublish" onclick="publishRev()">Publish Rev</button>
-  <button class="btn bg" id="btnExportDraft" onclick="doExportDraft()">Export Draft</button>
+<div class="abar" id="abar">
+  <button class="btn bg" id="btnPublish" onclick="publishRev()" style="display:none">Publish Rev</button>
+  <button class="btn bg" id="btnExportDraft" onclick="doExportDraft()" style="display:none">Export Draft</button>
   <div style="flex:1"></div>
+  <button class="btn bg" id="btnTemplate" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3);display:none">⬇ Template</button>
   <button class="cedbtn" id="colSettingsBtn" onclick="openColSettings()">⚙ Columns</button>
+  <button class="btn bg" id="btnImport" onclick="triggerImport()">⬆ Import</button>
+  <button class="btn bg" id="btnExport" onclick="exportXLSX()">⬇ Export</button>
+  <button class="btn bp" id="btnAddBoard" onclick="openAddBoardModal()">+ Add Board</button>
 </div>
 
 <div class="rev-bar" id="revBar" style="display:none"></div>
@@ -285,10 +284,16 @@ function switchTab(id){
 
 function renderActive(){
   var isMssb=_activeTab==='mssb';
-  document.getElementById('abar').style.display=isMssb?'flex':'none';
+  document.getElementById('abar').style.display='flex';
+  // Hide MSSB-only elements when on DCP
+  ['btnPublish','btnExportDraft','btnTemplate','colSettingsBtn','btnImport','btnExport','btnAddBoard'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.style.display=isMssb?(id==='btnPublish'||id==='btnExportDraft'?'none':'inline-flex'):'none';
+  });
   if(isMssb){renderRevBar();renderBoards();updateTemplateBtnVisibility();}
   else{
     document.getElementById('revBar').style.display='none';
+    document.getElementById('abar').style.display='none';
     document.getElementById('mainContent').innerHTML='<div class="placeholder-tab"><div style="font-size:48px;opacity:.3">🔌</div><h3>DCP Schedule</h3><p style="font-size:13px;max-width:300px">Distribution Control Panels — coming soon.</p></div>';
   }
 }
@@ -298,9 +303,12 @@ function renderRevBar(){
   var revs=_revData.mssb||[];
   var hasDraft=!!_revData.mssb_draft;
   var rb=document.getElementById('revBar');
-  var ab=document.getElementById('abar');
   rb.style.display='flex';
-  ab.style.display=hasDraft?'flex':'none';
+  // Control publish/draft export buttons based on draft state
+  var btnP=document.getElementById('btnPublish');
+  var btnD=document.getElementById('btnExportDraft');
+  if(btnP)btnP.style.display=hasDraft?'inline-flex':'none';
+  if(btnD)btnD.style.display=hasDraft?'inline-flex':'none';
 
   var html='';
   if(hasDraft){
