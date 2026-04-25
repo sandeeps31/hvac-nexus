@@ -63,13 +63,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .board-count{font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);color:var(--accent)}
 .board-chev{font-size:11px;color:var(--muted);transition:transform .2s;flex-shrink:0}
 .board-hdr.collapsed .board-chev{transform:rotate(-90deg)}
-.board-body{overflow-x:auto}
+.board-body{overflow:visible}
 .board-actions{display:flex;gap:6px;padding:8px 14px;border-top:1px solid var(--border);background:var(--surface)}
 /* Table */
-.btbl{width:100%;border-collapse:collapse;table-layout:auto}
+.sched-scroll{overflow-x:auto;padding:0 16px 16px}
+.sched-hdr-wrap{position:sticky;top:188px;z-index:85;background:var(--bg);padding-top:4px;margin:0 -16px;padding-left:16px;padding-right:16px}
+.sched-hdr{width:100%;border-collapse:collapse;table-layout:fixed}
+.sched-hdr thead tr{background:var(--surface2)}
+.sched-hdr th{padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;background:var(--surface2)}
+.sched-hdr th:last-child{border-right:none}
+.btbl{width:100%;border-collapse:collapse;table-layout:fixed}
 .btbl thead tr{background:var(--surface2)}
 .btbl th{padding:7px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
-.btbl td{padding:4px 6px;vertical-align:middle;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap}
+.btbl td{padding:4px 6px;vertical-align:middle;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .btbl tr:hover td{background:rgba(255,255,255,.02)}
 .btbl tr.totals-row td{background:var(--surface2);font-family:'DM Mono',monospace;font-size:11px;font-weight:600;border-top:2px solid var(--border)}
 .btbl tr.totals-row td.fla-total{color:var(--green);font-size:12px}
@@ -132,7 +138,7 @@ select.ci{cursor:pointer}
 
 <div class="rev-bar" id="revBar" style="display:none"></div>
 
-<div id="mainContent" style="padding:16px"></div>
+<div id="mainContent"></div>
 </div><!-- end mainWrap -->
 
 <!-- Board Modal -->
@@ -356,7 +362,20 @@ function renderBoards(readonly,overrideBoards){
     return;
   }
 
-  var html='';
+  // Shared <colgroup> — both sticky header and every board body use this exact width set
+  var colgroupHtml='<colgroup>';
+  vcols.forEach(function(c){colgroupHtml+='<col style="width:'+c.w+'">';});
+  if(!readonly)colgroupHtml+='<col style="width:36px">';
+  colgroupHtml+='</colgroup>';
+
+  // Sticky header (single row, column labels)
+  var headerHtml='<div class="sched-hdr-wrap"><table class="sched-hdr">'+colgroupHtml+'<thead><tr>';
+  vcols.forEach(function(c){headerHtml+='<th>'+X(c.l)+'</th>';});
+  if(!readonly)headerHtml+='<th></th>';
+  headerHtml+='</tr></thead></table></div>';
+
+  var html='<div class="sched-scroll">'+headerHtml;
+
   bds.forEach(function(board){
     var units=board.units||[];
     var ph1=0,ph2=0,ph3=0;
@@ -364,7 +383,7 @@ function renderBoards(readonly,overrideBoards){
     var hasFla=ph1||ph2||ph3;
 
     html+='<div class="board-group" id="bg_'+board.id+'">';
-    // Header
+    // Board header (the collapsible strip — NOT the column header)
     html+='<div class="board-hdr" id="bh_'+board.id+'" onclick="toggleBoard(\''+board.id+'\')">';
     html+='<span class="board-tag">'+X(board.ref)+'</span>';
     if(board.loc)html+='<span class="board-loc">'+X(board.loc)+'</span>';
@@ -378,11 +397,8 @@ function renderBoards(readonly,overrideBoards){
     html+='<span class="board-chev">▾</span>';
     html+='</div></div>';
 
-    // Body
-    html+='<div class="board-body"><table class="btbl"><thead><tr>';
-    vcols.forEach(function(c){html+='<th style="min-width:'+c.w+'">'+X(c.l)+'</th>';});
-    if(!readonly)html+='<th style="width:28px"></th>';
-    html+='</tr></thead><tbody>';
+    // Body — NO thead (column headers are sticky at top). Just colgroup + tbody.
+    html+='<div class="board-body"><table class="btbl">'+colgroupHtml+'<tbody>';
 
     units.forEach(function(unit){
       html+='<tr id="ur_'+unit.id+'">';
@@ -405,30 +421,24 @@ function renderBoards(readonly,overrideBoards){
       html+='</tr>';
     });
 
-    // Empty body hint (board with no units) — headers still show above
+    // Empty body hint (board with no units)
     if(!units.length){
       var emptySpan=vcols.length+(readonly?0:1);
       html+='<tr><td colspan="'+emptySpan+'" style="padding:14px;text-align:center;color:var(--muted);font-size:12px;font-style:italic">No units yet'+(!readonly?' — click + Add Unit below':'')+'</td></tr>';
     }
 
-    // Totals row — only when there are units (skip for empty boards)
+    // Totals row — only when there are units
     if(units.length){
       var ph1ColIdx=vcols.findIndex(function(c){return c.k==='ph1';});
       var ph2ColIdx=vcols.findIndex(function(c){return c.k==='ph2';});
       var ph3ColIdx=vcols.findIndex(function(c){return c.k==='ph3';});
-      // Label spans from col 0 up to (but not including) the first phase column visible.
-      // If no phase columns are visible, the label spans the entire row.
       var firstPhIdx=[ph1ColIdx,ph2ColIdx,ph3ColIdx].filter(function(x){return x>=0;}).sort(function(a,b){return a-b;})[0];
       html+='<tr class="totals-row">';
       if(firstPhIdx===undefined){
-        // No phase cols visible — single full-width label, no totals cells
         html+='<td colspan="'+vcols.length+'" class="fla-label">Total FLA per Board (hidden — enable Phase columns)</td>';
       } else {
         if(firstPhIdx>0){
           html+='<td colspan="'+firstPhIdx+'" class="fla-label">Total FLA per Board</td>';
-        } else {
-          // Phase col is the first visible — put label inline (no colspan cell)
-          // Nothing to prepend; totals cells handle themselves below
         }
         for(var vi=firstPhIdx;vi<vcols.length;vi++){
           var vc=vcols[vi];
@@ -447,7 +457,16 @@ function renderBoards(readonly,overrideBoards){
     html+='</div></div>';
   });
 
+  html+='</div>'; // close sched-scroll
   mc.innerHTML=html;
+
+  // Adjust sticky column-header offset depending on whether rev-bar is visible
+  var revBar=document.getElementById('revBar');
+  var hdrWrap=mc.querySelector('.sched-hdr-wrap');
+  if(hdrWrap){
+    var revVisible=revBar&&revBar.style.display!=='none'&&revBar.offsetHeight>0;
+    hdrWrap.style.top=revVisible?'188px':'140px';
+  }
 }
 
 // ── Board CRUD ──
