@@ -22,7 +22,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .etab:hover{background:var(--surface3);color:var(--text)}
 .etab.active{background:var(--bg);border-color:var(--accent);color:var(--accent);font-weight:600;z-index:2}
 .abar{background:var(--surface);border-bottom:1px solid var(--border);padding:7px 14px;display:flex;align-items:center;gap:8px;position:sticky;top:102px;z-index:90}
-.rev-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:140px;z-index:89;min-height:48px}
+.rev-bar-inline{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-right:6px}
 .rev-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:8px;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;border:1.5px solid var(--border);cursor:pointer;user-select:none;transition:all .13s}
 .rev-pill:hover{opacity:.8}
 .rev-pill.draft{border-color:var(--warn);color:var(--warn);background:rgba(255,184,48,.08)}
@@ -110,7 +110,7 @@ select.ci{cursor:pointer}
 /* Print stylesheet for PDF export via window.print() */
 @media print{
   body{background:#fff !important;color:#000 !important}
-  .topbar,.sb,.tstrip-outer,.abar,.rev-bar,.del-btn,.add-unit-btn,.bc-actions,.add-unit-row{display:none !important}
+  .topbar,.sb,.tstrip-outer,.abar,.del-btn,.add-unit-btn,.bc-actions,.add-unit-row{display:none !important}
   .mainwrap{margin-left:0 !important;padding:0 !important}
   .sched-scroll{padding:0 !important;overflow:visible !important}
   .btbl thead th{background:#e8e8e8 !important;color:#000 !important;border:1px solid #999 !important;font-size:8px !important;position:static !important;box-shadow:none !important}
@@ -180,15 +180,14 @@ select.ci{cursor:pointer}
     <span>Track changes</span>
   </label>
   <div style="flex:1"></div>
+  <!-- Revision pills inline (right side) -->
+  <div class="rev-bar-inline" id="revBar" style="display:none"></div>
   <button class="btn bg" id="btnTemplate" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3);display:none">⬇ Template</button>
   <button class="cedbtn" id="colSettingsBtn" onclick="openColSettings()">⚙ Columns</button>
   <button class="btn bg" id="btnImport" onclick="triggerImport()">⬆ Import</button>
   <button class="btn bg" onclick="exportXLSX()">⬇ Excel</button>
   <button class="btn bg" onclick="exportPDF()">⬇ PDF</button>
-  <button class="btn bp" id="btnAddBoard" onclick="openAddBoardModal()">+ Add Board</button>
 </div>
-
-<div class="rev-bar" id="revBar" style="display:none"></div>
 
 <div id="mainContent"></div>
 </div><!-- end mainWrap -->
@@ -198,11 +197,11 @@ select.ci{cursor:pointer}
   <div class="modal">
     <h3 id="boardModalTitle">Add Board</h3>
     <div class="form-row">
-      <label>MSSB Reference *</label>
+      <label>Board ID *</label>
       <input class="form-inp" id="bm-ref" placeholder="e.g. MSSB-L00-0001A">
     </div>
     <div class="form-row">
-      <label>MSSB Location</label>
+      <label>Board Location</label>
       <input class="form-inp" id="bm-loc" placeholder="e.g. GIS 1">
     </div>
     <div class="modal-btns">
@@ -261,25 +260,24 @@ function updateTemplateBtnVisibility(){
 
 // ── Constants ──
 var STARTER_TYPES=['VSD','EC','DOL','Star Delta','Soft Starter'];
-var DUTY_OPTIONS=['Duty','Standby','Duty/Standby','—'];
+var DUTY_OPTIONS=['Duty','Standby','—'];
 var LAMPS_OPTIONS=['Run/Fault','Run/Fault/Trip','Run only','—'];
 var CTRL_OPTIONS=['ON / AUTO / OFF','ON / OFF','AUTO / OFF','—'];
 
 var COLS=[
-  {k:'unitNum',  l:'Unit Number',               w:'160px'},
-  {k:'unitDesc', l:'Unit Description',           w:'180px'},
-  {k:'suppFrom', l:'Supplied From',              w:'130px'},
-  {k:'suppLoc',  l:'Supplied From Location',     w:'170px'},
-  {k:'level',    l:'Level',                      w:'70px'},
-  {k:'duty',     l:'Duty / Standby',             w:'110px', sel:DUTY_OPTIONS},
-  {k:'starter',  l:'Motor Starter Type',         w:'130px', sel:STARTER_TYPES},
-  {k:'lamps',    l:'Lamps',                      w:'120px', sel:LAMPS_OPTIONS},
-  {k:'power',    l:'Power (kW)',                 w:'80px',  num:true},
-  {k:'ph1',      l:'Phase 1 FLA (A)',            w:'95px',  num:true},
-  {k:'ph2',      l:'Phase 2 FLA (A)',            w:'95px',  num:true},
-  {k:'ph3',      l:'Phase 3 FLA (A)',            w:'95px',  num:true},
-  {k:'meterRef', l:'Meter Reference',            w:'170px'},
-  {k:'ctrlSw',   l:'Control Switch',             w:'130px', sel:CTRL_OPTIONS}
+  {k:'unitNum',  l:'Equipment ID',                w:'160px'},
+  {k:'unitDesc', l:'Equipment Location',          w:'180px'},
+  {k:'suppFrom', l:'Supplied From',               w:'130px'},
+  {k:'suppLoc',  l:'Supplied From Location',      w:'170px'},
+  {k:'duty',     l:'Duty / Standby',              w:'110px', sel:DUTY_OPTIONS},
+  {k:'starter',  l:'Motor Starter Type',          w:'130px', sel:STARTER_TYPES},
+  {k:'lamps',    l:'Lamps',                       w:'120px', sel:LAMPS_OPTIONS},
+  {k:'power',    l:'Power (kW)',                  w:'80px',  num:true},
+  {k:'ph1',      l:'Phase 1 FLA (A)',             w:'95px',  num:true},
+  {k:'ph2',      l:'Phase 2 FLA (A)',             w:'95px',  num:true},
+  {k:'ph3',      l:'Phase 3 FLA (A)',             w:'95px',  num:true},
+  {k:'meterRef', l:'Meter Reference',             w:'170px'},
+  {k:'ctrlSw',   l:'Control Switch',              w:'130px', sel:CTRL_OPTIONS}
 ];
 
 // ── State ──
@@ -319,7 +317,7 @@ function flattenBoards(bds){
     (b.units||[]).forEach(function(u){
       out[b.id+'::'+u.id]={boardId:b.id,unitId:u.id,boardRef:b.ref||'',boardLoc:b.loc||'',
         unitNum:u.unitNum||'',unitDesc:u.unitDesc||'',suppFrom:u.suppFrom||'',suppLoc:u.suppLoc||'',
-        level:u.level||'',duty:u.duty||'',starter:u.starter||'',lamps:u.lamps||'',power:u.power||'',
+        duty:u.duty||'',starter:u.starter||'',lamps:u.lamps||'',power:u.power||'',
         ph1:u.ph1||'',ph2:u.ph2||'',ph3:u.ph3||'',meterRef:u.meterRef||'',ctrlSw:u.ctrlSw||''};
     });
   });
@@ -343,7 +341,7 @@ function computeBoardsDiff(baseBoards,curBoards){
     if(Object.keys(bc).length)boardChanges[b.id]=bc;
   });
   // Unit-level cell changes
-  var unitCols=['unitNum','unitDesc','suppFrom','suppLoc','level','duty','starter','lamps','power','ph1','ph2','ph3','meterRef','ctrlSw'];
+  var unitCols=['unitNum','unitDesc','suppFrom','suppLoc','duty','starter','lamps','power','ph1','ph2','ph3','meterRef','ctrlSw'];
   Object.keys(curFlat).forEach(function(k){
     var b=baseFlat[k],c=curFlat[k];if(!b)return;
     var diffs={};
@@ -418,7 +416,7 @@ function renderActive(){
   var isMssb=_activeTab==='mssb';
   document.getElementById('abar').style.display='flex';
   // Hide MSSB-only elements when on DCP
-  ['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnExportDraft','btnTemplate','colSettingsBtn','btnImport','btnAddBoard','viewToggle','tcWrap'].forEach(function(id){
+  ['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnExportDraft','btnTemplate','colSettingsBtn','btnImport','viewToggle','tcWrap'].forEach(function(id){
     var el=document.getElementById(id);
     if(!el)return;
     if(!isMssb){el.style.display='none';return;}
@@ -443,7 +441,6 @@ function renderRevBar(){
   var revs=_revData.mssb||[];
   var hasDraft=!!_revData.mssb_draft;
   var rb=document.getElementById('revBar');
-  rb.style.display='flex';
   // Button visibility based on state machine:
   //   - viewing a published rev (read-only) → hide all edit controls
   //   - no draft → show "Start New Draft"
@@ -476,8 +473,13 @@ function renderRevBar(){
   revs.forEach(function(rv,i){
     html+='<div class="rev-pill published'+(_viewRevIdx===i?' active-rev':'')+'" onclick="viewRev('+i+')" title="'+fmtD(rv.date)+'">'+X(rv.rev)+'</div>';
   });
-  if(!html)html='<span style="font-size:12px;color:var(--muted)">No revisions yet.</span>';
-  rb.innerHTML=html;
+  if(html){
+    rb.style.display='flex';
+    rb.innerHTML=html;
+  } else {
+    rb.style.display='none';
+    rb.innerHTML='';
+  }
 }
 
 function viewRev(idx){
@@ -579,11 +581,11 @@ function renderBoards(readonly,overrideBoards){
   if(!bds||!bds.length){
     var emptyMsg;
     if(isEditable()){
-      emptyMsg='<div>No boards yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>+ Add Board</strong> to get started, or <strong>⬆ Import</strong> to import from Excel.</div>';
+      emptyMsg='<div>No data yet.</div><div style="margin-top:14px"><button class="add-unit-btn" onclick="addLineItem()" style="font-size:12px;padding:6px 14px">+ Add Line Item</button></div><div style="margin-top:10px;font-size:11px;color:var(--muted)">or <strong>⬆ Import</strong> from Excel</div>';
     } else if(_revData.mssb_draft){
-      emptyMsg='<div>No boards yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>✏ Edit Draft</strong> above to add boards.</div>';
+      emptyMsg='<div>No data yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>✏ Edit Draft</strong> above to add line items.</div>';
     } else {
-      emptyMsg='<div>No boards yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>✏ Start New Draft</strong> above to begin.</div>';
+      emptyMsg='<div>No data yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>✏ Start New Draft</strong> above to begin.</div>';
     }
     mc.innerHTML='<div class="emptyp" style="text-align:center;padding:60px 20px;color:var(--muted)"><div style="font-size:40px;opacity:.3;margin-bottom:12px">⚡</div>'+emptyMsg+'</div>';
     return;
@@ -625,10 +627,8 @@ function getStackedTopOffset(){
   var topbar=document.querySelector('.topbar');
   var tstrip=document.querySelector('.tstrip-outer');
   var abar=document.getElementById('abar');
-  var revBar=document.getElementById('revBar');
   var stackedTop=0;
   [topbar,tstrip,abar].forEach(function(el){if(el&&el.offsetHeight)stackedTop+=el.offsetHeight;});
-  if(revBar&&revBar.style.display!=='none'&&revBar.offsetHeight>0)stackedTop+=revBar.offsetHeight;
   return stackedTop;
 }
 
@@ -647,20 +647,22 @@ function syncHdrClone(){
   var shouldShow=theadRect.top<stackedTop&&scrollRect.bottom>stackedTop;
   if(!shouldShow){clone.classList.remove('active');return;}
 
-  // Position: fixed at viewport, top = bottom of toolbar stack, left = scroll-wrap left edge
   clone.style.top=stackedTop+'px';
   clone.style.left=scrollRect.left+'px';
   clone.style.width=scrollRect.width+'px';
 
-  // Build clone table with same colgroup widths as real table, mirroring horizontal scroll
-  var realCols=realTbl.querySelectorAll('colgroup col');
+  // Read column widths from the REAL header row's <th> cells (measured, not declared).
+  // Falling back to 0 if a cell can't be measured.
   var realThs=realThead.querySelectorAll('th');
-  // Total natural width of the real table (= sum of col widths)
-  var totalW=0;
   var widths=[];
-  realCols.forEach(function(col){var w=col.offsetWidth||parseFloat(col.style.width)||0;widths.push(w);totalW+=w;});
+  var totalW=0;
+  realThs.forEach(function(th){
+    var w=th.getBoundingClientRect().width;
+    widths.push(w);
+    totalW+=w;
+  });
 
-  // Build inner HTML: a table the SAME width as the real table, translated by -scrollLeft
+  // Build clone: a fixed-width inner wrapper that scrolls horizontally with the real table
   var inner='<div style="position:relative;width:100%;height:100%;overflow:hidden">';
   inner+='<table style="margin-left:'+(-scroll.scrollLeft)+'px;width:'+totalW+'px;table-layout:fixed;border-collapse:separate;border-spacing:0"><colgroup>';
   widths.forEach(function(w){inner+='<col style="width:'+w+'px">';});
@@ -735,7 +737,7 @@ function renderListView(mc,bds,vcols,readonly,diff){
   var html='<div class="sched-scroll"><table class="btbl">'+colgroupHtml;
   // Sticky header — inside the same table so columns ALWAYS align
   html+='<thead><tr>';
-  html+='<th>MSSB Reference</th><th>MSSB Location</th>';
+  html+='<th>Board ID</th><th>Board Location</th>';
   vcols.forEach(function(c){html+='<th>'+X(c.l)+'</th>';});
   if(!readonly)html+='<th></th>';
   html+='</tr></thead>';
@@ -752,8 +754,23 @@ function renderListView(mc,bds,vcols,readonly,diff){
     var refOv=bChange&&bChange.ref&&bChange.ref[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.ref[0])+'</span>':'';
     var locOv=bChange&&bChange.loc&&bChange.loc[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.loc[0])+'</span>':'';
 
+    // Board ID + Location cells. First row of each board is editable (when in edit mode);
+    // subsequent rows show read-only displays so the user doesn't get 3 inputs to update one value.
+    function refCellHtml(isFirstOfBoard){
+      if(readonly||!isFirstOfBoard){
+        return '<td'+refCellCls+' style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600"><span data-board-ref-display="'+board.id+'">'+refOv+X(board.ref||'—')+'</span></td>';
+      }
+      return '<td'+refCellCls+' style="padding:2px 4px"><input class="ci" data-board-ref-id="'+board.id+'" value="'+X(board.ref||'')+'" placeholder="Board ID" style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600;text-align:center" onchange="updBoardRef(\''+board.id+'\',this.value)"></td>';
+    }
+    function locCellHtml(isFirstOfBoard){
+      if(readonly||!isFirstOfBoard){
+        return '<td'+locCellCls+' style="font-size:11px;color:var(--text2)"><span data-board-loc-display="'+board.id+'">'+locOv+X(board.loc||'—')+'</span></td>';
+      }
+      return '<td'+locCellCls+' style="padding:2px 4px"><input class="ci" value="'+X(board.loc||'')+'" placeholder="e.g. Level 00 Plantroom" style="font-size:11px;color:var(--text2);text-align:center" onchange="updBoardLoc(\''+board.id+'\',this.value)"></td>';
+    }
+
     if(units.length){
-      units.forEach(function(unit){
+      units.forEach(function(unit,unitIdx){
         var key=board.id+'::'+unit.id;
         var rowCls='unit-row';
         if(diff){
@@ -761,17 +778,18 @@ function renderListView(mc,bds,vcols,readonly,diff){
         }
         var diffEntry=diff?diff.changed[key]:null;
         html+='<tr id="ur_'+unit.id+'" class="'+rowCls+'" data-board="'+board.id+'">';
-        html+='<td'+refCellCls+' style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600">'+refOv+X(board.ref)+'</td>';
-        html+='<td'+locCellCls+' style="font-size:11px;color:var(--text2)">'+locOv+X(board.loc||'—')+'</td>';
+        html+=refCellHtml(unitIdx===0);
+        html+=locCellHtml(unitIdx===0);
         vcols.forEach(function(c){html+=renderUnitCell(c,unit,board.id,readonly,diffEntry);});
         if(!readonly)html+='<td><button class="del-btn" onclick="deleteUnit(\''+board.id+'\',\''+unit.id+'\')">✕</button></td>';
         html+='</tr>';
       });
     } else {
+      // Empty board placeholder
       html+='<tr class="unit-row" data-board="'+board.id+'">';
-      html+='<td'+refCellCls+' style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600">'+refOv+X(board.ref)+'</td>';
-      html+='<td'+locCellCls+' style="font-size:11px;color:var(--text2)">'+locOv+X(board.loc||'—')+'</td>';
-      html+='<td colspan="'+dataColSpan+'" style="padding:10px;text-align:center;color:var(--muted);font-size:11px;font-style:italic">No units'+(!readonly?' — <a href="#" onclick="event.preventDefault();addUnit(\''+board.id+'\')" style="color:var(--accent);text-decoration:none">+ Add Unit</a>':'')+'</td>';
+      html+=refCellHtml(true);
+      html+=locCellHtml(true);
+      html+='<td colspan="'+dataColSpan+'" style="padding:10px;text-align:center;color:var(--muted);font-size:11px;font-style:italic">No equipment'+(!readonly?' — <a href="#" onclick="event.preventDefault();addUnit(\''+board.id+'\')" style="color:var(--accent);text-decoration:none">+ Add Equipment</a>':'')+'</td>';
       html+='</tr>';
     }
   });
@@ -789,15 +807,10 @@ function renderListView(mc,bds,vcols,readonly,diff){
     });
   }
 
-  // Bottom action row — add board / add unit shortcuts (live mode only)
+  // Footer — single + Add Line Item button (live edit mode only)
   if(!readonly&&_viewRevIdx===null){
     html+='<tr class="add-unit-row"><td colspan="'+totalCols+'" style="padding:10px 14px;text-align:left">';
-    html+='<button class="add-unit-btn" onclick="openAddBoardModal()">+ Add Board</button> ';
-    if(bds.length){
-      html+='<select class="ci" onchange="if(this.value){addUnit(this.value);this.value=&quot;&quot;;}" style="display:inline-block;width:auto;padding:4px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);margin-left:8px"><option value="">+ Add Unit to…</option>';
-      bds.forEach(function(b){html+='<option value="'+b.id+'">'+X(b.ref)+'</option>';});
-      html+='</select>';
-    }
+    html+='<button class="add-unit-btn" onclick="addLineItem()">+ Add Line Item</button>';
     html+='</td></tr>';
   }
 
@@ -818,7 +831,7 @@ function renderGroupedView(mc,bds,vcols,readonly,diff){
   var html='<div class="sched-scroll"><table class="btbl">'+colgroupHtml;
   // Sticky header — inside the same table so columns ALWAYS align
   html+='<thead><tr>';
-  html+='<th>MSSB Ref</th><th>Location</th>';
+  html+='<th>Board ID</th><th>Board Location</th>';
   vcols.forEach(function(c){html+='<th>'+X(c.l)+'</th>';});
   if(!readonly)html+='<th></th>';
   html+='</tr></thead>';
@@ -899,7 +912,7 @@ function renderGroupedView(mc,bds,vcols,readonly,diff){
     html+='</tr>';
 
     if(!readonly){
-      html+='<tr class="add-unit-row"><td></td><td></td><td colspan="'+dataColSpan+'" style="text-align:left;padding:6px 14px"><button class="add-unit-btn" onclick="addUnit(\''+board.id+'\')">+ Add Unit</button></td></tr>';
+      html+='<tr class="add-unit-row"><td></td><td></td><td colspan="'+dataColSpan+'" style="text-align:left;padding:6px 14px"><button class="add-unit-btn" onclick="addUnit(\''+board.id+'\')">+ Add Equipment</button></td></tr>';
     }
   });
 
@@ -915,6 +928,12 @@ function renderGroupedView(mc,bds,vcols,readonly,diff){
       if(!readonly)html+='<td></td>';
       html+='</tr>';
     });
+  }
+
+  // Bottom: + Add Line Item creates a brand new board+row pair
+  if(!readonly&&_viewRevIdx===null){
+    var totalCols=2+vcols.length+(readonly?0:1);
+    html+='<tr class="add-unit-row"><td colspan="'+totalCols+'" style="padding:10px 14px;text-align:left"><button class="add-unit-btn" onclick="addLineItem()">+ Add Line Item (new board)</button></td></tr>';
   }
 
   html+='</tbody></table></div>';
@@ -946,7 +965,7 @@ function closeBoardModal(){
 }
 function saveBoardModal(){
   var ref=(document.getElementById('bm-ref').value||'').trim();
-  if(!ref){alert('MSSB Reference is required');return;}
+  if(!ref){alert('Board ID is required');return;}
   var loc=(document.getElementById('bm-loc').value||'').trim();
   if(_editBoardId){
     var b=_boards.find(function(b){return b.id===_editBoardId;});
@@ -973,9 +992,60 @@ function addUnit(boardId){
   var board=_boards.find(function(b){return b.id===boardId;});
   if(!board)return;
   board.units=board.units||[];
-  board.units.push({id:nid(),unitNum:'',unitDesc:'',suppFrom:'',suppLoc:'',level:'',duty:'',starter:'',lamps:'',power:'',ph1:'',ph2:'',ph3:'',meterRef:'',ctrlSw:''});
+  board.units.push({id:nid(),unitNum:'',unitDesc:'',suppFrom:'',suppLoc:'',duty:'',starter:'',lamps:'',power:'',ph1:'',ph2:'',ph3:'',meterRef:'',ctrlSw:''});
   _revData.mssb_draft=true;
   renderBoards();saveBoards();
+}
+
+// Add a fresh blank line — creates a new placeholder board (empty ref/loc) with one unit.
+// User fills Board ID inline; if that ID matches an existing board, the row auto-merges into it.
+function addLineItem(){
+  var newBoard={id:nid(),ref:'',loc:'',units:[]};
+  newBoard.units.push({id:nid(),unitNum:'',unitDesc:'',suppFrom:'',suppLoc:'',duty:'',starter:'',lamps:'',power:'',ph1:'',ph2:'',ph3:'',meterRef:'',ctrlSw:''});
+  _boards.push(newBoard);
+  _revData.mssb_draft=true;
+  renderBoards();saveBoards();
+  // Focus the new row's Board ID input so the user can type immediately
+  setTimeout(function(){
+    var inp=document.querySelector('input[data-board-ref-id="'+newBoard.id+'"]');
+    if(inp)inp.focus();
+  },50);
+}
+
+// Update a board's ref (Board ID). If the new value matches an existing board's ref,
+// move this board's units into that board and remove this one (auto-merge).
+function updBoardRef(boardId,val){
+  var board=_boards.find(function(b){return b.id===boardId;});
+  if(!board)return;
+  var trimmed=String(val||'').trim();
+  // Auto-merge: if another board already has this ref, move units there
+  if(trimmed){
+    var target=_boards.find(function(b){return b.id!==boardId&&String(b.ref||'').trim()===trimmed;});
+    if(target){
+      target.units=(target.units||[]).concat(board.units||[]);
+      _boards=_boards.filter(function(b){return b.id!==boardId;});
+      _revData.mssb_draft=true;
+      renderBoards();saveBoards();
+      return;
+    }
+  }
+  board.ref=trimmed;
+  _revData.mssb_draft=true;
+  saveBoards();
+  // Don't full re-render — just update visible cells with the same id
+  var cells=document.querySelectorAll('[data-board-ref-display="'+boardId+'"]');
+  cells.forEach(function(c){c.textContent=trimmed||'—';});
+}
+
+function updBoardLoc(boardId,val){
+  var board=_boards.find(function(b){return b.id===boardId;});
+  if(!board)return;
+  board.loc=String(val||'').trim();
+  _revData.mssb_draft=true;
+  saveBoards();
+  // Update other rows of the same board so they all show the new location
+  var cells=document.querySelectorAll('[data-board-loc-display="'+boardId+'"]');
+  cells.forEach(function(c){c.textContent=board.loc||'—';});
 }
 function updUnit(boardId,unitId,key,val){
   var board=_boards.find(function(b){return b.id===boardId;});
@@ -1007,7 +1077,7 @@ function deleteUnit(boardId,unitId){
 
 function downloadTemplate(){
   // Build empty xlsx with headers only
-  var hdrRow=['MSSB Reference','MSSB Location'].concat(COLS.map(function(c){return c.l;}));
+  var hdrRow=['Board ID','Board Location'].concat(COLS.map(function(c){return c.l;}));
   var aoa=[hdrRow,['Example-MSSB-001','Level 00 - Plantroom'].concat(COLS.map(function(){return '';}))];
   if(typeof XLSX==='undefined'){
     var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
@@ -1034,7 +1104,7 @@ function exportXLSX(bds,revLabel){
 }
 
 function buildXLSX(bds,revLabel){
-  var hdrRow=['MSSB Reference','MSSB Location'].concat(COLS.map(function(c){return c.l;}));
+  var hdrRow=['Board ID','Board Location'].concat(COLS.map(function(c){return c.l;}));
   var aoa=[hdrRow];
   var merges=[];
 
@@ -1219,21 +1289,28 @@ function parseImport(file){
       var wb=XLSX.read(e.target.result,{type:'array'});
       var ws=wb.Sheets[wb.SheetNames[0]];
       var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      // Find header row
+      // Find header row — accept both old and new header names
       var hr=-1;
       for(var i=0;i<Math.min(aoa.length,25);i++){
-        if(aoa[i].some(function(v){return String(v||'').toLowerCase().includes('mssb reference')||String(v||'').toLowerCase().includes('unit number');})){hr=i;break;}
+        if(aoa[i].some(function(v){
+          var s=String(v||'').toLowerCase();
+          return s.includes('board id')||s.includes('mssb reference')||s.includes('equipment id')||s.includes('unit number');
+        })){hr=i;break;}
       }
       if(hr<0){alert('Could not find header row.');return;}
       var hdrs=aoa[hr].map(function(h){return String(h||'').toLowerCase().replace(/\n/g,' ').trim();});
       function col(keys){for(var i=0;i<keys.length;i++){var idx=hdrs.indexOf(keys[i]);if(idx>=0)return idx;}return -1;}
       var cm={
-        mssbRef:col(['mssb reference']),mssbLoc:col(['mssb location']),
-        unitNum:col(['unit number']),unitDesc:col(['unit description']),
-        suppFrom:col(['supplied from']),suppLoc:col(['supplied from location']),
-        level:col(['level']),duty:col(['duty / standby','duty/standby']),
+        mssbRef:col(['board id','mssb reference']),
+        mssbLoc:col(['board location','mssb location']),
+        unitNum:col(['equipment id','unit number']),
+        unitDesc:col(['equipment location','unit description']),
+        suppFrom:col(['supplied from']),
+        suppLoc:col(['supplied from location']),
+        duty:col(['duty / standby','duty/standby']),
         starter:col(['motor starter type','motor starter type (vsd / ec / dol)']),
-        lamps:col(['lamps']),power:col(['power (kw)','power consumption (kw)']),
+        lamps:col(['lamps']),
+        power:col(['power (kw)','power consumption (kw)']),
         ph1:col(['phase 1 fla (a)']),ph2:col(['phase 2 fla (a)']),ph3:col(['phase 3 fla (a)']),
         meterRef:col(['meter reference','electrical meter reference id']),
         ctrlSw:col(['control switch'])
@@ -1246,7 +1323,7 @@ function parseImport(file){
         if(!ref||ref.toLowerCase().includes('total'))continue;
         if(!boardMap[ref]){boardMap[ref]={id:nid(),ref:ref,loc:String(row[cm.mssbLoc]||'').trim(),units:[]};boardOrder.push(ref);}
         function g(k){return cm[k]>=0?String(row[cm[k]]||'').trim():'';}
-        boardMap[ref].units.push({id:nid(),unitNum:g('unitNum'),unitDesc:g('unitDesc'),suppFrom:g('suppFrom'),suppLoc:g('suppLoc'),level:g('level'),duty:g('duty'),starter:g('starter').replace(/\n/g,'/'),lamps:g('lamps'),power:g('power'),ph1:g('ph1'),ph2:g('ph2'),ph3:g('ph3'),meterRef:g('meterRef'),ctrlSw:g('ctrlSw')});
+        boardMap[ref].units.push({id:nid(),unitNum:g('unitNum'),unitDesc:g('unitDesc'),suppFrom:g('suppFrom'),suppLoc:g('suppLoc'),duty:g('duty'),starter:g('starter').replace(/\n/g,'/'),lamps:g('lamps'),power:g('power'),ph1:g('ph1'),ph2:g('ph2'),ph3:g('ph3'),meterRef:g('meterRef'),ctrlSw:g('ctrlSw')});
       }
       if(!boardOrder.length){alert('No board data found.');return;}
       var totalUnits=boardOrder.reduce(function(s,r){return s+boardMap[r].units.length;},0);
