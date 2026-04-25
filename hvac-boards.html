@@ -22,7 +22,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .etab:hover{background:var(--surface3);color:var(--text)}
 .etab.active{background:var(--bg);border-color:var(--accent);color:var(--accent);font-weight:600;z-index:2}
 .abar{background:var(--surface);border-bottom:1px solid var(--border);padding:7px 14px;display:flex;align-items:center;gap:8px;position:sticky;top:102px;z-index:90}
-.rev-bar-inline{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-right:6px}
+.rev-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 14px;display:flex;align-items:center;gap:8px;position:sticky;z-index:89;min-height:44px}
+.rev-pills{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.rev-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .rev-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:8px;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;border:1.5px solid var(--border);cursor:pointer;user-select:none;transition:all .13s}
 .rev-pill:hover{opacity:.8}
 .rev-pill.draft{border-color:var(--warn);color:var(--warn);background:rgba(255,184,48,.08)}
@@ -64,15 +66,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .btbl tr.board-alt td.board-cell{background:rgba(0,200,255,.03)}
 .btbl tr.add-unit-row td{background:transparent !important;padding:3px 6px !important;border-top:none !important}
 /* Table */
-.sched-scroll{overflow-x:auto;padding:0 16px 16px}
+.sched-scroll{overflow-x:auto;padding:8px 16px 16px}
 .btbl{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.btbl th,.btbl td{box-sizing:border-box}
 .btbl thead th{padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap}
 .btbl thead th:last-child{border-right:none}
 /* JS-positioned floating header clone — fixed to viewport, kept in sync with the real <thead> */
 .sched-hdr-clone{position:fixed;z-index:75;background:var(--bg);overflow:hidden;display:none;pointer-events:none}
 .sched-hdr-clone.active{display:block}
 .sched-hdr-clone table{border-collapse:separate;border-spacing:0;table-layout:fixed;margin:0}
-.sched-hdr-clone th{padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap}
+.sched-hdr-clone th{box-sizing:border-box;padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap}
 .sched-hdr-clone th:last-child{border-right:none}
 .btbl td{padding:4px 6px;vertical-align:middle;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--bg)}
 .btbl tr:hover td{background:rgba(255,255,255,.02)}
@@ -110,7 +113,7 @@ select.ci{cursor:pointer}
 /* Print stylesheet for PDF export via window.print() */
 @media print{
   body{background:#fff !important;color:#000 !important}
-  .topbar,.sb,.tstrip-outer,.abar,.del-btn,.add-unit-btn,.bc-actions,.add-unit-row{display:none !important}
+  .topbar,.sb,.tstrip-outer,.abar,.rev-bar,.del-btn,.add-unit-btn,.bc-actions,.add-unit-row{display:none !important}
   .mainwrap{margin-left:0 !important;padding:0 !important}
   .sched-scroll{padding:0 !important;overflow:visible !important}
   .btbl thead th{background:#e8e8e8 !important;color:#000 !important;border:1px solid #999 !important;font-size:8px !important;position:static !important;box-shadow:none !important}
@@ -163,14 +166,8 @@ select.ci{cursor:pointer}
 </div>
 
 <div class="abar" id="abar">
-  <button class="btn bp" id="btnStartDraft" onclick="startDraft()" style="display:none">✏ Start New Draft</button>
-  <button class="btn bp" id="btnEditDraft" onclick="editDraft()" style="display:none">✏ Edit Draft</button>
-  <button class="btn bp" id="btnSave" onclick="saveDraft()" style="display:none">💾 Save</button>
-  <button class="btn bg" id="btnPublish" onclick="publishRev()" style="display:none">↑ Publish Rev</button>
-  <button class="btn bg" id="btnDiscard" onclick="discardDraft()" style="display:none;color:var(--danger);border-color:rgba(255,77,109,.3)">🗑 Discard Draft</button>
-  <button class="btn bg" id="btnExportDraft" onclick="doExportDraft()" style="display:none">Export Draft</button>
   <!-- View mode toggle -->
-  <div class="view-toggle" id="viewToggle" style="margin-left:8px">
+  <div class="view-toggle" id="viewToggle">
     <button class="vt-btn active" id="vtList" onclick="setViewMode('list')">List View</button>
     <button class="vt-btn" id="vtGrouped" onclick="setViewMode('grouped')">Grouped View</button>
   </div>
@@ -180,13 +177,25 @@ select.ci{cursor:pointer}
     <span>Track changes</span>
   </label>
   <div style="flex:1"></div>
-  <!-- Revision pills inline (right side) -->
-  <div class="rev-bar-inline" id="revBar" style="display:none"></div>
   <button class="btn bg" id="btnTemplate" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3);display:none">⬇ Template</button>
   <button class="cedbtn" id="colSettingsBtn" onclick="openColSettings()">⚙ Columns</button>
   <button class="btn bg" id="btnImport" onclick="triggerImport()">⬆ Import</button>
   <button class="btn bg" onclick="exportXLSX()">⬇ Excel</button>
   <button class="btn bg" onclick="exportPDF()">⬇ PDF</button>
+</div>
+
+<!-- Revision bar: pills on the left, workflow buttons on the right -->
+<div class="rev-bar" id="revBar" style="display:none">
+  <div class="rev-pills" id="revPills"></div>
+  <div style="flex:1"></div>
+  <div class="rev-actions">
+    <button class="btn bp" id="btnStartDraft" onclick="startDraft()" style="display:none">✏ Start New Draft</button>
+    <button class="btn bp" id="btnEditDraft" onclick="editDraft()" style="display:none">✏ Edit Draft</button>
+    <button class="btn bp" id="btnSave" onclick="saveDraft()" style="display:none">💾 Save</button>
+    <button class="btn bg" id="btnPublish" onclick="publishRev()" style="display:none">↑ Publish Rev</button>
+    <button class="btn bg" id="btnDiscard" onclick="discardDraft()" style="display:none;color:var(--danger);border-color:rgba(255,77,109,.3)">🗑 Discard Draft</button>
+    <button class="btn bg" id="btnExportDraft" onclick="doExportDraft()" style="display:none">Export Draft</button>
+  </div>
 </div>
 
 <div id="mainContent"></div>
@@ -441,6 +450,7 @@ function renderRevBar(){
   var revs=_revData.mssb||[];
   var hasDraft=!!_revData.mssb_draft;
   var rb=document.getElementById('revBar');
+  var rp=document.getElementById('revPills');
   // Button visibility based on state machine:
   //   - viewing a published rev (read-only) → hide all edit controls
   //   - no draft → show "Start New Draft"
@@ -465,6 +475,7 @@ function renderRevBar(){
   var tcw=document.getElementById('tcWrap');
   if(tcw)tcw.style.display=revs.length?'inline-flex':'none';
 
+  // Build pills HTML (left side)
   var html='';
   if(hasDraft){
     var nextRevLabel='Rev '+String(revs.length+1).padStart(2,'0')+' Draft';
@@ -473,13 +484,9 @@ function renderRevBar(){
   revs.forEach(function(rv,i){
     html+='<div class="rev-pill published'+(_viewRevIdx===i?' active-rev':'')+'" onclick="viewRev('+i+')" title="'+fmtD(rv.date)+'">'+X(rv.rev)+'</div>';
   });
-  if(html){
-    rb.style.display='flex';
-    rb.innerHTML=html;
-  } else {
-    rb.style.display='none';
-    rb.innerHTML='';
-  }
+  rp.innerHTML=html||'<span style="font-size:12px;color:var(--muted)">No revisions yet — click <strong>✏ Start New Draft</strong></span>';
+  // Always show the rev-bar so the workflow buttons stay reachable
+  rb.style.display='flex';
 }
 
 function viewRev(idx){
@@ -627,8 +634,14 @@ function getStackedTopOffset(){
   var topbar=document.querySelector('.topbar');
   var tstrip=document.querySelector('.tstrip-outer');
   var abar=document.getElementById('abar');
+  var revBar=document.getElementById('revBar');
   var stackedTop=0;
   [topbar,tstrip,abar].forEach(function(el){if(el&&el.offsetHeight)stackedTop+=el.offsetHeight;});
+  // Also set rev-bar's sticky top so it pins below abar
+  if(revBar){
+    revBar.style.top=stackedTop+'px';
+    if(revBar.style.display!=='none'&&revBar.offsetHeight>0)stackedTop+=revBar.offsetHeight;
+  }
   return stackedTop;
 }
 
