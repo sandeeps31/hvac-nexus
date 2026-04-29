@@ -70,23 +70,28 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .sched-scroll{overflow-x:auto;padding:14px 16px 16px}
 .btbl{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .btbl th,.btbl td{box-sizing:border-box}
-.btbl thead th{padding:11px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap}
+.btbl thead th{padding:6px 8px 8px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;vertical-align:top}
 .btbl thead th:last-child{border-right:none}
+.th-stack{display:flex;flex-direction:column;gap:5px;align-items:stretch}
+.th-label{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:center;gap:4px;padding:4px 0;transition:color .12s}
+.th-label:hover{color:var(--text2)}
+.sort-arrow{font-size:9px;color:var(--accent);font-family:'DM Sans',sans-serif}
+.sort-arrow.inactive{color:var(--muted);opacity:.4}
+.col-filter{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;padding:3px 6px;border-radius:3px;outline:none;text-transform:none;letter-spacing:0;width:100%;box-sizing:border-box;font-weight:normal}
+.col-filter:focus{border-color:var(--accent)}
+.col-filter::placeholder{color:var(--muted);opacity:.6}
 /* Body cells — fixed height regardless of edit / read-only mode (uses the edit-mode height) */
 .btbl tbody td{height:34px;padding:0 6px;vertical-align:middle;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.btbl tbody td.board-merged{background:rgba(0,200,255,.025);vertical-align:middle}
-.btbl tbody td.board-merged .ro-val,.btbl tbody td.board-merged .loc-cell{height:auto}
-.btbl tbody td.board-merged input.ci{height:30px}
 /* Read-only display cell content — match input metrics so row height stays constant */
 .btbl tbody td .ro-val{display:flex;align-items:center;justify-content:center;height:100%;padding:0 6px;font-size:12.5px;color:var(--text);font-family:'DM Sans',sans-serif}
 .btbl tbody td .ro-val.mono{font-family:'DM Mono',monospace;font-size:12px}
 .btbl tbody td .ro-val.muted{color:var(--text2)}
 .btbl tbody td .ro-val.empty{color:var(--muted);font-size:11px}
 /* JS-positioned floating header clone — fixed to viewport, kept in sync with the real <thead> */
-.sched-hdr-clone{position:fixed;z-index:75;background:var(--bg);overflow:hidden;display:none;pointer-events:none}
+.sched-hdr-clone{position:fixed;z-index:75;background:var(--bg);overflow:hidden;display:none}
 .sched-hdr-clone.active{display:block}
 .sched-hdr-clone table{border-collapse:separate;border-spacing:0;table-layout:fixed;margin:0}
-.sched-hdr-clone th{box-sizing:border-box;padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap}
+.sched-hdr-clone th{box-sizing:border-box;padding:6px 8px 8px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;vertical-align:top}
 .sched-hdr-clone th:last-child{border-right:none}
 .btbl tbody td{background:var(--bg)}
 .btbl tr:hover td{background:rgba(255,255,255,.02)}
@@ -475,6 +480,9 @@ var _editBoardId=null;
 var _uidN=0;
 var _viewMode='list'; // 'list' or 'grouped'
 var _editing=false; // true when user is actively editing a draft (table is interactive)
+var _sortKey=null;     // column key currently sorted by, or null = no sort (default order)
+var _sortDir='asc';    // 'asc' or 'desc'
+var _colFilters={};    // { colKey: 'search text' } — non-persistent, resets on reload
 
 function nid(){return 'b'+(++_uidN)+'_'+Math.random().toString(36).slice(2,6);}
 function X(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -490,6 +498,77 @@ function setViewMode(m){
     document.getElementById('vtGrouped').classList.toggle('active',m==='grouped');
     renderBoards();
   }
+}
+
+// ── Sort + filter ──
+// Returns the cell value used for filtering/sorting on a given column key.
+// Special keys '__boardRef' and '__boardLoc' resolve to the board-level value.
+function getRowVal(board,unit,key){
+  if(key==='__boardRef')return String(board.ref||'').toLowerCase();
+  if(key==='__boardLoc')return String(board.loc||'').toLowerCase();
+  if(!unit)return '';
+  return String(unit[key]||'').toLowerCase();
+}
+
+function rowMatchesFilters(board,unit){
+  var keys=Object.keys(_colFilters);
+  if(!keys.length)return true;
+  for(var i=0;i<keys.length;i++){
+    var k=keys[i];
+    var q=String(_colFilters[k]||'').trim().toLowerCase();
+    if(!q)continue;
+    if(getRowVal(board,unit,k).indexOf(q)<0)return false;
+  }
+  return true;
+}
+
+// Sorts a list of {board,unit} pairs by current sort settings. Returns sorted COPY.
+function sortPairs(pairs){
+  if(!_sortKey)return pairs;
+  var key=_sortKey,dir=_sortDir==='desc'?-1:1;
+  return pairs.slice().sort(function(a,b){
+    var av=getRowVal(a.board,a.unit,key);
+    var bv=getRowVal(b.board,b.unit,key);
+    var an=parseFloat(av),bn=parseFloat(bv);
+    var bothNumeric=!isNaN(an)&&!isNaN(bn)&&isFinite(an)&&isFinite(bn)&&av.replace(/[\d.\-+\se]/g,'')==='';
+    if(bothNumeric){if(an<bn)return -1*dir;if(an>bn)return 1*dir;return 0;}
+    if(av<bv)return -1*dir;
+    if(av>bv)return 1*dir;
+    return 0;
+  });
+}
+
+function setSort(key){
+  if(_sortKey===key){
+    if(_sortDir==='asc')_sortDir='desc';
+    else {_sortKey=null;_sortDir='asc';} // third click clears the sort
+  } else {
+    _sortKey=key;_sortDir='asc';
+  }
+  renderBoards();
+}
+
+function setFilter(key,val){
+  if(!val||!val.trim())delete _colFilters[key];
+  else _colFilters[key]=val;
+  renderBoards();
+  // Re-focus the input after re-render so the user can keep typing
+  setTimeout(function(){
+    var inp=document.querySelector('input.col-filter[data-col="'+key+'"]');
+    if(inp){inp.focus();var l=inp.value.length;inp.setSelectionRange(l,l);}
+  },0);
+}
+
+// Returns the inner HTML for a sortable/filterable header cell
+function renderHeaderCell(label,key){
+  var sortIcon='';
+  if(_sortKey===key){sortIcon=_sortDir==='asc'?' <span class="sort-arrow active">▲</span>':' <span class="sort-arrow active">▼</span>';}
+  else sortIcon=' <span class="sort-arrow inactive">↕</span>';
+  var filterVal=_colFilters[key]||'';
+  return '<div class="th-stack">'
+    +'<div class="th-label" onclick="setSort(\''+key+'\')" title="Click to sort">'+X(label)+sortIcon+'</div>'
+    +'<input type="text" class="col-filter" data-col="'+key+'" placeholder="Filter…" value="'+X(filterVal).replace(/"/g,'&quot;')+'" oninput="setFilter(\''+key+'\',this.value)" onclick="event.stopPropagation()">'
+    +'</div>';
 }
 
 // ── Track-changes diff ──
@@ -1048,8 +1127,8 @@ function renderListView(mc,bds,vcols,readonly,diff){
   var html='<div class="sched-scroll"><table class="btbl">'+colgroupHtml;
   // Sticky header — inside the same table so columns ALWAYS align
   html+='<thead><tr>';
-  html+='<th>Board ID</th><th>Board Location</th>';
-  vcols.forEach(function(c){html+='<th>'+X(c.l)+'</th>';});
+  html+='<th>'+renderHeaderCell('Board ID','__boardRef')+'</th><th>'+renderHeaderCell('Board Location','__boardLoc')+'</th>';
+  vcols.forEach(function(c){html+='<th>'+renderHeaderCell(c.l,c.k)+'</th>';});
   if(!readonly)html+='<th></th>';
   html+='</tr></thead>';
   html+='<tbody>';
@@ -1057,51 +1136,56 @@ function renderListView(mc,bds,vcols,readonly,diff){
   var dataColSpan=vcols.length+(readonly?0:1);
   var totalCols=2+vcols.length+(readonly?0:1);
 
+  // Build a flat list of {board, unit} pairs (one per visible row), then filter & sort.
+  // Empty boards become a single pair with unit=null.
+  var pairs=[];
   bds.forEach(function(board){
     var units=board.units||[];
+    if(units.length){
+      units.forEach(function(unit){pairs.push({board:board,unit:unit});});
+    } else {
+      pairs.push({board:board,unit:null});
+    }
+  });
+  // Apply filters
+  pairs=pairs.filter(function(p){return rowMatchesFilters(p.board,p.unit);});
+  // Apply sort
+  pairs=sortPairs(pairs);
+
+  pairs.forEach(function(p){
+    var board=p.board,unit=p.unit;
     var bChange=(diff&&diff.boardChanges&&diff.boardChanges[board.id])||null;
     var refCellCls=bChange&&bChange.ref?' class="cell-changed"':'';
     var locCellCls=bChange&&bChange.loc?' class="cell-changed"':'';
     var refOv=bChange&&bChange.ref&&bChange.ref[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.ref[0])+'</span>':'';
     var locOv=bChange&&bChange.loc&&bChange.loc[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.loc[0])+'</span>':'';
 
-    // Board ID + Location cells: rowspan-merged across all units of this board so it's
-    // visually clear they're shared. The cell renders ONCE on the first unit row of each board.
-    var spanRows=Math.max(units.length,1); // at least 1 (empty board placeholder counts as 1)
-
     function refCellHtml(){
       if(readonly){
-        return '<td rowspan="'+spanRows+'" class="board-merged'+(refCellCls?' cell-changed':'')+'"><div class="ro-val mono" style="color:var(--accent);font-weight:600" data-board-ref-display="'+board.id+'">'+refOv+X(board.ref||'—')+'</div></td>';
+        return '<td'+refCellCls+'><div class="ro-val mono" style="color:var(--accent);font-weight:600" data-board-ref-display="'+board.id+'">'+refOv+X(board.ref||'—')+'</div></td>';
       }
-      return '<td rowspan="'+spanRows+'" class="board-merged'+(refCellCls?' cell-changed':'')+'"><input class="ci" data-board-ref-id="'+board.id+'" value="'+X(board.ref||'')+'" placeholder="Board ID" style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600;text-align:center" onchange="updBoardRef(\''+board.id+'\',this.value)"></td>';
+      return '<td'+refCellCls+'><input class="ci" data-board-ref-id="'+board.id+'" value="'+X(board.ref||'')+'" placeholder="Board ID" style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600;text-align:center" onchange="updBoardRef(\''+board.id+'\',this.value)"></td>';
     }
     function locCellHtml(){
       if(readonly){
-        return '<td rowspan="'+spanRows+'" class="board-merged'+(locCellCls?' cell-changed':'')+'"><div class="ro-val muted" data-board-loc-display="'+board.id+'">'+locOv+X(board.loc||'—')+'</div></td>';
+        return '<td'+locCellCls+'><div class="ro-val muted" data-board-loc-display="'+board.id+'">'+locOv+X(board.loc||'—')+'</div></td>';
       }
-      return '<td rowspan="'+spanRows+'" class="board-merged'+(locCellCls?' cell-changed':'')+'" data-loc-bid="'+board.id+'"><div class="loc-cell" onclick="openBoardLocPicker(event,\''+board.id+'\')" title="'+X(board.loc||'')+'"><span class="loc-val">'+(board.loc?X(board.loc):'<span style="color:var(--muted);font-size:11px">—</span>')+'</span><span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span></div></td>';
+      return '<td'+locCellCls+' data-loc-bid="'+board.id+'"><div class="loc-cell" onclick="openBoardLocPicker(event,\''+board.id+'\')" title="'+X(board.loc||'')+'"><span class="loc-val" data-board-loc-display="'+board.id+'">'+(board.loc?X(board.loc):'<span style="color:var(--muted);font-size:11px">—</span>')+'</span><span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span></div></td>';
     }
 
-    if(units.length){
-      units.forEach(function(unit,unitIdx){
-        var key=board.id+'::'+unit.id;
-        var rowCls='unit-row';
-        if(diff){
-          if(diff.added[key])rowCls+=' tr-added';
-        }
-        var diffEntry=diff?diff.changed[key]:null;
-        html+='<tr id="ur_'+unit.id+'" class="'+rowCls+'" data-board="'+board.id+'">';
-        // Only emit Board ID + Location cells on the FIRST row of each board (rowspan covers the rest)
-        if(unitIdx===0){
-          html+=refCellHtml();
-          html+=locCellHtml();
-        }
-        vcols.forEach(function(c){html+=renderUnitCell(c,unit,board.id,readonly,diffEntry);});
-        if(!readonly)html+='<td><button class="del-btn" onclick="deleteUnit(\''+board.id+'\',\''+unit.id+'\')">✕</button></td>';
-        html+='</tr>';
-      });
+    if(unit){
+      var diffKey=board.id+'::'+unit.id;
+      var rowCls='unit-row';
+      if(diff&&diff.added[diffKey])rowCls+=' tr-added';
+      var diffEntry=diff?diff.changed[diffKey]:null;
+      html+='<tr id="ur_'+unit.id+'" class="'+rowCls+'" data-board="'+board.id+'">';
+      html+=refCellHtml();
+      html+=locCellHtml();
+      vcols.forEach(function(c){html+=renderUnitCell(c,unit,board.id,readonly,diffEntry);});
+      if(!readonly)html+='<td><button class="del-btn" onclick="deleteUnit(\''+board.id+'\',\''+unit.id+'\')">✕</button></td>';
+      html+='</tr>';
     } else {
-      // Empty board placeholder — single row, board cells still rowspan=1
+      // Empty-board placeholder
       html+='<tr class="unit-row" data-board="'+board.id+'">';
       html+=refCellHtml();
       html+=locCellHtml();
@@ -1147,16 +1231,39 @@ function renderGroupedView(mc,bds,vcols,readonly,diff){
   var html='<div class="sched-scroll"><table class="btbl">'+colgroupHtml;
   // Sticky header — inside the same table so columns ALWAYS align
   html+='<thead><tr>';
-  html+='<th>Board ID</th><th>Board Location</th>';
-  vcols.forEach(function(c){html+='<th>'+X(c.l)+'</th>';});
+  html+='<th>'+renderHeaderCell('Board ID','__boardRef')+'</th><th>'+renderHeaderCell('Board Location','__boardLoc')+'</th>';
+  vcols.forEach(function(c){html+='<th>'+renderHeaderCell(c.l,c.k)+'</th>';});
   if(!readonly)html+='<th></th>';
   html+='</tr></thead>';
   html+='<tbody>';
 
   var dataColSpan=vcols.length+(readonly?0:1);
 
-  bds.forEach(function(board,boardIdx){
+  // First, determine the displayed units per board (after filter + sort), and skip boards
+  // with no matching units when filters are active. We need this because boardSpanRows
+  // calculation depends on the visible unit count.
+  var hasFilters=Object.keys(_colFilters).some(function(k){return String(_colFilters[k]||'').trim()!=='';});
+  var displayBds=bds.map(function(board){
     var units=board.units||[];
+    var visibleUnits=units.filter(function(u){return rowMatchesFilters(board,u);});
+    if(_sortKey){
+      // Sort units within this board
+      var pairs=visibleUnits.map(function(u){return {board:board,unit:u};});
+      pairs=sortPairs(pairs);
+      visibleUnits=pairs.map(function(p){return p.unit;});
+    }
+    return {board:board,units:units,visibleUnits:visibleUnits};
+  }).filter(function(d){
+    // If filters active, hide boards whose Board ID/Loc don't match AND have no matching units
+    if(!hasFilters)return true;
+    if(d.visibleUnits.length>0)return true;
+    // Empty board still shown if board itself matches filters (board ref/loc filter)
+    return rowMatchesFilters(d.board,null);
+  });
+
+  displayBds.forEach(function(d,boardIdx){
+    var board=d.board;
+    var units=d.visibleUnits;
     var ph1=0,ph2=0,ph3=0;
     units.forEach(function(u){ph1+=fla(u.ph1);ph2+=fla(u.ph2);ph3+=fla(u.ph3);});
 
