@@ -74,6 +74,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .btbl thead th:last-child{border-right:none}
 /* Body cells — fixed height regardless of edit / read-only mode (uses the edit-mode height) */
 .btbl tbody td{height:34px;padding:0 6px;vertical-align:middle;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btbl tbody td.board-merged{background:rgba(0,200,255,.025);vertical-align:middle}
+.btbl tbody td.board-merged .ro-val,.btbl tbody td.board-merged .loc-cell{height:auto}
+.btbl tbody td.board-merged input.ci{height:30px}
 /* Read-only display cell content — match input metrics so row height stays constant */
 .btbl tbody td .ro-val{display:flex;align-items:center;justify-content:center;height:100%;padding:0 6px;font-size:12.5px;color:var(--text);font-family:'DM Sans',sans-serif}
 .btbl tbody td .ro-val.mono{font-family:'DM Mono',monospace;font-size:12px}
@@ -155,6 +158,9 @@ select.ci{cursor:pointer}
 .col-row:hover{background:var(--surface3,rgba(255,255,255,.03))}
 .col-row.dragging{opacity:.4;border-style:dashed}
 .col-row.dragover{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.col-row-locked{opacity:.85;background:rgba(0,200,255,.04);border-color:rgba(0,200,255,.15)}
+.col-row-locked .col-label-text{font-weight:500}
+.col-tag-locked{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);padding:2px 6px;border:1px solid rgba(0,200,255,.3);border-radius:3px;flex-shrink:0;background:rgba(0,200,255,.06)}
 .col-grip{cursor:grab;color:var(--muted);font-size:14px;line-height:1;user-select:none;padding:0 2px;font-family:'DM Mono',monospace}
 .col-grip:active{cursor:grabbing}
 .col-row input[type="checkbox"]{accent-color:var(--accent);width:15px;height:15px;cursor:pointer;flex-shrink:0}
@@ -313,10 +319,28 @@ function getAllColsOrdered(){
 function getVisibleCols(){return getAllColsOrdered().filter(function(c){return _colVis[c.k]!==false;});}
 
 function openColSettings(){renderColList();document.getElementById('colModal').classList.add('open');}
+
+// Two pseudo-columns shown at the top of the modal — locked (cannot hide or delete).
+// They're not in COLS because they live on the Board object, not the unit.
+var BOARD_COLS=[
+  {k:'__boardRef',l:'Board ID',locked:true,boardCol:true},
+  {k:'__boardLoc',l:'Board Location',locked:true,boardCol:true}
+];
+
 function renderColList(){
   var list=document.getElementById('colList');
+  // Top section: locked board-level columns
+  var lockedHtml=BOARD_COLS.map(function(c){
+    return '<div class="col-row col-row-locked">'
+      +'<span class="col-grip" style="opacity:.25;cursor:not-allowed" title="Locked — cannot reorder">⋮⋮</span>'
+      +'<input type="checkbox" checked disabled title="Required column — cannot be hidden">'
+      +'<span class="col-label-text">'+X(c.l)+'</span>'
+      +'<span class="col-tag-locked" title="Required — always visible">🔒 LOCKED</span>'
+      +'</div>';
+  }).join('');
+  // Below: the user-managed (unit-level) columns
   var all=getAllColsOrdered();
-  list.innerHTML=all.map(function(c,i){
+  var managedHtml=all.map(function(c,i){
     var checked=_colVis[c.k]!==false;
     var isCustom=!!c.custom;
     return '<div class="col-row" id="cr_'+i+'" draggable="true" '
@@ -328,6 +352,9 @@ function renderColList(){
       +(isCustom?'<button class="col-del-btn" onclick="deleteCustomCol(\''+c.k+'\')" title="Delete column">✕</button>':'')
       +'</div>';
   }).join('');
+  list.innerHTML=lockedHtml
+    +'<div style="height:1px;background:var(--border);margin:8px 0"></div>'
+    +managedHtml;
 }
 function toggleCol(key,visible){_colVis[key]=visible;renderBoards();saveBoards();}
 function resetCols(){
@@ -1038,19 +1065,21 @@ function renderListView(mc,bds,vcols,readonly,diff){
     var refOv=bChange&&bChange.ref&&bChange.ref[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.ref[0])+'</span>':'';
     var locOv=bChange&&bChange.loc&&bChange.loc[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.loc[0])+'</span>':'';
 
-    // Board ID + Location cells. First row of each board is editable (when in edit mode);
-    // subsequent rows show read-only displays so the user doesn't get 3 inputs to update one value.
-    function refCellHtml(isFirstOfBoard){
-      if(readonly||!isFirstOfBoard){
-        return '<td'+refCellCls+'><div class="ro-val mono" style="color:var(--accent);font-weight:600" data-board-ref-display="'+board.id+'">'+refOv+X(board.ref||'—')+'</div></td>';
+    // Board ID + Location cells: rowspan-merged across all units of this board so it's
+    // visually clear they're shared. The cell renders ONCE on the first unit row of each board.
+    var spanRows=Math.max(units.length,1); // at least 1 (empty board placeholder counts as 1)
+
+    function refCellHtml(){
+      if(readonly){
+        return '<td rowspan="'+spanRows+'" class="board-merged'+(refCellCls?' cell-changed':'')+'"><div class="ro-val mono" style="color:var(--accent);font-weight:600" data-board-ref-display="'+board.id+'">'+refOv+X(board.ref||'—')+'</div></td>';
       }
-      return '<td'+refCellCls+'><input class="ci" data-board-ref-id="'+board.id+'" value="'+X(board.ref||'')+'" placeholder="Board ID" style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600;text-align:center" onchange="updBoardRef(\''+board.id+'\',this.value)"></td>';
+      return '<td rowspan="'+spanRows+'" class="board-merged'+(refCellCls?' cell-changed':'')+'"><input class="ci" data-board-ref-id="'+board.id+'" value="'+X(board.ref||'')+'" placeholder="Board ID" style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600;text-align:center" onchange="updBoardRef(\''+board.id+'\',this.value)"></td>';
     }
-    function locCellHtml(isFirstOfBoard){
-      if(readonly||!isFirstOfBoard){
-        return '<td'+locCellCls+'><div class="ro-val muted" data-board-loc-display="'+board.id+'">'+locOv+X(board.loc||'—')+'</div></td>';
+    function locCellHtml(){
+      if(readonly){
+        return '<td rowspan="'+spanRows+'" class="board-merged'+(locCellCls?' cell-changed':'')+'"><div class="ro-val muted" data-board-loc-display="'+board.id+'">'+locOv+X(board.loc||'—')+'</div></td>';
       }
-      return '<td'+locCellCls+' data-loc-bid="'+board.id+'"><div class="loc-cell" onclick="openBoardLocPicker(event,\''+board.id+'\')" title="'+X(board.loc||'')+'"><span class="loc-val">'+(board.loc?X(board.loc):'<span style="color:var(--muted);font-size:11px">—</span>')+'</span><span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span></div></td>';
+      return '<td rowspan="'+spanRows+'" class="board-merged'+(locCellCls?' cell-changed':'')+'" data-loc-bid="'+board.id+'"><div class="loc-cell" onclick="openBoardLocPicker(event,\''+board.id+'\')" title="'+X(board.loc||'')+'"><span class="loc-val">'+(board.loc?X(board.loc):'<span style="color:var(--muted);font-size:11px">—</span>')+'</span><span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span></div></td>';
     }
 
     if(units.length){
@@ -1062,17 +1091,20 @@ function renderListView(mc,bds,vcols,readonly,diff){
         }
         var diffEntry=diff?diff.changed[key]:null;
         html+='<tr id="ur_'+unit.id+'" class="'+rowCls+'" data-board="'+board.id+'">';
-        html+=refCellHtml(unitIdx===0);
-        html+=locCellHtml(unitIdx===0);
+        // Only emit Board ID + Location cells on the FIRST row of each board (rowspan covers the rest)
+        if(unitIdx===0){
+          html+=refCellHtml();
+          html+=locCellHtml();
+        }
         vcols.forEach(function(c){html+=renderUnitCell(c,unit,board.id,readonly,diffEntry);});
         if(!readonly)html+='<td><button class="del-btn" onclick="deleteUnit(\''+board.id+'\',\''+unit.id+'\')">✕</button></td>';
         html+='</tr>';
       });
     } else {
-      // Empty board placeholder
+      // Empty board placeholder — single row, board cells still rowspan=1
       html+='<tr class="unit-row" data-board="'+board.id+'">';
-      html+=refCellHtml(true);
-      html+=locCellHtml(true);
+      html+=refCellHtml();
+      html+=locCellHtml();
       html+='<td colspan="'+dataColSpan+'" style="padding:10px;text-align:center;color:var(--muted);font-size:11px;font-style:italic">No equipment'+(!readonly?' — <a href="#" onclick="event.preventDefault();addUnit(\''+board.id+'\')" style="color:var(--accent);text-decoration:none">+ Add Equipment</a>':'')+'</td>';
       html+='</tr>';
     }
