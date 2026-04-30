@@ -323,12 +323,16 @@ select.ci{cursor:pointer}
   <div class="modal">
     <h3 id="boardModalTitle">Add Board</h3>
     <div class="form-row">
-      <label>Board ID *</label>
+      <label id="bm-ref-label">Board ID *</label>
       <input class="form-inp" id="bm-ref" placeholder="e.g. MSSB-L00-0001A">
     </div>
     <div class="form-row">
-      <label>Board Location</label>
+      <label id="bm-loc-label">Board Location</label>
       <input class="form-inp" id="bm-loc" placeholder="e.g. GIS 1">
+    </div>
+    <div class="form-row" id="bm-sup-row" style="display:none">
+      <label>Supplied From</label>
+      <input class="form-inp" id="bm-sup" placeholder="e.g. MSSB-01">
     </div>
     <div class="modal-btns">
       <button class="btn bg" onclick="closeBoardModal()">Cancel</button>
@@ -384,14 +388,11 @@ function openColSettings(){renderColList();document.getElementById('colModal').c
 
 // Two pseudo-columns shown at the top of the modal — locked (cannot hide or delete).
 // They're not in COLS because they live on the Board object, not the unit.
-var BOARD_COLS=[
-  {k:'__boardRef',l:'Board ID',locked:true,boardCol:true},
-  {k:'__boardLoc',l:'Board Location',locked:true,boardCol:true}
-];
+// (Defined per-tab in TAB_CFG; accessible via window.BOARD_COLS getter.)
 
 function renderColList(){
   var list=document.getElementById('colList');
-  // Top section: locked board-level columns (Board ID + Board Location)
+  // Top section: locked board-level columns
   var lockedHtml=BOARD_COLS.map(function(c){
     return '<div class="col-row col-row-locked">'
       +'<span class="col-grip" style="opacity:.25;cursor:not-allowed" title="Locked">⠿</span>'
@@ -487,7 +488,7 @@ function hasAnyData(){
 }
 function updateTemplateBtnVisibility(){
   var btn=document.getElementById('btnTemplate');if(!btn)return;
-  var revs=_revData.mssb||[];
+  var revs=_revData.revisions||[];
   btn.style.display=(revs.length===0&&!hasAnyData())?'inline-flex':'none';
 }
 
@@ -497,21 +498,59 @@ var DUTY_OPTIONS=['Duty','Standby','—'];
 var LAMPS_OPTIONS=['Run/Fault','Run/Fault/Trip','Run only','—'];
 var CTRL_OPTIONS=['ON / AUTO / OFF','ON / OFF','AUTO / OFF','—'];
 
-var COLS=[
-  {k:'unitNum',  l:'Equipment ID',                w:'160px'},
-  {k:'unitDesc', l:'Equipment Location',          w:'180px'},
-  {k:'suppFrom', l:'Supplied From',               w:'130px'},
-  {k:'suppLoc',  l:'Supplied From Location',      w:'170px'},
-  {k:'duty',     l:'Duty / Standby',              w:'110px', sel:DUTY_OPTIONS},
-  {k:'starter',  l:'Motor Starter Type',          w:'130px', sel:STARTER_TYPES},
-  {k:'lamps',    l:'Lamps',                       w:'120px', sel:LAMPS_OPTIONS},
-  {k:'power',    l:'Power (kW)',                  w:'80px',  num:true},
-  {k:'ph1',      l:'Phase 1 FLA (A)',             w:'95px',  num:true},
-  {k:'ph2',      l:'Phase 2 FLA (A)',             w:'95px',  num:true},
-  {k:'ph3',      l:'Phase 3 FLA (A)',             w:'95px',  num:true},
-  {k:'meterRef', l:'Meter Reference',             w:'170px'},
-  {k:'ctrlSw',   l:'Control Switch',              w:'130px', sel:CTRL_OPTIONS}
-];
+// ── Per-tab schedule configuration ──
+// Each tab type has its own column definitions and behaviour. State (boards, revs,
+// preferences) is also tracked per-tab so switching tabs swaps in the right data set.
+var TAB_CFG={
+  mssb:{
+    storeKey:'_boards',                // Supabase key suffix → '{pNum}_boards'
+    displayName:'Mechanical Switchboards Schedule',
+    shortName:'MSSB Schedule',
+    hasFLATotals:true,                 // Grouped View renders per-board FLA totals row
+    boardCols:[
+      {k:'__boardRef',l:'Board ID',locked:true,boardCol:true},
+      {k:'__boardLoc',l:'Board Location',locked:true,boardCol:true}
+    ],
+    cols:[
+      {k:'unitNum',  l:'Equipment ID',                w:'160px'},
+      {k:'unitDesc', l:'Equipment Location',          w:'180px'},
+      {k:'suppFrom', l:'Supplied From',               w:'130px'},
+      {k:'suppLoc',  l:'Supplied From Location',      w:'170px'},
+      {k:'duty',     l:'Duty / Standby',              w:'110px', sel:DUTY_OPTIONS},
+      {k:'starter',  l:'Motor Starter Type',          w:'130px', sel:STARTER_TYPES},
+      {k:'lamps',    l:'Lamps',                       w:'120px', sel:LAMPS_OPTIONS},
+      {k:'power',    l:'Power (kW)',                  w:'80px',  num:true},
+      {k:'ph1',      l:'Phase 1 FLA (A)',             w:'95px',  num:true},
+      {k:'ph2',      l:'Phase 2 FLA (A)',             w:'95px',  num:true},
+      {k:'ph3',      l:'Phase 3 FLA (A)',             w:'95px',  num:true},
+      {k:'meterRef', l:'Meter Reference',             w:'170px'},
+      {k:'ctrlSw',   l:'Control Switch',              w:'130px', sel:CTRL_OPTIONS}
+    ]
+  },
+  dcp:{
+    storeKey:'_dcp',                   // → '{pNum}_dcp'
+    displayName:'Damper Control Panels Schedule',
+    shortName:'DCP Schedule',
+    hasFLATotals:false,                // No phase totals — DCPs aren't load-bearing
+    boardCols:[
+      {k:'__boardRef',l:'DCP Reference',  locked:true,boardCol:true},
+      {k:'__boardLoc',l:'Location',       locked:true,boardCol:true},
+      {k:'__boardSup',l:'Supplied From',  locked:true,boardCol:true}
+    ],
+    cols:[
+      {k:'damperId', l:'Damper ID', w:'200px'}
+    ]
+  }
+};
+
+// Returns the column list for the current tab (built-in unit-level cols).
+// All consuming code reads from this instead of a hardcoded COLS.
+function COLS_FOR_TAB(tab){return (TAB_CFG[tab||_activeTab]||TAB_CFG.mssb).cols;}
+function BOARD_COLS_FOR_TAB(tab){return (TAB_CFG[tab||_activeTab]||TAB_CFG.mssb).boardCols;}
+// Backwards-compat shorthand — many existing references use COLS / BOARD_COLS directly.
+// These getters return the right list based on the currently active tab.
+Object.defineProperty(window,'COLS',{get:function(){return COLS_FOR_TAB();},configurable:true});
+Object.defineProperty(window,'BOARD_COLS',{get:function(){return BOARD_COLS_FOR_TAB();},configurable:true});
 
 // ── State ──
 var _proj=null;
@@ -523,6 +562,46 @@ var _revData={};
 var _viewRevIdx=null; // null=live, -1=draft, >=0=published
 var _editBoardId=null;
 var _uidN=0;
+
+// Per-tab state cache. When the user switches tabs, the current tab's state is saved
+// into _tabStates[tabId], and the target tab's state loads from _tabStates[targetId].
+// State vars below (_boards, _revData, etc.) always reflect the ACTIVE tab.
+var _tabStates={};
+
+// Snapshot the currently-active tab's state into the cache. Called before tab switch.
+function _saveActiveTabState(){
+  _tabStates[_activeTab]={
+    boards:_boards,
+    revData:_revData,
+    colVis:_colVis,
+    customCols:_customCols,
+    colOrder:_colOrder,
+    colWidths:_colWidths,
+    sortKey:_sortKey,
+    sortDir:_sortDir,
+    colFilters:_colFilters,
+    viewMode:_viewMode,
+    viewRevIdx:_viewRevIdx,
+    editing:_editing
+  };
+}
+
+// Restore a tab's state from the cache (or initialise fresh if missing).
+function _restoreTabState(tabId){
+  var s=_tabStates[tabId]||{};
+  _boards=s.boards||[];
+  _revData=s.revData||{};
+  _colVis=s.colVis||{};
+  _customCols=s.customCols||[];
+  _colOrder=s.colOrder||null;
+  _colWidths=s.colWidths||{};
+  _sortKey=s.sortKey||null;
+  _sortDir=s.sortDir||'asc';
+  _colFilters=s.colFilters||{};
+  _viewMode=s.viewMode||'list';
+  _viewRevIdx=s.viewRevIdx===undefined?null:s.viewRevIdx;
+  _editing=!!s.editing;
+}
 var _viewMode='list'; // 'list' or 'grouped'
 var _editing=false; // true when user is actively editing a draft (table is interactive)
 var _sortKey=null;     // column key currently sorted by, or null = no sort (default order)
@@ -554,6 +633,7 @@ function setViewMode(m){
 function getRowVal(board,unit,key){
   if(key==='__boardRef')return String(board.ref||'');
   if(key==='__boardLoc')return String(board.loc||'');
+  if(key==='__boardSup')return String(board.supp||'');
   if(!unit)return '';
   return String(unit[key]||'');
 }
@@ -821,14 +901,13 @@ function flattenBoards(bds){
   var allKeys=COLS.map(function(c){return c.k;}).concat(_customCols.map(function(c){return c.k;}));
   (bds||[]).forEach(function(b){
     (b.units||[]).forEach(function(u){
-      var rec={boardId:b.id,unitId:u.id,boardRef:b.ref||'',boardLoc:b.loc||''};
+      var rec={boardId:b.id,unitId:u.id,boardRef:b.ref||'',boardLoc:b.loc||'',boardSup:b.supp||''};
       allKeys.forEach(function(k){rec[k]=u[k]||'';});
       out[b.id+'::'+u.id]=rec;
     });
   });
   return out;
 }
-// Returns {addedKeys:Set, deletedKeys:Set, deletedRows:[{key,row}], changed:{key:{col:[old,new]}}, boardChanges:{boardId:{ref?:[],loc?:[]}}}
 function computeBoardsDiff(baseBoards,curBoards){
   var baseFlat=flattenBoards(baseBoards);
   var curFlat=flattenBoards(curBoards);
@@ -842,15 +921,16 @@ function computeBoardsDiff(baseBoards,curBoards){
     var bc={};
     if((bb.ref||'')!==(b.ref||''))bc.ref=[bb.ref||'',b.ref||''];
     if((bb.loc||'')!==(b.loc||''))bc.loc=[bb.loc||'',b.loc||''];
+    if((bb.supp||'')!==(b.supp||''))bc.supp=[bb.supp||'',b.supp||''];
     if(Object.keys(bc).length)boardChanges[b.id]=bc;
   });
-  // Unit-level changes — diff every key that exists in either snapshot's flat record (catches custom cols)
+  // Unit-level changes — diff every key that exists in either snapshot's flat record
   Object.keys(curFlat).forEach(function(k){
     var b=baseFlat[k],c=curFlat[k];if(!b)return;
     var allKeys={};Object.keys(b).forEach(function(kk){allKeys[kk]=true;});Object.keys(c).forEach(function(kk){allKeys[kk]=true;});
     var diffs={};
     Object.keys(allKeys).forEach(function(col){
-      if(col==='boardId'||col==='unitId'||col==='boardRef'||col==='boardLoc')return; // board-level handled separately
+      if(col==='boardId'||col==='unitId'||col==='boardRef'||col==='boardLoc'||col==='boardSup')return; // board-level handled separately
       var ov=String(b[col]||'').trim(),nv=String(c[col]||'').trim();
       if(ov!==nv)diffs[col]=[b[col]||'',c[col]||''];
     });
@@ -860,7 +940,7 @@ function computeBoardsDiff(baseBoards,curBoards){
 }
 // Decide which baseline to diff against given current view state
 function getDiffBaseline(){
-  var revs=_revData.mssb||[];
+  var revs=_revData.revisions||[];
   if(_viewRevIdx!==null&&_viewRevIdx>=0){
     // Viewing a published rev — compare against previous rev (or empty if rev 0)
     if(_viewRevIdx===0)return null;
@@ -881,24 +961,50 @@ function shouldShowDiff(){
 // ── DB ──
 function saveBoards(){
   if(!_dataLoaded)return;
-  dbSetProject('boards_schedule',_pNum+'_boards',{boards:_boards,revData:_revData,colVis:_colVis,customCols:_customCols,colOrder:_colOrder,colWidths:_colWidths,sortKey:_sortKey,sortDir:_sortDir}).catch(function(e){console.error('saveBoards:',e);});
+  var cfg=TAB_CFG[_activeTab];if(!cfg)return;
+  var key=_pNum+cfg.storeKey;
+  dbSetProject('boards_schedule',key,{boards:_boards,revData:_revData,colVis:_colVis,customCols:_customCols,colOrder:_colOrder,colWidths:_colWidths,sortKey:_sortKey,sortDir:_sortDir}).catch(function(e){console.error('saveBoards:',e);});
 }
-async function loadBoards(){
+
+// Load one tab's state from Supabase into the per-tab cache (does NOT swap into active state).
+async function loadTabFromDb(tabId){
+  var cfg=TAB_CFG[tabId];if(!cfg)return;
   try{
-    var d=await dbGetProject('boards_schedule',_pNum+'_boards');
+    var d=await dbGetProject('boards_schedule',_pNum+cfg.storeKey);
     if(d&&d.boards){
-      _boards=d.boards;
-      _revData=d.revData||{};
-      _colVis=d.colVis||{};
-      _customCols=d.customCols||[];
-      _colOrder=d.colOrder||null;
-      _colWidths=d.colWidths||{};
-      _sortKey=d.sortKey||null;
-      _sortDir=d.sortDir||'asc';
-      return true;
+      // Migrate legacy shape: _revData.mssb → _revData.revisions, _revData.mssb_draft → _revData.draft
+      var rd=d.revData||{};
+      if(rd.mssb&&!rd.revisions){rd.revisions=rd.mssb;}
+      if(rd.mssb_draft!==undefined&&rd.draft===undefined){rd.draft=rd.mssb_draft;}
+      delete rd.mssb;delete rd.mssb_draft;
+      _tabStates[tabId]={
+        boards:d.boards,
+        revData:rd,
+        colVis:d.colVis||{},
+        customCols:d.customCols||[],
+        colOrder:d.colOrder||null,
+        colWidths:d.colWidths||{},
+        sortKey:d.sortKey||null,
+        sortDir:d.sortDir||'asc',
+        colFilters:{},
+        viewMode:'list',
+        viewRevIdx:null,
+        editing:false
+      };
+    } else {
+      _tabStates[tabId]={boards:[],revData:{},colVis:{},customCols:[],colOrder:null,colWidths:{},sortKey:null,sortDir:'asc',colFilters:{},viewMode:'list',viewRevIdx:null,editing:false};
     }
-  }catch(e){}
-  return false;
+  }catch(e){
+    _tabStates[tabId]={boards:[],revData:{},colVis:{},customCols:[],colOrder:null,colWidths:{},sortKey:null,sortDir:'asc',colFilters:{},viewMode:'list',viewRevIdx:null,editing:false};
+  }
+}
+
+// Convenience: load both tabs at startup, then activate the first one.
+async function loadBoards(){
+  await loadTabFromDb('mssb');
+  await loadTabFromDb('dcp');
+  _restoreTabState(_activeTab);
+  return true;
 }
 
 // ── Init ──
@@ -1047,39 +1153,36 @@ function renderTabStrip(){
   }).join('');
 }
 function switchTab(id){
+  if(id===_activeTab)return;
+  // Snapshot current tab's state before switching
+  _saveActiveTabState();
   _activeTab=id;
+  // Restore destination tab's state
+  _restoreTabState(id);
   renderTabStrip();
   renderActive();
 }
 
 function renderActive(){
-  var isMssb=_activeTab==='mssb';
+  // Both tabs (MSSB + DCP) share the same UI: action bar, rev bar, tables.
+  // The only difference is the column set, which is sourced from TAB_CFG.
   document.getElementById('abar').style.display='flex';
-  // Hide MSSB-only elements when on DCP
-  ['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnRevHistory','btnLiveView','btnTemplate','colSettingsBtn','btnImport','viewToggle'].forEach(function(id){
+  // All workflow + utility buttons visible on both tabs
+  ['btnTemplate','colSettingsBtn','btnImport','viewToggle'].forEach(function(id){
     var el=document.getElementById(id);
-    if(!el)return;
-    if(!isMssb){el.style.display='none';return;}
-    // On MSSB tab — let renderRevBar manage workflow buttons; show others
-    var workflowBtns=['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnRevHistory','btnLiveView'];
-    if(workflowBtns.indexOf(id)>=0)return; // managed elsewhere
-    el.style.display='inline-flex';
+    if(el)el.style.display='inline-flex';
   });
-  // Excel/PDF export buttons (no IDs)
   var expBtns=document.querySelectorAll('.abar button[onclick="openExportModal()"]');
-  expBtns.forEach(function(b){b.style.display=isMssb?'inline-flex':'none';});
-  if(isMssb){renderRevBar();renderBoards();updateTemplateBtnVisibility();}
-  else{
-    document.getElementById('revBar').style.display='none';
-    document.getElementById('abar').style.display='none';
-    document.getElementById('mainContent').innerHTML='<div class="placeholder-tab"><div style="font-size:48px;opacity:.3">🔌</div><h3>Damper Control Panels</h3><p style="font-size:13px;max-width:300px">DCP module — coming soon.</p></div>';
-  }
+  expBtns.forEach(function(b){b.style.display='inline-flex';});
+  renderRevBar();
+  renderBoards();
+  updateTemplateBtnVisibility();
 }
 
 // ── Rev bar ──
 function renderRevBar(){
-  var revs=_revData.mssb||[];
-  var hasDraft=!!_revData.mssb_draft;
+  var revs=_revData.revisions||[];
+  var hasDraft=!!_revData.draft;
   var rb=document.getElementById('revBar');
   var rp=document.getElementById('revPills');
   // Button visibility based on state machine:
@@ -1149,7 +1252,7 @@ function viewRev(idx){
     _viewRevIdx=(idx===-1)?-1:null;
     renderBoards();
   } else {
-    var rv=(_revData.mssb||[])[idx];if(rv)renderBoards(true,rv.boards);
+    var rv=(_revData.revisions||[])[idx];if(rv)renderBoards(true,rv.boards);
   }
 }
 
@@ -1164,8 +1267,8 @@ function isEditable(){
 // Start a brand new draft from the last published revision (or empty state).
 // Does NOT enter edit mode automatically — same flow as Start New Draft + Edit Draft separately.
 function startDraft(){
-  if(_revData.mssb_draft){alert('A draft already exists. Click Edit Draft to continue.');return;}
-  _revData.mssb_draft=true;
+  if(_revData.draft){alert('A draft already exists. Click Edit Draft to continue.');return;}
+  _revData.draft=true;
   _editing=true;
   _viewRevIdx=null;
   saveBoards();
@@ -1176,7 +1279,7 @@ function startDraft(){
 
 // Re-enter edit mode for an existing draft.
 function editDraft(){
-  if(!_revData.mssb_draft){startDraft();return;}
+  if(!_revData.draft){startDraft();return;}
   _editing=true;
   _viewRevIdx=null;
   renderRevBar();
@@ -1194,7 +1297,7 @@ function saveDraft(){
 }
 
 function publishRev(){
-  var revs=_revData.mssb||[];
+  var revs=_revData.revisions||[];
   var snap=JSON.parse(JSON.stringify(_boards));
   // Compute change summary vs previous revision (or empty if first rev)
   var baseSnap=revs.length?revs[revs.length-1].boards||[]:[];
@@ -1205,8 +1308,8 @@ function publishRev(){
     changed:Object.keys(diff.changed).length+Object.keys(diff.boardChanges).length
   };
   revs.push({rev:'Rev '+String(revs.length+1).padStart(2,'0'),date:todayStr(),boards:snap,changeSummary:changeSummary});
-  _revData.mssb=revs;
-  delete _revData.mssb_draft;
+  _revData.revisions=revs;
+  delete _revData.draft;
   _editing=false;
   _viewRevIdx=null;
   saveBoards();
@@ -1215,9 +1318,12 @@ function publishRev(){
 }
 
 function openRevHistory(){
-  var revs=_revData.mssb||[];
+  var revs=_revData.revisions||[];
   var modal=document.getElementById('revHistModal');
   var list=document.getElementById('revHistList');
+  // Update subtitle to match active tab's schedule name
+  var sub=document.getElementById('revHistSubtitle');
+  if(sub){var cfg=TAB_CFG[_activeTab]||TAB_CFG.mssb;sub.textContent=cfg.displayName;}
   if(!revs.length){
     list.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">No revisions yet.</div>';
   } else {
@@ -1258,7 +1364,7 @@ var _exportingRevIdx=null;
 function exportRevAtIdx(idx){
   closeRevHistory();
   _exportingRevIdx=idx;
-  var revs=_revData.mssb||[];
+  var revs=_revData.revisions||[];
   var rv=revs[idx];
   // Update modal subtitle so the user knows which rev they're exporting
   var sub=document.getElementById('exportSubtitle');
@@ -1273,8 +1379,8 @@ function exportRevAtIdx(idx){
 }
 
 function discardDraft(){
-  if(!_revData.mssb_draft){return;}
-  var revs=_revData.mssb||[];
+  if(!_revData.draft){return;}
+  var revs=_revData.revisions||[];
   var msg=revs.length
     ? 'Discard draft?\n\nAll changes since the last published revision ('+revs[revs.length-1].rev+') will be permanently lost. This cannot be undone.'
     : 'Discard draft?\n\nThere is no published revision to fall back on — discarding will clear all boards. This cannot be undone.';
@@ -1284,7 +1390,7 @@ function discardDraft(){
   } else {
     _boards=[];
   }
-  delete _revData.mssb_draft;
+  delete _revData.draft;
   _editing=false;
   _viewRevIdx=null;
   saveBoards();
@@ -1305,7 +1411,7 @@ function renderBoards(readonly,overrideBoards){
     var emptyMsg;
     if(isEditable()){
       emptyMsg='<div>No data yet.</div><div style="margin-top:14px"><button class="add-unit-btn" onclick="addLineItem()" style="font-size:12px;padding:6px 14px">+ Add Line Item</button></div><div style="margin-top:10px;font-size:11px;color:var(--muted)">or <strong>⬆ Import</strong> from Excel</div>';
-    } else if(_revData.mssb_draft){
+    } else if(_revData.draft){
       emptyMsg='<div>No data yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>✏ Edit Draft</strong> above to add line items.</div>';
     } else {
       emptyMsg='<div>No data yet.</div><div style="margin-top:8px;font-size:12px">Click <strong>✏ Start New Draft</strong> above to begin.</div>';
@@ -1329,7 +1435,7 @@ function renderBoards(readonly,overrideBoards){
       // Update label based on what we're comparing against
       var lbl=document.getElementById('diffLegendLabel');
       if(lbl){
-        var revs=_revData.mssb||[];
+        var revs=_revData.revisions||[];
         if(_viewRevIdx!==null&&_viewRevIdx>=0){
           // Viewing a published rev — comparing against rev N-1
           var prevRev=_viewRevIdx>0?revs[_viewRevIdx-1].rev:'(none)';
@@ -1474,26 +1580,26 @@ function renderUnitCell(c,unit,boardId,readonly,diffEntry){
 
 // ── List View — flat, one row per unit (matches Excel template) ──
 function renderListView(mc,bds,vcols,readonly,diff){
-  var BOARD_W='180px',LOC_W='130px';
+  var bcols=BOARD_COLS_FOR_TAB();
   var widthFor=function(key,fallback){return _colWidths[key]||fallback;};
+  // Default widths per board column (fallbacks)
+  var DEFAULT_BC_W={__boardRef:'180px',__boardLoc:'140px',__boardSup:'150px'};
   var colgroupHtml='<colgroup>';
-  colgroupHtml+='<col data-col-key="__boardRef" style="width:'+widthFor('__boardRef',BOARD_W)+'">';
-  colgroupHtml+='<col data-col-key="__boardLoc" style="width:'+widthFor('__boardLoc',LOC_W)+'">';
+  bcols.forEach(function(bc){colgroupHtml+='<col data-col-key="'+bc.k+'" style="width:'+widthFor(bc.k,DEFAULT_BC_W[bc.k]||'160px')+'">';});
   vcols.forEach(function(c){colgroupHtml+='<col data-col-key="'+c.k+'" style="width:'+widthFor(c.k,c.w)+'">';});
   if(!readonly)colgroupHtml+='<col style="width:36px">';
   colgroupHtml+='</colgroup>';
 
   var html='<div class="sched-scroll"><table class="btbl">'+colgroupHtml;
-  // Sticky header — inside the same table so columns ALWAYS align
   html+='<thead><tr>';
-  html+='<th>'+renderHeaderCell('Board ID','__boardRef',0)+'</th><th>'+renderHeaderCell('Board Location','__boardLoc',1)+'</th>';
-  vcols.forEach(function(c,i){html+='<th>'+renderHeaderCell(c.l,c.k,2+i)+'</th>';});
+  bcols.forEach(function(bc,i){html+='<th>'+renderHeaderCell(bc.l,bc.k,i)+'</th>';});
+  vcols.forEach(function(c,i){html+='<th>'+renderHeaderCell(c.l,c.k,bcols.length+i)+'</th>';});
   if(!readonly)html+='<th></th>';
   html+='</tr></thead>';
   html+='<tbody>';
 
   var dataColSpan=vcols.length+(readonly?0:1);
-  var totalCols=2+vcols.length+(readonly?0:1);
+  var totalCols=bcols.length+vcols.length+(readonly?0:1);
 
   // Build a flat list of {board, unit} pairs (one per visible row), then filter & sort.
   // Empty boards become a single pair with unit=null.
@@ -1514,22 +1620,39 @@ function renderListView(mc,bds,vcols,readonly,diff){
   pairs.forEach(function(p){
     var board=p.board,unit=p.unit;
     var bChange=(diff&&diff.boardChanges&&diff.boardChanges[board.id])||null;
-    var refCellCls=bChange&&bChange.ref?' class="cell-changed"':'';
-    var locCellCls=bChange&&bChange.loc?' class="cell-changed"':'';
-    var refOv=bChange&&bChange.ref&&bChange.ref[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.ref[0])+'</span>':'';
-    var locOv=bChange&&bChange.loc&&bChange.loc[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.loc[0])+'</span>':'';
 
-    function refCellHtml(){
-      if(readonly){
-        return '<td'+refCellCls+'><div class="ro-val mono" style="color:var(--accent);font-weight:600" data-board-ref-display="'+board.id+'">'+refOv+X(board.ref||'—')+'</div></td>';
+    // Renders one board-level cell (Board ID, Location, or Supplied From, etc.)
+    function boardCellHtml(bcKey){
+      // Map __boardRef → ref (id), __boardLoc → loc, __boardSup → supp
+      var fieldMap={'__boardRef':'ref','__boardLoc':'loc','__boardSup':'supp'};
+      var diffMap={'__boardRef':'ref','__boardLoc':'loc','__boardSup':'supp'};
+      var f=fieldMap[bcKey]||bcKey.replace(/^__/,'');
+      var df=diffMap[bcKey]||f;
+      var val=board[f]||'';
+      var changed=bChange&&bChange[df];
+      var cellCls=changed?' class="cell-changed"':'';
+      var ov=(changed&&changed[0])?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(changed[0])+'</span>':'';
+      // Per-field rendering
+      if(bcKey==='__boardRef'){
+        if(readonly){
+          return '<td'+cellCls+'><div class="ro-val mono" style="color:var(--accent);font-weight:600" data-board-ref-display="'+board.id+'">'+ov+X(val||'—')+'</div></td>';
+        }
+        return '<td'+cellCls+'><input class="ci" data-board-ref-id="'+board.id+'" value="'+X(val)+'" placeholder="Board ID" style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600;text-align:center" onchange="updBoardRef(\''+board.id+'\',this.value)"></td>';
       }
-      return '<td'+refCellCls+'><input class="ci" data-board-ref-id="'+board.id+'" value="'+X(board.ref||'')+'" placeholder="Board ID" style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--accent);font-weight:600;text-align:center" onchange="updBoardRef(\''+board.id+'\',this.value)"></td>';
-    }
-    function locCellHtml(){
-      if(readonly){
-        return '<td'+locCellCls+'><div class="ro-val muted" data-board-loc-display="'+board.id+'">'+locOv+X(board.loc||'—')+'</div></td>';
+      if(bcKey==='__boardLoc'){
+        if(readonly){
+          return '<td'+cellCls+'><div class="ro-val muted" data-board-loc-display="'+board.id+'">'+ov+X(val||'—')+'</div></td>';
+        }
+        return '<td'+cellCls+' data-loc-bid="'+board.id+'"><div class="loc-cell" onclick="openBoardLocPicker(event,\''+board.id+'\')" title="'+X(val)+'"><span class="loc-val" data-board-loc-display="'+board.id+'">'+(val?X(val):'<span style="color:var(--muted);font-size:11px">—</span>')+'</span><span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span></div></td>';
       }
-      return '<td'+locCellCls+' data-loc-bid="'+board.id+'"><div class="loc-cell" onclick="openBoardLocPicker(event,\''+board.id+'\')" title="'+X(board.loc||'')+'"><span class="loc-val" data-board-loc-display="'+board.id+'">'+(board.loc?X(board.loc):'<span style="color:var(--muted);font-size:11px">—</span>')+'</span><span style="font-size:9px;color:var(--muted);flex-shrink:0">▾</span></div></td>';
+      // Supplied From — plain text input (board-level)
+      if(bcKey==='__boardSup'){
+        if(readonly){
+          return '<td'+cellCls+'><div class="ro-val muted" data-board-sup-display="'+board.id+'">'+ov+X(val||'—')+'</div></td>';
+        }
+        return '<td'+cellCls+'><input class="ci" value="'+X(val)+'" placeholder="e.g. MSSB-01" style="font-family:\'DM Mono\',monospace;font-size:11px;text-align:center" onchange="updBoardField(\''+board.id+'\',\'supp\',this.value)"></td>';
+      }
+      return '<td>—</td>';
     }
 
     if(unit){
@@ -1538,16 +1661,14 @@ function renderListView(mc,bds,vcols,readonly,diff){
       if(diff&&diff.added[diffKey])rowCls+=' tr-added';
       var diffEntry=diff?diff.changed[diffKey]:null;
       html+='<tr id="ur_'+unit.id+'" class="'+rowCls+'" data-board="'+board.id+'">';
-      html+=refCellHtml();
-      html+=locCellHtml();
+      bcols.forEach(function(bc){html+=boardCellHtml(bc.k);});
       vcols.forEach(function(c){html+=renderUnitCell(c,unit,board.id,readonly,diffEntry);});
       if(!readonly)html+='<td><button class="del-btn" onclick="deleteUnit(\''+board.id+'\',\''+unit.id+'\')">✕</button></td>';
       html+='</tr>';
     } else {
       // Empty-board placeholder
       html+='<tr class="unit-row" data-board="'+board.id+'">';
-      html+=refCellHtml();
-      html+=locCellHtml();
+      bcols.forEach(function(bc){html+=boardCellHtml(bc.k);});
       html+='<td colspan="'+dataColSpan+'" style="padding:10px;text-align:center;color:var(--muted);font-size:11px;font-style:italic">No equipment'+(!readonly?' — <a href="#" onclick="event.preventDefault();addUnit(\''+board.id+'\')" style="color:var(--accent);text-decoration:none">+ Add Equipment</a>':'')+'</td>';
       html+='</tr>';
     }
@@ -1558,8 +1679,12 @@ function renderListView(mc,bds,vcols,readonly,diff){
     Object.keys(diff.deleted).forEach(function(key){
       var d=diff.deleted[key];
       html+='<tr class="tr-deleted">';
-      html+='<td style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:600">'+X(d.boardRef)+'</td>';
-      html+='<td style="font-size:11px">'+X(d.boardLoc||'—')+'</td>';
+      // Render deleted board cells from snapshot
+      bcols.forEach(function(bc){
+        var fieldMap={'__boardRef':'boardRef','__boardLoc':'boardLoc','__boardSup':'boardSup'};
+        var v=d[fieldMap[bc.k]||bc.k]||'';
+        html+='<td style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:600">'+X(v)+'</td>';
+      });
       vcols.forEach(function(c){html+='<td style="font-size:12px;padding:4px 6px">'+X(d[c.k]||'')+'</td>';});
       if(!readonly)html+='<td></td>';
       html+='</tr>';
@@ -1579,76 +1704,81 @@ function renderListView(mc,bds,vcols,readonly,diff){
 
 // ── Grouped View — original rowspan layout with totals row per board ──
 function renderGroupedView(mc,bds,vcols,readonly,diff){
-  var BOARD_W='160px',LOC_W='140px';
+  var bcols=BOARD_COLS_FOR_TAB();
+  var cfg=TAB_CFG[_activeTab]||TAB_CFG.mssb;
   var widthFor=function(key,fallback){return _colWidths[key]||fallback;};
+  var DEFAULT_BC_W={__boardRef:'160px',__boardLoc:'160px',__boardSup:'150px'};
   var colgroupHtml='<colgroup>';
-  colgroupHtml+='<col data-col-key="__boardRef" style="width:'+widthFor('__boardRef',BOARD_W)+'">';
-  colgroupHtml+='<col data-col-key="__boardLoc" style="width:'+widthFor('__boardLoc',LOC_W)+'">';
+  bcols.forEach(function(bc){colgroupHtml+='<col data-col-key="'+bc.k+'" style="width:'+widthFor(bc.k,DEFAULT_BC_W[bc.k]||'160px')+'">';});
   vcols.forEach(function(c){colgroupHtml+='<col data-col-key="'+c.k+'" style="width:'+widthFor(c.k,c.w)+'">';});
   if(!readonly)colgroupHtml+='<col style="width:36px">';
   colgroupHtml+='</colgroup>';
 
   var html='<div class="sched-scroll"><table class="btbl">'+colgroupHtml;
-  // Sticky header — inside the same table so columns ALWAYS align
   html+='<thead><tr>';
-  html+='<th>'+renderHeaderCell('Board ID','__boardRef',0)+'</th><th>'+renderHeaderCell('Board Location','__boardLoc',1)+'</th>';
-  vcols.forEach(function(c,i){html+='<th>'+renderHeaderCell(c.l,c.k,2+i)+'</th>';});
+  bcols.forEach(function(bc,i){html+='<th>'+renderHeaderCell(bc.l,bc.k,i)+'</th>';});
+  vcols.forEach(function(c,i){html+='<th>'+renderHeaderCell(c.l,c.k,bcols.length+i)+'</th>';});
   if(!readonly)html+='<th></th>';
   html+='</tr></thead>';
   html+='<tbody>';
 
   var dataColSpan=vcols.length+(readonly?0:1);
+  var nBcols=bcols.length;
 
-  // First, determine the displayed units per board (after filter + sort), and skip boards
-  // with no matching units when filters are active. We need this because boardSpanRows
-  // calculation depends on the visible unit count.
+  // Filter + sort within each board (same as before)
   var hasFilters=Object.keys(_colFilters).some(function(k){return String(_colFilters[k]||'').trim()!=='';});
   var displayBds=bds.map(function(board){
     var units=board.units||[];
     var visibleUnits=units.filter(function(u){return rowMatchesFilters(board,u);});
     if(_sortKey){
-      // Sort units within this board
       var pairs=visibleUnits.map(function(u){return {board:board,unit:u};});
       pairs=sortPairs(pairs);
       visibleUnits=pairs.map(function(p){return p.unit;});
     }
     return {board:board,units:units,visibleUnits:visibleUnits};
   }).filter(function(d){
-    // If filters active, hide boards whose Board ID/Loc don't match AND have no matching units
     if(!hasFilters)return true;
     if(d.visibleUnits.length>0)return true;
-    // Empty board still shown if board itself matches filters (board ref/loc filter)
     return rowMatchesFilters(d.board,null);
   });
+
+  // Returns the rowspan-shared cell HTML for a given board column on this board
+  function boardSpanCellHtml(board,bcKey,boardSpanRows,bChange,boardIdx){
+    var fieldMap={'__boardRef':'ref','__boardLoc':'loc','__boardSup':'supp'};
+    var f=fieldMap[bcKey]||bcKey.replace(/^__/,'');
+    var val=board[f]||'';
+    var changed=bChange&&bChange[f];
+    var ov=(changed&&changed[0])?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(changed[0])+'</span>':'';
+    var extraCls=changed?' cell-changed':'';
+    if(bcKey==='__boardRef'){
+      var content=ov+X(val);
+      if(!readonly){
+        content+='<div class="bc-actions">'
+          +'<button class="bc-btn" onclick="editBoard(\''+board.id+'\')" title="Edit board">✏</button>'
+          +'<button class="bc-btn bc-del" onclick="deleteBoard(\''+board.id+'\')" title="Delete board">✕</button>'
+          +'</div>';
+      }
+      return '<td class="board-cell'+extraCls+'" rowspan="'+boardSpanRows+'" id="bcell_'+board.id+'">'+content+'</td>';
+    }
+    // Other board cols rendered as plain text in the merged cell
+    var content2=ov+X(val||'—');
+    return '<td class="board-cell'+extraCls+'" rowspan="'+boardSpanRows+'" style="font-family:\'DM Sans\',sans-serif;font-weight:400;color:var(--text2);border-left:none !important">'+content2+'</td>';
+  }
 
   displayBds.forEach(function(d,boardIdx){
     var board=d.board;
     var units=d.visibleUnits;
     var ph1=0,ph2=0,ph3=0;
-    units.forEach(function(u){ph1+=fla(u.ph1);ph2+=fla(u.ph2);ph3+=fla(u.ph3);});
+    if(cfg.hasFLATotals)units.forEach(function(u){ph1+=fla(u.ph1);ph2+=fla(u.ph2);ph3+=fla(u.ph3);});
 
     if(boardIdx>0){
-      html+='<tr class="board-sep"><td colspan="'+(2+dataColSpan)+'"></td></tr>';
+      html+='<tr class="board-sep"><td colspan="'+(nBcols+dataColSpan)+'"></td></tr>';
     }
 
     var altClass=(boardIdx%2===1)?' board-alt':'';
     var unitRowCount=Math.max(units.length,1);
-    var boardSpanRows=unitRowCount+1;
-
+    var boardSpanRows=cfg.hasFLATotals?(unitRowCount+1):unitRowCount; // FLA totals add 1 row
     var bChange=(diff&&diff.boardChanges&&diff.boardChanges[board.id])||null;
-    var refOv=bChange&&bChange.ref&&bChange.ref[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.ref[0])+'</span>':'';
-    var locOv=bChange&&bChange.loc&&bChange.loc[0]?'<span class="cell-cleared-old" style="position:static;display:block;font-size:9px;margin-bottom:2px">'+X(bChange.loc[0])+'</span>':'';
-    var boardCellExtra=(bChange&&bChange.ref)?' cell-changed':'';
-    var locCellExtra=(bChange&&bChange.loc)?' cell-changed':'';
-
-    var boardCellContent=refOv+X(board.ref);
-    if(!readonly){
-      boardCellContent+='<div class="bc-actions">'
-        +'<button class="bc-btn" onclick="editBoard(\''+board.id+'\')" title="Edit board">✏</button>'
-        +'<button class="bc-btn bc-del" onclick="deleteBoard(\''+board.id+'\')" title="Delete board">✕</button>'
-        +'</div>';
-    }
-    var locCellContent=locOv+X(board.loc||'—');
 
     if(units.length){
       units.forEach(function(unit,unitIdx){
@@ -1658,8 +1788,8 @@ function renderGroupedView(mc,bds,vcols,readonly,diff){
         var diffEntry=diff?diff.changed[key]:null;
         html+='<tr id="ur_'+unit.id+'" class="'+rowCls+'" data-board="'+board.id+'">';
         if(unitIdx===0){
-          html+='<td class="board-cell'+boardCellExtra+'" rowspan="'+boardSpanRows+'" id="bcell_'+board.id+'">'+boardCellContent+'</td>';
-          html+='<td class="board-cell'+locCellExtra+'" rowspan="'+boardSpanRows+'" style="font-family:\'DM Sans\',sans-serif;font-weight:400;color:var(--text2);border-left:none !important">'+locCellContent+'</td>';
+          // Emit all rowspan-shared board cells
+          bcols.forEach(function(bc){html+=boardSpanCellHtml(board,bc.k,boardSpanRows,bChange,boardIdx);});
         }
         vcols.forEach(function(c){html+=renderUnitCell(c,unit,board.id,readonly,diffEntry);});
         if(!readonly)html+='<td><button class="del-btn" onclick="deleteUnit(\''+board.id+'\',\''+unit.id+'\')">✕</button></td>';
@@ -1667,35 +1797,36 @@ function renderGroupedView(mc,bds,vcols,readonly,diff){
       });
     } else {
       html+='<tr class="unit-row'+altClass+'" data-board="'+board.id+'">';
-      html+='<td class="board-cell'+boardCellExtra+'" rowspan="'+boardSpanRows+'" id="bcell_'+board.id+'">'+boardCellContent+'</td>';
-      html+='<td class="board-cell'+locCellExtra+'" rowspan="'+boardSpanRows+'" style="font-family:\'DM Sans\',sans-serif;font-weight:400;color:var(--text2);border-left:none !important">'+locCellContent+'</td>';
-      html+='<td colspan="'+dataColSpan+'" style="padding:14px;text-align:center;color:var(--muted);font-size:12px;font-style:italic">No units yet'+(!readonly?' — click + Add Unit below':'')+'</td>';
+      bcols.forEach(function(bc){html+=boardSpanCellHtml(board,bc.k,boardSpanRows,bChange,boardIdx);});
+      html+='<td colspan="'+dataColSpan+'" style="padding:14px;text-align:center;color:var(--muted);font-size:12px;font-style:italic">No units yet'+(!readonly?' — click + Add Equipment below':'')+'</td>';
       html+='</tr>';
     }
 
-    // Totals row
-    var ph1ColIdx=vcols.findIndex(function(c){return c.k==='ph1';});
-    var ph2ColIdx=vcols.findIndex(function(c){return c.k==='ph2';});
-    var ph3ColIdx=vcols.findIndex(function(c){return c.k==='ph3';});
-    var firstPhIdx=[ph1ColIdx,ph2ColIdx,ph3ColIdx].filter(function(x){return x>=0;}).sort(function(a,b){return a-b;})[0];
-    html+='<tr class="totals-row'+altClass+'">';
-    if(firstPhIdx===undefined){
-      html+='<td colspan="'+vcols.length+'" class="fla-label">Total FLA per Board (hidden — enable Phase columns)</td>';
-    } else {
-      if(firstPhIdx>0){html+='<td colspan="'+firstPhIdx+'" class="fla-label">Total FLA per Board</td>';}
-      for(var vi=firstPhIdx;vi<vcols.length;vi++){
-        var vc=vcols[vi];
-        if(vc.k==='ph1')html+='<td class="fla-total" id="ft1_'+board.id+'">'+ph1.toFixed(1)+' A</td>';
-        else if(vc.k==='ph2')html+='<td class="fla-total" id="ft2_'+board.id+'">'+ph2.toFixed(1)+' A</td>';
-        else if(vc.k==='ph3')html+='<td class="fla-total" id="ft3_'+board.id+'">'+ph3.toFixed(1)+' A</td>';
-        else html+='<td></td>';
+    // FLA totals row — only for tabs that have phase loads (MSSB, not DCP)
+    if(cfg.hasFLATotals){
+      var ph1ColIdx=vcols.findIndex(function(c){return c.k==='ph1';});
+      var ph2ColIdx=vcols.findIndex(function(c){return c.k==='ph2';});
+      var ph3ColIdx=vcols.findIndex(function(c){return c.k==='ph3';});
+      var firstPhIdx=[ph1ColIdx,ph2ColIdx,ph3ColIdx].filter(function(x){return x>=0;}).sort(function(a,b){return a-b;})[0];
+      html+='<tr class="totals-row'+altClass+'">';
+      if(firstPhIdx===undefined){
+        html+='<td colspan="'+vcols.length+'" class="fla-label">Total FLA per Board (hidden — enable Phase columns)</td>';
+      } else {
+        if(firstPhIdx>0){html+='<td colspan="'+firstPhIdx+'" class="fla-label">Total FLA per Board</td>';}
+        for(var vi=firstPhIdx;vi<vcols.length;vi++){
+          var vc=vcols[vi];
+          if(vc.k==='ph1')html+='<td class="fla-total" id="ft1_'+board.id+'">'+ph1.toFixed(1)+' A</td>';
+          else if(vc.k==='ph2')html+='<td class="fla-total" id="ft2_'+board.id+'">'+ph2.toFixed(1)+' A</td>';
+          else if(vc.k==='ph3')html+='<td class="fla-total" id="ft3_'+board.id+'">'+ph3.toFixed(1)+' A</td>';
+          else html+='<td></td>';
+        }
       }
+      if(!readonly)html+='<td></td>';
+      html+='</tr>';
     }
-    if(!readonly)html+='<td></td>';
-    html+='</tr>';
 
     if(!readonly){
-      html+='<tr class="add-unit-row"><td></td><td></td><td colspan="'+dataColSpan+'" style="text-align:left;padding:6px 14px"><button class="add-unit-btn" onclick="addUnit(\''+board.id+'\')">+ Add Equipment</button></td></tr>';
+      html+='<tr class="add-unit-row"><td colspan="'+nBcols+'"></td><td colspan="'+dataColSpan+'" style="text-align:left;padding:6px 14px"><button class="add-unit-btn" onclick="addUnit(\''+board.id+'\')">+ Add Equipment</button></td></tr>';
     }
   });
 
@@ -1703,10 +1834,13 @@ function renderGroupedView(mc,bds,vcols,readonly,diff){
   if(diff){
     Object.keys(diff.deleted).forEach(function(key){
       var d=diff.deleted[key];
-      html+='<tr class="board-sep"><td colspan="'+(2+dataColSpan)+'"></td></tr>';
+      html+='<tr class="board-sep"><td colspan="'+(nBcols+dataColSpan)+'"></td></tr>';
       html+='<tr class="tr-deleted">';
-      html+='<td class="board-cell" style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:600">'+X(d.boardRef)+'</td>';
-      html+='<td class="board-cell" style="font-size:11px;font-family:\'DM Sans\',sans-serif;font-weight:400;border-left:none !important">'+X(d.boardLoc||'—')+'</td>';
+      bcols.forEach(function(bc){
+        var fieldMap={'__boardRef':'boardRef','__boardLoc':'boardLoc','__boardSup':'boardSup'};
+        var v=d[fieldMap[bc.k]||bc.k]||'';
+        html+='<td class="board-cell" style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:600">'+X(v)+'</td>';
+      });
       vcols.forEach(function(c){html+='<td>'+X(d[c.k]||'')+'</td>';});
       if(!readonly)html+='<td></td>';
       html+='</tr>';
@@ -1715,7 +1849,7 @@ function renderGroupedView(mc,bds,vcols,readonly,diff){
 
   // Bottom: + Add Line Item creates a brand new board+row pair
   if(!readonly&&_viewRevIdx===null){
-    var totalCols=2+vcols.length+(readonly?0:1);
+    var totalCols=nBcols+vcols.length+(readonly?0:1);
     html+='<tr class="add-unit-row"><td colspan="'+totalCols+'" style="padding:10px 14px;text-align:left"><button class="add-unit-btn" onclick="addLineItem()">+ Add Line Item (new board)</button></td></tr>';
   }
 
@@ -1724,11 +1858,26 @@ function renderGroupedView(mc,bds,vcols,readonly,diff){
 }
 
 // ── Board CRUD ──
+function _configureBoardModal(){
+  // Adjust labels and field visibility based on active tab
+  var isDcp=_activeTab==='dcp';
+  var refLabel=document.getElementById('bm-ref-label');
+  var locLabel=document.getElementById('bm-loc-label');
+  var supRow=document.getElementById('bm-sup-row');
+  if(refLabel)refLabel.textContent=isDcp?'DCP Reference *':'Board ID *';
+  if(locLabel)locLabel.textContent=isDcp?'Location':'Board Location';
+  if(supRow)supRow.style.display=isDcp?'':'none';
+  var refInp=document.getElementById('bm-ref');
+  if(refInp)refInp.placeholder=isDcp?'e.g. OHE-BD155/DCP/L00/0001':'e.g. MSSB-L00-0001A';
+}
+
 function openAddBoardModal(){
   _editBoardId=null;
-  document.getElementById('boardModalTitle').textContent='Add Board';
+  _configureBoardModal();
+  document.getElementById('boardModalTitle').textContent=_activeTab==='dcp'?'Add DCP':'Add Board';
   document.getElementById('bm-ref').value='';
   document.getElementById('bm-loc').value='';
+  var sup=document.getElementById('bm-sup');if(sup)sup.value='';
   document.getElementById('boardModal').classList.add('open');
   setTimeout(function(){document.getElementById('bm-ref').focus();},80);
 }
@@ -1736,9 +1885,11 @@ function editBoard(id){
   var b=_boards.find(function(b){return b.id===id;});
   if(!b)return;
   _editBoardId=id;
-  document.getElementById('boardModalTitle').textContent='Edit Board';
+  _configureBoardModal();
+  document.getElementById('boardModalTitle').textContent=_activeTab==='dcp'?'Edit DCP':'Edit Board';
   document.getElementById('bm-ref').value=b.ref||'';
   document.getElementById('bm-loc').value=b.loc||'';
+  var sup=document.getElementById('bm-sup');if(sup)sup.value=b.supp||'';
   document.getElementById('boardModal').classList.add('open');
   setTimeout(function(){document.getElementById('bm-ref').focus();},80);
 }
@@ -1748,16 +1899,18 @@ function closeBoardModal(){
 }
 function saveBoardModal(){
   var ref=(document.getElementById('bm-ref').value||'').trim();
-  if(!ref){alert('Board ID is required');return;}
+  if(!ref){alert((_activeTab==='dcp'?'DCP Reference':'Board ID')+' is required');return;}
   var loc=(document.getElementById('bm-loc').value||'').trim();
+  var supEl=document.getElementById('bm-sup');
+  var supp=supEl?(supEl.value||'').trim():'';
   if(_editBoardId){
     var b=_boards.find(function(b){return b.id===_editBoardId;});
-    if(b){b.ref=ref;b.loc=loc;}
+    if(b){b.ref=ref;b.loc=loc;b.supp=supp;}
   } else {
-    _boards.push({id:nid(),ref:ref,loc:loc,units:[]});
+    _boards.push({id:nid(),ref:ref,loc:loc,supp:supp,units:[]});
   }
   closeBoardModal();
-  _revData.mssb_draft=true;
+  _revData.draft=true;
   renderBoards();
   renderRevBar();
   saveBoards();
@@ -1766,27 +1919,34 @@ function deleteBoard(id){
   var b=_boards.find(function(b){return b.id===id;});
   if(!b||!confirm('Delete board "'+b.ref+'" and all its units?'))return;
   _boards=_boards.filter(function(b){return b.id!==id;});
-  _revData.mssb_draft=true;
+  _revData.draft=true;
   renderBoards();renderRevBar();saveBoards();
 }
 
 // ── Unit CRUD ──
+// Returns a fresh empty unit object with all of the active tab's column keys initialised to ''.
+function _makeEmptyUnit(){
+  var u={id:nid()};
+  COLS.forEach(function(c){u[c.k]='';});
+  return u;
+}
+
 function addUnit(boardId){
   var board=_boards.find(function(b){return b.id===boardId;});
   if(!board)return;
   board.units=board.units||[];
-  board.units.push({id:nid(),unitNum:'',unitDesc:'',suppFrom:'',suppLoc:'',duty:'',starter:'',lamps:'',power:'',ph1:'',ph2:'',ph3:'',meterRef:'',ctrlSw:''});
-  _revData.mssb_draft=true;
+  board.units.push(_makeEmptyUnit());
+  _revData.draft=true;
   renderBoards();saveBoards();
 }
 
 // Add a fresh blank line — creates a new placeholder board (empty ref/loc) with one unit.
 // User fills Board ID inline; if that ID matches an existing board, the row auto-merges into it.
 function addLineItem(){
-  var newBoard={id:nid(),ref:'',loc:'',units:[]};
-  newBoard.units.push({id:nid(),unitNum:'',unitDesc:'',suppFrom:'',suppLoc:'',duty:'',starter:'',lamps:'',power:'',ph1:'',ph2:'',ph3:'',meterRef:'',ctrlSw:''});
+  var newBoard={id:nid(),ref:'',loc:'',supp:'',units:[]};
+  newBoard.units.push(_makeEmptyUnit());
   _boards.push(newBoard);
-  _revData.mssb_draft=true;
+  _revData.draft=true;
   renderBoards();saveBoards();
   // Focus the new row's Board ID input so the user can type immediately
   setTimeout(function(){
@@ -1807,13 +1967,13 @@ function updBoardRef(boardId,val){
     if(target){
       target.units=(target.units||[]).concat(board.units||[]);
       _boards=_boards.filter(function(b){return b.id!==boardId;});
-      _revData.mssb_draft=true;
+      _revData.draft=true;
       renderBoards();saveBoards();
       return;
     }
   }
   board.ref=trimmed;
-  _revData.mssb_draft=true;
+  _revData.draft=true;
   saveBoards();
   // Don't full re-render — just update visible cells with the same id
   var cells=document.querySelectorAll('[data-board-ref-display="'+boardId+'"]');
@@ -1824,11 +1984,22 @@ function updBoardLoc(boardId,val){
   var board=_boards.find(function(b){return b.id===boardId;});
   if(!board)return;
   board.loc=String(val||'').trim();
-  _revData.mssb_draft=true;
+  _revData.draft=true;
   saveBoards();
   // Update other rows of the same board so they all show the new location
   var cells=document.querySelectorAll('[data-board-loc-display="'+boardId+'"]');
   cells.forEach(function(c){c.textContent=board.loc||'—';});
+}
+// Generic — used for any board-level field (e.g. 'supp' for DCP's Supplied From)
+function updBoardField(boardId,field,val){
+  var board=_boards.find(function(b){return b.id===boardId;});
+  if(!board)return;
+  board[field]=String(val||'').trim();
+  _revData.draft=true;
+  saveBoards();
+  // Refresh visible cells for this field
+  var cells=document.querySelectorAll('[data-board-'+field+'-display="'+boardId+'"]');
+  cells.forEach(function(c){c.textContent=board[field]||'—';});
 }
 function updUnit(boardId,unitId,key,val){
   var board=_boards.find(function(b){return b.id===boardId;});
@@ -1847,7 +2018,7 @@ function updUnit(boardId,unitId,key,val){
     if(t2)t2.textContent=ph2.toFixed(1)+' A';
     if(t3)t3.textContent=ph3.toFixed(1)+' A';
   }
-  _revData.mssb_draft=true;
+  _revData.draft=true;
   saveBoards();
 }
 function deleteUnit(boardId,unitId){
@@ -1858,25 +2029,37 @@ function deleteUnit(boardId,unitId){
   if(!board.units.length){
     _boards=_boards.filter(function(b){return b.id!==boardId;});
   }
-  _revData.mssb_draft=true;
+  _revData.draft=true;
   renderBoards();saveBoards();
 }
 
 function downloadTemplate(){
   // Build empty xlsx with headers only
-  var hdrRow=['Board ID','Board Location'].concat(COLS.map(function(c){return c.l;}));
-  var aoa=[hdrRow,['Example-MSSB-001','Level 00 - Plantroom'].concat(COLS.map(function(){return '';}))];
+  var bcols=BOARD_COLS_FOR_TAB();
+  var hdrRow=bcols.map(function(b){return b.l;}).concat(COLS.map(function(c){return c.l;}));
+  // Sample row — use placeholder values matching the tab
+  var sampleBoard;
+  if(_activeTab==='dcp'){
+    sampleBoard=['Example-DCP-001','Level 00 - Plantroom','MSSB-01'];
+  } else {
+    sampleBoard=['Example-MSSB-001','Level 00 - Plantroom'];
+  }
+  var aoa=[hdrRow,sampleBoard.concat(COLS.map(function(){return '';}))];
   if(typeof XLSX==='undefined'){
     var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
     s.onload=function(){_doTemplateDownload(aoa);};document.head.appendChild(s);
   } else {_doTemplateDownload(aoa);}
 }
 function _doTemplateDownload(aoa){
+  var cfg=TAB_CFG[_activeTab]||TAB_CFG.mssb;
+  var bcols=BOARD_COLS_FOR_TAB();
   var ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:30},{wch:20}].concat(COLS.map(function(c){return {wch:parseInt(c.w)||16};}));
+  // Column widths: each board col 25, then unit cols
+  var bcWidths=bcols.map(function(){return {wch:25};});
+  ws['!cols']=bcWidths.concat(COLS.map(function(c){return {wch:parseInt(c.w)||16};}));
   var wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'MSSB Schedule');
-  XLSX.writeFile(wb,'MSSB Schedule Template.xlsx');
+  XLSX.utils.book_append_sheet(wb,ws,cfg.shortName);
+  XLSX.writeFile(wb,cfg.shortName+' Template.xlsx');
 }
 // ── Export modal (combined Excel + PDF with optional track-changes) ──
 var _exportTracked=true;
@@ -1884,7 +2067,7 @@ function openExportModal(){
   // Clear any rev-targeted export state (so direct opens default to live/draft)
   _exportingRevIdx=null;
   // Determine if there's a baseline to diff against (a previous published revision)
-  var revs=_revData.mssb||[];
+  var revs=_revData.revisions||[];
   var hasBaseline=revs.length>0;
   var wrap=document.getElementById('exportTrackToggleWrap');
   if(wrap)wrap.style.display=hasBaseline?'':'none';
@@ -1898,7 +2081,7 @@ function openExportModal(){
     if(_viewRevIdx!==null&&_viewRevIdx>=0){
       var rv=revs[_viewRevIdx];
       label='Exporting '+(rv?rv.rev:'revision');
-    } else if(_revData.mssb_draft){
+    } else if(_revData.draft){
       label='Exporting Rev '+String(revs.length+1).padStart(2,'0')+' Draft';
     } else if(revs.length){
       label='Exporting '+revs[revs.length-1].rev+' (current)';
@@ -1931,7 +2114,7 @@ function _withExportTrack(fn){
   // If exporting a specific rev from history, temporarily switch into that rev's view
   if(_exportingRevIdx!==null&&_exportingRevIdx>=0){
     _viewRevIdx=_exportingRevIdx;
-    var revs=_revData.mssb||[];
+    var revs=_revData.revisions||[];
     var rv=revs[_exportingRevIdx];
     if(rv){
       // Render the rev's snapshot (with diff vs prev rev when tracked)
@@ -1951,7 +2134,7 @@ function _withExportTrack(fn){
       _exportingRevIdx=null;
       // Re-render to live state
       if(prevViewRevIdx!==null&&prevViewRevIdx>=0){
-        var revs2=_revData.mssb||[];
+        var revs2=_revData.revisions||[];
         var rv2=revs2[prevViewRevIdx];
         if(rv2)renderBoards(true,rv2.boards);else renderBoards();
       } else {
@@ -1970,7 +2153,7 @@ function doExportXLSX(){
     // When exporting a specific rev, pass the rev's snapshot data to exportXLSX since
     // it works from the data array (not the DOM like the PDF path does).
     if(_exportingRevIdx!==null&&_exportingRevIdx>=0){
-      var revs=_revData.mssb||[];
+      var revs=_revData.revisions||[];
       var rv=revs[_exportingRevIdx];
       exportXLSX(rv?rv.boards:null,rv?rv.rev:null);
     } else {
@@ -1982,7 +2165,7 @@ function doExportXLSX(){
 function exportXLSX(bds,revLabel){
   bds=bds||_boards;
   if(!revLabel){
-    var revs=_revData.mssb||[];
+    var revs=_revData.revisions||[];
     revLabel=revs.length?revs[revs.length-1].rev:'Draft';
   }
   if(typeof XLSX==='undefined'){
@@ -1992,48 +2175,60 @@ function exportXLSX(bds,revLabel){
 }
 
 function buildXLSX(bds,revLabel){
-  var hdrRow=['Board ID','Board Location'].concat(COLS.map(function(c){return c.l;}));
+  var bcols=BOARD_COLS_FOR_TAB();
+  var cfg=TAB_CFG[_activeTab]||TAB_CFG.mssb;
+  var fieldMap={'__boardRef':'ref','__boardLoc':'loc','__boardSup':'supp'};
+  var hdrRow=bcols.map(function(b){return b.l;}).concat(COLS.map(function(c){return c.l;}));
   var aoa=[hdrRow];
   var merges=[];
+  var nB=bcols.length;
 
   bds.forEach(function(board){
     var units=board.units||[];
     var startRow=aoa.length;
+    var boardVals=bcols.map(function(b){return board[fieldMap[b.k]||b.k.replace(/^__/,'')]||'';});
     if(!units.length){
-      aoa.push([board.ref,board.loc].concat(COLS.map(function(){return '';})));
+      aoa.push(boardVals.concat(COLS.map(function(){return '';})));
     } else {
       units.forEach(function(unit){
-        aoa.push([board.ref,board.loc].concat(COLS.map(function(c){
+        aoa.push(boardVals.concat(COLS.map(function(c){
           var v=unit[c.k]||'';
           return c.num&&v!==''?parseFloat(v)||0:v;
         })));
       });
+      // Merge each board column across all unit rows
       if(units.length>1){
-        merges.push({s:{r:startRow,c:0},e:{r:startRow+units.length-1,c:0}});
-        merges.push({s:{r:startRow,c:1},e:{r:startRow+units.length-1,c:1}});
+        for(var bi=0;bi<nB;bi++){
+          merges.push({s:{r:startRow,c:bi},e:{r:startRow+units.length-1,c:bi}});
+        }
       }
-      // Totals row
-      var ph1=0,ph2=0,ph3=0;
-      units.forEach(function(u){ph1+=fla(u.ph1);ph2+=fla(u.ph2);ph3+=fla(u.ph3);});
-      var tot=['','TOTAL FLA'].concat(COLS.map(function(c){
-        if(c.k==='ph1')return ph1;if(c.k==='ph2')return ph2;if(c.k==='ph3')return ph3;return '';
-      }));
-      aoa.push(tot);
+      // Totals row — MSSB only
+      if(cfg.hasFLATotals){
+        var ph1=0,ph2=0,ph3=0;
+        units.forEach(function(u){ph1+=fla(u.ph1);ph2+=fla(u.ph2);ph3+=fla(u.ph3);});
+        var tot=[];
+        for(var bi2=0;bi2<nB;bi2++){tot.push(bi2===nB-1?'TOTAL FLA':'');}
+        tot=tot.concat(COLS.map(function(c){
+          if(c.k==='ph1')return ph1;if(c.k==='ph2')return ph2;if(c.k==='ph3')return ph3;return '';
+        }));
+        aoa.push(tot);
+      }
     }
   });
 
   var ws=XLSX.utils.aoa_to_sheet(aoa);
   if(merges.length)ws['!merges']=merges;
-  ws['!cols']=[{wch:30},{wch:16}].concat(COLS.map(function(c){return {wch:parseInt(c.w)||16};}));
+  var bcWidths=bcols.map(function(){return {wch:25};});
+  ws['!cols']=bcWidths.concat(COLS.map(function(c){return {wch:parseInt(c.w)||16};}));
 
   var wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'MSSB Schedule');
+  XLSX.utils.book_append_sheet(wb,ws,cfg.shortName);
   var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
 
   function dl(out){
     var blob=new Blob([new Uint8Array(out)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-    a.download='MSSB Schedule '+revLabel+'.xlsx';a.click();URL.revokeObjectURL(a.href);
+    a.download=cfg.shortName+' '+revLabel+'.xlsx';a.click();URL.revokeObjectURL(a.href);
   }
 
   function inject(JSZip){
@@ -2116,10 +2311,10 @@ function exportPDF(){
   // Make sure Track Changes state and current view are reflected. The print stylesheet
   // (in <style>) hides toolbars/sidebars, lays out the table for paper, and preserves
   // diff highlighting if Track Changes is on.
-  var revs=_revData.mssb||[];
+  var revs=_revData.revisions||[];
   var revLabel;
   if(_viewRevIdx===null||_viewRevIdx===undefined){
-    revLabel=_revData.mssb_draft?('Rev '+String(revs.length+1).padStart(2,'0')+' Draft'):(revs.length?revs[revs.length-1].rev:'Draft');
+    revLabel=_revData.draft?('Rev '+String(revs.length+1).padStart(2,'0')+' Draft'):(revs.length?revs[revs.length-1].rev:'Draft');
   } else if(_viewRevIdx===-1){
     revLabel='Rev '+String(revs.length+1).padStart(2,'0')+' Draft';
   } else {
@@ -2127,13 +2322,14 @@ function exportPDF(){
   }
   var viewLabel=_viewMode==='list'?'List View':'Grouped View';
   var projName=(_proj&&(_proj.name||_proj.projectName))||'Project';
-  var docTitle='MSSB Schedule — '+projName+' — '+viewLabel+' — '+revLabel;
+  var cfg=TAB_CFG[_activeTab]||TAB_CFG.mssb;
+  var docTitle=cfg.shortName+' — '+projName+' — '+viewLabel+' — '+revLabel;
   // Inject print header banner (pulled out after print)
   var banner=document.createElement('div');
   banner.id='__printBanner';
   banner.style.cssText='display:none';
   banner.innerHTML='<style>@media print{#__printBanner{display:block !important;padding:8px 0 14px;border-bottom:1.5px solid #000;margin-bottom:14px;font-family:Arial,sans-serif}#__printBanner h1{margin:0;font-size:14pt;color:#000}#__printBanner .pb-meta{margin-top:4px;font-size:9pt;color:#444}@page{size:A3 landscape;margin:12mm}}</style>'
-    +'<h1>MSSB Schedule</h1>'
+    +'<h1>'+X(cfg.shortName)+'</h1>'
     +'<div class="pb-meta">Project: '+X(projName)+' &nbsp;&middot;&nbsp; View: '+X(viewLabel)+' &nbsp;&middot;&nbsp; Revision: '+X(revLabel)+' &nbsp;&middot;&nbsp; Date: '+todayStr()+'</div>';
   var mc=document.getElementById('mainContent');
   mc.parentNode.insertBefore(banner,mc);
@@ -2151,7 +2347,7 @@ function exportPDF(){
 // ── Import XLSX ──
 function triggerImport(){
   if(!isEditable()){
-    if(_revData.mssb_draft){
+    if(_revData.draft){
       if(!confirm('You need to be in edit mode to import.\n\nClick OK to enter edit mode, or Cancel.'))return;
       editDraft();
     } else {
@@ -2177,50 +2373,98 @@ function parseImport(file){
       var wb=XLSX.read(e.target.result,{type:'array'});
       var ws=wb.Sheets[wb.SheetNames[0]];
       var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      // Find header row — accept both old and new header names
+      var bcols=BOARD_COLS_FOR_TAB();
+      var ucols=COLS;
+      // Header alias map per board column key (accepts old + new header text)
+      var bHeaderAliases={
+        '__boardRef':['board id','dcp reference','mssb reference','equipment reference','panel id','panel reference'],
+        '__boardLoc':['board location','dcp location','mssb location','location'],
+        '__boardSup':['supplied from','board supplied from','dcp supplied from','feed from']
+      };
+      // Header alias map for unit cols — start with the column's label, plus common aliases
+      var uHeaderAliases={
+        unitNum:['equipment id','unit number','equipment ref','equipment reference'],
+        unitDesc:['equipment location','unit description','equipment description'],
+        suppFrom:['supplied from'],
+        suppLoc:['supplied from location'],
+        duty:['duty / standby','duty/standby'],
+        starter:['motor starter type','motor starter type (vsd / ec / dol)'],
+        lamps:['lamps'],
+        power:['power (kw)','power consumption (kw)'],
+        ph1:['phase 1 fla (a)'],ph2:['phase 2 fla (a)'],ph3:['phase 3 fla (a)'],
+        meterRef:['meter reference','electrical meter reference id'],
+        ctrlSw:['control switch'],
+        damperId:['damper id','damper reference','damper number']
+      };
+      // Find header row — match against any of our known headers
+      var allHeaders=[];
+      Object.keys(bHeaderAliases).forEach(function(k){bHeaderAliases[k].forEach(function(h){allHeaders.push(h);});});
+      Object.keys(uHeaderAliases).forEach(function(k){uHeaderAliases[k].forEach(function(h){allHeaders.push(h);});});
+      ucols.forEach(function(c){allHeaders.push(c.l.toLowerCase());});
       var hr=-1;
       for(var i=0;i<Math.min(aoa.length,25);i++){
         if(aoa[i].some(function(v){
-          var s=String(v||'').toLowerCase();
-          return s.includes('board id')||s.includes('mssb reference')||s.includes('equipment id')||s.includes('unit number');
+          var s=String(v||'').toLowerCase().trim();
+          return allHeaders.indexOf(s)>=0;
         })){hr=i;break;}
       }
-      if(hr<0){alert('Could not find header row.');return;}
+      if(hr<0){alert('Could not find header row. Make sure your spreadsheet has a header row with column names like "Board ID", "DCP Reference", "Equipment ID", etc.');return;}
       var hdrs=aoa[hr].map(function(h){return String(h||'').toLowerCase().replace(/\n/g,' ').trim();});
-      function col(keys){for(var i=0;i<keys.length;i++){var idx=hdrs.indexOf(keys[i]);if(idx>=0)return idx;}return -1;}
-      var cm={
-        mssbRef:col(['board id','mssb reference']),
-        mssbLoc:col(['board location','mssb location']),
-        unitNum:col(['equipment id','unit number']),
-        unitDesc:col(['equipment location','unit description']),
-        suppFrom:col(['supplied from']),
-        suppLoc:col(['supplied from location']),
-        duty:col(['duty / standby','duty/standby']),
-        starter:col(['motor starter type','motor starter type (vsd / ec / dol)']),
-        lamps:col(['lamps']),
-        power:col(['power (kw)','power consumption (kw)']),
-        ph1:col(['phase 1 fla (a)']),ph2:col(['phase 2 fla (a)']),ph3:col(['phase 3 fla (a)']),
-        meterRef:col(['meter reference','electrical meter reference id']),
-        ctrlSw:col(['control switch'])
-      };
+      function findCol(aliases){for(var i=0;i<aliases.length;i++){var idx=hdrs.indexOf(aliases[i]);if(idx>=0)return idx;}return -1;}
+      // Map each board col to its column index
+      var bcMap={};
+      bcols.forEach(function(bc){
+        var aliases=bHeaderAliases[bc.k]||[bc.l.toLowerCase()];
+        bcMap[bc.k]=findCol(aliases);
+      });
+      // Map each unit col to its column index
+      var ucMap={};
+      ucols.forEach(function(c){
+        var aliases=uHeaderAliases[c.k]||[c.l.toLowerCase()];
+        // Always also try the column's label directly
+        if(aliases.indexOf(c.l.toLowerCase())<0)aliases=aliases.concat([c.l.toLowerCase()]);
+        ucMap[c.k]=findCol(aliases);
+      });
+      // Sanity check — Board ID column must exist
+      if(bcMap.__boardRef<0){
+        alert('Could not find a Board ID / DCP Reference column. Make sure your header row has one of: Board ID, DCP Reference, MSSB Reference.');return;
+      }
+      var fieldMap={'__boardRef':'ref','__boardLoc':'loc','__boardSup':'supp'};
       var boardMap={};var boardOrder=[];
       for(var ri=hr+1;ri<aoa.length;ri++){
         var row=aoa[ri];
         if(!row||row.every(function(v){return !v;}))continue;
-        var ref=String(row[cm.mssbRef]||'').trim();
+        var ref=String(row[bcMap.__boardRef]||'').trim();
         if(!ref||ref.toLowerCase().includes('total'))continue;
-        if(!boardMap[ref]){boardMap[ref]={id:nid(),ref:ref,loc:String(row[cm.mssbLoc]||'').trim(),units:[]};boardOrder.push(ref);}
-        function g(k){return cm[k]>=0?String(row[cm[k]]||'').trim():'';}
-        boardMap[ref].units.push({id:nid(),unitNum:g('unitNum'),unitDesc:g('unitDesc'),suppFrom:g('suppFrom'),suppLoc:g('suppLoc'),duty:g('duty'),starter:g('starter').replace(/\n/g,'/'),lamps:g('lamps'),power:g('power'),ph1:g('ph1'),ph2:g('ph2'),ph3:g('ph3'),meterRef:g('meterRef'),ctrlSw:g('ctrlSw')});
+        if(!boardMap[ref]){
+          var b={id:nid(),ref:ref,units:[]};
+          // Populate other board-level fields if present in source
+          bcols.forEach(function(bc){
+            if(bc.k==='__boardRef')return;
+            var idx=bcMap[bc.k];
+            if(idx>=0)b[fieldMap[bc.k]]=String(row[idx]||'').trim();
+          });
+          boardMap[ref]=b;boardOrder.push(ref);
+        }
+        // Build unit from u-col mappings
+        var unit={id:nid()};
+        ucols.forEach(function(c){
+          var idx=ucMap[c.k];
+          unit[c.k]=idx>=0?String(row[idx]||'').trim().replace(/\n/g,'/'):'';
+        });
+        boardMap[ref].units.push(unit);
       }
-      if(!boardOrder.length){alert('No board data found.');return;}
+      if(!boardOrder.length){alert('No data rows found.');return;}
       var totalUnits=boardOrder.reduce(function(s,r){return s+boardMap[r].units.length;},0);
-      if(!confirm('Import '+boardOrder.length+' boards with '+totalUnits+' units?\n\nThis will replace all current board data.'))return;
+      var cfg=TAB_CFG[_activeTab]||TAB_CFG.mssb;
+      var noun=_activeTab==='dcp'?'DCPs':'boards';
+      var subNoun=_activeTab==='dcp'?'dampers':'units';
+      if(!confirm('Import '+boardOrder.length+' '+noun+' with '+totalUnits+' '+subNoun+'?\n\nThis will replace all current '+cfg.shortName+' data.'))return;
       _boards=boardOrder.map(function(r){return boardMap[r];});
-      _revData.mssb_draft=true;
+      _revData.draft=true;
       renderBoards();renderRevBar();saveBoards();
       updateTemplateBtnVisibility();
-      alert('Imported '+boardOrder.length+' boards successfully.');
+      alert('Imported '+boardOrder.length+' '+noun+' successfully.');
     }catch(err){alert('Import failed: '+err.message);}
   };
   reader.readAsArrayBuffer(file);
@@ -2244,7 +2488,7 @@ function parseImport(file){
 <div class="modal-overlay" id="revHistModal">
   <div class="modal" style="width:540px;max-width:95vw">
     <h3>Revision History</h3>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">Mechanical Switchboards Schedule</p>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px" id="revHistSubtitle">Schedule</p>
     <div id="revHistList" style="max-height:60vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--surface2)"></div>
     <div class="modal-btns">
       <button class="btn bp" onclick="closeRevHistory()">Close</button>
@@ -2256,7 +2500,7 @@ function parseImport(file){
 <div class="modal-overlay" id="exportModal">
   <div class="modal" style="width:420px;max-width:95vw">
     <h3>Export</h3>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 14px" id="exportSubtitle">Mechanical Switchboards Schedule</p>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px" id="exportSubtitle">Schedule</p>
     <!-- Tracked changes toggle — shown only when there's a baseline to diff against -->
     <div id="exportTrackToggleWrap" style="display:none;margin:14px 0 4px">
       <div onclick="toggleExportTrack()" style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
