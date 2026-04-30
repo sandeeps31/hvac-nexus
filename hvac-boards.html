@@ -281,11 +281,6 @@ select.ci{cursor:pointer}
     <button class="vt-btn active" id="vtList" onclick="setViewMode('list')">List View</button>
     <button class="vt-btn" id="vtGrouped" onclick="setViewMode('grouped')">Grouped View</button>
   </div>
-  <!-- Track changes toggle (only when draft exists) -->
-  <label class="tc-wrap" id="tcWrap" style="display:none;margin-left:10px">
-    <input type="checkbox" id="tcChk" onchange="renderBoards()">
-    <span>Track changes</span>
-  </label>
   <div style="flex:1"></div>
   <button class="btn bg" id="btnTemplate" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3);display:none">⬇ Template</button>
   <button class="cedbtn" id="colSettingsBtn" onclick="openColSettings()">⚙ Columns</button>
@@ -872,12 +867,11 @@ function getDiffBaseline(){
   if(!revs.length)return null;
   return revs[revs.length-1].boards||[];
 }
+// Temporary override used by export modal — set to false to render UNtracked snapshots regardless of baseline
+var _diffOverride=null;
 function shouldShowDiff(){
-  // Auto-enabled when viewing any published revision (track changes against previous rev)
-  if(_viewRevIdx!==null&&_viewRevIdx>=0)return getDiffBaseline()!==null;
-  // Otherwise only if user has explicitly enabled the toggle
-  var chk=document.getElementById('tcChk');
-  if(!chk||!chk.checked)return false;
+  if(_diffOverride===false)return false;
+  // Always-on whenever there's a baseline to compare against (a previous published rev)
   return getDiffBaseline()!==null;
 }
 
@@ -1059,12 +1053,12 @@ function renderActive(){
   var isMssb=_activeTab==='mssb';
   document.getElementById('abar').style.display='flex';
   // Hide MSSB-only elements when on DCP
-  ['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnRevHistory','btnLiveView','btnTemplate','colSettingsBtn','btnImport','viewToggle','tcWrap'].forEach(function(id){
+  ['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnRevHistory','btnLiveView','btnTemplate','colSettingsBtn','btnImport','viewToggle'].forEach(function(id){
     var el=document.getElementById(id);
     if(!el)return;
     if(!isMssb){el.style.display='none';return;}
     // On MSSB tab — let renderRevBar manage workflow buttons; show others
-    var workflowBtns=['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnRevHistory','btnLiveView','tcWrap'];
+    var workflowBtns=['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnRevHistory','btnLiveView'];
     if(workflowBtns.indexOf(id)>=0)return; // managed elsewhere
     el.style.display='inline-flex';
   });
@@ -1111,9 +1105,6 @@ function renderRevBar(){
     setBtn('btnStartDraft',false);setBtn('btnEditDraft',true);setBtn('btnSave',false);
     setBtn('btnPublish',false);setBtn('btnDiscard',true);
   }
-  // Track-changes toggle: show when there's at least one revision to compare against
-  var tcw=document.getElementById('tcWrap');
-  if(tcw)tcw.style.display=revs.length?'inline-flex':'none';
 
   // Build pill strip — latest published rev (capsule) + draft (if exists).
   // Full revision history accessible via the History button.
@@ -1836,6 +1827,10 @@ function deleteUnit(boardId,unitId){
   var board=_boards.find(function(b){return b.id===boardId;});
   if(!board)return;
   board.units=board.units.filter(function(u){return u.id!==unitId;});
+  // If that was the last unit on the board, drop the entire board (Board ID + Location too)
+  if(!board.units.length){
+    _boards=_boards.filter(function(b){return b.id!==boardId;});
+  }
   _revData.mssb_draft=true;
   renderBoards();saveBoards();
 }
@@ -1897,18 +1892,17 @@ function _applyExportTrack(){
 }
 function isTrackedExport(){return _exportTracked;}
 
-// Wrapper functions called by the export modal — temporarily flip track-changes
-// to honour the toggle, then call the underlying export function.
+// Wrapper for export modal — temporarily honours the export track toggle.
+// If _exportTracked=false, suppress the diff overlay during the export render.
 function _withExportTrack(fn){
-  var chk=document.getElementById('tcChk');
-  var prev=chk?chk.checked:false;
-  if(chk)chk.checked=isTrackedExport();
+  var prev=_diffOverride;
+  _diffOverride=isTrackedExport()?null:false;
   // Re-render so the diff classes are present in the DOM (PDF) / influence flatten (XLSX)
   renderBoards();
   // Defer to next tick so DOM updates flush before printing
   setTimeout(function(){
     try{fn();}finally{
-      if(chk)chk.checked=prev;
+      _diffOverride=prev;
       renderBoards();
     }
   },50);
