@@ -51,8 +51,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .rh-add{background:rgba(0,229,160,.10);color:var(--green);border:1px solid rgba(0,229,160,.3)}
 .rh-del{background:rgba(255,77,109,.10);color:var(--danger);border:1px solid rgba(255,77,109,.3)}
 .rh-chg{background:rgba(255,184,48,.10);color:var(--amber);border:1px solid rgba(255,184,48,.3)}
-.rev-hist-view-btn{background:transparent;border:1px solid var(--border);color:var(--accent);padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;flex-shrink:0;align-self:center}
+.rev-hist-view-btn{background:transparent;border:1px solid var(--border);color:var(--accent);padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;flex-shrink:0}
 .rev-hist-view-btn:hover{border-color:var(--accent);background:var(--accent-dim)}
+.rev-hist-actions{display:flex;flex-direction:column;gap:6px;align-self:center;flex-shrink:0}
+.rev-hist-export-btn{background:transparent;border:1px solid var(--border);color:var(--text2);padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;flex-shrink:0;white-space:nowrap}
+.rev-hist-export-btn:hover{border-color:var(--green);color:var(--green);background:rgba(0,229,160,.06)}
 /* ── SIDEBAR STANDARD ── */
 .sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden;overflow-x:hidden}
 .sb.sm{width:52px}
@@ -1235,7 +1238,10 @@ function openRevHistory(){
         +(!cs.added&&!cs.deleted&&!cs.changed?'<span style="font-size:11px;color:var(--muted)">Initial revision</span>':'')
         +'</div>'
         +'</div>'
+        +'<div class="rev-hist-actions">'
         +'<button class="rev-hist-view-btn" onclick="viewRevFromHistory('+origIdx+')">View →</button>'
+        +'<button class="rev-hist-export-btn" onclick="exportRevAtIdx('+origIdx+')">⬇ Export</button>'
+        +'</div>'
         +'</div>';
     });
     list.innerHTML=html;
@@ -1244,6 +1250,27 @@ function openRevHistory(){
 }
 function closeRevHistory(){document.getElementById('revHistModal').classList.remove('open');}
 function viewRevFromHistory(idx){closeRevHistory();viewRev(idx);}
+
+// _exportingRevIdx: index of the rev being exported, or null = export current/live state.
+// Set when user clicks Export from the rev history modal.
+var _exportingRevIdx=null;
+
+function exportRevAtIdx(idx){
+  closeRevHistory();
+  _exportingRevIdx=idx;
+  var revs=_revData.mssb||[];
+  var rv=revs[idx];
+  // Update modal subtitle so the user knows which rev they're exporting
+  var sub=document.getElementById('exportSubtitle');
+  if(sub)sub.textContent='Exporting: '+(rv?rv.rev+' ('+fmtD(rv.date)+')':'revision');
+  // Default tracked = true if there's a previous rev to compare against
+  _exportTracked=idx>0;
+  _applyExportTrack();
+  // Show track toggle
+  var wrap=document.getElementById('exportTrackToggleWrap');
+  if(wrap)wrap.style.display=idx>0?'':'none';
+  document.getElementById('exportModal').classList.add('open');
+}
 
 function discardDraft(){
   if(!_revData.mssb_draft){return;}
@@ -1854,6 +1881,8 @@ function _doTemplateDownload(aoa){
 // ── Export modal (combined Excel + PDF with optional track-changes) ──
 var _exportTracked=true;
 function openExportModal(){
+  // Clear any rev-targeted export state (so direct opens default to live/draft)
+  _exportingRevIdx=null;
   // Determine if there's a baseline to diff against (a previous published revision)
   var revs=_revData.mssb||[];
   var hasBaseline=revs.length>0;
@@ -1892,23 +1921,63 @@ function _applyExportTrack(){
 }
 function isTrackedExport(){return _exportTracked;}
 
-// Wrapper for export modal — temporarily honours the export track toggle.
-// If _exportTracked=false, suppress the diff overlay during the export render.
+// Wrapper for export modal — temporarily switches into the targeted rev (if any)
+// and honours the export track toggle, runs the export, then restores state.
 function _withExportTrack(fn){
-  var prev=_diffOverride;
+  var prevDiffOverride=_diffOverride;
+  var prevViewRevIdx=_viewRevIdx;
+  // Honour the track-changes toggle
   _diffOverride=isTrackedExport()?null:false;
-  // Re-render so the diff classes are present in the DOM (PDF) / influence flatten (XLSX)
-  renderBoards();
+  // If exporting a specific rev from history, temporarily switch into that rev's view
+  if(_exportingRevIdx!==null&&_exportingRevIdx>=0){
+    _viewRevIdx=_exportingRevIdx;
+    var revs=_revData.mssb||[];
+    var rv=revs[_exportingRevIdx];
+    if(rv){
+      // Render the rev's snapshot (with diff vs prev rev when tracked)
+      renderBoards(true,rv.boards);
+    } else {
+      renderBoards();
+    }
+  } else {
+    renderBoards();
+  }
   // Defer to next tick so DOM updates flush before printing
   setTimeout(function(){
     try{fn();}finally{
-      _diffOverride=prev;
-      renderBoards();
+      // Restore everything
+      _diffOverride=prevDiffOverride;
+      _viewRevIdx=prevViewRevIdx;
+      _exportingRevIdx=null;
+      // Re-render to live state
+      if(prevViewRevIdx!==null&&prevViewRevIdx>=0){
+        var revs2=_revData.mssb||[];
+        var rv2=revs2[prevViewRevIdx];
+        if(rv2)renderBoards(true,rv2.boards);else renderBoards();
+      } else {
+        renderBoards();
+      }
     }
   },50);
 }
-function doExportPDF(){closeExportModal();_withExportTrack(function(){exportPDF();});}
-function doExportXLSX(){closeExportModal();_withExportTrack(function(){exportXLSX();});}
+function doExportPDF(){
+  closeExportModal();
+  _withExportTrack(function(){exportPDF();});
+}
+function doExportXLSX(){
+  closeExportModal();
+  _withExportTrack(function(){
+    // When exporting a specific rev, pass the rev's snapshot data to exportXLSX since
+    // it works from the data array (not the DOM like the PDF path does).
+    if(_exportingRevIdx!==null&&_exportingRevIdx>=0){
+      var revs=_revData.mssb||[];
+      var rv=revs[_exportingRevIdx];
+      exportXLSX(rv?rv.boards:null,rv?rv.rev:null);
+    } else {
+      exportXLSX();
+    }
+  });
+}
 
 function exportXLSX(bds,revLabel){
   bds=bds||_boards;
