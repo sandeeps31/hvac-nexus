@@ -70,16 +70,40 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .sched-scroll{overflow-x:auto;padding:14px 16px 16px}
 .btbl{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .btbl th,.btbl td{box-sizing:border-box}
-.btbl thead th{padding:6px 8px 8px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;vertical-align:top}
+.btbl thead th{position:relative;padding:6px 8px 8px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;vertical-align:top}
 .btbl thead th:last-child{border-right:none}
-.th-stack{display:flex;flex-direction:column;gap:5px;align-items:stretch}
-.th-label{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:center;gap:4px;padding:4px 0;transition:color .12s}
+.th-stack{display:flex;flex-direction:column;gap:2px;align-items:stretch}
+.th-row{display:flex;align-items:center;justify-content:center;gap:4px}
+.th-label{cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;padding:4px 0;transition:color .12s;flex:1;justify-content:center;min-width:0}
 .th-label:hover{color:var(--text2)}
 .sort-arrow{font-size:9px;color:var(--accent);font-family:'DM Sans',sans-serif}
 .sort-arrow.inactive{color:var(--muted);opacity:.4}
-.col-filter{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;padding:3px 6px;border-radius:3px;outline:none;text-transform:none;letter-spacing:0;width:100%;box-sizing:border-box;font-weight:normal}
-.col-filter:focus{border-color:var(--accent)}
-.col-filter::placeholder{color:var(--muted);opacity:.6}
+.filter-icon{background:transparent;border:1px solid transparent;color:var(--muted);width:18px;height:18px;border-radius:3px;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;transition:all .12s}
+.filter-icon:hover{color:var(--text);border-color:var(--border);background:var(--surface)}
+.filter-icon.open{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
+.filter-icon.filtered{color:var(--accent)}
+.filter-icon.filtered::after{content:'';position:absolute;width:6px;height:6px;border-radius:50%;background:var(--green);top:0;right:0;border:1.5px solid var(--surface2)}
+/* Filter dropdown panel */
+#filterDrop{position:fixed;z-index:9000;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.6);width:240px;max-height:380px;display:none;flex-direction:column;overflow:hidden;font-family:'DM Sans',sans-serif}
+#filterDrop[style*="display:block"],#filterDrop[style*="display: block"]{display:flex !important}
+.fd-search-wrap{padding:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.fd-search{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:5px;font-size:12px;outline:none;box-sizing:border-box;font-family:'DM Sans',sans-serif}
+.fd-search:focus{border-color:var(--accent)}
+.fd-row{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:12px;color:var(--text);user-select:none;transition:background .1s}
+.fd-row:hover{background:var(--surface2)}
+.fd-row input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;flex-shrink:0}
+.fd-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fd-all{font-weight:600;border-bottom:1px solid var(--border);background:var(--surface2)}
+.fd-list{overflow-y:auto;flex:1;min-height:80px;max-height:200px}
+.fd-empty{padding:20px;text-align:center;color:var(--muted);font-size:11px}
+.fd-actions{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--border);background:var(--surface2);flex-shrink:0}
+.fd-btn-clear{flex:1;background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s}
+.fd-btn-clear:hover{border-color:var(--danger);color:var(--danger)}
+.fd-btn-ok{flex:1;background:var(--accent);color:#0a0a0a;border:none;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.fd-btn-ok:hover{filter:brightness(1.1)}
+/* Column resize handle (right edge of each th) */
+.col-resize-handle{position:absolute;top:0;right:-3px;width:6px;height:100%;cursor:col-resize;z-index:5;user-select:none}
+.col-resize-handle:hover,.col-resize-handle:active{background:linear-gradient(90deg,transparent 0,transparent 2px,var(--accent) 2px,var(--accent) 4px,transparent 4px)}
 /* Body cells — fixed height regardless of edit / read-only mode (uses the edit-mode height) */
 .btbl tbody td{height:34px;padding:0 6px;vertical-align:middle;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Read-only display cell content — match input metrics so row height stays constant */
@@ -91,8 +115,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .sched-hdr-clone{position:fixed;z-index:75;background:var(--bg);overflow:hidden;display:none}
 .sched-hdr-clone.active{display:block}
 .sched-hdr-clone table{border-collapse:separate;border-spacing:0;table-layout:fixed;margin:0}
-.sched-hdr-clone th{box-sizing:border-box;padding:6px 8px 8px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;vertical-align:top}
+.sched-hdr-clone th{box-sizing:border-box;padding:6px 8px 8px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;vertical-align:top;position:relative}
 .sched-hdr-clone th:last-child{border-right:none}
+.sched-hdr-clone .col-resize-handle{display:none}
 .btbl tbody td{background:var(--bg)}
 .btbl tr:hover td{background:rgba(255,255,255,.02)}
 .btbl tr:hover td.board-cell{background:var(--surface)}
@@ -482,7 +507,8 @@ var _viewMode='list'; // 'list' or 'grouped'
 var _editing=false; // true when user is actively editing a draft (table is interactive)
 var _sortKey=null;     // column key currently sorted by, or null = no sort (default order)
 var _sortDir='asc';    // 'asc' or 'desc'
-var _colFilters={};    // { colKey: 'search text' } — non-persistent, resets on reload
+var _colFilters={};    // { colKey: { search: '', selected: [...] | null } }
+var _colWidths={};     // { colKey: '160px' } — user-resized widths persisted
 
 function nid(){return 'b'+(++_uidN)+'_'+Math.random().toString(36).slice(2,6);}
 function X(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -501,34 +527,65 @@ function setViewMode(m){
 }
 
 // ── Sort + filter ──
-// Returns the cell value used for filtering/sorting on a given column key.
-// Special keys '__boardRef' and '__boardLoc' resolve to the board-level value.
+// Filter state: _colFilters[key] = { search: '', selected: Array<string>|null }
+//   - selected === null → no filter (all values pass)
+//   - selected === []   → no values selected (filter hides everything)
+//   - selected ⊃ value  → that row passes
 function getRowVal(board,unit,key){
-  if(key==='__boardRef')return String(board.ref||'').toLowerCase();
-  if(key==='__boardLoc')return String(board.loc||'').toLowerCase();
+  if(key==='__boardRef')return String(board.ref||'');
+  if(key==='__boardLoc')return String(board.loc||'');
   if(!unit)return '';
-  return String(unit[key]||'').toLowerCase();
+  return String(unit[key]||'');
 }
+function getRowValLower(board,unit,key){return getRowVal(board,unit,key).toLowerCase();}
 
 function rowMatchesFilters(board,unit){
   var keys=Object.keys(_colFilters);
   if(!keys.length)return true;
   for(var i=0;i<keys.length;i++){
     var k=keys[i];
-    var q=String(_colFilters[k]||'').trim().toLowerCase();
-    if(!q)continue;
-    if(getRowVal(board,unit,k).indexOf(q)<0)return false;
+    var f=_colFilters[k];
+    if(!f||f.selected===null||f.selected===undefined)continue;
+    var val=getRowVal(board,unit,k);
+    // Empty values are represented as "(blank)" in the filter dropdown
+    var matchVal=val===''?'(blank)':val;
+    if(f.selected.indexOf(matchVal)<0)return false;
   }
   return true;
 }
 
-// Sorts a list of {board,unit} pairs by current sort settings. Returns sorted COPY.
+// Returns sorted list of distinct values for a given column across all current boards/units
+function getDistinctValuesForCol(key){
+  var seen={};
+  _boards.forEach(function(b){
+    var units=b.units||[];
+    if(units.length){
+      units.forEach(function(u){
+        var v=getRowVal(b,u,key);
+        var k=v===''?'(blank)':v;
+        seen[k]=true;
+      });
+    } else {
+      var v=getRowVal(b,null,key);
+      var k=v===''?'(blank)':v;
+      seen[k]=true;
+    }
+  });
+  return Object.keys(seen).sort(function(a,b){
+    if(a==='(blank)')return 1;
+    if(b==='(blank)')return -1;
+    var an=parseFloat(a),bn=parseFloat(b);
+    if(!isNaN(an)&&!isNaN(bn))return an-bn;
+    return a.localeCompare(b);
+  });
+}
+
 function sortPairs(pairs){
   if(!_sortKey)return pairs;
   var key=_sortKey,dir=_sortDir==='desc'?-1:1;
   return pairs.slice().sort(function(a,b){
-    var av=getRowVal(a.board,a.unit,key);
-    var bv=getRowVal(b.board,b.unit,key);
+    var av=getRowValLower(a.board,a.unit,key);
+    var bv=getRowValLower(b.board,b.unit,key);
     var an=parseFloat(av),bn=parseFloat(bv);
     var bothNumeric=!isNaN(an)&&!isNaN(bn)&&isFinite(an)&&isFinite(bn)&&av.replace(/[\d.\-+\se]/g,'')==='';
     if(bothNumeric){if(an<bn)return -1*dir;if(an>bn)return 1*dir;return 0;}
@@ -545,30 +602,195 @@ function setSort(key){
   } else {
     _sortKey=key;_sortDir='asc';
   }
+  saveBoards();
   renderBoards();
 }
 
-function setFilter(key,val){
-  if(!val||!val.trim())delete _colFilters[key];
-  else _colFilters[key]=val;
-  renderBoards();
-  // Re-focus the input after re-render so the user can keep typing
-  setTimeout(function(){
-    var inp=document.querySelector('input.col-filter[data-col="'+key+'"]');
-    if(inp){inp.focus();var l=inp.value.length;inp.setSelectionRange(l,l);}
-  },0);
+// ── Filter dropdown ──
+var _filterDropOpen=null; // colKey of currently open dropdown
+var _filterDropSearch='';
+
+function toggleFilterDrop(e,key){
+  e.stopPropagation();
+  if(_filterDropOpen===key){closeFilterDrop();return;}
+  _filterDropOpen=key;
+  _filterDropSearch='';
+  // Initialise selected set if not set yet
+  if(!_colFilters[key]||_colFilters[key].selected===null||_colFilters[key].selected===undefined){
+    _colFilters[key]={search:'',selected:getDistinctValuesForCol(key)};
+  }
+  renderFilterDrop(e.currentTarget);
 }
 
-// Returns the inner HTML for a sortable/filterable header cell
-function renderHeaderCell(label,key){
+function renderFilterDrop(anchorEl){
+  if(!_filterDropOpen)return;
+  var key=_filterDropOpen;
+  var distinct=getDistinctValuesForCol(key);
+  var f=_colFilters[key]||{search:'',selected:distinct.slice()};
+  var sel=f.selected||distinct.slice();
+  var search=(f.search||'').toLowerCase();
+  var visibleVals=distinct.filter(function(v){return !search||String(v).toLowerCase().indexOf(search)>=0;});
+  var allChecked=visibleVals.length>0&&visibleVals.every(function(v){return sel.indexOf(v)>=0;});
+  var someChecked=visibleVals.some(function(v){return sel.indexOf(v)>=0;});
+
+  var html='';
+  html+='<div class="fd-search-wrap"><input class="fd-search" placeholder="Search…" value="'+X(f.search||'')+'" oninput="setFilterSearch(\''+key+'\',this.value)"></div>';
+  html+='<label class="fd-row fd-all"><input type="checkbox" '+(allChecked?'checked':someChecked?'class="indet"':'')+' onchange="toggleFilterAll(\''+key+'\',this.checked)"><span>(Select All'+(search?' Filtered':'')+')</span></label>';
+  if(!visibleVals.length){
+    html+='<div class="fd-empty">No matching values</div>';
+  } else {
+    html+='<div class="fd-list">';
+    visibleVals.forEach(function(v){
+      var checked=sel.indexOf(v)>=0;
+      var displayV=v==='(blank)'?'<span style="color:var(--muted);font-style:italic">(blank)</span>':X(v);
+      html+='<label class="fd-row"><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleFilterValue(\''+key+'\',\''+escAttr(v)+'\',this.checked)"><span>'+displayV+'</span></label>';
+    });
+    html+='</div>';
+  }
+  html+='<div class="fd-actions"><button class="fd-btn-clear" onclick="clearFilterCol(\''+key+'\')">Clear filter</button><button class="fd-btn-ok" onclick="closeFilterDrop()">Done</button></div>';
+
+  var fd=document.getElementById('filterDrop');
+  fd.innerHTML=html;
+  fd.style.display='block';
+  // Position
+  var rect=anchorEl.getBoundingClientRect();
+  var fdW=240,fdH=Math.min(360,fd.offsetHeight||360);
+  var left=rect.left;
+  var top=rect.bottom+4;
+  if(left+fdW>window.innerWidth)left=window.innerWidth-fdW-8;
+  if(top+fdH>window.innerHeight)top=Math.max(8,rect.top-fdH-4);
+  fd.style.left=left+'px';
+  fd.style.top=top+'px';
+  // Update header icon active state
+  document.querySelectorAll('.filter-icon').forEach(function(el){el.classList.remove('open');});
+  var headerIcon=document.querySelector('.filter-icon[data-col="'+key+'"]');
+  if(headerIcon)headerIcon.classList.add('open');
+  // Focus search
+  setTimeout(function(){var s=fd.querySelector('.fd-search');if(s)s.focus();},0);
+}
+
+function escAttr(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+
+// ── Column resize ──
+// Drag a thin handle on the right edge of any <th> to resize that column.
+// New width persists to _colWidths and is saved.
+var _resizeState=null;
+
+function startColResize(e,colIndex){
+  e.preventDefault();
+  e.stopPropagation();
+  var col=document.querySelector('.btbl colgroup col:nth-child('+(colIndex+1)+')');
+  if(!col)return;
+  var startX=e.clientX;
+  var startW=col.getBoundingClientRect().width;
+  _resizeState={col:col,colIndex:colIndex,startX:startX,startW:startW};
+  document.body.style.cursor='col-resize';
+  document.body.style.userSelect='none';
+  document.addEventListener('mousemove',onColResize);
+  document.addEventListener('mouseup',endColResize);
+}
+function onColResize(e){
+  if(!_resizeState)return;
+  var dx=e.clientX-_resizeState.startX;
+  var w=Math.max(60,_resizeState.startW+dx); // min 60px
+  _resizeState.col.style.width=w+'px';
+  scheduleHdrSync(); // keep cloned header aligned in real time
+}
+function endColResize(){
+  if(!_resizeState){return;}
+  // Persist this column's new width by its key
+  var col=_resizeState.col;
+  var newW=col.getBoundingClientRect().width;
+  var key=col.getAttribute('data-col-key');
+  if(key){_colWidths[key]=Math.round(newW)+'px';saveBoards();}
+  document.removeEventListener('mousemove',onColResize);
+  document.removeEventListener('mouseup',endColResize);
+  document.body.style.cursor='';
+  document.body.style.userSelect='';
+  _resizeState=null;
+  scheduleHdrSync();
+}
+
+function setFilterSearch(key,val){
+  if(!_colFilters[key])_colFilters[key]={search:'',selected:getDistinctValuesForCol(key)};
+  _colFilters[key].search=val;
+  // Re-render in place — only the list section needs to refresh
+  var anchorEl=document.querySelector('.filter-icon[data-col="'+key+'"]');
+  if(anchorEl)renderFilterDrop(anchorEl);
+  // Restore focus to search after re-render
+  setTimeout(function(){var s=document.querySelector('#filterDrop .fd-search');if(s){s.focus();var l=s.value.length;s.setSelectionRange(l,l);}},0);
+}
+
+function toggleFilterValue(key,val,checked){
+  if(!_colFilters[key])_colFilters[key]={search:'',selected:getDistinctValuesForCol(key)};
+  var sel=_colFilters[key].selected||[];
+  if(checked){if(sel.indexOf(val)<0)sel.push(val);}
+  else {sel=sel.filter(function(v){return v!==val;});}
+  _colFilters[key].selected=sel;
+  renderBoards();
+  var anchorEl=document.querySelector('.filter-icon[data-col="'+key+'"]');
+  if(anchorEl)renderFilterDrop(anchorEl);
+}
+
+function toggleFilterAll(key,checked){
+  if(!_colFilters[key])_colFilters[key]={search:'',selected:getDistinctValuesForCol(key)};
+  var distinct=getDistinctValuesForCol(key);
+  var search=(_colFilters[key].search||'').toLowerCase();
+  var visibleVals=distinct.filter(function(v){return !search||String(v).toLowerCase().indexOf(search)>=0;});
+  var sel=_colFilters[key].selected||[];
+  if(checked){
+    // Add all currently-visible values
+    visibleVals.forEach(function(v){if(sel.indexOf(v)<0)sel.push(v);});
+  } else {
+    // Remove all currently-visible values
+    sel=sel.filter(function(v){return visibleVals.indexOf(v)<0;});
+  }
+  _colFilters[key].selected=sel;
+  renderBoards();
+  var anchorEl=document.querySelector('.filter-icon[data-col="'+key+'"]');
+  if(anchorEl)renderFilterDrop(anchorEl);
+}
+
+function clearFilterCol(key){
+  delete _colFilters[key];
+  renderBoards();
+  closeFilterDrop();
+}
+
+function closeFilterDrop(){
+  _filterDropOpen=null;
+  var fd=document.getElementById('filterDrop');
+  if(fd)fd.style.display='none';
+  document.querySelectorAll('.filter-icon').forEach(function(el){el.classList.remove('open');});
+}
+
+// Outside-click closer
+document.addEventListener('click',function(e){
+  if(!_filterDropOpen)return;
+  if(e.target.closest('#filterDrop')||e.target.closest('.filter-icon'))return;
+  closeFilterDrop();
+});
+
+// Returns the inner HTML for a sortable/filterable header cell.
+// `colIndex` is the position in the actual rendered <colgroup>, used by the resize handle.
+function renderHeaderCell(label,key,colIndex){
   var sortIcon='';
   if(_sortKey===key){sortIcon=_sortDir==='asc'?' <span class="sort-arrow active">▲</span>':' <span class="sort-arrow active">▼</span>';}
   else sortIcon=' <span class="sort-arrow inactive">↕</span>';
-  var filterVal=_colFilters[key]||'';
-  return '<div class="th-stack">'
-    +'<div class="th-label" onclick="setSort(\''+key+'\')" title="Click to sort">'+X(label)+sortIcon+'</div>'
-    +'<input type="text" class="col-filter" data-col="'+key+'" placeholder="Filter…" value="'+X(filterVal).replace(/"/g,'&quot;')+'" oninput="setFilter(\''+key+'\',this.value)" onclick="event.stopPropagation()">'
+  var f=_colFilters[key];
+  var hasFilter=f&&f.selected&&f.selected.length<getDistinctValuesForCol(key).length;
+  var filterIconCls='filter-icon'+(hasFilter?' filtered':'');
+  var html='<div class="th-stack">'
+    +'<div class="th-row">'
+    +'<span class="th-label" onclick="setSort(\''+key+'\')" title="Click to sort">'+X(label)+sortIcon+'</span>'
+    +'<button class="'+filterIconCls+'" data-col="'+key+'" onclick="toggleFilterDrop(event,\''+key+'\')" title="Filter">▾</button>'
+    +'</div>'
     +'</div>';
+  // Resize handle (right edge) — only when colIndex provided
+  if(typeof colIndex==='number'){
+    html+='<div class="col-resize-handle" onmousedown="startColResize(event,'+colIndex+')"></div>';
+  }
+  return html;
 }
 
 // ── Track-changes diff ──
@@ -637,7 +859,7 @@ function shouldShowDiff(){
 // ── DB ──
 function saveBoards(){
   if(!_dataLoaded)return;
-  dbSetProject('boards_schedule',_pNum+'_boards',{boards:_boards,revData:_revData,colVis:_colVis,customCols:_customCols,colOrder:_colOrder}).catch(function(e){console.error('saveBoards:',e);});
+  dbSetProject('boards_schedule',_pNum+'_boards',{boards:_boards,revData:_revData,colVis:_colVis,customCols:_customCols,colOrder:_colOrder,colWidths:_colWidths,sortKey:_sortKey,sortDir:_sortDir}).catch(function(e){console.error('saveBoards:',e);});
 }
 async function loadBoards(){
   try{
@@ -648,6 +870,9 @@ async function loadBoards(){
       _colVis=d.colVis||{};
       _customCols=d.customCols||[];
       _colOrder=d.colOrder||null;
+      _colWidths=d.colWidths||{};
+      _sortKey=d.sortKey||null;
+      _sortDir=d.sortDir||'asc';
       return true;
     }
   }catch(e){}
@@ -1117,18 +1342,19 @@ function renderUnitCell(c,unit,boardId,readonly,diffEntry){
 // ── List View — flat, one row per unit (matches Excel template) ──
 function renderListView(mc,bds,vcols,readonly,diff){
   var BOARD_W='180px',LOC_W='130px';
+  var widthFor=function(key,fallback){return _colWidths[key]||fallback;};
   var colgroupHtml='<colgroup>';
-  colgroupHtml+='<col style="width:'+BOARD_W+'">';
-  colgroupHtml+='<col style="width:'+LOC_W+'">';
-  vcols.forEach(function(c){colgroupHtml+='<col style="width:'+c.w+'">';});
+  colgroupHtml+='<col data-col-key="__boardRef" style="width:'+widthFor('__boardRef',BOARD_W)+'">';
+  colgroupHtml+='<col data-col-key="__boardLoc" style="width:'+widthFor('__boardLoc',LOC_W)+'">';
+  vcols.forEach(function(c){colgroupHtml+='<col data-col-key="'+c.k+'" style="width:'+widthFor(c.k,c.w)+'">';});
   if(!readonly)colgroupHtml+='<col style="width:36px">';
   colgroupHtml+='</colgroup>';
 
   var html='<div class="sched-scroll"><table class="btbl">'+colgroupHtml;
   // Sticky header — inside the same table so columns ALWAYS align
   html+='<thead><tr>';
-  html+='<th>'+renderHeaderCell('Board ID','__boardRef')+'</th><th>'+renderHeaderCell('Board Location','__boardLoc')+'</th>';
-  vcols.forEach(function(c){html+='<th>'+renderHeaderCell(c.l,c.k)+'</th>';});
+  html+='<th>'+renderHeaderCell('Board ID','__boardRef',0)+'</th><th>'+renderHeaderCell('Board Location','__boardLoc',1)+'</th>';
+  vcols.forEach(function(c,i){html+='<th>'+renderHeaderCell(c.l,c.k,2+i)+'</th>';});
   if(!readonly)html+='<th></th>';
   html+='</tr></thead>';
   html+='<tbody>';
@@ -1221,18 +1447,19 @@ function renderListView(mc,bds,vcols,readonly,diff){
 // ── Grouped View — original rowspan layout with totals row per board ──
 function renderGroupedView(mc,bds,vcols,readonly,diff){
   var BOARD_W='160px',LOC_W='140px';
+  var widthFor=function(key,fallback){return _colWidths[key]||fallback;};
   var colgroupHtml='<colgroup>';
-  colgroupHtml+='<col style="width:'+BOARD_W+'">';
-  colgroupHtml+='<col style="width:'+LOC_W+'">';
-  vcols.forEach(function(c){colgroupHtml+='<col style="width:'+c.w+'">';});
+  colgroupHtml+='<col data-col-key="__boardRef" style="width:'+widthFor('__boardRef',BOARD_W)+'">';
+  colgroupHtml+='<col data-col-key="__boardLoc" style="width:'+widthFor('__boardLoc',LOC_W)+'">';
+  vcols.forEach(function(c){colgroupHtml+='<col data-col-key="'+c.k+'" style="width:'+widthFor(c.k,c.w)+'">';});
   if(!readonly)colgroupHtml+='<col style="width:36px">';
   colgroupHtml+='</colgroup>';
 
   var html='<div class="sched-scroll"><table class="btbl">'+colgroupHtml;
   // Sticky header — inside the same table so columns ALWAYS align
   html+='<thead><tr>';
-  html+='<th>'+renderHeaderCell('Board ID','__boardRef')+'</th><th>'+renderHeaderCell('Board Location','__boardLoc')+'</th>';
-  vcols.forEach(function(c){html+='<th>'+renderHeaderCell(c.l,c.k)+'</th>';});
+  html+='<th>'+renderHeaderCell('Board ID','__boardRef',0)+'</th><th>'+renderHeaderCell('Board Location','__boardLoc',1)+'</th>';
+  vcols.forEach(function(c,i){html+='<th>'+renderHeaderCell(c.l,c.k,2+i)+'</th>';});
   if(!readonly)html+='<th></th>';
   html+='</tr></thead>';
   html+='<tbody>';
@@ -1771,5 +1998,8 @@ function parseImport(file){
   </div>
   <div class="loc-pick-list" id="locPickList"></div>
 </div>
+
+<!-- Column filter dropdown -->
+<div id="filterDrop"></div>
 </body>
 </html>
