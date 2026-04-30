@@ -26,11 +26,33 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .rev-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:8px;min-height:52px}
 .rev-pills{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .rev-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.rev-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:8px;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;border:1.5px solid var(--border);cursor:pointer;user-select:none;transition:all .13s}
-.rev-pill:hover{opacity:.8}
-.rev-pill.draft{border-color:var(--warn);color:var(--warn);background:rgba(255,184,48,.08)}
-.rev-pill.published{border-color:var(--green);color:var(--green);background:rgba(0,229,160,.08)}
-.rev-pill.active-rev{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+/* Rev capsule — shows latest revision number + date inline */
+.rev-capsule{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;border:1.5px solid var(--green);color:var(--green);background:rgba(0,229,160,.06);cursor:pointer;user-select:none;transition:all .13s;white-space:nowrap}
+.rev-capsule:hover{background:rgba(0,229,160,.12)}
+.rev-capsule.active{background:rgba(0,200,255,.10);border-color:var(--accent);color:var(--accent)}
+.rev-capsule .rc-num{font-weight:600}
+.rev-capsule .rc-sep{color:var(--muted);font-weight:400;margin:0 1px}
+.rev-capsule .rc-date{font-weight:400;color:var(--muted)}
+.rev-capsule.active .rc-date{color:var(--text2)}
+.rev-capsule.draft{border-color:var(--amber);color:var(--amber);background:rgba(255,184,48,.08)}
+.rev-capsule.draft:hover{background:rgba(255,184,48,.15)}
+.rev-capsule.draft.active{background:rgba(255,184,48,.18)}
+/* Revision history modal rows */
+.rev-hist-row{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:14px}
+.rev-hist-row:last-child{border-bottom:none}
+.rev-hist-row:hover{background:var(--surface2)}
+.rev-hist-num{font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:700;width:80px;flex-shrink:0;display:flex;flex-direction:column;gap:3px}
+.rev-hist-current-tag{font-family:'DM Mono',monospace;font-size:8px;font-weight:600;color:var(--green);background:rgba(0,229,160,.10);padding:1px 5px;border-radius:3px;letter-spacing:.8px;width:fit-content}
+.rev-hist-meta{flex:1;min-width:0}
+.rev-hist-date{font-size:12px;color:var(--text2);margin-bottom:3px}
+.rev-hist-note{font-size:12px;color:var(--muted);font-style:italic;margin-top:3px}
+.rev-hist-changes{font-size:11px;margin-top:5px;display:flex;gap:6px;flex-wrap:wrap}
+.rh-chip{padding:2px 8px;border-radius:4px;font-family:'DM Mono',monospace;font-size:10px}
+.rh-add{background:rgba(0,229,160,.10);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+.rh-del{background:rgba(255,77,109,.10);color:var(--danger);border:1px solid rgba(255,77,109,.3)}
+.rh-chg{background:rgba(255,184,48,.10);color:var(--amber);border:1px solid rgba(255,184,48,.3)}
+.rev-hist-view-btn{background:transparent;border:1px solid var(--border);color:var(--accent);padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;flex-shrink:0;align-self:center}
+.rev-hist-view-btn:hover{border-color:var(--accent);background:var(--accent-dim)}
 /* ── SIDEBAR STANDARD ── */
 .sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden;overflow-x:hidden}
 .sb.sm{width:52px}
@@ -67,11 +89,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .btbl tr.board-alt td.board-cell{background:rgba(0,200,255,.03)}
 .btbl tr.add-unit-row td{background:transparent !important;padding:3px 6px !important;border-top:none !important}
 /* Table */
-.sched-scroll{overflow-x:auto;padding:14px 16px 16px}
-.btbl{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.sched-scroll{overflow-x:auto;padding:28px 20px 22px}
+.btbl{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg)}
 .btbl th,.btbl td{box-sizing:border-box}
 .btbl thead th{position:relative;padding:6px 8px 8px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:2px solid var(--accent);border-right:1px solid var(--border);white-space:nowrap;vertical-align:top}
-.btbl thead th:last-child{border-right:none}
+.btbl thead th:first-child{border-top-left-radius:9px}
+.btbl thead th:last-child{border-right:none;border-top-right-radius:9px}
+/* Rounded bottom corners on the last row's outermost cells */
+.btbl tbody tr:last-child td:first-child{border-bottom-left-radius:9px}
+.btbl tbody tr:last-child td:last-child{border-bottom-right-radius:9px}
+.btbl tbody tr:last-child td{border-bottom:none}
 .th-stack{display:flex;flex-direction:column;gap:2px;align-items:stretch}
 .th-row{display:flex;align-items:center;justify-content:center;gap:4px}
 .th-label{cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;padding:4px 0;transition:color .12s;flex:1;justify-content:center;min-width:0}
@@ -142,15 +169,23 @@ select.ci{cursor:pointer}
 /* Track-changes toggle */
 .tc-wrap{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2);user-select:none}
 .tc-wrap input{cursor:pointer}
-/* Diff highlights */
+/* Diff highlights — matches equipment-schedule */
 .btbl tr.tr-added td{background:rgba(0,229,160,.10) !important}
-.btbl tr.tr-added td.board-cell{border-left-color:var(--green) !important}
-.btbl tr.tr-deleted td{background:rgba(255,77,109,.10) !important;color:var(--muted) !important;text-decoration:line-through;text-decoration-color:rgba(255,77,109,.6)}
-.btbl tr.tr-deleted td.board-cell{border-left-color:var(--danger) !important;color:var(--muted) !important}
-.btbl tr.tr-deleted .ci{text-decoration:line-through;color:var(--muted) !important}
-.btbl td.cell-changed{background:rgba(255,184,48,.18) !important;outline:1px solid rgba(255,184,48,.45);outline-offset:-1px;position:relative}
+.btbl tr.tr-added td:first-child{border-left:3px solid var(--green) !important}
+.btbl tr.tr-deleted td{background:rgba(255,77,109,.10) !important;text-decoration:line-through;color:rgba(255,100,100,.9) !important}
+.btbl tr.tr-deleted td:first-child{border-left:3px solid var(--danger) !important}
+.btbl tr.tr-deleted .ci,.btbl tr.tr-deleted .csel,.btbl tr.tr-deleted span,.btbl tr.tr-deleted select{text-decoration:line-through !important;pointer-events:none}
+.btbl tr.tr-deleted .del-btn{display:none !important}
+.btbl td.cell-changed{background:rgba(255,184,48,.20) !important;outline:1px solid rgba(255,184,48,.45);outline-offset:-1px;position:relative}
 .btbl td.cell-cleared{background:rgba(255,184,48,.10) !important;position:relative}
 .cell-cleared-old{position:absolute;top:2px;left:6px;right:6px;font-size:10px;color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(255,77,109,.6);pointer-events:none;font-family:'DM Mono',monospace;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Diff legend — small bar shown when track-changes active */
+.diff-legend{display:flex;align-items:center;gap:14px;padding:6px 16px;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0;font-family:'DM Sans',sans-serif}
+.diff-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+.diff-swatch{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+.ds-add{background:rgba(0,229,160,.3);border:1px solid var(--green)}
+.ds-del{background:rgba(255,77,109,.3);border:1px solid var(--danger)}
+.ds-chg{background:rgba(255,184,48,.3);border:1px solid var(--amber)}
 /* Print stylesheet for PDF export via window.print() */
 @media print{
   body{background:#fff !important;color:#000 !important}
@@ -184,26 +219,22 @@ select.ci{cursor:pointer}
 .placeholder-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:12px;color:var(--muted);text-align:center}
 .placeholder-tab h3{font-size:18px;color:var(--text2);margin:0}
 /* Column settings modal — drag-to-reorder rows + custom column form */
-.col-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--border);border-radius:5px;background:var(--surface2);transition:background .12s,border-color .12s}
-.col-row:hover{background:var(--surface3,rgba(255,255,255,.03))}
-.col-row.dragging{opacity:.4;border-style:dashed}
-.col-row.dragover{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.col-row-locked{opacity:.85;background:rgba(0,200,255,.04);border-color:rgba(0,200,255,.15)}
-.col-row-locked .col-label-text{font-weight:500}
-.col-tag-locked{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);padding:2px 6px;border:1px solid rgba(0,200,255,.3);border-radius:3px;flex-shrink:0;background:rgba(0,200,255,.06)}
-.col-grip{cursor:grab;color:var(--muted);font-size:14px;line-height:1;user-select:none;padding:0 2px;font-family:'DM Mono',monospace}
+.col-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);transition:border-color .12s}
+.col-row:hover{border-color:var(--muted)}
+.col-row.dragging{opacity:.3}
+.col-row.dragover{border-top:2px solid var(--accent)}
+.col-row-locked{background:var(--surface2);border-color:var(--border)}
+.col-grip{cursor:grab;color:var(--muted);font-size:14px;line-height:1;user-select:none;font-family:'DM Mono',monospace;flex-shrink:0}
 .col-grip:active{cursor:grabbing}
 .col-row input[type="checkbox"]{accent-color:var(--accent);width:15px;height:15px;cursor:pointer;flex-shrink:0}
 .col-label-text{font-size:13px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.col-tag-builtin{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);padding:2px 6px;border:1px solid var(--border);border-radius:3px;flex-shrink:0}
-.col-tag-custom{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--green);padding:2px 6px;border:1px solid rgba(0,229,160,.3);border-radius:3px;flex-shrink:0;background:rgba(0,229,160,.06)}
+.col-key-pill{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;color:var(--accent);padding:2px 9px;border:1px solid rgba(0,200,255,.35);border-radius:10px;flex-shrink:0;background:rgba(0,200,255,.06)}
 .col-del-btn{width:22px;height:22px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-radius:4px;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s;padding:0}
 .col-del-btn:hover{background:rgba(255,77,109,.15);color:var(--danger)}
-.col-add-form{display:flex;gap:6px;align-items:stretch;padding:10px;background:var(--surface2);border:1px dashed var(--border);border-radius:6px;margin-bottom:12px}
-.col-add-form input,.col-add-form select{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none}
-.col-add-form input{flex:1}
-.col-add-form input:focus,.col-add-form select:focus{border-color:var(--accent)}
-.col-add-form button{background:var(--accent);color:#0a0a0a;border:none;padding:5px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.col-add-form{display:flex;gap:8px;align-items:stretch;padding:10px;background:var(--surface2);border:1px dashed var(--border);border-radius:6px}
+.col-add-form input{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:5px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none}
+.col-add-form input:focus{border-color:var(--accent)}
+.col-add-form button{background:var(--accent);color:#0a0a0a;border:none;padding:6px 16px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 .col-add-form button:hover{filter:brightness(1.1)}
 .loc-cell{display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;height:100%;padding:0 6px;border:1px solid transparent;border-radius:5px;transition:border-color .15s;font-size:12px;color:var(--text2);font-family:'DM Mono',monospace}
 .loc-cell:hover{border-color:var(--border)}
@@ -259,8 +290,7 @@ select.ci{cursor:pointer}
   <button class="btn bg" id="btnTemplate" onclick="downloadTemplate()" style="color:var(--green);border-color:rgba(0,229,160,.3);display:none">⬇ Template</button>
   <button class="cedbtn" id="colSettingsBtn" onclick="openColSettings()">⚙ Columns</button>
   <button class="btn bg" id="btnImport" onclick="triggerImport()">⬆ Import</button>
-  <button class="btn bg" onclick="exportXLSX()">⬇ Excel</button>
-  <button class="btn bg" onclick="exportPDF()">⬇ PDF</button>
+  <button class="btn bg" onclick="openExportModal()">⬇ Export</button>
 </div>
 
 <!-- Revision bar: pills on the left, workflow buttons on the right -->
@@ -268,13 +298,22 @@ select.ci{cursor:pointer}
   <div class="rev-pills" id="revPills"></div>
   <div style="flex:1"></div>
   <div class="rev-actions">
+    <button class="btn bg" id="btnRevHistory" onclick="openRevHistory()" style="display:none">📋 Revision History</button>
+    <button class="btn bg" id="btnLiveView" onclick="viewRev(null)" style="display:none">← Live View</button>
     <button class="btn bp" id="btnStartDraft" onclick="startDraft()" style="display:none">✏ Start New Draft</button>
     <button class="btn bp" id="btnEditDraft" onclick="editDraft()" style="display:none">✏ Edit Draft</button>
     <button class="btn bp" id="btnSave" onclick="saveDraft()" style="display:none">💾 Save</button>
     <button class="btn bg" id="btnPublish" onclick="publishRev()" style="display:none">↑ Publish Rev</button>
     <button class="btn bg" id="btnDiscard" onclick="discardDraft()" style="display:none;color:var(--danger);border-color:rgba(255,77,109,.3)">🗑 Discard Draft</button>
-    <button class="btn bg" id="btnExportDraft" onclick="doExportDraft()" style="display:none">Export Draft</button>
   </div>
+</div>
+
+<!-- Diff legend — visible only when track-changes is showing diff -->
+<div class="diff-legend" id="diffLegend" style="display:none">
+  <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)" id="diffLegendLabel">Changes vs prev rev:</span>
+  <div class="diff-legend-item"><div class="diff-swatch ds-add"></div>Added row</div>
+  <div class="diff-legend-item"><div class="diff-swatch ds-del"></div>Deleted row</div>
+  <div class="diff-legend-item"><div class="diff-swatch ds-chg"></div>Changed cell</div>
 </div>
 </div><!-- end toolbar-stack -->
 
@@ -304,17 +343,12 @@ select.ci{cursor:pointer}
 <div class="modal-overlay" id="colModal">
   <div class="modal" style="min-width:480px;max-width:560px">
     <h3>Column Settings</h3>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">Drag to reorder, toggle visibility, or add custom columns. Built-in columns can be hidden but not deleted.</p>
-    <div class="col-add-form">
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">Drag to reorder · toggle visibility · add custom columns</p>
+    <div id="colList" style="display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto"></div>
+    <div class="col-add-form" style="margin:14px 0 0">
       <input id="newColName" placeholder="New column name…" maxlength="50">
-      <select id="newColType">
-        <option value="text">Text</option>
-        <option value="num">Number</option>
-        <option value="dropdown">Dropdown</option>
-      </select>
       <button onclick="addCustomCol()">+ Add</button>
     </div>
-    <div id="colList" style="display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto"></div>
     <div class="modal-btns">
       <button class="btn bg" onclick="resetCols()">Reset to Default</button>
       <button class="btn bp" onclick="closeColSettings()">Done</button>
@@ -359,13 +393,13 @@ var BOARD_COLS=[
 
 function renderColList(){
   var list=document.getElementById('colList');
-  // Top section: locked board-level columns
+  // Top section: locked board-level columns (Board ID + Board Location)
   var lockedHtml=BOARD_COLS.map(function(c){
     return '<div class="col-row col-row-locked">'
-      +'<span class="col-grip" style="opacity:.25;cursor:not-allowed" title="Locked — cannot reorder">⋮⋮</span>'
+      +'<span class="col-grip" style="opacity:.25;cursor:not-allowed" title="Locked">⠿</span>'
       +'<input type="checkbox" checked disabled title="Required column — cannot be hidden">'
       +'<span class="col-label-text">'+X(c.l)+'</span>'
-      +'<span class="col-tag-locked" title="Required — always visible">🔒 LOCKED</span>'
+      +'<span class="col-key-pill">Key</span>'
       +'</div>';
   }).join('');
   // Below: the user-managed (unit-level) columns
@@ -375,16 +409,13 @@ function renderColList(){
     var isCustom=!!c.custom;
     return '<div class="col-row" id="cr_'+i+'" draggable="true" '
       +'ondragstart="colDS('+i+')" ondragover="colDO(event,'+i+')" ondragend="colDE()" ondrop="colDD('+i+')">'
-      +'<span class="col-grip">⋮⋮</span>'
+      +'<span class="col-grip">⠿</span>'
       +'<input type="checkbox"'+(checked?' checked':'')+' onchange="toggleCol(\''+c.k+'\',this.checked)">'
       +'<span class="col-label-text">'+X(c.l)+'</span>'
-      +(isCustom?'<span class="col-tag-custom">CUSTOM</span>':'<span class="col-tag-builtin">BUILT-IN</span>')
       +(isCustom?'<button class="col-del-btn" onclick="deleteCustomCol(\''+c.k+'\')" title="Delete column">✕</button>':'')
       +'</div>';
   }).join('');
-  list.innerHTML=lockedHtml
-    +'<div style="height:1px;background:var(--border);margin:8px 0"></div>'
-    +managedHtml;
+  list.innerHTML=lockedHtml+managedHtml;
 }
 function toggleCol(key,visible){_colVis[key]=visible;renderBoards();saveBoards();}
 function resetCols(){
@@ -397,21 +428,12 @@ function closeColSettings(){document.getElementById('colModal').classList.remove
 // ── Add / delete custom columns ──
 function addCustomCol(){
   var nameInp=document.getElementById('newColName');
-  var typeSel=document.getElementById('newColType');
   var name=nameInp.value.trim();
   if(!name){alert('Column name is required');return;}
   // Generate a stable unique key
   var key='c_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,5);
-  var type=typeSel.value;
   var col={k:key,l:name,custom:true,w:'140px'};
-  if(type==='num')col.num=true;
-  if(type==='dropdown'){
-    var opts=prompt('Enter dropdown options (one per line, or comma-separated):','');
-    if(opts===null)return;
-    var optList=opts.split(/[\n,]/).map(function(s){return s.trim();}).filter(Boolean);
-    if(!optList.length){alert('At least one dropdown option is required');return;}
-    col.sel=optList;
-  }
+  // All custom cols are plain text — no type selector
   _customCols.push(col);
   // Append to colOrder if it's been set; otherwise leave null so default order is used
   if(_colOrder){_colOrder.push(key);}
@@ -851,6 +873,9 @@ function getDiffBaseline(){
   return revs[revs.length-1].boards||[];
 }
 function shouldShowDiff(){
+  // Auto-enabled when viewing any published revision (track changes against previous rev)
+  if(_viewRevIdx!==null&&_viewRevIdx>=0)return getDiffBaseline()!==null;
+  // Otherwise only if user has explicitly enabled the toggle
   var chk=document.getElementById('tcChk');
   if(!chk||!chk.checked)return false;
   return getDiffBaseline()!==null;
@@ -1031,17 +1056,17 @@ function renderActive(){
   var isMssb=_activeTab==='mssb';
   document.getElementById('abar').style.display='flex';
   // Hide MSSB-only elements when on DCP
-  ['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnExportDraft','btnTemplate','colSettingsBtn','btnImport','viewToggle','tcWrap'].forEach(function(id){
+  ['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnRevHistory','btnLiveView','btnTemplate','colSettingsBtn','btnImport','viewToggle','tcWrap'].forEach(function(id){
     var el=document.getElementById(id);
     if(!el)return;
     if(!isMssb){el.style.display='none';return;}
     // On MSSB tab — let renderRevBar manage workflow buttons; show others
-    var workflowBtns=['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnExportDraft','tcWrap'];
+    var workflowBtns=['btnStartDraft','btnEditDraft','btnSave','btnPublish','btnDiscard','btnRevHistory','btnLiveView','tcWrap'];
     if(workflowBtns.indexOf(id)>=0)return; // managed elsewhere
     el.style.display='inline-flex';
   });
   // Excel/PDF export buttons (no IDs)
-  var expBtns=document.querySelectorAll('.abar button[onclick="exportXLSX()"], .abar button[onclick="exportPDF()"]');
+  var expBtns=document.querySelectorAll('.abar button[onclick="openExportModal()"]');
   expBtns.forEach(function(b){b.style.display=isMssb?'inline-flex':'none';});
   if(isMssb){renderRevBar();renderBoards();updateTemplateBtnVisibility();}
   else{
@@ -1058,40 +1083,64 @@ function renderRevBar(){
   var rb=document.getElementById('revBar');
   var rp=document.getElementById('revPills');
   // Button visibility based on state machine:
-  //   - viewing a published rev (read-only) → hide all edit controls
+  //   - viewing a published rev (read-only) → hide all edit controls (but show History)
   //   - no draft → show "Start New Draft"
   //   - has draft, NOT in edit mode → show "Edit Draft", "Publish", "Discard"
   //   - has draft, IN edit mode → show "Save", "Publish", "Discard"
   var viewingPub=_viewRevIdx!==null&&_viewRevIdx>=0;
   var setBtn=function(id,show){var el=document.getElementById(id);if(el)el.style.display=show?'inline-flex':'none';};
+  // History button always visible when at least one revision exists
+  setBtn('btnRevHistory',revs.length>0);
+  // Live View / Return-to-current button only when viewing a past rev
+  setBtn('btnLiveView',viewingPub);
   if(viewingPub){
     setBtn('btnStartDraft',false);setBtn('btnEditDraft',false);setBtn('btnSave',false);
-    setBtn('btnPublish',false);setBtn('btnDiscard',false);setBtn('btnExportDraft',false);
+    setBtn('btnPublish',false);setBtn('btnDiscard',false);
   } else if(!hasDraft){
     setBtn('btnStartDraft',true);setBtn('btnEditDraft',false);setBtn('btnSave',false);
-    setBtn('btnPublish',false);setBtn('btnDiscard',false);setBtn('btnExportDraft',false);
+    setBtn('btnPublish',false);setBtn('btnDiscard',false);
   } else if(_editing){
+    // In edit mode — Publish + Save + Discard available
     setBtn('btnStartDraft',false);setBtn('btnEditDraft',false);setBtn('btnSave',true);
-    setBtn('btnPublish',true);setBtn('btnDiscard',true);setBtn('btnExportDraft',true);
+    setBtn('btnPublish',true);setBtn('btnDiscard',true);
   } else {
+    // Has draft but not actively editing — only Edit/Discard. Publish requires going into edit mode first.
     setBtn('btnStartDraft',false);setBtn('btnEditDraft',true);setBtn('btnSave',false);
-    setBtn('btnPublish',true);setBtn('btnDiscard',true);setBtn('btnExportDraft',true);
+    setBtn('btnPublish',false);setBtn('btnDiscard',true);
   }
   // Track-changes toggle: show when there's at least one revision to compare against
   var tcw=document.getElementById('tcWrap');
   if(tcw)tcw.style.display=revs.length?'inline-flex':'none';
 
-  // Build pills HTML (left side)
+  // Build pill strip — latest published rev (capsule) + draft (if exists).
+  // Full revision history accessible via the History button.
   var html='';
+  if(revs.length){
+    var latest=revs[revs.length-1];
+    var latestIdx=revs.length-1;
+    var isViewing=_viewRevIdx===latestIdx;
+    html+='<div class="rev-capsule'+(isViewing?' active':'')+'" onclick="viewRev('+latestIdx+')" title="Click to view this revision">'
+      +'<span class="rc-num">'+X(latest.rev)+'</span>'
+      +'<span class="rc-sep">·</span>'
+      +'<span class="rc-date">'+X(fmtD(latest.date))+'</span>'
+      +'</div>';
+  }
   if(hasDraft){
     var nextRevLabel='Rev '+String(revs.length+1).padStart(2,'0')+' Draft';
-    html+='<div class="rev-pill draft'+(_viewRevIdx===-1?' active-rev':'')+'" onclick="viewRev(-1)">'+nextRevLabel+'</div>';
+    html+='<div class="rev-capsule draft'+(_viewRevIdx===-1?' active':'')+'" onclick="viewRev(-1)" title="Click to view the current draft">'
+      +'<span class="rc-num">✏ '+X(nextRevLabel)+'</span>'
+      +'</div>';
   }
-  revs.forEach(function(rv,i){
-    html+='<div class="rev-pill published'+(_viewRevIdx===i?' active-rev':'')+'" onclick="viewRev('+i+')" title="'+fmtD(rv.date)+'">'+X(rv.rev)+'</div>';
-  });
+  if(viewingPub&&_viewRevIdx<revs.length-1){
+    // Showing a non-latest rev — also show its capsule so the user knows what's active
+    var rv=revs[_viewRevIdx];
+    html+='<div class="rev-capsule active" title="Currently viewing">'
+      +'<span class="rc-num">'+X(rv.rev)+'</span>'
+      +'<span class="rc-sep">·</span>'
+      +'<span class="rc-date">'+X(fmtD(rv.date))+'</span>'
+      +'</div>';
+  }
   rp.innerHTML=html||'<span style="font-size:12px;color:var(--muted)">No revisions yet — click <strong>✏ Start New Draft</strong></span>';
-  // Always show the rev-bar so the workflow buttons stay reachable
   rb.style.display='flex';
 }
 
@@ -1150,7 +1199,15 @@ function saveDraft(){
 function publishRev(){
   var revs=_revData.mssb||[];
   var snap=JSON.parse(JSON.stringify(_boards));
-  revs.push({rev:'Rev '+String(revs.length+1).padStart(2,'0'),date:todayStr(),boards:snap});
+  // Compute change summary vs previous revision (or empty if first rev)
+  var baseSnap=revs.length?revs[revs.length-1].boards||[]:[];
+  var diff=computeBoardsDiff(baseSnap,_boards);
+  var changeSummary={
+    added:Object.keys(diff.added).length,
+    deleted:Object.keys(diff.deleted).length,
+    changed:Object.keys(diff.changed).length+Object.keys(diff.boardChanges).length
+  };
+  revs.push({rev:'Rev '+String(revs.length+1).padStart(2,'0'),date:todayStr(),boards:snap,changeSummary:changeSummary});
   _revData.mssb=revs;
   delete _revData.mssb_draft;
   _editing=false;
@@ -1159,6 +1216,40 @@ function publishRev(){
   renderRevBar();
   renderBoards();
 }
+
+function openRevHistory(){
+  var revs=_revData.mssb||[];
+  var modal=document.getElementById('revHistModal');
+  var list=document.getElementById('revHistList');
+  if(!revs.length){
+    list.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">No revisions yet.</div>';
+  } else {
+    var html='';
+    // Newest first
+    revs.slice().reverse().forEach(function(rv,ri){
+      var origIdx=revs.length-1-ri;
+      var isLatest=ri===0;
+      var cs=rv.changeSummary||{};
+      html+='<div class="rev-hist-row">'
+        +'<div class="rev-hist-num">'+X(rv.rev)+(isLatest?'<span class="rev-hist-current-tag">CURRENT</span>':'')+'</div>'
+        +'<div class="rev-hist-meta">'
+        +'<div class="rev-hist-date">'+X(fmtD(rv.date))+'</div>'
+        +'<div class="rev-hist-changes">'
+        +(cs.added?'<span class="rh-chip rh-add">+'+cs.added+' added</span>':'')
+        +(cs.deleted?'<span class="rh-chip rh-del">-'+cs.deleted+' deleted</span>':'')
+        +(cs.changed?'<span class="rh-chip rh-chg">~'+cs.changed+' changed</span>':'')
+        +(!cs.added&&!cs.deleted&&!cs.changed?'<span style="font-size:11px;color:var(--muted)">Initial revision</span>':'')
+        +'</div>'
+        +'</div>'
+        +'<button class="rev-hist-view-btn" onclick="viewRevFromHistory('+origIdx+')">View →</button>'
+        +'</div>';
+    });
+    list.innerHTML=html;
+  }
+  modal.classList.add('open');
+}
+function closeRevHistory(){document.getElementById('revHistModal').classList.remove('open');}
+function viewRevFromHistory(idx){closeRevHistory();viewRev(idx);}
 
 function discardDraft(){
   if(!_revData.mssb_draft){return;}
@@ -1180,8 +1271,6 @@ function discardDraft(){
   renderBoards();
   if(typeof showToast==='function')showToast('✓ Draft discarded — restored to '+(revs.length?revs[revs.length-1].rev:'empty state'));
 }
-
-function doExportDraft(){var revs=_revData.mssb||[];var lbl='Rev '+String(revs.length+1).padStart(2,'0')+' Draft';exportXLSX(_boards,lbl);}
 
 // ── Render boards (dispatcher) ──
 function renderBoards(readonly,overrideBoards){
@@ -1209,6 +1298,29 @@ function renderBoards(readonly,overrideBoards){
   if(shouldShowDiff()){
     var base=getDiffBaseline();
     if(base)diff=computeBoardsDiff(base,bds);
+  }
+
+  // Show/hide the diff legend bar
+  var legend=document.getElementById('diffLegend');
+  if(legend){
+    if(diff){
+      legend.style.display='flex';
+      // Update label based on what we're comparing against
+      var lbl=document.getElementById('diffLegendLabel');
+      if(lbl){
+        var revs=_revData.mssb||[];
+        if(_viewRevIdx!==null&&_viewRevIdx>=0){
+          // Viewing a published rev — comparing against rev N-1
+          var prevRev=_viewRevIdx>0?revs[_viewRevIdx-1].rev:'(none)';
+          lbl.textContent='Changes vs '+prevRev+':';
+        } else {
+          var lastPub=revs.length?revs[revs.length-1].rev:'(none)';
+          lbl.textContent='Changes vs '+lastPub+':';
+        }
+      }
+    } else {
+      legend.style.display='none';
+    }
   }
 
   if(_viewMode==='list')renderListView(mc,bds,vcols,readonly,diff);
@@ -1741,6 +1853,66 @@ function _doTemplateDownload(aoa){
   XLSX.utils.book_append_sheet(wb,ws,'MSSB Schedule');
   XLSX.writeFile(wb,'MSSB Schedule Template.xlsx');
 }
+// ── Export modal (combined Excel + PDF with optional track-changes) ──
+var _exportTracked=true;
+function openExportModal(){
+  // Determine if there's a baseline to diff against (a previous published revision)
+  var revs=_revData.mssb||[];
+  var hasBaseline=revs.length>0;
+  var wrap=document.getElementById('exportTrackToggleWrap');
+  if(wrap)wrap.style.display=hasBaseline?'':'none';
+  // Default tracked = true when there's a baseline; false otherwise
+  _exportTracked=hasBaseline;
+  _applyExportTrack();
+  // Subtitle line
+  var sub=document.getElementById('exportSubtitle');
+  if(sub){
+    var label;
+    if(_viewRevIdx!==null&&_viewRevIdx>=0){
+      var rv=revs[_viewRevIdx];
+      label='Exporting '+(rv?rv.rev:'revision');
+    } else if(_revData.mssb_draft){
+      label='Exporting Rev '+String(revs.length+1).padStart(2,'0')+' Draft';
+    } else if(revs.length){
+      label='Exporting '+revs[revs.length-1].rev+' (current)';
+    } else {
+      label='Exporting current data';
+    }
+    sub.textContent=label;
+  }
+  document.getElementById('exportModal').classList.add('open');
+}
+function closeExportModal(){document.getElementById('exportModal').classList.remove('open');}
+function toggleExportTrack(){_exportTracked=!_exportTracked;_applyExportTrack();}
+function _applyExportTrack(){
+  var sw=document.getElementById('exportTrackSwitch');
+  var th=document.getElementById('exportTrackThumb');
+  var lbl=document.getElementById('exportTrackLabel');
+  if(sw)sw.style.background=_exportTracked?'#00e5a0':'#3a4555';
+  if(th)th.style.left=_exportTracked?'21px':'3px';
+  if(lbl){lbl.textContent=_exportTracked?'Changes tracked':'Untracked';lbl.style.color=_exportTracked?'var(--text)':'var(--muted)';}
+}
+function isTrackedExport(){return _exportTracked;}
+
+// Wrapper functions called by the export modal — temporarily flip track-changes
+// to honour the toggle, then call the underlying export function.
+function _withExportTrack(fn){
+  var chk=document.getElementById('tcChk');
+  var prev=chk?chk.checked:false;
+  if(chk)chk.checked=isTrackedExport();
+  // Re-render so the diff classes are present in the DOM (PDF) / influence flatten (XLSX)
+  renderBoards();
+  // Defer to next tick so DOM updates flush before printing
+  setTimeout(function(){
+    try{fn();}finally{
+      if(chk)chk.checked=prev;
+      renderBoards();
+    }
+  },50);
+}
+function doExportPDF(){closeExportModal();_withExportTrack(function(){exportPDF();});}
+function doExportXLSX(){closeExportModal();_withExportTrack(function(){exportXLSX();});}
+
 function exportXLSX(bds,revLabel){
   bds=bds||_boards;
   if(!revLabel){
@@ -2001,5 +2173,42 @@ function parseImport(file){
 
 <!-- Column filter dropdown -->
 <div id="filterDrop"></div>
+
+<!-- Revision history modal -->
+<div class="modal-overlay" id="revHistModal">
+  <div class="modal" style="width:540px;max-width:95vw">
+    <h3>Revision History</h3>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">Mechanical Switchboards Schedule</p>
+    <div id="revHistList" style="max-height:60vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--surface2)"></div>
+    <div class="modal-btns">
+      <button class="btn bp" onclick="closeRevHistory()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export modal — combines Excel + PDF with optional track-changes toggle -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal" style="width:420px;max-width:95vw">
+    <h3>Export</h3>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px" id="exportSubtitle">Mechanical Switchboards Schedule</p>
+    <!-- Tracked changes toggle — shown only when there's a baseline to diff against -->
+    <div id="exportTrackToggleWrap" style="display:none;margin:14px 0 4px">
+      <div onclick="toggleExportTrack()" style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
+        <div id="exportTrackSwitch" style="width:42px;height:24px;border-radius:12px;background:#00e5a0;position:relative;transition:background .2s;flex-shrink:0">
+          <div id="exportTrackThumb" style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:3px;left:21px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>
+        </div>
+        <span id="exportTrackLabel" style="font-size:13px;color:var(--text)">Changes tracked</span>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin:6px 0 0 52px">Highlight added, deleted, and changed rows in the export</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin:14px 0">
+      <button class="btn bp" onclick="doExportPDF()" style="justify-content:center">📄 Export as PDF</button>
+      <button class="btn bg" style="background:var(--green);color:#080c12;justify-content:center;border-color:var(--green);font-weight:600" onclick="doExportXLSX()">📊 Export as Excel</button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn bg" onclick="closeExportModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
