@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<!-- build: 2026-05-03 om-shell-v1 -->
+<html lang="en">
+<head>
+<link rel="stylesheet" href="theme.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O&amp;M Manual — HVAC Nexus</title>
+<style>
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
+.btn{padding:6px 13px;border-radius:7px;border:none;cursor:pointer;font-size:12.5px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted)}
+.bsm{padding:5px 11px;font-size:12px}
+.bw{background:var(--warn);color:#080c12;border:none}.bw:hover{filter:brightness(1.1)}
+.btn.danger-outline{border-color:var(--danger);color:var(--danger);background:none;border:1px solid var(--danger)}
+.btn.danger-outline:hover{background:rgba(255,77,109,.12)}
+
+/* Shell */
+.main{position:fixed;top:0;left:230px;right:0;bottom:0;display:flex;flex-direction:column;transition:left .25s;overflow:hidden}
+.main.sb-sm{left:52px}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.bc{display:flex;align-items:center;gap:6px;font-size:12.5px;flex-wrap:wrap}
+.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}
+.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+
+/* Rev bar */
+.rev-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap}
+.rev-bar-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0;flex-wrap:wrap}
+.rev-pill{display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:.3px;white-space:nowrap}
+.rev-pill.published{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+.rev-pill.draft{border-color:var(--warn);background:var(--warn-dim);color:var(--warn)}
+.rev-pill.empty{border-style:dashed}
+.docno{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--text2);background:var(--surface3);padding:5px 10px;border-radius:6px;border:1px solid var(--border)}
+.rev-actions{display:flex;gap:6px;align-items:center}
+
+/* Body */
+.body{flex:1;min-height:0;overflow-y:auto;padding:18px 22px}
+.body-hdr{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.body-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--text)}
+.body-sub{font-size:12.5px;color:var(--muted)}
+
+/* Mobile lockout */
+.mobile-block{display:none;padding:60px 20px;text-align:center;color:var(--text2)}
+.mobile-block-icon{font-size:40px;margin-bottom:12px}
+@media (max-width:1023px){
+  .body-grid,.body-hdr{display:none}
+  .mobile-block{display:block}
+}
+
+/* Card grid */
+.body-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;padding-bottom:30px}
+
+/* Card */
+.om-card{background:var(--surface);border:1.5px solid var(--border);border-radius:11px;padding:14px 14px 12px;display:flex;flex-direction:column;gap:8px;cursor:default;transition:border-color .15s,box-shadow .15s,opacity .2s;position:relative}
+.om-card:hover{border-color:var(--muted)}
+.om-card.dragging{opacity:.4}
+.om-card.drag-over{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
+.om-card.na{opacity:.55;background:repeating-linear-gradient(135deg,var(--surface),var(--surface) 10px,var(--surface2) 10px,var(--surface2) 20px)}
+
+.card-top{display:flex;align-items:flex-start;gap:8px}
+.card-handle{flex-shrink:0;color:var(--muted);font-size:14px;cursor:grab;line-height:1.2;user-select:none;padding:1px 3px}
+.card-handle:hover{color:var(--text2)}
+.card-handle:active{cursor:grabbing}
+.card-num{flex-shrink:0;width:26px;height:26px;border-radius:6px;background:var(--surface3);border:1px solid var(--border);color:var(--text2);font-family:'DM Mono',monospace;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:600}
+.card-title-wrap{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.card-title{font-size:13.5px;font-weight:600;color:var(--text);line-height:1.25}
+.card-type{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+.card-status{flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:10px;font-family:'DM Mono',monospace;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
+.st-empty{background:rgba(255,77,109,.10);color:var(--danger);border:1px solid rgba(255,77,109,.25)}
+.st-draft{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+.st-complete{background:rgba(0,229,160,.10);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+.st-na{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+
+.card-summary{font-size:12px;color:var(--text2);line-height:1.5;min-height:32px}
+.card-summary .empty{color:var(--muted);font-style:italic}
+.card-summary .meta-line{display:block;font-family:'DM Mono',monospace;font-size:10.5px;color:var(--muted);margin-top:3px}
+
+.card-actions{display:flex;gap:6px;align-items:center;border-top:1px solid var(--border);padding-top:9px;margin-top:auto}
+.card-action-btn{flex:1;padding:5px 8px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11.5px;transition:all .12s;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.card-action-btn:hover{color:var(--text);border-color:var(--muted)}
+.card-action-btn.primary{background:var(--accent-dim);color:var(--accent);border-color:rgba(0,200,255,.25)}
+.card-action-btn.primary:hover{background:rgba(0,200,255,.15)}
+.card-action-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Frozen ribbon when viewing published rev */
+.frozen-ribbon{padding:8px 14px;background:rgba(0,200,255,.05);border-bottom:1px solid rgba(0,200,255,.12);display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--text2);flex-shrink:0}
+
+/* Empty state (no manual yet) */
+.empty-state{padding:80px 20px;text-align:center;color:var(--text2)}
+.empty-state-icon{font-size:48px;margin-bottom:14px;opacity:.5}
+.empty-state-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px}
+.empty-state-sub{font-size:13px;color:var(--muted);max-width:480px;margin:0 auto 20px;line-height:1.6}
+
+/* Modals */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;z-index:500;padding:50px 20px;overflow-y:auto}
+.mo.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:640px;display:flex;flex-direction:column;max-height:calc(100vh - 100px);overflow:hidden}
+.mhdr{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.mh3{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text)}
+.mclose{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}.mclose:hover{color:var(--text)}
+.mbody{padding:18px 20px;overflow-y:auto;flex:1}
+.mfoot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+.mlbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;margin-top:14px}
+.mlbl:first-child{margin-top:0}
+.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;box-sizing:border-box}
+.mi:focus{border-color:var(--accent)}
+.mi.mono{font-family:'DM Mono',monospace}
+textarea.mi{min-height:90px;resize:vertical;font-family:'DM Sans',sans-serif}
+.sup-warn{background:var(--warn-dim);border:1px solid rgba(255,184,48,.25);border-radius:8px;padding:11px 14px;font-size:12.5px;color:var(--warn);display:flex;gap:9px;align-items:flex-start;margin-bottom:14px}
+
+/* Card-type specific edit blocks */
+.placeholder-block{padding:14px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;color:var(--muted);font-size:12.5px;line-height:1.6}
+.placeholder-block strong{color:var(--text2);font-weight:600}
+.placeholder-block .pb-icon{font-size:20px;display:block;margin-bottom:6px}
+
+.contact-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 30px;gap:6px;align-items:center;margin-bottom:5px}
+.contact-row input{width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font-size:12px;font-family:DM Sans,sans-serif;outline:none}
+.contact-row input:focus{border-color:var(--accent)}
+.contact-row .row-del{background:transparent;border:1px solid var(--border);color:var(--danger);border-radius:5px;cursor:pointer;font-size:11px;padding:4px}
+.contact-row-hdr{font-family:DM Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;padding:0 4px 4px}
+
+/* Cert row */
+.cert-row{display:flex;gap:8px;align-items:center;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:6px}
+.cert-name{flex:1;font-size:13px;color:var(--text)}
+.cert-status-pill{font-family:DM Mono,monospace;font-size:10px;padding:2px 8px;border-radius:4px}
+.cert-status-pill.uploaded{background:rgba(0,229,160,.10);color:var(--green);border:1px solid rgba(0,229,160,.25)}
+.cert-status-pill.na{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.cert-status-pill.pending{background:rgba(255,77,109,.10);color:var(--danger);border:1px solid rgba(255,77,109,.25)}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--surface3);color:var(--text);padding:10px 18px;border-radius:9px;border:1px solid var(--border);font-size:13px;z-index:9999;transition:transform .25s ease;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* Rev hist list */
+.rh-row{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start}
+.rh-row:last-child{border-bottom:none}
+.rh-num{font-family:DM Mono,monospace;font-size:12px;color:var(--accent);font-weight:700;min-width:60px}
+.rh-meta{flex:1}
+.rh-date{font-size:12px;color:var(--text2);margin-bottom:3px}
+.rh-note{font-size:12px;color:var(--muted)}
+.rh-action{flex-shrink:0}
+</style>
+
+<script src="head-common.js"></script>
+<script src="db.js"></script>
+<script>
+// Auth guard (matches other modules)
+(async function(){
+  var DEV_BYPASS=false;
+  if(DEV_BYPASS)return;
+  var stored=localStorage.getItem('hvacnexus_session');
+  if(!stored){window.location.href='hvac-login.html';return;}
+  try{
+    var sess=JSON.parse(stored);
+    if(Date.now()/1000<(sess.expires_at||0)-60){
+      if(typeof _authSession!=='undefined')_authSession=sess;
+      return;
+    }
+    var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
+    var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+    var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
+    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
+    else{localStorage.removeItem('hvacnexus_session');window.location.href='hvac-login.html';}
+  }catch(e){window.location.href='hvac-login.html';}
+})();
+</script>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="app-sidebar"></div>
+<script src="sidebar.js"></script>
+<span class="sb-user-name" id="sb-user">—</span></div>
+</div>
+
+<div class="main" id="mainWrap">
+
+<div class="topbar">
+  <div class="bc">
+    <span class="bcl" onclick="navTo('hvac-projects.html')">My Projects</span><span class="bcs">›</span>
+    <span class="bcl" id="bcProj" onclick="navTo('project.html')">—</span><span class="bcs">›</span>
+    <span class="bcc">O&amp;M Manual</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="bg bsm btn" onclick="openRevHistory()">📜 Revision History</button>
+    <button class="bg bsm btn" id="exportBtn" onclick="openExportModal()" disabled style="opacity:.4">⬇ Export PDF</button>
+  </div>
+</div>
+
+<!-- REV BAR -->
+<div class="rev-bar" id="revBar" style="display:none">
+  <div class="rev-bar-left">
+    <span class="docno" id="docNoTxt">Doc No: —</span>
+    <span class="rev-pill empty" id="revPill">No Manual Created</span>
+    <span style="font-size:11.5px;color:var(--muted)" id="revBarMeta"></span>
+  </div>
+  <div class="rev-actions" id="revActions"></div>
+</div>
+
+<!-- VIEWING PUBLISHED REV BANNER -->
+<div class="frozen-ribbon" id="viewBanner" style="display:none">
+  <span>📄</span><span id="viewBannerText"></span>
+  <span style="flex:1"></span>
+  <button class="bg bsm btn" onclick="returnToCurrent()">← Return to Current</button>
+</div>
+
+<div class="body" id="body">
+  <!-- Empty state shown when no manual exists -->
+  <div class="empty-state" id="emptyState" style="display:none">
+    <div class="empty-state-icon">📘</div>
+    <div class="empty-state-title">No O&amp;M Manual Yet</div>
+    <div class="empty-state-sub">Start your first draft to set up the manual structure. You'll get 15 standard chapters as cards which you can edit, mark N/A, or rearrange. Once you publish a revision, it's frozen and exportable as a PDF.</div>
+    <button class="btn bp" onclick="startFirstDraft()">＋ Start First Draft</button>
+  </div>
+
+  <!-- Mobile lockout (the brief said desktop-only) -->
+  <div class="mobile-block" id="mobileBlock" style="display:none">
+    <div class="mobile-block-icon">🖥</div>
+    <div style="font-family:Syne,sans-serif;font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px">Desktop only</div>
+    <div style="font-size:13px;color:var(--muted);max-width:380px;margin:0 auto;line-height:1.5">The O&amp;M Manual builder is only available on the desktop web app. Open this on a laptop or larger screen to continue.</div>
+  </div>
+
+  <!-- Header strip + grid -->
+  <div class="body-hdr" id="bodyHdr" style="display:none">
+    <div class="body-title">O&amp;M Manual</div>
+    <div class="body-sub" id="bodyHdrSub"></div>
+  </div>
+  <div class="body-grid" id="cardGrid" style="display:none"></div>
+</div>
+
+</div><!-- /main -->
+
+<!-- ═══════════════════════════════════════════════════════════════
+     EDIT CARD MODAL — content swaps based on card key/type
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="mo" id="editModal">
+  <div class="modal" style="max-width:720px">
+    <div class="mhdr">
+      <div class="mh3" id="editModalTitle">Edit Section</div>
+      <button class="mclose" onclick="closeM('editModal')">✕</button>
+    </div>
+    <div class="mbody" id="editModalBody"></div>
+    <div class="mfoot">
+      <button class="bg bsm btn" onclick="closeM('editModal')">Cancel</button>
+      <button class="bp bsm btn" onclick="saveCardEdit()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PUBLISH MODAL -->
+<div class="mo" id="publishModal">
+  <div class="modal" style="max-width:480px">
+    <div class="mhdr">
+      <div class="mh3">Publish Revision</div>
+      <button class="mclose" onclick="closeM('publishModal')">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="sup-warn"><span>⚠️</span><span>Once published, this revision is frozen — all current data is captured as a snapshot. Start a new draft for further changes.</span></div>
+      <label class="mlbl">Revision</label>
+      <input class="mi mono" id="pubRev" readonly/>
+      <label class="mlbl">Date</label>
+      <input class="mi" id="pubDate" type="date"/>
+      <label class="mlbl">Description</label>
+      <input class="mi" id="pubNote" placeholder="e.g. Issued for Practical Completion"/>
+      <label class="mlbl">Prepared By</label>
+      <input class="mi" id="pubPrep" placeholder="Your name"/>
+      <label class="mlbl">Reviewed By</label>
+      <input class="mi" id="pubRev2" placeholder="(Optional)"/>
+      <label class="mlbl">Approved By</label>
+      <input class="mi" id="pubApp" placeholder="(Optional)"/>
+    </div>
+    <div class="mfoot">
+      <button class="bg bsm btn" onclick="closeM('publishModal')">Cancel</button>
+      <button class="bp bsm btn" onclick="confirmPublish()">↑ Publish</button>
+    </div>
+  </div>
+</div>
+
+<!-- DISCARD CONFIRM -->
+<div class="mo" id="discardModal">
+  <div class="modal" style="max-width:440px">
+    <div class="mhdr"><div class="mh3">Discard Draft?</div><button class="mclose" onclick="closeM('discardModal')">✕</button></div>
+    <div class="mbody">
+      <div class="sup-warn"><span>⚠️</span><span>Discarding will delete all changes made in this draft. This cannot be undone.</span></div>
+      <p style="font-size:13px;color:var(--text2);margin:0">The manual will revert to the last published revision (or empty state if no revisions exist yet).</p>
+    </div>
+    <div class="mfoot">
+      <button class="bg bsm btn" onclick="closeM('discardModal')">Cancel</button>
+      <button class="btn danger-outline bsm" onclick="confirmDiscard()">🗑 Discard Draft</button>
+    </div>
+  </div>
+</div>
+
+<!-- REV HISTORY -->
+<div class="mo" id="revHistModal">
+  <div class="modal" style="max-width:580px">
+    <div class="mhdr"><div class="mh3">Revision History</div><button class="mclose" onclick="closeM('revHistModal')">✕</button></div>
+    <div class="mbody" id="revHistList" style="padding:0"></div>
+    <div class="mfoot"><button class="bg bsm btn" onclick="closeM('revHistModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- EXPORT placeholder -->
+<div class="mo" id="exportModal">
+  <div class="modal" style="max-width:440px">
+    <div class="mhdr"><div class="mh3">Export PDF</div><button class="mclose" onclick="closeM('exportModal')">✕</button></div>
+    <div class="mbody">
+      <div class="placeholder-block"><span class="pb-icon">⚙️</span>PDF export will be built in the next phase. The full manual will compile into a single PDF with cover, TOC, bookmarks, page numbers, doc no and rev no on every page footer.</div>
+    </div>
+    <div class="mfoot"><button class="bg bsm btn" onclick="closeM('exportModal')">Close</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// O&M MANUAL — STATE & SETUP
+// ════════════════════════════════════════════════════════════════════
+var _proj = (typeof dbGetCurrentProject==='function') ? (dbGetCurrentProject()||{}) : {};
+var _pNum = _proj.num || _proj.number || 'GCT001';
+var _pName = _proj.name || 'Project';
+
+// Manual data shape:
+// { cards:[], draft:{revLabel,startedAt,startedBy,note}|null, revisions:[{rev,date,note,...,snapshot}] }
+var manual = null;
+// When viewing a published rev, this holds the snapshot index
+var viewingRevIdx = null;
+// Card currently being edited
+var _editingCardKey = null;
+// Local draft of card content while modal is open
+var _editingCardDraft = null;
+
+// Default 15-card structure
+var DEFAULT_CARDS = [
+  {key:'cover',       title:'Cover Sheet',                         type:'cover',     icon:'📕'},
+  {key:'intro',       title:'Introduction',                        type:'ai',        icon:'📝'},
+  {key:'contacts',    title:'Contact Information',                 type:'manual',    icon:'📞'},
+  {key:'suppliers',   title:'Equipment Suppliers & Subcontractors',type:'ai',        icon:'🏗'},
+  {key:'description', title:'Project Description & Operation',     type:'ai',        icon:'📋'},
+  {key:'assets',      title:'Asset Register',                      type:'pull-in',   icon:'🗂',  source:'asset_register'},
+  {key:'equipsch',    title:'Equipment Schedules',                 type:'pull-in',   icon:'📊',  source:'equipment'},
+  {key:'firereg',     title:'Passive Fire Register',               type:'pull-in',   icon:'🔥',  source:'fire_register'},
+  {key:'literature',  title:"Manufacturer's Literature",           type:'pull-in',   icon:'📑',  source:'tech_submissions'},
+  {key:'warranties',  title:'Warranties',                          type:'pull-in',   icon:'🛡',  source:'tech_submissions'},
+  {key:'maintenance', title:'Maintenance',                         type:'ai',        icon:'🛠'},
+  {key:'commissioning',title:'Commissioning Reports',              type:'pull-in',   icon:'✅',  source:'commissioning'},
+  {key:'certificates',title:'Certificates',                        type:'upload',    icon:'📜'},
+  {key:'spares',      title:'Spares',                              type:'ai',        icon:'⚙️'},
+  {key:'asbuilt',     title:'As Built Drawings',                   type:'pull-in',   icon:'📐',  source:'drawings'}
+];
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded', async function(){
+  if(typeof dbReady!=='undefined') await dbReady;
+  document.getElementById('bcProj').textContent = _pName;
+  await loadManual();
+  render();
+  attachSidebarObserver();
+  checkViewport();
+  window.addEventListener('resize', checkViewport);
+});
+
+// Mirror sidebar collapsed state to main
+function attachSidebarObserver(){
+  var sb = document.querySelector('.sb');
+  if(!sb) return;
+  var apply = function(){
+    document.getElementById('mainWrap').classList.toggle('sb-sm', sb.classList.contains('sm'));
+  };
+  apply();
+  new MutationObserver(apply).observe(sb,{attributes:true,attributeFilter:['class']});
+}
+function checkViewport(){
+  // Re-render so body-hdr / grid / mobileBlock visibility update on resize
+  if(manual) render();
+}
+
+async function loadManual(){
+  try{ manual = await dbGetOmManual(_pNum); }catch(e){ manual=null; }
+}
+async function saveManual(){
+  if(!manual) return;
+  manual.updatedAt = new Date().toISOString();
+  try{ await dbSetOmManual(_pNum, manual); }catch(e){ console.error('saveManual',e); showToast('⚠ Save failed: '+e.message); }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// REV / DRAFT STATE MACHINE
+// ════════════════════════════════════════════════════════════════════
+function nextRevLabel(){
+  if(!manual || !manual.revisions || !manual.revisions.length) return 'Rev 01';
+  var last = manual.revisions[manual.revisions.length-1].rev || 'Rev 00';
+  var m = last.match(/(\d+)/);
+  var n = m ? parseInt(m[1])+1 : 1;
+  return 'Rev ' + String(n).padStart(2,'0');
+}
+
+async function startFirstDraft(){
+  manual = {
+    cards: JSON.parse(JSON.stringify(DEFAULT_CARDS)).map(function(c){
+      c.status = 'empty';
+      c.content = {};
+      c.lastEdited = null;
+      return c;
+    }),
+    draft: {
+      revLabel: 'Rev 01',
+      startedAt: new Date().toISOString(),
+      startedBy: getCurrentUserName()
+    },
+    revisions: [],
+    docNo: 'OM-' + (_pNum || 'XXXX'),
+    createdAt: new Date().toISOString()
+  };
+  // Seed certificates card from company template
+  await seedCertificatesCard();
+  await saveManual();
+  render();
+  showToast('✓ Draft started — ' + manual.draft.revLabel + ' Draft');
+}
+
+async function startNewDraft(){
+  if(!manual || manual.draft){ return; }
+  manual.draft = {
+    revLabel: nextRevLabel(),
+    startedAt: new Date().toISOString(),
+    startedBy: getCurrentUserName()
+  };
+  // The cards remain as the last published state (already in manual.cards)
+  await saveManual();
+  render();
+  showToast('✓ Draft started — ' + manual.draft.revLabel + ' Draft');
+}
+
+function openPublishModal(){
+  if(!manual || !manual.draft){ alert('No active draft to publish.'); return; }
+  document.getElementById('pubRev').value = manual.draft.revLabel;
+  document.getElementById('pubDate').value = todayStr();
+  document.getElementById('pubNote').value = '';
+  document.getElementById('pubPrep').value = getCurrentUserName();
+  document.getElementById('pubRev2').value = '';
+  document.getElementById('pubApp').value = '';
+  document.getElementById('publishModal').classList.add('open');
+}
+
+async function confirmPublish(){
+  if(!manual || !manual.draft) return;
+  var revLabel = manual.draft.revLabel;
+  var snapshot = {
+    cards: JSON.parse(JSON.stringify(manual.cards))
+    // TODO: pull-in snapshots will be populated here when pull-in cards are wired in Phase 3
+  };
+  manual.revisions.push({
+    rev: revLabel,
+    date: document.getElementById('pubDate').value || todayStr(),
+    note: document.getElementById('pubNote').value.trim(),
+    preparedBy: document.getElementById('pubPrep').value.trim(),
+    reviewedBy: document.getElementById('pubRev2').value.trim(),
+    approvedBy: document.getElementById('pubApp').value.trim(),
+    publishedAt: new Date().toISOString(),
+    snapshot: snapshot
+  });
+  manual.draft = null;
+  await saveManual();
+  closeM('publishModal');
+  render();
+  showToast('✓ ' + revLabel + ' published');
+}
+
+function openDiscardModal(){
+  if(!manual || !manual.draft){ return; }
+  document.getElementById('discardModal').classList.add('open');
+}
+async function confirmDiscard(){
+  if(!manual || !manual.draft) return;
+  // Restore cards from last published snapshot, or wipe to empty defaults if none
+  if(manual.revisions && manual.revisions.length){
+    var last = manual.revisions[manual.revisions.length-1];
+    manual.cards = JSON.parse(JSON.stringify(last.snapshot.cards));
+  } else {
+    // No prior publish — drop the manual entirely
+    manual = null;
+    try{ await dbSetOmManual(_pNum, null); }catch(e){}
+    closeM('discardModal');
+    render();
+    showToast('✓ Draft discarded — manual reset');
+    return;
+  }
+  manual.draft = null;
+  await saveManual();
+  closeM('discardModal');
+  render();
+  showToast('✓ Draft discarded');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// VIEW PUBLISHED REVISIONS (read-only)
+// ════════════════════════════════════════════════════════════════════
+function viewRevision(idx){
+  viewingRevIdx = idx;
+  closeM('revHistModal');
+  render();
+}
+function returnToCurrent(){
+  viewingRevIdx = null;
+  render();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════════════════════════════════
+function render(){
+  var emptyState = document.getElementById('emptyState');
+  var bodyHdr = document.getElementById('bodyHdr');
+  var grid = document.getElementById('cardGrid');
+  var revBar = document.getElementById('revBar');
+  var viewBanner = document.getElementById('viewBanner');
+  var exportBtn = document.getElementById('exportBtn');
+
+  if(!manual){
+    emptyState.style.display = 'block';
+    bodyHdr.style.display = 'none';
+    grid.style.display = 'none';
+    revBar.style.display = 'none';
+    viewBanner.style.display = 'none';
+    document.getElementById('mobileBlock').style.display = 'none';
+    exportBtn.disabled = true;
+    exportBtn.style.opacity = '.4';
+    return;
+  }
+
+  // Mobile?
+  if(window.innerWidth < 1024){
+    document.getElementById('mobileBlock').style.display = 'block';
+    bodyHdr.style.display = 'none';
+    grid.style.display = 'none';
+    revBar.style.display = 'flex';
+  } else {
+    document.getElementById('mobileBlock').style.display = 'none';
+    bodyHdr.style.display = 'flex';
+    grid.style.display = 'grid';
+    revBar.style.display = 'flex';
+  }
+
+  emptyState.style.display = 'none';
+
+  // Doc no & rev pill
+  document.getElementById('docNoTxt').textContent = 'Doc No: ' + (manual.docNo || ('OM-'+_pNum));
+  var pill = document.getElementById('revPill');
+  var meta = document.getElementById('revBarMeta');
+  pill.classList.remove('published','draft','empty');
+
+  if(viewingRevIdx !== null){
+    var rv = manual.revisions[viewingRevIdx];
+    pill.textContent = rv.rev + ' (Viewing)';
+    pill.classList.add('published');
+    meta.textContent = fmtD(rv.date) + (rv.note?' · '+rv.note:'');
+    viewBanner.style.display = 'flex';
+    document.getElementById('viewBannerText').textContent = 'Viewing ' + rv.rev + ' — frozen snapshot from ' + fmtD(rv.date);
+  } else if(manual.draft){
+    pill.textContent = manual.draft.revLabel + ' Draft';
+    pill.classList.add('draft');
+    meta.textContent = 'Started ' + fmtD(manual.draft.startedAt.split('T')[0]) + (manual.draft.startedBy?' by '+manual.draft.startedBy:'');
+    viewBanner.style.display = 'none';
+  } else if(manual.revisions && manual.revisions.length){
+    var lastR = manual.revisions[manual.revisions.length-1];
+    pill.textContent = lastR.rev + ' (Current)';
+    pill.classList.add('published');
+    meta.textContent = fmtD(lastR.date) + (lastR.note?' · '+lastR.note:'');
+    viewBanner.style.display = 'none';
+  } else {
+    pill.textContent = '—';
+    pill.classList.add('empty');
+    meta.textContent = '';
+    viewBanner.style.display = 'none';
+  }
+
+  // Header subtitle
+  var totalCards = manual.cards.length;
+  var activeCards = manual.cards.filter(function(c){return c.status!=='na';}).length;
+  var completeCards = manual.cards.filter(function(c){return c.status==='complete';}).length;
+  document.getElementById('bodyHdrSub').textContent = activeCards + ' active sections · ' + completeCards + ' complete · ' + (totalCards-activeCards) + ' marked N/A';
+
+  // Rev actions
+  renderRevActions();
+
+  // Cards
+  renderCards();
+
+  // Export available only when at least one revision exists
+  var hasRev = manual.revisions && manual.revisions.length>0;
+  exportBtn.disabled = !hasRev;
+  exportBtn.style.opacity = hasRev ? '1' : '.4';
+}
+
+function renderRevActions(){
+  var box = document.getElementById('revActions');
+  if(viewingRevIdx !== null){
+    box.innerHTML = '<button class="bg bsm btn" onclick="returnToCurrent()">← Back to Current</button>';
+    return;
+  }
+  var html = '';
+  if(manual.draft){
+    html += '<button class="bp bsm btn" onclick="openPublishModal()">↑ Publish Revision</button>';
+    html += '<button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="openDiscardModal()">🗑 Discard Draft</button>';
+  } else {
+    html += '<button class="bp bsm btn" onclick="startNewDraft()">＋ Start New Draft</button>';
+  }
+  box.innerHTML = html;
+}
+
+function getActiveCards(){
+  // When viewing a rev, return that snapshot's cards
+  if(viewingRevIdx !== null){
+    return manual.revisions[viewingRevIdx].snapshot.cards;
+  }
+  return manual.cards;
+}
+
+function renderCards(){
+  var grid = document.getElementById('cardGrid');
+  var cards = getActiveCards();
+  var readonly = (viewingRevIdx !== null) || !manual.draft;
+  // readonly when published current OR viewing rev. Draft = editable.
+
+  grid.innerHTML = cards.map(function(c, idx){
+    return cardHtml(c, idx, readonly);
+  }).join('');
+
+  // Drag handlers (only when editable)
+  if(!readonly){ wireDragDrop(); }
+}
+
+function cardHtml(c, idx, readonly){
+  var statusCls = 'st-'+(c.status||'empty');
+  var statusLabel = {empty:'🔴 Empty', draft:'🟡 Draft', complete:'🟢 Complete', na:'⚪ N/A'}[c.status||'empty'] || '🔴 Empty';
+  var summary = cardSummary(c);
+  var typeLbl = {cover:'Cover', ai:'AI Generated', 'pull-in':'Pulled In', upload:'Upload', manual:'Manual', history:'Auto'}[c.type] || c.type;
+
+  var actionsHtml = '';
+  if(readonly){
+    actionsHtml =
+      '<button class="card-action-btn" onclick="openCardEdit(\''+c.key+'\')">👁 View</button>';
+  } else {
+    var disabledNa = c.status==='na';
+    actionsHtml =
+      '<button class="card-action-btn primary" onclick="openCardEdit(\''+c.key+'\')" '+(disabledNa?'disabled':'')+'>✎ '+(c.status==='complete'?'Edit':'Open')+'</button>'+
+      '<button class="card-action-btn" onclick="toggleNA(\''+c.key+'\')" title="Mark this section Not Applicable">'+(c.status==='na'?'↻ Restore':'⊘ N/A')+'</button>'+
+      (c.status!=='na' ? '<button class="card-action-btn" onclick="markComplete(\''+c.key+'\')" title="Mark this section as complete">'+(c.status==='complete'?'↻ Reopen':'✓ Done')+'</button>' : '');
+  }
+
+  return '<div class="om-card '+(c.status==='na'?'na':'')+'" data-key="'+c.key+'" '+(!readonly?'draggable="true"':'')+'>'+
+    '<div class="card-top">'+
+      (!readonly?'<span class="card-handle" title="Drag to reorder">⋮⋮</span>':'')+
+      '<div class="card-num">'+(idx+1)+'</div>'+
+      '<div class="card-title-wrap">'+
+        '<div class="card-title">'+(c.icon||'')+' '+escHtml(c.title)+'</div>'+
+        '<div class="card-type">'+typeLbl+'</div>'+
+      '</div>'+
+      '<div class="card-status '+statusCls+'">'+statusLabel+'</div>'+
+    '</div>'+
+    '<div class="card-summary">'+summary+'</div>'+
+    '<div class="card-actions">'+actionsHtml+'</div>'+
+  '</div>';
+}
+
+function cardSummary(c){
+  if(c.status==='na') return '<span class="empty">Marked Not Applicable for this project.</span>';
+  var content = c.content || {};
+  // Card-specific summaries
+  switch(c.key){
+    case 'cover':
+      var ttl = content.title || 'Mechanical Services Installation, Operation & Maintenance Manual';
+      return '<div>'+escHtml(ttl)+'</div>'+
+             (content.siteAddress?'<span class="meta-line">📍 '+escHtml(content.siteAddress)+'</span>':'<span class="meta-line empty">Auto-fills from project & company settings</span>');
+    case 'intro':
+    case 'description':
+    case 'maintenance':
+    case 'spares':
+    case 'suppliers':
+      var body = content.body || '';
+      if(!body) return '<span class="empty">AI will generate based on project data. Open to begin.</span>';
+      return escHtml(body.length>140?body.slice(0,140)+'…':body);
+    case 'contacts':
+      var rows = content.contacts||[];
+      if(!rows.length) return '<span class="empty">No contacts added yet.</span>';
+      return rows.length + ' contact' + (rows.length===1?'':'s') + '<span class="meta-line">'+escHtml((rows[0]&&rows[0].name)||'')+(rows.length>1?' + '+(rows.length-1)+' more':'')+'</span>';
+    case 'assets':
+    case 'equipsch':
+    case 'firereg':
+    case 'commissioning':
+    case 'asbuilt':
+    case 'literature':
+    case 'warranties':
+      return '<span class="empty">Pulled live from '+escHtml(c.source||'source module')+'. Snapshotted on publish.</span>';
+    case 'certificates':
+      var certs = content.certificates||[];
+      if(!certs.length) return '<span class="empty">No certificates configured yet. Set up in Company Settings.</span>';
+      var pending=0,uploaded=0,na=0;
+      certs.forEach(function(x){if(x.status==='uploaded')uploaded++;else if(x.status==='na')na++;else pending++;});
+      return uploaded+' uploaded · '+pending+' pending · '+na+' N/A<span class="meta-line">'+certs.length+' certificate'+(certs.length===1?'':'s')+' in scope</span>';
+  }
+  return '<span class="empty">—</span>';
+}
+
+// ════════════════════════════════════════════════════════════════════
+// CARD-LEVEL ACTIONS
+// ════════════════════════════════════════════════════════════════════
+function getCard(key){
+  if(viewingRevIdx!==null){
+    return manual.revisions[viewingRevIdx].snapshot.cards.find(function(c){return c.key===key;});
+  }
+  return manual.cards.find(function(c){return c.key===key;});
+}
+
+async function toggleNA(key){
+  if(!manual.draft){ showToast('Start a new draft to make changes'); return; }
+  var c = getCard(key); if(!c) return;
+  if(c.status==='na'){
+    c.status = 'empty';
+    c.naReason = '';
+  } else {
+    c.status = 'na';
+    c.naReason = '';
+  }
+  c.lastEdited = new Date().toISOString();
+  await saveManual();
+  render();
+}
+
+async function markComplete(key){
+  if(!manual.draft){ showToast('Start a new draft to make changes'); return; }
+  var c = getCard(key); if(!c) return;
+  if(c.status==='complete'){
+    // Reopen — back to draft if there's content, else empty
+    var hasContent = c.content && Object.keys(c.content).length>0;
+    c.status = hasContent ? 'draft' : 'empty';
+  } else {
+    c.status = 'complete';
+  }
+  c.lastEdited = new Date().toISOString();
+  await saveManual();
+  render();
+}
+
+// ── Open the per-card edit modal ──
+function openCardEdit(key){
+  var c = getCard(key);
+  if(!c) return;
+  _editingCardKey = key;
+  _editingCardDraft = JSON.parse(JSON.stringify(c.content||{}));
+  var readonly = (viewingRevIdx !== null) || !manual.draft;
+
+  document.getElementById('editModalTitle').textContent = (readonly?'View: ':'Edit: ') + c.title;
+  document.getElementById('editModalBody').innerHTML = renderCardEditor(c, readonly);
+  // Hide save button when readonly
+  var foot = document.querySelector('#editModal .mfoot');
+  foot.innerHTML = readonly
+    ? '<button class="bg bsm btn" onclick="closeM(\'editModal\')">Close</button>'
+    : '<button class="bg bsm btn" onclick="closeM(\'editModal\')">Cancel</button><button class="bp bsm btn" onclick="saveCardEdit()">💾 Save</button>';
+
+  document.getElementById('editModal').classList.add('open');
+}
+
+// ── Renderers per card type ──
+function renderCardEditor(c, ro){
+  switch(c.key){
+    case 'cover':       return editorCover(c, ro);
+    case 'contacts':    return editorContacts(c, ro);
+    case 'certificates':return editorCertificates(c, ro);
+    case 'intro':
+    case 'description':
+    case 'suppliers':
+    case 'maintenance':
+    case 'spares':      return editorAi(c, ro);
+    case 'assets':
+    case 'equipsch':
+    case 'firereg':
+    case 'commissioning':
+    case 'asbuilt':
+    case 'literature':
+    case 'warranties':  return editorPullIn(c, ro);
+  }
+  return '<div class="placeholder-block">No editor defined for this card type yet.</div>';
+}
+
+function editorCover(c, ro){
+  var d = _editingCardDraft;
+  var roAttr = ro?'readonly disabled':'';
+  return ''+
+    '<div class="placeholder-block" style="margin-bottom:14px"><span class="pb-icon">📕</span>The cover sheet auto-populates from <strong>Company Settings</strong> (logo, ABN, addresses, accreditation logos) and the <strong>Project record</strong> (project no, project name, site address). Override here only if needed for this manual.</div>'+
+    '<label class="mlbl">Manual Title</label>'+
+    '<input class="mi" id="ec_title" value="'+escAttr(d.title||'Mechanical Services Installation, Operation & Maintenance Manual')+'" '+roAttr+'/>'+
+    '<label class="mlbl">Project Name (override — defaults to project record)</label>'+
+    '<input class="mi" id="ec_pname" value="'+escAttr(d.projectName||'')+'" placeholder="'+escAttr(_pName)+'" '+roAttr+'/>'+
+    '<label class="mlbl">Project Number (override)</label>'+
+    '<input class="mi mono" id="ec_pnum" value="'+escAttr(d.projectNumber||'')+'" placeholder="'+escAttr(_pNum)+'" '+roAttr+'/>'+
+    '<label class="mlbl">Site Address</label>'+
+    '<textarea class="mi" id="ec_addr" rows="2" '+roAttr+'>'+escHtml(d.siteAddress||'')+'</textarea>';
+}
+
+function editorContacts(c, ro){
+  var rows = (_editingCardDraft.contacts||[]);
+  var rowsHtml = rows.map(function(r,i){
+    return '<div class="contact-row" data-idx="'+i+'">'+
+      '<input placeholder="Role / Title" value="'+escAttr(r.role||'')+'" '+(ro?'readonly':'oninput="contactsUpd('+i+',\'role\',this.value)"')+'/>'+
+      '<input placeholder="Name" value="'+escAttr(r.name||'')+'" '+(ro?'readonly':'oninput="contactsUpd('+i+',\'name\',this.value)"')+'/>'+
+      '<input placeholder="Phone" value="'+escAttr(r.phone||'')+'" '+(ro?'readonly':'oninput="contactsUpd('+i+',\'phone\',this.value)"')+'/>'+
+      '<input placeholder="Email" value="'+escAttr(r.email||'')+'" '+(ro?'readonly':'oninput="contactsUpd('+i+',\'email\',this.value)"')+'/>'+
+      (ro?'':'<button class="row-del" onclick="contactsDel('+i+')">✕</button>')+
+    '</div>';
+  }).join('');
+  return ''+
+    '<div class="placeholder-block" style="margin-bottom:12px"><span class="pb-icon">📞</span>List the key contacts for this project — Builder, Mechanical Engineer, Hydraulic Engineer, Fire Engineer, Mechanical PM, etc. AI will pre-fill common roles in a future update.</div>'+
+    '<div class="contact-row contact-row-hdr"><span>Role</span><span>Name</span><span>Phone</span><span>Email</span><span></span></div>'+
+    '<div id="contactsRowsWrap">'+rowsHtml+'</div>'+
+    (ro?'':'<button class="bg bsm btn" onclick="contactsAdd()" style="margin-top:8px">＋ Add Contact</button>');
+}
+function contactsAdd(){
+  if(!_editingCardDraft.contacts) _editingCardDraft.contacts=[];
+  _editingCardDraft.contacts.push({role:'',name:'',phone:'',email:''});
+  document.getElementById('editModalBody').innerHTML = renderCardEditor(getCard(_editingCardKey), false);
+}
+function contactsDel(i){
+  _editingCardDraft.contacts.splice(i,1);
+  document.getElementById('editModalBody').innerHTML = renderCardEditor(getCard(_editingCardKey), false);
+}
+function contactsUpd(i,field,val){
+  if(_editingCardDraft.contacts[i]) _editingCardDraft.contacts[i][field] = val;
+}
+
+function editorAi(c, ro){
+  var d = _editingCardDraft;
+  return ''+
+    '<div class="placeholder-block" style="margin-bottom:14px"><span class="pb-icon">🤖</span><strong>AI generation will be wired in Phase 4.</strong> The AI will draft this section using project data, specifications and (where relevant) the maintenance library / equipment schedule. For now you can write the content manually — it will save as a draft.</div>'+
+    '<label class="mlbl">Section Content</label>'+
+    '<textarea class="mi" id="ec_body" rows="14" '+(ro?'readonly disabled':'')+' placeholder="Write content here, or wait for AI generation in the next phase…">'+escHtml(d.body||'')+'</textarea>';
+}
+
+function editorPullIn(c, ro){
+  return ''+
+    '<div class="placeholder-block" style="margin-bottom:14px"><span class="pb-icon">🔗</span><strong>Pulled-in section.</strong> This card pulls live data from <strong>'+escHtml(c.source||'source module')+'</strong> while the manual is in draft. On publish, the data is snapshotted and frozen against this revision. The pull-in wiring will be built in Phase 3 — for now you can add notes or override text below.</div>'+
+    '<label class="mlbl">Section Notes / Cover Page (optional)</label>'+
+    '<textarea class="mi" id="ec_notes" rows="6" '+(ro?'readonly disabled':'')+' placeholder="Optional intro text shown on the chapter cover sheet…">'+escHtml((_editingCardDraft.notes)||'')+'</textarea>';
+}
+
+function editorCertificates(c, ro){
+  var certs = _editingCardDraft.certificates||[];
+  var rowsHtml = certs.map(function(x,i){
+    var statusBadge =
+      x.status==='uploaded' ? '<span class="cert-status-pill uploaded">UPLOADED</span>' :
+      x.status==='na' ? '<span class="cert-status-pill na">N/A</span>' :
+      '<span class="cert-status-pill pending">PENDING</span>';
+    var actions = ro ? '' :
+      '<select class="fsel" style="font-size:11px;padding:3px 6px" onchange="certUpdStatus('+i+',this.value)">'+
+        '<option value="pending"'+(x.status==='pending'||!x.status?' selected':'')+'>Pending</option>'+
+        '<option value="uploaded"'+(x.status==='uploaded'?' selected':'')+'>Uploaded</option>'+
+        '<option value="na"'+(x.status==='na'?' selected':'')+'>N/A</option>'+
+      '</select>'+
+      (x.status==='uploaded' ? ' <button class="bg bsm btn" onclick="certClearUpload('+i+')" style="font-size:10px;padding:2px 7px;color:var(--danger);border-color:rgba(255,77,109,.3)">✕ Clear</button>' :
+        '<label class="bg bsm btn" style="font-size:10px;padding:3px 8px;cursor:pointer">⬆ Upload<input type="file" style="display:none" accept=".pdf,image/*" onchange="certUploadFile('+i+',this)"></label>');
+    return '<div class="cert-row">'+
+      '<span class="cert-name">'+escHtml(x.name||'')+'</span>'+
+      statusBadge+
+      actions+
+    '</div>';
+  }).join('');
+  return ''+
+    '<div class="placeholder-block" style="margin-bottom:14px"><span class="pb-icon">📜</span>Master list comes from <strong>Company Settings → Templates → O&amp;M Certificates</strong>. Mark items N/A if not applicable to this project, or upload the document.</div>'+
+    (certs.length?'':'<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No certificates configured. <a href="hvac-settings.html" style="color:var(--accent)">Add some in Company Settings →</a></div>')+
+    rowsHtml;
+}
+function certUpdStatus(i,val){
+  if(_editingCardDraft.certificates[i]) _editingCardDraft.certificates[i].status = val;
+  // re-render to update badge
+  document.getElementById('editModalBody').innerHTML = renderCardEditor(getCard(_editingCardKey), false);
+}
+async function certUploadFile(i, input){
+  var f = input.files && input.files[0]; if(!f) return;
+  // Use existing photo bucket helper for now
+  showToast('Uploading…');
+  try{
+    var url = await sbUploadFile(PHOTO_BUCKET, 'om-certs/'+_pNum+'/'+Date.now()+'_'+f.name, f, {contentType:f.type});
+    _editingCardDraft.certificates[i].fileUrl = url;
+    _editingCardDraft.certificates[i].fileName = f.name;
+    _editingCardDraft.certificates[i].uploadedAt = new Date().toISOString();
+    _editingCardDraft.certificates[i].status = 'uploaded';
+    document.getElementById('editModalBody').innerHTML = renderCardEditor(getCard(_editingCardKey), false);
+    showToast('✓ Uploaded — Save to keep');
+  }catch(e){ alert('Upload failed: '+e.message); }
+}
+function certClearUpload(i){
+  if(!confirm('Remove this uploaded file?')) return;
+  delete _editingCardDraft.certificates[i].fileUrl;
+  delete _editingCardDraft.certificates[i].fileName;
+  delete _editingCardDraft.certificates[i].uploadedAt;
+  _editingCardDraft.certificates[i].status = 'pending';
+  document.getElementById('editModalBody').innerHTML = renderCardEditor(getCard(_editingCardKey), false);
+}
+
+// ── Save card edit ──
+async function saveCardEdit(){
+  if(!_editingCardKey || !manual || !manual.draft) return;
+  var c = manual.cards.find(function(x){return x.key===_editingCardKey;});
+  if(!c) return;
+  // Merge draft form values into _editingCardDraft for inputs that update on save
+  var body = document.getElementById('editModalBody');
+  var titleEl = body.querySelector('#ec_title');
+  if(titleEl) _editingCardDraft.title = titleEl.value.trim();
+  var pn = body.querySelector('#ec_pname'); if(pn) _editingCardDraft.projectName = pn.value.trim();
+  var pnum = body.querySelector('#ec_pnum'); if(pnum) _editingCardDraft.projectNumber = pnum.value.trim();
+  var ad = body.querySelector('#ec_addr'); if(ad) _editingCardDraft.siteAddress = ad.value.trim();
+  var bd = body.querySelector('#ec_body'); if(bd) _editingCardDraft.body = bd.value;
+  var nt = body.querySelector('#ec_notes'); if(nt) _editingCardDraft.notes = nt.value;
+
+  c.content = _editingCardDraft;
+  c.lastEdited = new Date().toISOString();
+  c.editedBy = getCurrentUserName();
+  // Bump status to draft if it was empty and there's now content
+  if(c.status==='empty' && hasAnyContent(_editingCardDraft)) c.status = 'draft';
+  await saveManual();
+  closeM('editModal');
+  _editingCardKey = null;
+  _editingCardDraft = null;
+  render();
+  showToast('✓ Section saved');
+}
+
+function hasAnyContent(o){
+  if(!o) return false;
+  for(var k in o){
+    var v = o[k];
+    if(v==null) continue;
+    if(typeof v==='string' && v.trim()) return true;
+    if(typeof v==='object' && Object.keys(v).length) return true;
+    if(typeof v==='number' || typeof v==='boolean') return true;
+  }
+  return false;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// CERTIFICATE SEEDING from company template
+// ════════════════════════════════════════════════════════════════════
+async function seedCertificatesCard(){
+  var card = manual.cards.find(function(c){return c.key==='certificates';});
+  if(!card) return;
+  try{
+    var tpl = await dbGetCertificatesTemplate();
+    if(!Array.isArray(tpl) || !tpl.length) return;
+    var seeded = tpl
+      .filter(function(t){return t.defaultRequired!==false;})
+      .map(function(t){return {id:t.id,name:t.name,status:'pending'};});
+    card.content = card.content || {};
+    card.content.certificates = seeded;
+  }catch(e){ console.warn('seedCertificatesCard',e); }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// REV HISTORY
+// ════════════════════════════════════════════════════════════════════
+function openRevHistory(){
+  var list = document.getElementById('revHistList');
+  if(!manual || !manual.revisions || !manual.revisions.length){
+    list.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted)">No revisions yet.</div>';
+  } else {
+    var html = '';
+    manual.revisions.slice().reverse().forEach(function(rv,ri){
+      var origIdx = manual.revisions.length-1-ri;
+      var isLatest = ri===0;
+      html += '<div class="rh-row">'+
+        '<div class="rh-num">'+rv.rev+(isLatest?' <span style="font-size:9px;color:var(--green);font-weight:500">LATEST</span>':'')+'</div>'+
+        '<div class="rh-meta">'+
+          '<div class="rh-date">'+fmtD(rv.date)+(rv.preparedBy?' · Prepared: '+escHtml(rv.preparedBy):'')+'</div>'+
+          (rv.note?'<div class="rh-note">'+escHtml(rv.note)+'</div>':'')+
+        '</div>'+
+        '<div class="rh-action"><button class="bg bsm btn" onclick="viewRevision('+origIdx+')">👁 View</button></div>'+
+      '</div>';
+    });
+    list.innerHTML = html;
+  }
+  document.getElementById('revHistModal').classList.add('open');
+}
+
+function openExportModal(){
+  if(!manual || !manual.revisions || !manual.revisions.length){
+    showToast('Publish a revision first to export'); return;
+  }
+  document.getElementById('exportModal').classList.add('open');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DRAG-AND-DROP (desktop only)
+// ════════════════════════════════════════════════════════════════════
+function wireDragDrop(){
+  var grid = document.getElementById('cardGrid');
+  var dragKey = null;
+  grid.querySelectorAll('.om-card').forEach(function(el){
+    el.addEventListener('dragstart', function(e){
+      dragKey = el.getAttribute('data-key');
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try{ e.dataTransfer.setData('text/plain', dragKey); }catch(_){}
+    });
+    el.addEventListener('dragend', function(){
+      dragKey = null;
+      grid.querySelectorAll('.om-card').forEach(function(c){c.classList.remove('dragging','drag-over');});
+    });
+    el.addEventListener('dragover', function(e){
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      grid.querySelectorAll('.om-card').forEach(function(c){c.classList.remove('drag-over');});
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('drop', async function(e){
+      e.preventDefault();
+      var sourceKey = dragKey || e.dataTransfer.getData('text/plain');
+      var targetKey = el.getAttribute('data-key');
+      if(!sourceKey || sourceKey===targetKey) return;
+      reorderCards(sourceKey, targetKey);
+      await saveManual();
+      render();
+    });
+  });
+}
+
+function reorderCards(sourceKey, targetKey){
+  var cards = manual.cards;
+  var sIdx = cards.findIndex(function(c){return c.key===sourceKey;});
+  var tIdx = cards.findIndex(function(c){return c.key===targetKey;});
+  if(sIdx<0 || tIdx<0) return;
+  var moved = cards.splice(sIdx,1)[0];
+  cards.splice(tIdx, 0, moved);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════
+function getCurrentUserName(){
+  try{
+    var cu = (typeof dbGetCurrentUser==='function') ? dbGetCurrentUser() : null;
+    if(cu && cu.name) return cu.name;
+  }catch(e){}
+  return '';
+}
+function todayStr(){ return new Date().toISOString().split('T')[0]; }
+function fmtD(d){ if(!d) return '—'; var p=String(d).split('T')[0].split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d; }
+function escHtml(s){ if(s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s){ if(s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function closeM(id){ var el=document.getElementById(id); if(el) el.classList.remove('open'); }
+function navTo(url){ window.location.href = url; }
+function showToast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.classList.remove('show'); }, 2400);
+}
+
+// Click outside modal closes it
+document.addEventListener('click', function(e){
+  if(e.target.classList && e.target.classList.contains('mo')){
+    e.target.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

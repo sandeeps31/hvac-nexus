@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<!-- build: 2026-05-03 maint-lib-v1 -->
+<html lang="en">
+<head>
+<link rel="stylesheet" href="theme.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maintenance Library — HVAC Nexus</title>
+<style>
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;overflow:hidden;height:100vh;margin:0}
+.main{margin-left:230px;transition:margin-left .25s;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.main.sb-sm{margin-left:52px}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:200}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px}
+.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}
+.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted)}
+.bsm{padding:5px 12px;font-size:12px}
+.body-wrap{flex:1;overflow:auto;padding:24px}
+.body-inner{max-width:1100px;margin:0 auto}
+.info-banner{background:rgba(0,200,255,.06);border:1px solid rgba(0,200,255,.2);border-radius:10px;padding:12px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px;font-size:13px;color:var(--text2)}
+.info-banner .ib-icon{font-size:18px;color:var(--accent);flex-shrink:0;line-height:1.4}
+
+.eq-list{display:flex;flex-direction:column;gap:14px}
+.eq-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.eq-hdr{padding:14px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.eq-name-input{background:transparent;border:1px solid transparent;border-radius:6px;color:var(--text);font-family:'Syne',sans-serif;font-weight:700;font-size:15px;padding:5px 10px;outline:none;flex:1;min-width:200px}
+.eq-name-input:hover{border-color:var(--border)}
+.eq-name-input:focus{border-color:var(--accent);background:var(--surface3)}
+.eq-tasks-count{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
+.eq-actions{display:flex;gap:6px}
+.icon-btn{padding:5px 9px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:6px;cursor:pointer;font-size:12px;transition:all .12s}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent)}
+.icon-btn.danger:hover{border-color:var(--danger);color:var(--danger)}
+
+.eq-body{padding:0}
+.task-row{padding:10px 18px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 130px 130px 38px;gap:10px;align-items:start;align-content:start}
+.task-row:last-child{border-bottom:none}
+.task-row input,.task-row select,.task-row textarea{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;width:100%;box-sizing:border-box}
+.task-row input:focus,.task-row select:focus,.task-row textarea:focus{border-color:var(--accent)}
+.task-row textarea{resize:vertical;min-height:34px;max-height:120px;font-family:inherit}
+.task-meta{display:flex;flex-direction:column;gap:6px}
+.task-meta-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.checklist{margin-top:6px;display:flex;flex-direction:column;gap:4px;padding-left:0}
+.checklist-item{display:flex;align-items:center;gap:6px;font-size:12px}
+.checklist-item input[type=text]{flex:1}
+.checklist-add{font-size:11.5px;color:var(--accent);background:transparent;border:1px dashed var(--border);border-radius:5px;padding:4px 10px;cursor:pointer;align-self:flex-start}
+.checklist-add:hover{border-color:var(--accent);background:rgba(0,200,255,.04)}
+.eq-foot{padding:10px 18px;background:var(--surface2);border-top:1px solid var(--border)}
+.add-task-btn{font-size:12.5px;color:var(--accent);background:transparent;border:1px dashed var(--border);border-radius:7px;padding:7px 14px;cursor:pointer;width:100%}
+.add-task-btn:hover{border-color:var(--accent);background:rgba(0,200,255,.04)}
+.add-eq-btn{margin-top:18px;width:100%;padding:14px;font-size:13px;color:var(--accent);background:transparent;border:2px dashed var(--border);border-radius:12px;cursor:pointer;transition:all .12s}
+.add-eq-btn:hover{border-color:var(--accent);background:rgba(0,200,255,.04)}
+
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);color:var(--text);padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.empty-state{padding:60px 20px;text-align:center;color:var(--muted)}
+.empty-state .es-icon{font-size:42px;margin-bottom:10px;opacity:.5}
+</style>
+</head>
+<body>
+
+<div id="app-sidebar"></div>
+<script src="sidebar.js"></script>
+
+<div class="main" id="mainWrap">
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl" onclick="navTo('hvac-settings.html')">Settings</span>
+      <span class="bcs">›</span>
+      <span class="bcc">Maintenance Library</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)" id="syncStatus"></span>
+      <button class="btn bg bsm" onclick="loadAll()">↻ Sync</button>
+      <button class="btn bp bsm" onclick="saveAll()">💾 Save</button>
+    </div>
+  </div>
+
+  <div class="body-wrap">
+    <div class="body-inner">
+      <div class="info-banner">
+        <span class="ib-icon">🔧</span>
+        <span>Define maintenance tasks, frequencies and inspection checklists per equipment type. Used by the O&amp;M Manual <b>Maintenance</b> chapter (AI generation) and future PPM module. Tasks here are templates — actual project plans pull from this library.</span>
+      </div>
+
+      <div class="eq-list" id="eqList"></div>
+      <button class="add-eq-btn" onclick="addEqType()">+ Add Equipment Type</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="db.js"></script>
+<script>
+(function(){if(!localStorage.getItem('hvacnexus_session')){window.location.href='hvac-login.html';}})();
+</script>
+<script>
+function navTo(p){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+p;}
+function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
+function showToast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('show');},2500);}
+function setSync(m){var el=document.getElementById('syncStatus');if(el)el.textContent=m;}
+
+var _lib={types:[]};
+var _dirty=false;
+var FREQ_OPTS=['Weekly','Monthly','Quarterly','6-Monthly','Annually','2-Yearly','5-Yearly','As required'];
+
+(async function(){
+  await dbReady;
+  await loadAll();
+  // Warn before unload if dirty
+  window.addEventListener('beforeunload',function(e){if(_dirty){e.preventDefault();e.returnValue='';}});
+})();
+
+async function loadAll(){
+  setSync('Syncing…');
+  try{
+    var l=await dbGetMaintenanceLibrary();
+    _lib=l&&l.types?l:{types:[]};
+    setSync('Synced');
+  }catch(e){console.error(e);setSync('Sync failed');}
+  render();
+}
+
+function render(){
+  var list=document.getElementById('eqList');
+  if(!_lib.types.length){
+    list.innerHTML='<div class="empty-state"><div class="es-icon">🔧</div><div>No equipment types yet. Add your first one below.</div></div>';
+    return;
+  }
+  list.innerHTML='';
+  _lib.types.forEach(function(t,i){
+    list.appendChild(buildEqCard(t,i));
+  });
+}
+
+function buildEqCard(t,idx){
+  var card=document.createElement('div');card.className='eq-card';
+  var taskCount=(t.tasks||[]).length;
+  var html=
+    '<div class="eq-hdr">'+
+      '<input class="eq-name-input" data-eq-idx="'+idx+'" data-f="name" value="'+escH(t.name||'')+'" placeholder="e.g. Fan Coil Unit (FCU)">'+
+      '<span class="eq-tasks-count">'+taskCount+' task'+(taskCount===1?'':'s')+'</span>'+
+      '<div class="eq-actions">'+
+        '<button class="icon-btn danger" onclick="deleteEqType('+idx+')" title="Delete equipment type">🗑</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="eq-body">';
+  (t.tasks||[]).forEach(function(task,ti){
+    html+=buildTaskRow(idx,ti,task);
+  });
+  html+='</div>'+
+    '<div class="eq-foot"><button class="add-task-btn" onclick="addTask('+idx+')">+ Add task</button></div>';
+  card.innerHTML=html;
+  return card;
+}
+
+function buildTaskRow(eqIdx,ti,task){
+  var checklist=task.checklist||[];
+  var html='<div class="task-row" data-eq="'+eqIdx+'" data-ti="'+ti+'">'+
+    '<div>'+
+      '<div class="task-meta-label" style="margin-bottom:4px">Task</div>'+
+      '<textarea data-f="task" placeholder="e.g. Inspect filters, clean if required, replace if damaged">'+escH(task.task||'')+'</textarea>'+
+      '<div class="task-meta-label" style="margin-top:8px;margin-bottom:4px">Inspection Checklist</div>'+
+      '<div class="checklist">'+
+        checklist.map(function(c,ci){return '<div class="checklist-item"><span style="color:var(--muted);font-size:12px">☐</span><input type="text" data-cli="'+ci+'" value="'+escH(c)+'" placeholder="Checklist item"><button class="icon-btn danger" onclick="delChecklistItem('+eqIdx+','+ti+','+ci+')" style="padding:2px 6px">×</button></div>';}).join('')+
+        '<button class="checklist-add" onclick="addChecklistItem('+eqIdx+','+ti+')">+ Add checklist item</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="task-meta">'+
+      '<div class="task-meta-label">Frequency</div>'+
+      '<select data-f="freq">'+
+        FREQ_OPTS.map(function(f){return '<option value="'+escH(f)+'"'+(task.freq===f?' selected':'')+'>'+escH(f)+'</option>';}).join('')+
+      '</select>'+
+    '</div>'+
+    '<div class="task-meta">'+
+      '<div class="task-meta-label">Standard Ref</div>'+
+      '<input data-f="stdRef" value="'+escH(task.stdRef||'')+'" placeholder="e.g. AS 1851">'+
+    '</div>'+
+    '<div class="task-meta">'+
+      '<div class="task-meta-label">&nbsp;</div>'+
+      '<button class="icon-btn danger" onclick="deleteTask('+eqIdx+','+ti+')" title="Delete task">🗑</button>'+
+    '</div>'+
+  '</div>';
+  return html;
+}
+
+function addEqType(){
+  _lib.types.push({id:nid(),name:'',tasks:[]});
+  _dirty=true;
+  render();
+  // Focus the new name input
+  setTimeout(function(){
+    var inputs=document.querySelectorAll('.eq-name-input');
+    if(inputs.length)inputs[inputs.length-1].focus();
+  },50);
+}
+
+function deleteEqType(idx){
+  var t=_lib.types[idx];
+  if(!confirm('Delete "'+(t.name||'this equipment type')+'" and all its tasks?'))return;
+  _lib.types.splice(idx,1);
+  _dirty=true;
+  render();
+}
+
+function addTask(eqIdx){
+  gather();
+  if(!_lib.types[eqIdx].tasks)_lib.types[eqIdx].tasks=[];
+  _lib.types[eqIdx].tasks.push({id:nid(),task:'',freq:'Quarterly',stdRef:'',checklist:[]});
+  _dirty=true;
+  render();
+}
+
+function deleteTask(eqIdx,ti){
+  if(!confirm('Delete this task?'))return;
+  gather();
+  _lib.types[eqIdx].tasks.splice(ti,1);
+  _dirty=true;
+  render();
+}
+
+function addChecklistItem(eqIdx,ti){
+  gather();
+  if(!_lib.types[eqIdx].tasks[ti].checklist)_lib.types[eqIdx].tasks[ti].checklist=[];
+  _lib.types[eqIdx].tasks[ti].checklist.push('');
+  _dirty=true;
+  render();
+}
+
+function delChecklistItem(eqIdx,ti,ci){
+  gather();
+  _lib.types[eqIdx].tasks[ti].checklist.splice(ci,1);
+  _dirty=true;
+  render();
+}
+
+// Pull all DOM input values back into _lib before re-rendering or saving
+function gather(){
+  document.querySelectorAll('.eq-name-input').forEach(function(inp){
+    var idx=parseInt(inp.dataset.eqIdx);
+    if(!isNaN(idx)&&_lib.types[idx])_lib.types[idx].name=inp.value.trim();
+  });
+  document.querySelectorAll('.task-row').forEach(function(tr){
+    var eq=parseInt(tr.dataset.eq),ti=parseInt(tr.dataset.ti);
+    var task=_lib.types[eq]&&_lib.types[eq].tasks[ti];
+    if(!task)return;
+    tr.querySelectorAll('[data-f]').forEach(function(el){
+      task[el.dataset.f]=(el.value||'').trim();
+    });
+    var clItems=tr.querySelectorAll('.checklist-item input[type=text]');
+    task.checklist=Array.from(clItems).map(function(i){return i.value.trim();}).filter(function(s){return s.length>0||true;});
+    // Keep empty items so user can fill them in — only filter blank on save
+  });
+  _dirty=true;
+}
+
+async function saveAll(){
+  gather();
+  // Filter empty checklist items at save time
+  _lib.types.forEach(function(t){
+    (t.tasks||[]).forEach(function(task){
+      task.checklist=(task.checklist||[]).filter(function(s){return s&&s.trim();});
+    });
+  });
+  setSync('Saving…');
+  try{
+    await dbSetMaintenanceLibrary(_lib);
+    _dirty=false;
+    setSync('Saved '+new Date().toLocaleTimeString());
+    showToast('✓ Maintenance library saved');
+  }catch(e){console.error(e);showToast('Save failed');setSync('Save failed');}
+}
+</script>
+</body>
+</html>

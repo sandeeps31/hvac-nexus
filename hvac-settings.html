@@ -200,14 +200,17 @@ function switchTab(tab){
   if(tab==='templates')setTimeout(function(){if(typeof initBudgetTemplateBuilder==='function')initBudgetTemplateBuilder();},100);
 }
 function switchInnerTab(tab){
-  ['budget','itp','precx','equip'].forEach(function(t){
+  ['budget','itp','precx','equip','maint','certs'].forEach(function(t){
     var el=document.getElementById('itab-content-'+t);
     var btn=document.getElementById('itab-'+t);
     if(el)el.style.display=t===tab?'':'none';
     if(btn)btn.classList.toggle('active',t===tab);
   });
-  // equip tab opens external builder via button - no init needed
+  if(tab==='maint' && !_maintLoaded){_maintLoaded=true;loadMaintLibrary();}
+  if(tab==='certs' && !_certsLoaded){_certsLoaded=true;loadCertsTemplate();}
 }
+var _maintLoaded=false;
+var _certsLoaded=false;
 function toggleSB(){
   var c=!document.getElementById('sidebar').classList.contains('sm');
   localStorage.setItem('hvacnexus_sb_collapsed',c?'1':'0');
@@ -329,6 +332,11 @@ function budgetTplAddRow(type){
               <input class="field-input" id="co-name" placeholder="e.g. Acme HVAC Pty Ltd"/>
             </div>
             <div class="field">
+              <span class="field-label">Trading Name</span>
+              <input class="field-input" id="co-trading" placeholder="e.g. Trading as Air Conditioning Engineering Services"/>
+              <span class="field-hint">Optional — appears under company name on cover sheets</span>
+            </div>
+            <div class="field">
               <span class="field-label">ABN</span>
               <input class="field-input" id="co-abn" placeholder="e.g. 12 345 678 901"/>
             </div>
@@ -353,6 +361,33 @@ function budgetTplAddRow(type){
               <input class="field-input" id="co-licence" placeholder="e.g. 123456C"/>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- OFFICE ADDRESSES (cover sheet footer) -->
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">Office Addresses</div>
+          <div class="card-hdr-sub">Up to 4 office locations shown along the bottom of O&amp;M cover sheets</div>
+        </div>
+        <div class="card-body">
+          <div id="officeAddrList" style="display:flex;flex-direction:column;gap:10px"></div>
+          <button class="bg bsm btn" id="addOfficeBtn" onclick="addOfficeAddr()" style="margin-top:10px">＋ Add Office</button>
+        </div>
+      </div>
+
+      <!-- FOOTER LOGOS (accreditation / industry body logos for cover sheet) -->
+      <div class="settings-card">
+        <div class="card-hdr">
+          <div class="card-hdr-title">Accreditation Logos</div>
+          <div class="card-hdr-sub">Industry body / accreditation logos shown along the bottom of O&amp;M cover sheets (e.g. GBCA, AIRAH, RACCA)</div>
+        </div>
+        <div class="card-body">
+          <div id="footerLogosList" style="display:flex;gap:14px;flex-wrap:wrap"></div>
+          <label class="bg bsm btn" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-top:14px">
+            &#128247; Add Logo
+            <input type="file" accept="image/*" style="display:none" id="footerLogoInput" onchange="handleFooterLogoUpload(this)">
+          </label>
         </div>
       </div>
 
@@ -417,6 +452,8 @@ function budgetTplAddRow(type){
         <button class="stab-inner" id="itab-itp" onclick="switchInnerTab('itp')">📋 ITP</button>
         <button class="stab-inner" id="itab-precx" onclick="switchInnerTab('precx')">✅ Pre-Commissioning</button>
         <button class="stab-inner" id="itab-equip" onclick="switchInnerTab('equip')">🗂️ Equipment Schedules</button>
+        <button class="stab-inner" id="itab-maint" onclick="switchInnerTab('maint')">🛠 Maintenance</button>
+        <button class="stab-inner" id="itab-certs" onclick="switchInnerTab('certs')">📜 O&amp;M Certificates</button>
       </div>
 
       <!-- INNER TAB: BUDGET -->
@@ -503,6 +540,46 @@ function budgetTplAddRow(type){
           <div class="card-body" style="display:flex;align-items:center;justify-content:space-between">
             <div style="font-size:13px;color:var(--text2)">Create versioned templates with custom fields, section headers and layout settings. Templates are pulled into project equipment schedules.</div>
             <button class="btn bp bsm" onclick="navTo('hvac-equip-templates.html')" style="flex-shrink:0;margin-left:16px">Open Equipment Template Builder →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- INNER TAB: MAINTENANCE LIBRARY -->
+      <div id="itab-content-maint" style="display:none">
+        <div class="settings-card">
+          <div class="card-hdr" style="display:flex;align-items:center">
+            <div style="flex:1">
+              <div class="card-hdr-title">Maintenance Library</div>
+              <div class="card-hdr-sub">Equipment type → tasks, frequency and inspection checklist. Used by the O&amp;M Manual maintenance chapter.</div>
+            </div>
+            <div style="display:flex;gap:7px">
+              <button class="bg bsm btn" id="maintEditBtn" onclick="enterMaintEditMode()" style="color:var(--accent);border-color:rgba(0,200,255,.3)">&#9998; Edit</button>
+              <button class="bp bsm btn" id="maintSaveBtn" onclick="saveMaintLibrary()" style="display:none">&#128190; Save</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:14px 16px">
+            <div id="maintLibList"></div>
+            <button class="tpl-add-btn" id="maintAddBtn" onclick="maintAddEquipType()" style="display:none;margin-top:10px">＋ Add Equipment Type</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- INNER TAB: O&M CERTIFICATES -->
+      <div id="itab-content-certs" style="display:none">
+        <div class="settings-card">
+          <div class="card-hdr" style="display:flex;align-items:center">
+            <div style="flex:1">
+              <div class="card-hdr-title">O&amp;M Certificates List</div>
+              <div class="card-hdr-sub">Master list of certificates the O&amp;M Manual expects. Each project can mark items N/A or upload the doc.</div>
+            </div>
+            <div style="display:flex;gap:7px">
+              <button class="bg bsm btn" id="certsEditBtn" onclick="enterCertsEditMode()" style="color:var(--accent);border-color:rgba(0,200,255,.3)">&#9998; Edit</button>
+              <button class="bp bsm btn" id="certsSaveBtn" onclick="saveCertsTemplate()" style="display:none">&#128190; Save</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:14px 16px">
+            <div id="certsTplList"></div>
+            <button class="tpl-add-btn" id="certsAddBtn" onclick="certsAddItem()" style="display:none;margin-top:10px">＋ Add Certificate</button>
           </div>
         </div>
       </div>
@@ -683,13 +760,15 @@ document.querySelectorAll('.sb-item[data-tip]').forEach(function(el){
 async function loadSettings(){
   try{
     var s=await dbGetCompanySettings();
-    if(s) return JSON.parse(s);
+    if(s && typeof s==='object') return s;
+    if(typeof s==='string') return JSON.parse(s);
   }catch(e){}
   return {};
 }
 
 function applySettings(s){
   document.getElementById('co-name').value    = s.coName    || '';
+  document.getElementById('co-trading').value = s.coTrading || '';
   document.getElementById('co-abn').value     = s.coAbn     || '';
   document.getElementById('co-phone').value   = s.coPhone   || '';
   document.getElementById('co-email').value   = s.coEmail   || '';
@@ -699,6 +778,14 @@ function applySettings(s){
   document.getElementById('user-name').value  = s.userName  || '';
   document.getElementById('user-role').value  = s.userRole  || '';
   document.getElementById('default-margin').value = s.defaultMargin != null ? s.defaultMargin : 15;
+  // Logo
+  if(s.coLogo){var lp=document.getElementById('logoPreview');lp.innerHTML='<img src="'+s.coLogo+'" style="width:100%;height:100%;object-fit:contain"/>';}
+  // Office addresses
+  _officeAddrs = Array.isArray(s.officeAddresses)?s.officeAddresses.slice():[];
+  renderOfficeAddrs();
+  // Footer logos
+  _footerLogos = Array.isArray(s.footerLogos)?s.footerLogos.slice():[];
+  renderFooterLogos();
   // Sidebar
   if(s.coName)  document.getElementById('sb-proj-name').textContent = s.coName;
   if(s.userName)document.getElementById('sb-user').textContent = s.userName;
@@ -707,14 +794,22 @@ function applySettings(s){
 // ── SAVE ──
 async function saveAll(){
   if(typeof dbReady!=='undefined')await dbReady;
+  // Read current logo from preview if present
+  var lp=document.getElementById('logoPreview');
+  var lpImg=lp?lp.querySelector('img'):null;
+  var coLogo = lpImg?lpImg.getAttribute('src'):'';
   var s = {
     coName:      document.getElementById('co-name').value.trim(),
+    coTrading:   document.getElementById('co-trading').value.trim(),
     coAbn:       document.getElementById('co-abn').value.trim(),
     coPhone:     document.getElementById('co-phone').value.trim(),
     coEmail:     document.getElementById('co-email').value.trim(),
     coAddress:   document.getElementById('co-address').value.trim(),
     coWebsite:   document.getElementById('co-website').value.trim(),
     coLicence:   document.getElementById('co-licence').value.trim(),
+    coLogo:      coLogo,
+    officeAddresses: _officeAddrs.slice(),
+    footerLogos:     _footerLogos.slice(),
     userName:    document.getElementById('user-name').value.trim(),
     userRole:    document.getElementById('user-role').value.trim(),
     defaultMargin: parseFloat(document.getElementById('default-margin').value)||15,
@@ -1212,14 +1307,238 @@ async function saveBudgetTemplateSettings(){
 }
 
 // ── LOGO ──
+function handleLogoUpload(input){
+  var f=input.files&&input.files[0];if(!f)return;
+  if(!/^image\//.test(f.type)){showToast('⚠ Please choose an image file');return;}
+  var rd=new FileReader();
+  rd.onload=function(e){
+    var lp=document.getElementById('logoPreview');
+    if(lp)lp.innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:contain"/>';
+    showToast('Logo updated — click Save to keep');
+  };
+  rd.readAsDataURL(f);
+}
 function clearLogo(){
-  var s=document.getElementById('logoPreview');
-  var b=document.getElementById('logoActions');
-  var i=document.getElementById('logoInput');
-  if(s)s.style.display='none';
-  if(b)b.style.display='none';
-  if(i)i.value='';
-  showToast('Logo cleared');
+  var lp=document.getElementById('logoPreview');
+  if(lp)lp.innerHTML='&#127970;';
+  showToast('Logo cleared — click Save to keep');
+}
+
+// ── OFFICE ADDRESSES ──
+var _officeAddrs=[];
+function addOfficeAddr(){
+  if(_officeAddrs.length>=4){showToast('Maximum 4 office addresses');return;}
+  _officeAddrs.push({label:'',address:''});
+  renderOfficeAddrs();
+}
+function delOfficeAddr(idx){_officeAddrs.splice(idx,1);renderOfficeAddrs();}
+function updOfficeAddr(idx,field,val){if(_officeAddrs[idx])_officeAddrs[idx][field]=val;}
+function renderOfficeAddrs(){
+  var wrap=document.getElementById('officeAddrList');if(!wrap)return;
+  if(!_officeAddrs.length){wrap.innerHTML='<div style="font-size:12px;color:var(--muted);font-style:italic">No offices added yet.</div>';return;}
+  wrap.innerHTML=_officeAddrs.map(function(o,i){
+    return '<div style="display:flex;gap:8px;align-items:center">'
+      +'<input class="field-input" placeholder="Label (optional)" style="flex:0 0 130px" value="'+(o.label||'').replace(/"/g,'&quot;')+'" oninput="updOfficeAddr('+i+',\'label\',this.value)"/>'
+      +'<input class="field-input" placeholder="e.g. U7, 192 Kingsgrove Rd, Kingsgrove NSW 2208" style="flex:1" value="'+(o.address||'').replace(/"/g,'&quot;')+'" oninput="updOfficeAddr('+i+',\'address\',this.value)"/>'
+      +'<button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3);flex-shrink:0" onclick="delOfficeAddr('+i+')">✕</button>'
+      +'</div>';
+  }).join('');
+  document.getElementById('addOfficeBtn').style.display=_officeAddrs.length>=4?'none':'';
+}
+
+// ── FOOTER LOGOS ──
+var _footerLogos=[];
+function handleFooterLogoUpload(input){
+  var f=input.files&&input.files[0];if(!f)return;
+  if(!/^image\//.test(f.type)){showToast('⚠ Please choose an image file');return;}
+  var rd=new FileReader();
+  rd.onload=function(e){_footerLogos.push({src:e.target.result,label:''});renderFooterLogos();showToast('Logo added — click Save to keep');};
+  rd.readAsDataURL(f);
+  input.value='';
+}
+function delFooterLogo(idx){_footerLogos.splice(idx,1);renderFooterLogos();}
+function updFooterLogoLabel(idx,val){if(_footerLogos[idx])_footerLogos[idx].label=val;}
+function renderFooterLogos(){
+  var wrap=document.getElementById('footerLogosList');if(!wrap)return;
+  if(!_footerLogos.length){wrap.innerHTML='<div style="font-size:12px;color:var(--muted);font-style:italic">No accreditation logos added.</div>';return;}
+  wrap.innerHTML=_footerLogos.map(function(l,i){
+    return '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;width:130px">'
+      +'<div style="width:80px;height:50px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:5px;padding:4px"><img src="'+l.src+'" style="max-width:100%;max-height:100%;object-fit:contain"/></div>'
+      +'<input class="field-input" placeholder="Label" style="font-size:11px;padding:3px 6px" value="'+(l.label||'').replace(/"/g,'&quot;')+'" oninput="updFooterLogoLabel('+i+',this.value)"/>'
+      +'<button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3);font-size:10px;padding:3px 8px" onclick="delFooterLogo('+i+')">✕ Remove</button>'
+      +'</div>';
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+// MAINTENANCE LIBRARY
+// ══════════════════════════════════════════════════
+var _maintLib=[];
+var _maintEditMode=false;
+async function loadMaintLibrary(){
+  try{var d=await dbGetMaintenanceLibrary();_maintLib=Array.isArray(d)?d:[];}catch(e){_maintLib=[];}
+  renderMaintLib();
+}
+function enterMaintEditMode(){
+  _maintEditMode=true;
+  document.getElementById('maintEditBtn').style.display='none';
+  document.getElementById('maintSaveBtn').style.display='';
+  document.getElementById('maintAddBtn').style.display='';
+  renderMaintLib();
+}
+function maintAddEquipType(){
+  _maintLib.push({id:'mt'+Date.now()+Math.random().toString(36).slice(2,5),equipmentType:'',tasks:[]});
+  renderMaintLib();
+}
+function maintDelEquipType(idx){
+  if(!confirm('Delete this equipment type and all its tasks?'))return;
+  _maintLib.splice(idx,1);renderMaintLib();
+}
+function maintUpdEquipType(idx,val){if(_maintLib[idx])_maintLib[idx].equipmentType=val;}
+function maintAddTask(eqIdx){
+  _maintLib[eqIdx].tasks.push({task:'',frequency:'M',checklist:[]});
+  renderMaintLib();
+}
+function maintDelTask(eqIdx,tIdx){_maintLib[eqIdx].tasks.splice(tIdx,1);renderMaintLib();}
+function maintUpdTask(eqIdx,tIdx,field,val){if(_maintLib[eqIdx]&&_maintLib[eqIdx].tasks[tIdx])_maintLib[eqIdx].tasks[tIdx][field]=val;}
+function maintAddChecklist(eqIdx,tIdx){
+  _maintLib[eqIdx].tasks[tIdx].checklist.push('');
+  renderMaintLib();
+}
+function maintDelChecklist(eqIdx,tIdx,cIdx){_maintLib[eqIdx].tasks[tIdx].checklist.splice(cIdx,1);renderMaintLib();}
+function maintUpdChecklist(eqIdx,tIdx,cIdx,val){_maintLib[eqIdx].tasks[tIdx].checklist[cIdx]=val;}
+function renderMaintLib(){
+  var wrap=document.getElementById('maintLibList');if(!wrap)return;
+  if(!_maintLib.length){
+    wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12.5px">No equipment types defined yet.'+(_maintEditMode?' Click + Add Equipment Type to begin.':' Click ✎ Edit to add.')+'</div>';
+    return;
+  }
+  var ro=!_maintEditMode;
+  wrap.innerHTML=_maintLib.map(function(eq,ei){
+    var taskRows=eq.tasks.map(function(t,ti){
+      var checklistHtml=(t.checklist||[]).map(function(c,ci){
+        return '<div style="display:flex;gap:6px;align-items:center;margin:3px 0">'
+          +'<span style="color:var(--muted);font-size:11px">•</span>'
+          +(ro
+            ?'<span style="font-size:12px;color:var(--text2);flex:1">'+(c||'').replace(/</g,'&lt;')+'</span>'
+            :'<input class="field-input" style="flex:1;font-size:12px;padding:4px 8px" value="'+(c||'').replace(/"/g,'&quot;')+'" oninput="maintUpdChecklist('+ei+','+ti+','+ci+',this.value)"/>'
+              +'<button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3);font-size:10px;padding:2px 6px" onclick="maintDelChecklist('+ei+','+ti+','+ci+')">✕</button>')
+          +'</div>';
+      }).join('');
+      return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">'
+        +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
+        +(ro
+          ?'<span style="flex:1;font-size:13px;color:var(--text);font-weight:500">'+(t.task||'(unnamed task)').replace(/</g,'&lt;')+'</span>'
+          :'<input class="field-input" placeholder="Task description, e.g. Replace filters" style="flex:1" value="'+(t.task||'').replace(/"/g,'&quot;')+'" oninput="maintUpdTask('+ei+','+ti+',\'task\',this.value)"/>')
+        +(ro
+          ?'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 8px;border-radius:4px">'+freqLabel(t.frequency)+'</span>'
+          :'<select class="fsel" style="flex:0 0 130px" onchange="maintUpdTask('+ei+','+ti+',\'frequency\',this.value)">'
+            +['M','Q','6M','A','2A','5A'].map(function(f){return '<option value="'+f+'"'+(t.frequency===f?' selected':'')+'>'+freqLabel(f)+'</option>';}).join('')
+          +'</select>')
+        +(ro?'':'<button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3);font-size:10px;padding:3px 8px" onclick="maintDelTask('+ei+','+ti+')">✕</button>')
+        +'</div>'
+        +'<div style="margin-left:14px">'
+        +'<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Inspection Checklist</div>'
+        +checklistHtml
+        +(ro?'':'<button class="bg bsm btn" onclick="maintAddChecklist('+ei+','+ti+')" style="font-size:11px;padding:3px 8px;margin-top:4px">＋ Add Checklist Item</button>')
+        +'</div>'
+        +'</div>';
+    }).join('');
+    return '<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">'
+      +(ro
+        ?'<span style="flex:1;font-family:Syne,sans-serif;font-size:15px;font-weight:700;color:var(--text)">'+(eq.equipmentType||'(unnamed)').replace(/</g,'&lt;')+'</span>'
+        :'<input class="field-input" placeholder="Equipment type, e.g. Fan Coil Unit, AHU, VAV Box" style="flex:1;font-weight:600" value="'+(eq.equipmentType||'').replace(/"/g,'&quot;')+'" oninput="maintUpdEquipType('+ei+',this.value)"/>')
+      +(ro?'':'<button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="maintDelEquipType('+ei+')">🗑 Delete</button>')
+      +'</div>'
+      +taskRows
+      +(ro?'':'<button class="bg bsm btn" onclick="maintAddTask('+ei+')" style="margin-top:4px">＋ Add Task</button>')
+      +'</div>';
+  }).join('');
+}
+function freqLabel(f){return {M:'Monthly',Q:'Quarterly','6M':'6-Monthly',A:'Annual','2A':'2-Yearly','5A':'5-Yearly'}[f]||f;}
+async function saveMaintLibrary(){
+  try{
+    await dbSetMaintenanceLibrary(_maintLib);
+    _maintEditMode=false;
+    document.getElementById('maintEditBtn').style.display='';
+    document.getElementById('maintSaveBtn').style.display='none';
+    document.getElementById('maintAddBtn').style.display='none';
+    renderMaintLib();
+    showToast('Maintenance library saved');
+  }catch(e){alert('Save failed: '+e.message);}
+}
+
+// ══════════════════════════════════════════════════
+// O&M CERTIFICATES TEMPLATE
+// ══════════════════════════════════════════════════
+var _certsTpl=[];
+var _certsEditMode=false;
+async function loadCertsTemplate(){
+  try{var d=await dbGetCertificatesTemplate();_certsTpl=Array.isArray(d)?d:[];}catch(e){_certsTpl=[];}
+  // Seed defaults if empty
+  if(!_certsTpl.length){
+    _certsTpl=[
+      {id:'cert'+Date.now()+'1',name:'Design Certificate',defaultRequired:true},
+      {id:'cert'+Date.now()+'2',name:'Installation Certificate',defaultRequired:true},
+      {id:'cert'+Date.now()+'3',name:'Certificate of Compliance for Electrical Work (CCEW)',defaultRequired:true},
+      {id:'cert'+Date.now()+'4',name:'Refrigerant Handling Licence',defaultRequired:true},
+      {id:'cert'+Date.now()+'5',name:'Commissioning Certificate',defaultRequired:true}
+    ];
+  }
+  renderCertsTpl();
+}
+function enterCertsEditMode(){
+  _certsEditMode=true;
+  document.getElementById('certsEditBtn').style.display='none';
+  document.getElementById('certsSaveBtn').style.display='';
+  document.getElementById('certsAddBtn').style.display='';
+  renderCertsTpl();
+}
+function certsAddItem(){
+  _certsTpl.push({id:'cert'+Date.now()+Math.random().toString(36).slice(2,5),name:'',defaultRequired:true});
+  renderCertsTpl();
+}
+function certsDelItem(idx){
+  if(!confirm('Remove this certificate from the master list? Existing project uploads under it will not be deleted.'))return;
+  _certsTpl.splice(idx,1);renderCertsTpl();
+}
+function certsUpdName(idx,val){if(_certsTpl[idx])_certsTpl[idx].name=val;}
+function certsUpdDefault(idx,checked){if(_certsTpl[idx])_certsTpl[idx].defaultRequired=!!checked;}
+function certsMoveUp(idx){if(idx<=0)return;var t=_certsTpl[idx-1];_certsTpl[idx-1]=_certsTpl[idx];_certsTpl[idx]=t;renderCertsTpl();}
+function certsMoveDown(idx){if(idx>=_certsTpl.length-1)return;var t=_certsTpl[idx+1];_certsTpl[idx+1]=_certsTpl[idx];_certsTpl[idx]=t;renderCertsTpl();}
+function renderCertsTpl(){
+  var wrap=document.getElementById('certsTplList');if(!wrap)return;
+  if(!_certsTpl.length){
+    wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12.5px">No certificates defined yet.'+(_certsEditMode?' Click + Add Certificate to begin.':' Click ✎ Edit to add.')+'</div>';
+    return;
+  }
+  var ro=!_certsEditMode;
+  wrap.innerHTML=_certsTpl.map(function(c,i){
+    return '<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:6px">'
+      +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted);width:24px;text-align:center">'+(i+1)+'</span>'
+      +(ro
+        ?'<span style="flex:1;font-size:13px;color:var(--text)">'+(c.name||'(unnamed)').replace(/</g,'&lt;')+'</span>'
+        :'<input class="field-input" style="flex:1" placeholder="e.g. Design Certificate" value="'+(c.name||'').replace(/"/g,'&quot;')+'" oninput="certsUpdName('+i+',this.value)"/>')
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);'+(ro?'pointer-events:none;opacity:.6':'cursor:pointer')+'">'
+      +'<input type="checkbox" '+(c.defaultRequired?'checked':'')+' onchange="certsUpdDefault('+i+',this.checked)"/> Required by default'
+      +'</label>'
+      +(ro?'':'<button class="bg bsm btn" style="font-size:11px;padding:2px 6px" onclick="certsMoveUp('+i+')">▲</button>'
+        +'<button class="bg bsm btn" style="font-size:11px;padding:2px 6px" onclick="certsMoveDown('+i+')">▼</button>'
+        +'<button class="bg bsm btn" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="certsDelItem('+i+')">✕</button>')
+      +'</div>';
+  }).join('');
+}
+async function saveCertsTemplate(){
+  try{
+    await dbSetCertificatesTemplate(_certsTpl);
+    _certsEditMode=false;
+    document.getElementById('certsEditBtn').style.display='';
+    document.getElementById('certsSaveBtn').style.display='none';
+    document.getElementById('certsAddBtn').style.display='none';
+    renderCertsTpl();
+    showToast('Certificates list saved');
+  }catch(e){alert('Save failed: '+e.message);}
 }
 
 // ── CONTACTS ──

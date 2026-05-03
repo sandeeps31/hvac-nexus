@@ -669,6 +669,30 @@ async function dbSetAssetRegister(projectNum, data) {
   return await dbSetProject('asset_register', projectNum, data);
 }
 
+// ── O&M Manual (project-scoped) ──
+async function dbGetOmManual(projectNum) {
+  return await dbGetProject('om_manuals', projectNum) || null;
+}
+async function dbSetOmManual(projectNum, data) {
+  return await dbSetProject('om_manuals', projectNum, data);
+}
+
+// ── Maintenance Library (company-level) ──
+async function dbGetMaintenanceLibrary() {
+  return await dbGet('maintenance_library') || [];
+}
+async function dbSetMaintenanceLibrary(data) {
+  return await dbSet('maintenance_library', data);
+}
+
+// ── Certificates Template (company-level) ──
+async function dbGetCertificatesTemplate() {
+  return await dbGet('certificates_template') || [];
+}
+async function dbSetCertificatesTemplate(data) {
+  return await dbSet('certificates_template', data);
+}
+
 // ── Specifications ──
 async function dbGetSpecifications(projectNum) {
   return await dbGetProject('specifications', projectNum) || [];
