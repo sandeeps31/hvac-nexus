@@ -1074,7 +1074,7 @@ async function runConflictDetection(){
 
     var data=await sbCallEdgeFunction('hyper-endpoint',{
       model:AI_MODEL,
-      max_tokens:2000,
+      max_tokens:8000,
       messages:[{
         role:'user',
         content:`You are reviewing the following HVAC project specifications for conflicts and contradictions.\n\nSpecifications:\n${specSummaries}\n\nFind all conflicts, contradictions, or inconsistencies between these specifications. For each conflict:\n1. State which documents conflict\n2. Give the specific clauses or sections\n3. Describe the contradiction clearly\n4. Rate severity: HIGH (will cause variation/dispute), MEDIUM (needs clarification), LOW (minor inconsistency)\n\nRespond in JSON format only:\n{\n  "conflicts": [\n    {\n      "severity": "HIGH|MEDIUM|LOW",\n      "title": "brief title",\n      "description": "what conflicts",\n      "docs": ["Doc 1", "Doc 2"],\n      "clauses": ["Clause X", "Clause Y"]\n    }\n  ],\n  "summary": "overall summary"\n}`
@@ -1082,7 +1082,14 @@ async function runConflictDetection(){
     });
     var raw=data.content&&data.content[0]&&data.content[0].text||'{}';
     var clean=raw.replace(/```json|```/g,'').trim();
-    var parsed=JSON.parse(clean);
+    var parsed;
+    try{parsed=JSON.parse(clean);}
+    catch(je){
+      // If the model's JSON got truncated or malformed, surface a helpful error
+      var stopReason=data.stop_reason||'unknown';
+      console.error('Conflict detection JSON parse failed. stop_reason:',stopReason,'raw length:',clean.length,'response:',clean);
+      throw new Error('AI response was not valid JSON (stop_reason: '+stopReason+'). Try again, or check the console for the raw response.');
+    }
     var conflicts=parsed.conflicts||[];
     // Log token usage
     if(data.usage)dbLogAiUsage(_pNum,'specifications','conflict_detection',data.usage);
@@ -1129,7 +1136,7 @@ async function generateComplianceChecklist(){
   try{
     var data=await sbCallEdgeFunction('hyper-endpoint',{
       model:AI_MODEL,
-      max_tokens:2000,
+      max_tokens:8000,
       messages:[{
         role:'user',
         content:`From the following HVAC specification, extract all mandatory requirements that must be demonstrated for compliance (requirements with "shall", "must", "is required", "to be", etc.).\n\nSpec: ${s.title} (${s.docNo})\n\n${rev.extractedText.substring(0,12000)}\n\nRespond in JSON only:\n{\n  "sections": [\n    {\n      "heading": "section name",\n      "clauses": [\n        {\n          "ref": "clause reference e.g. 15.4.1",\n          "requirement": "what must be done",\n          "evidence": "what evidence is needed"\n        }\n      ]\n    }\n  ]\n}`
@@ -1137,7 +1144,13 @@ async function generateComplianceChecklist(){
     });
     var raw=data.content&&data.content[0]&&data.content[0].text||'{}';
     var clean=raw.replace(/```json|```/g,'').trim();
-    var parsed=JSON.parse(clean);
+    var parsed;
+    try{parsed=JSON.parse(clean);}
+    catch(je){
+      var stopReason=data.stop_reason||'unknown';
+      console.error('Compliance checklist JSON parse failed. stop_reason:',stopReason,'raw length:',clean.length,'response:',clean);
+      throw new Error('AI response was not valid JSON (stop_reason: '+stopReason+'). The spec may be too long — try again or upload a smaller section.');
+    }
     var sections=parsed.sections||[];
     // Log token usage
     if(data.usage)dbLogAiUsage(_pNum,'specifications','compliance_checklist',data.usage);
