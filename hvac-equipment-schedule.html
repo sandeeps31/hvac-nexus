@@ -2168,11 +2168,26 @@ function buildAndDownloadTemplate(t,cols){
 
   XLSX.utils.book_append_sheet(wb,ws,tabName);
 
+  // Build data-validation entries from the dropdownMap so the downloaded template
+  // has dropdown arrows on every dropdown column. Data starts after example row +
+  // optional section row + header row. Excel rows are 1-based; arrays are 0-based,
+  // so the row below `hdrRow` (the column-header row) translates to Excel row hdrRow+2.
+  function _tplColLetter(ci){return ci<26?String.fromCharCode(65+ci):(String.fromCharCode(64+Math.floor(ci/26))+String.fromCharCode(65+(ci%26)));}
+  var tplDataStartRow=hdrRow+2; // 1-based Excel row where data validation begins
+  var tplDvEntries=[];
+  cols.forEach(function(col,ci){
+    var opts=dropdownMap[col.k];
+    if(!opts||!opts.length)return;
+    var sqref=_tplColLetter(ci)+tplDataStartRow+':'+_tplColLetter(ci)+'2000';
+    var formula1='"'+opts.slice(0,20).map(function(o){return String(o).replace(/[,"<]/g,'').replace(/>/g,'-');}).join(',').substring(0,250)+'"';
+    tplDvEntries.push('<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="'+sqref+'"><formula1>'+formula1+'</formula1></dataValidation>');
+  });
+
   // Always run JSZip to apply alignment + dropdowns
   var tplRevLabel='Template';
   try{
     var wboutT=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
-    injectDataValidation(wboutT,hasDV?dvEntries:[],tabName,t.name,hasSections,{},tplRevLabel);
+    injectDataValidation(wboutT,tplDvEntries,tabName,t.name,hasSections,{},tplRevLabel);
     return;
   }catch(err){
     console.warn('template inject failed, falling back:',err);
