@@ -676,6 +676,15 @@ async function dbGetOmManual(projectNum) {
 async function dbSetOmManual(projectNum, data) {
   return await dbSetProject('om_manuals', projectNum, data);
 }
+async function dbDeleteOmManual(projectNum) {
+  try {
+    await sbFetch(`om_manuals?project_num=eq.${encodeURIComponent(projectNum)}`, { method: 'DELETE' });
+    return true;
+  } catch(e) {
+    console.warn(`dbDeleteOmManual(${projectNum}) failed:`, e.message);
+    return false;
+  }
+}
 
 // ── Maintenance Library (company-level) ──
 async function dbGetMaintenanceLibrary() {
