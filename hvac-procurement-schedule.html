@@ -183,6 +183,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
       <div class="sb-group-items" id="gitems-procurement" style="display:block">
     <div class="sb-item active"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
     <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
+    <div class="sb-item" onclick="navTo('hvac-material-receiving.html')"><span class="sb-item-icon">🚚</span><span class="sb-item-label">Material receiving</span></div>
     <div class="sb-item" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span></div>
       </div></div>
     <div class="sb-group"><div class="sb-group-hdr" onclick="toggleGroup('technical')" id="ghdr-technical"><span class="sb-group-chev" id="gchev-technical">▾</span><span class="sb-group-name">Technical</span></div>
@@ -235,8 +236,9 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button class="bg bsm btn" onclick="runSync()">⟳ Sync from Equipment Schedule</button>
+    <button class="bg bsm btn" onclick="openGroupSettings()" title="Group equipment types as bulk procurement lines">⊞ Group Settings</button>
     <button class="bg bsm btn" onclick="openColSettings()">⚙ Columns</button>
-    <button class="bg bsm btn" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="bg bsm btn" onclick="openExportModal()">⬇ Export</button>
 
     <button class="bp bsm btn" onclick="openAddModal()">＋ Add Item</button>
   </div>
@@ -399,8 +401,34 @@ function isPast(ds){if(!ds)return false;return ds<today();}
 // DATA
 var _tsLookup={}; // equipId -> {status, approvedDate} from tech subs
 var _equipLookup={}; // equipId -> {location, manufacturer, model, equipType} — always master
-function save(){dbSetProcurement(_psPNum,items).catch(e=>console.error(e));}
-async function load(){try{var p=await dbGetProcurement(_psPNum);items=Array.isArray(p)?p:[];}catch(e){items=[];}}
+// Set of equipment types the user has flagged as bulk (rendered as a single grouped row)
+var _groupedTypes=new Set();
+// Persisted UI state for which group rows are expanded
+var _expandedGroups=new Set();
+// Status → colour map used in both the table render and the summary view
+var STATUS_COLORS={'Delivered':'var(--green)','Ordered':'var(--accent)','Ready':'var(--purple)','Not ordered':'var(--danger)','Supplied by others':'var(--muted)'};
+function save(){
+  // Persist as {items, groupedTypes} to support grouping config alongside the items array.
+  // Legacy projects that stored a bare array still load fine via the migration in load().
+  var payload={items:items,groupedTypes:Array.from(_groupedTypes)};
+  dbSetProcurement(_psPNum,payload).catch(e=>console.error(e));
+}
+async function load(){
+  try{
+    var p=await dbGetProcurement(_psPNum);
+    if(Array.isArray(p)){
+      // Legacy shape — bare items array
+      items=p;
+      _groupedTypes=new Set();
+    } else if(p&&typeof p==='object'&&Array.isArray(p.items)){
+      items=p.items;
+      _groupedTypes=new Set(Array.isArray(p.groupedTypes)?p.groupedTypes:[]);
+    } else {
+      items=[];
+      _groupedTypes=new Set();
+    }
+  }catch(e){items=[];_groupedTypes=new Set();}
+}
 // ETA RECALC
 function calcETA(orderDate,leadWeeks){return addWeeks(orderDate,leadWeeks);}
 function recalcETA(){
@@ -569,7 +597,7 @@ function getFilteredItems(){
   var tf=document.getElementById('typeFilter').value;
   var lf=document.getElementById('locFilter').value;
   return items.filter(function(i){
-    return(!q||(i.equipId||'').toLowerCase().includes(q)||(i.building||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
+    return(!q||(i.equipId||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
       &&(!sf||i.status===sf)
       &&(!tf||i.equipType===tf)
       &&(!lf||i.location===lf);
@@ -718,7 +746,87 @@ function renderTable(){
   var thead=document.getElementById('procThead');if(thead){while(thead.children.length>2)thead.removeChild(thead.lastChild);}
   // Filter out items with no equipment ID
   filtered=filtered.filter(function(i){return i.equipId&&i.equipId.trim();});
-  filtered.forEach(function(item,idx){
+
+  // ─── Apply bulk-grouping transform ───
+  // Items whose equipType is in _groupedTypes collapse into a single virtual "group" entry
+  // followed by its children. Children render with class "proc-group-child" so CSS controls
+  // whether they're visible based on _expandedGroups state.
+  var displayList=[];
+  if(_groupedTypes.size===0){
+    displayList=filtered.map(function(it){return {kind:'item',item:it};});
+  } else {
+    var groupBuckets={};       // type -> array of items
+    var nonGrouped=[];
+    filtered.forEach(function(it){
+      var t=it.equipType||'(Untyped)';
+      if(_groupedTypes.has(t)){
+        if(!groupBuckets[t])groupBuckets[t]=[];
+        groupBuckets[t].push(it);
+      } else {
+        nonGrouped.push(it);
+      }
+    });
+    // Group rows first (alpha by type), then individual plant items
+    Object.keys(groupBuckets).sort().forEach(function(t){
+      var children=groupBuckets[t];
+      displayList.push({kind:'group',type:t,children:children});
+      children.forEach(function(c){displayList.push({kind:'item',item:c,parentType:t});});
+    });
+    nonGrouped.forEach(function(it){displayList.push({kind:'item',item:it});});
+  }
+
+  // Render loop iterates displayList — group rows are rendered inline, item rows fall through
+  // to the existing per-item logic via the `forEach` below.
+  var _rowIdx=0;
+  displayList.forEach(function(entry){
+    if(entry.kind==='group'){
+      // Render group summary row
+      var t=entry.type;
+      var children=entry.children;
+      var totalQty=children.reduce(function(s,c){return s+(parseInt(c.qty,10)||1);},0);
+      var deliveredQty=children.reduce(function(s,c){return s+(parseInt(c.qtyDelivered,10)||0);},0);
+      // Worst-case status rollup
+      var stRank={'Not ordered':0,'Ordered':1,'Ready':2,'Delivered':3,'Supplied by others':4};
+      var minSt=null;children.forEach(function(c){var r=stRank[c.status];if(r==null)r=0;if(minSt===null||r<minSt)minSt=r;});
+      var rolledStatus=Object.keys(stRank).find(function(k){return stRank[k]===minSt;})||'Not ordered';
+      var rolledHex=STATUS_COLORS[rolledStatus]||'#ddeeff';
+      var deliveredCol=children.filter(function(c){return c.status==='Delivered';}).length;
+      var expanded=_expandedGroups.has(t);
+      // Common ETA across children (or "—" if mixed)
+      var firstEta=children[0]&&children[0].eta||'';var sameEta=true;
+      children.forEach(function(c){if((c.eta||'')!==firstEta)sameEta=false;});
+      var etaText=sameEta&&firstEta?fmtD(firstEta):(firstEta?'mixed':'—');
+      var manufacturer=children[0]&&children[0].manufacturer||'';var sameMfr=true;
+      children.forEach(function(c){if((c.manufacturer||'')!==manufacturer)sameMfr=false;});
+      var mfrText=sameMfr&&manufacturer?manufacturer:(manufacturer?'mixed':'—');
+      var groupTr=document.createElement('tr');
+      groupTr.className='proc-group-row';
+      groupTr.setAttribute('data-group-type',t);
+      var totalVisibleCols=2+getOrderedCols().filter(function(c){return isColVisible(c.id);}).length;
+      // Build a summary cell that spans equip-id + location (first 2 visible data columns) so it stands out
+      var titleHtml='<span class="proc-group-chev'+(expanded?' expanded':'')+'">▸</span>'
+        +escH(t)
+        +'<span class="proc-group-tag">Bulk</span>'
+        +'<span class="proc-group-qty">×'+totalQty+(deliveredCol?' · '+deliveredCol+' delivered':'')+'</span>';
+      var inner='<td style="text-align:center;color:var(--muted);font-family:\'DM Mono\',monospace;font-size:11px"></td>'
+        +'<td style="color:var(--muted);font-family:\'DM Mono\',monospace;font-size:11px"></td>';
+      // Add data cells in the user's column order
+      getOrderedCols().forEach(function(c){
+        if(!isColVisible(c.id))return;
+        if(c.id==='equipId'){inner+='<td class="equip-id">'+titleHtml+'</td>';}
+        else if(c.id==='manufacturer'){inner+='<td>'+escH(mfrText)+'</td>';}
+        else if(c.id==='equipType'){inner+='<td class="equip-type">'+escH(t)+'</td>';}
+        else if(c.id==='status'){inner+='<td><span style="font-family:DM Mono,monospace;font-size:11px;color:'+rolledHex+'">'+escH(rolledStatus)+'</span></td>';}
+        else if(c.id==='eta'){inner+='<td><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+etaText+'</span></td>';}
+        else {inner+='<td style="color:var(--muted);font-family:DM Mono,monospace;font-size:11px">—</td>';}
+      });
+      groupTr.innerHTML=inner;
+      groupTr.addEventListener('click',function(){toggleGroupExpand(t);});
+      tbody.appendChild(groupTr);
+      return;
+    }
+    var item=entry.item;
+    var idx=_rowIdx++;
     // Always recalc ETA from stored orderDate + leadWeeks
     if(item.orderDate&&item.leadWeeks){
       item.eta=calcETA(item.orderDate,item.leadWeeks);
@@ -736,6 +844,12 @@ function renderTable(){
     tr.setAttribute('data-item-id',item.id);
     tr.setAttribute('data-id',item.id);
     if(_editMode)tr.classList.add('editing');
+    // Mark as a group child so CSS can hide it when the parent group is collapsed
+    if(entry.parentType){
+      tr.classList.add('proc-group-child');
+      if(_expandedGroups.has(entry.parentType))tr.classList.add('shown');
+      tr.setAttribute('data-parent-type',entry.parentType);
+    }
     var stHex=item.status==='Not ordered'?'#ff4d6d':'#ddeeff';
     var lw=item.leadWeeks?parseInt(item.leadWeeks):null;
     var tsLw=(_tsLookup[item.equipId]||{}).leadTime?parseInt((_tsLookup[item.equipId]||{}).leadTime):null;
@@ -782,7 +896,6 @@ function renderTable(){
     // Build cells in user-defined column order
     var cellMap={
       equipId:'<td class="equip-id">'+escH(item.equipId||'—')+'</td>',
-      building:'<td style="color:var(--text2)">'+escH(_location)+'</td>',
       location:'<td style="color:var(--muted);font-size:12px">'+escH(_subLocation)+'</td>',
       manufacturer:'<td style="font-weight:500">'+escH(_manufacturer)+'</td>',
       model:'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(_model)+'</td>',
@@ -891,18 +1004,264 @@ function deleteItem(){
   save();closeModal();renderTable();
 }
 
-// EXPORT CSV
-function exportCSV(){
-  var headers=['Equipment ID','Location','Sub area','Manufacturer','Model','Equipment type','Submission approval date','Order status','Order date','Normal lead time (weeks)','ETA','Comments'];
-  var rows=[headers.join(',')];
-  var filtered=getFilteredItems();
-  filtered.forEach(function(item){
-    var row=[item.equipId,item.location,item.subarea,item.manufacturer,item.model,item.equipType,item.subApproval,item.status,item.orderDate,item.leadWeeks,item.eta,item.comments];
-    rows.push(row.map(function(v){return '"'+(String(v||'').replace(/"/g,'""'))+'"';}).join(','));
-  });
-  var blob=new Blob([rows.join('\n')],{type:'text/csv'});
-  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='procurement-schedule-GCT001.csv';a.click();
+// ──────────────────────────────────────────────────────────────────────────────
+// GROUP SETTINGS — flag equipment types as bulk so they collapse into one row
+// ──────────────────────────────────────────────────────────────────────────────
+// Pending edits while modal is open (committed on Save)
+var _gsPending=null;
+
+function openGroupSettings(){
+  _gsPending=new Set(_groupedTypes);
+  renderGroupSettings();
+  document.getElementById('groupSettingsModal').classList.add('open');
 }
+function closeGroupSettings(){
+  _gsPending=null;
+  document.getElementById('groupSettingsModal').classList.remove('open');
+}
+function saveGroupSettings(){
+  if(!_gsPending){closeGroupSettings();return;}
+  _groupedTypes=new Set(_gsPending);
+  _expandedGroups.clear(); // any newly-grouped type starts collapsed
+  save();
+  renderTable();
+  closeGroupSettings();
+  showToast(_groupedTypes.size+' type'+(_groupedTypes.size===1?'':'s')+' grouped as bulk');
+}
+function renderGroupSettings(){
+  var list=document.getElementById('groupSettingsList');
+  // Build distinct equipment types with counts from the procurement items
+  var typeMap={};
+  items.forEach(function(it){
+    if(!it.equipId)return;
+    var t=it.equipType||'(Untyped)';
+    typeMap[t]=(typeMap[t]||0)+1;
+  });
+  var types=Object.keys(typeMap).sort();
+  if(!types.length){
+    list.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">No equipment types yet — sync from Equipment Schedule first.</div>';
+    document.getElementById('groupSettingsCount').textContent='0 grouped';
+    return;
+  }
+  list.innerHTML=types.map(function(t){
+    var checked=_gsPending.has(t);
+    var count=typeMap[t];
+    return '<label class="gs-row'+(checked?' checked':'')+'" data-gs-type="'+escH(t)+'">'
+      +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleGroupSetting(this,\''+escH(t).replace(/'/g,"\\'")+'\')">'
+      +'<span class="gs-row-name">'+escH(t)+'</span>'
+      +'<span class="gs-row-count">'+count+'</span>'
+      +'</label>';
+  }).join('');
+  document.getElementById('groupSettingsCount').textContent=_gsPending.size+' grouped';
+}
+function toggleGroupSetting(cb,type){
+  if(cb.checked)_gsPending.add(type);else _gsPending.delete(type);
+  cb.closest('.gs-row').classList.toggle('checked',cb.checked);
+  document.getElementById('groupSettingsCount').textContent=_gsPending.size+' grouped';
+}
+// Expand / collapse a group row in the schedule table
+function toggleGroupExpand(type){
+  if(_expandedGroups.has(type))_expandedGroups.delete(type);
+  else _expandedGroups.add(type);
+  renderTable();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// EXPORT MODAL — type filter + grouped display radio + CSV / Excel
+// ──────────────────────────────────────────────────────────────────────────────
+var _expSel=null;            // Set of equipment types to include in export
+var _expDisplay='summary';   // 'summary' | 'expanded' | 'flat'
+
+function openExportModal(){
+  // Default selection: all types ticked, grouped types displayed as summary rows
+  var typeMap={};
+  items.forEach(function(it){if(!it.equipId)return;var t=it.equipType||'(Untyped)';typeMap[t]=(typeMap[t]||0)+1;});
+  _expSel=new Set(Object.keys(typeMap));
+  _expDisplay='summary';
+  renderExportModal();
+  document.getElementById('exportModal').classList.add('open');
+}
+function closeExportModal(){
+  document.getElementById('exportModal').classList.remove('open');
+}
+function renderExportModal(){
+  var typeMap={};
+  items.forEach(function(it){if(!it.equipId)return;var t=it.equipType||'(Untyped)';typeMap[t]=(typeMap[t]||0)+1;});
+  var types=Object.keys(typeMap).sort();
+  var listEl=document.getElementById('exportTypeList');
+  if(!types.length){
+    listEl.innerHTML='<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px">No equipment types in schedule.</div>';
+  } else {
+    listEl.innerHTML=types.map(function(t){
+      var checked=_expSel.has(t);
+      var bulk=_groupedTypes.has(t);
+      return '<label class="gs-row'+(checked?' checked':'')+'">'
+        +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleExportType(this,\''+escH(t).replace(/'/g,"\\'")+'\')">'
+        +'<span class="gs-row-name">'+escH(t)+(bulk?' <span class="proc-group-tag">Bulk</span>':'')+'</span>'
+        +'<span class="gs-row-count">'+typeMap[t]+'</span>'
+        +'</label>';
+    }).join('');
+  }
+  // Display radio
+  var hasBulk=Array.from(_expSel).some(function(t){return _groupedTypes.has(t);});
+  var radioEl=document.getElementById('exportDisplayRadio');
+  var opts=[
+    {v:'summary',title:'Summary row only',sub:'One line per group (e.g. "Fire Dampers — qty 127"). Cleanest for clients.'},
+    {v:'expanded',title:'Summary row + child equipment IDs',sub:'Group line at top, equipment IDs listed underneath. Useful for QA / handover.'},
+    {v:'flat',title:'Individual rows only',sub:'Flatten back to one row per equipment ID. Ignores grouping.'}
+  ];
+  radioEl.innerHTML=opts.map(function(o){
+    var disabled=!hasBulk;
+    return '<label class="exp-radio'+(_expDisplay===o.v?' selected':'')+'" '+(disabled?'style="opacity:.45;cursor:not-allowed"':'')+'>'
+      +'<input type="radio" name="expDisp" value="'+o.v+'" '+(_expDisplay===o.v?'checked':'')+' '+(disabled?'disabled':'')+' onchange="setExportDisplay(this.value)">'
+      +'<div class="exp-radio-body"><div class="exp-radio-title">'+o.title+'</div><div class="exp-radio-sub">'+o.sub+'</div></div>'
+      +'</label>';
+  }).join('');
+  updateExportSummary();
+}
+function toggleExportType(cb,type){
+  if(cb.checked)_expSel.add(type);else _expSel.delete(type);
+  cb.closest('.gs-row').classList.toggle('checked',cb.checked);
+  // Re-render so radio enable/disable reflects current selection
+  renderExportModal();
+}
+function exportQuickSelect(mode){
+  var typeMap={};
+  items.forEach(function(it){if(!it.equipId)return;var t=it.equipType||'(Untyped)';typeMap[t]=(typeMap[t]||0)+1;});
+  var types=Object.keys(typeMap);
+  if(mode==='all'){_expSel=new Set(types);}
+  else if(mode==='none'){_expSel=new Set();}
+  else if(mode==='plant'){_expSel=new Set(types.filter(function(t){return!_groupedTypes.has(t);}));}
+  else if(mode==='bulk'){_expSel=new Set(types.filter(function(t){return _groupedTypes.has(t);}));}
+  renderExportModal();
+}
+function setExportDisplay(v){
+  _expDisplay=v;
+  document.querySelectorAll('.exp-radio').forEach(function(el){
+    var inp=el.querySelector('input[type=radio]');
+    el.classList.toggle('selected',inp&&inp.value===v);
+  });
+  updateExportSummary();
+}
+function updateExportSummary(){
+  var filtered=items.filter(function(it){return it.equipId&&_expSel.has(it.equipType||'(Untyped)');});
+  var groups=0,plant=0;
+  var groupSeen={};
+  filtered.forEach(function(it){
+    var t=it.equipType||'(Untyped)';
+    if(_groupedTypes.has(t)&&_expSel.has(t)){if(!groupSeen[t]){groupSeen[t]=true;groups++;}}
+    else plant++;
+  });
+  var summary=document.getElementById('exportSummary');
+  if(_expDisplay==='flat'||groups===0)summary.textContent=filtered.length+' rows';
+  else if(_expDisplay==='summary')summary.textContent=plant+' individual + '+groups+' bulk = '+(plant+groups)+' rows';
+  else summary.textContent=plant+' individual + '+groups+' bulk (with '+(filtered.length-plant)+' children) = '+(plant+filtered.length-plant+groups)+' rows';
+}
+function runExport(format){
+  var headers=['Equipment ID','Location','Manufacturer','Model','Equipment Type','Sub Approval Date','Order Status','Order Date','Lead Weeks','ETA','Delivery Date','Qty','Qty Delivered','Comments'];
+  var rows=[];
+  var filtered=items.filter(function(it){return it.equipId&&_expSel.has(it.equipType||'(Untyped)');});
+  // Apply same search/status/loc/type filter as the on-screen view? Keep export self-contained — only the type checklist drives it
+  // Sort within each group by equipId
+  filtered.sort(function(a,b){return (a.equipType||'').localeCompare(b.equipType||'')||(a.equipId||'').localeCompare(b.equipId||'');});
+
+  // Build rows according to display mode
+  var groupBuckets={};
+  filtered.forEach(function(it){
+    var t=it.equipType||'(Untyped)';
+    if(_groupedTypes.has(t)&&_expDisplay!=='flat'){
+      if(!groupBuckets[t])groupBuckets[t]=[];
+      groupBuckets[t].push(it);
+    } else {
+      rows.push([it.equipId,it.location||'',it.manufacturer||'',it.model||'',it.equipType||'',it.subApproval||'',it.status||'',it.orderDate||'',it.leadWeeks||'',it.eta||'',it.deliveryDate||'',it.qty||1,it.qtyDelivered||0,it.comments||'']);
+    }
+  });
+  // Add grouped rows
+  Object.keys(groupBuckets).sort().forEach(function(t){
+    var children=groupBuckets[t];
+    var totalQty=children.reduce(function(s,c){return s+(parseInt(c.qty,10)||1);},0);
+    var deliveredQty=children.reduce(function(s,c){return s+(parseInt(c.qtyDelivered,10)||0);},0);
+    // Roll up — pick the worst-case status (Not ordered > Ordered > Ready > Delivered)
+    var stRank={'Not ordered':0,'Ordered':1,'Ready':2,'Delivered':3,'Supplied by others':4};
+    var minSt=null;children.forEach(function(c){var r=stRank[c.status]==null?0:stRank[c.status];if(minSt===null||r<minSt)minSt=r;});
+    var rolledStatus=Object.keys(stRank).find(function(k){return stRank[k]===minSt;})||'Not ordered';
+    // Shared fields if all match
+    function commonField(field){var v=children[0][field]||'';for(var i=1;i<children.length;i++){if((children[i][field]||'')!==v)return '';}return v;}
+    rows.push([
+      t+' (×'+totalQty+')',
+      commonField('location'),
+      commonField('manufacturer'),
+      commonField('model'),
+      t,
+      commonField('subApproval'),
+      rolledStatus,
+      commonField('orderDate'),
+      commonField('leadWeeks'),
+      commonField('eta'),
+      commonField('deliveryDate'),
+      totalQty,
+      deliveredQty,
+      'Bulk group'
+    ]);
+    if(_expDisplay==='expanded'){
+      children.forEach(function(c){
+        rows.push(['  '+c.equipId,c.location||'',c.manufacturer||'',c.model||'',c.equipType||'',c.subApproval||'',c.status||'',c.orderDate||'',c.leadWeeks||'',c.eta||'',c.deliveryDate||'',c.qty||1,c.qtyDelivered||0,c.comments||'']);
+      });
+    }
+  });
+
+  var fname=_buildExportFilename(format);
+  if(format==='csv'){
+    var csvRows=[headers.join(',')].concat(rows.map(function(r){return r.map(function(v){return '"'+(String(v||'').replace(/"/g,'""'))+'"';}).join(',');}));
+    var blob=new Blob([csvRows.join('\n')],{type:'text/csv'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;a.click();
+    URL.revokeObjectURL(a.href);
+  } else if(format==='xlsx'){
+    if(typeof XLSX==='undefined'){
+      var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=function(){_writeXlsx(headers,rows,fname);};document.head.appendChild(s);
+    } else {_writeXlsx(headers,rows,fname);}
+  }
+  closeExportModal();
+  showToast('Exported '+rows.length+' rows');
+}
+function _writeXlsx(headers,rows,fname){
+  var aoa=[headers].concat(rows);
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=headers.map(function(h){return {wch:Math.max(12,h.length+2)};});
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Procurement');
+  XLSX.writeFile(wb,fname);
+}
+function _buildExportFilename(format){
+  var ext=format==='xlsx'?'.xlsx':'.csv';
+  var typeMap={};items.forEach(function(it){if(!it.equipId)return;typeMap[it.equipType||'(Untyped)']=true;});
+  var allTypes=Object.keys(typeMap);
+  var selSize=_expSel.size;
+  var allCount=allTypes.length;
+  var dateStr=new Date().toISOString().slice(0,10);
+  var proj=_psPNum||'Procurement';
+  if(selSize===0)return 'Procurement Schedule - Empty - '+dateStr+ext;
+  if(selSize===allCount)return 'Procurement Schedule - '+proj+' - '+dateStr+ext;
+  // Plant-only
+  var bulkInSel=Array.from(_expSel).filter(function(t){return _groupedTypes.has(t);}).length;
+  if(bulkInSel===0&&selSize===allTypes.filter(function(t){return!_groupedTypes.has(t);}).length){
+    return 'Procurement Schedule - Plant - '+proj+' - '+dateStr+ext;
+  }
+  // Bulk-only
+  if(bulkInSel===selSize&&selSize===allTypes.filter(function(t){return _groupedTypes.has(t);}).length){
+    return 'Procurement Schedule - Bulk - '+proj+' - '+dateStr+ext;
+  }
+  // Single type
+  if(selSize===1){
+    var only=Array.from(_expSel)[0].replace(/[^a-zA-Z0-9 ]/g,'').trim();
+    return 'Procurement Schedule - '+only+' - '+proj+' - '+dateStr+ext;
+  }
+  return 'Procurement Schedule - Filtered - '+proj+' - '+dateStr+ext;
+}
+
+// Backwards-compat shim — older code paths might still call exportCSV
+function exportCSV(){openExportModal();}
 
 (async function(){
   await load();
@@ -1058,7 +1417,6 @@ function applyBatchComments(){
 // ── COLUMN SETTINGS ──
 var PROC_COLS = [
   {id:'equipId',    label:'Equipment ID',       default:true,  locked:true},
-  {id:'building',   label:'Building',            default:true},
   {id:'location',   label:'Location',            default:true},
   {id:'manufacturer',label:'Manufacturer',       default:true},
   {id:'model',      label:'Model',               default:true},
@@ -1244,7 +1602,6 @@ function renderSummary(){
   gOrder.sort();
 
   var td=today();
-  var STATUS_COLORS={'Delivered':'var(--green)','Ordered':'var(--accent)','Ready':'var(--purple)','Not ordered':'var(--danger)','Supplied by others':'var(--muted)'};
 
   var html='';
   gOrder.forEach(function(grpName,gi){
@@ -1294,7 +1651,6 @@ function renderSummary(){
           var stColor=STATUS_COLORS[item.status]||'var(--text2)';
           return '<div class="summary-row" onclick="openEditModal(\''+item.id+'\')">'
             +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);min-width:140px">'+escH(item.equipId||'—')+'</span>'
-            +'<span style="color:var(--text2);min-width:100px">'+escH(item.building||'—')+'</span>'
             +'<span style="color:var(--muted);flex:1">'+escH(item.manufacturer||'—')+(item.model?' · '+escH(item.model):'')+'</span>'
             +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+stColor+';min-width:120px">'+escH(item.status||'—')+'</span>'
             +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+etaColor+';min-width:80px;text-align:right">'+etaD+'</span>'
@@ -1357,6 +1713,88 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
     </div>
   </div>
 </div>
+
+<!-- GROUP SETTINGS MODAL — pick which equipment types should render as bulk group rows -->
+<div class="mo" id="groupSettingsModal">
+  <div class="modal" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;width:480px;max-width:96vw;max-height:84vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-weight:700;font-size:15px">Group as Bulk</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Tick equipment types that should collapse into a single procurement line</div>
+      </div>
+      <button onclick="closeGroupSettings()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">✕</button>
+    </div>
+    <div style="padding:8px 6px;overflow-y:auto;flex:1" id="groupSettingsList"></div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:space-between;align-items:center">
+      <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace" id="groupSettingsCount">0 grouped</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="closeGroupSettings()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:12px;padding:6px 14px">Cancel</button>
+        <button onclick="saveGroupSettings()" style="background:var(--accent);border:none;border-radius:8px;color:#080c12;font-size:12px;font-weight:700;padding:6px 16px;cursor:pointer">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL — type filter + display radio + format buttons -->
+<div class="mo" id="exportModal">
+  <div class="modal" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;width:520px;max-width:96vw;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-weight:700;font-size:15px">Export Procurement Schedule</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Pick what to include — useful for filtering by client / subbie / package</div>
+      </div>
+      <button onclick="closeExportModal()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">✕</button>
+    </div>
+    <div style="padding:14px 20px 4px;overflow-y:auto;flex:1">
+      <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Equipment Types</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <button onclick="exportQuickSelect('plant')" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif">Plant only</button>
+        <button onclick="exportQuickSelect('bulk')" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif">Bulk only</button>
+        <button onclick="exportQuickSelect('all')" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif">All</button>
+        <button onclick="exportQuickSelect('none')" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif">None</button>
+      </div>
+      <div id="exportTypeList" style="border:1px solid var(--border);border-radius:8px;background:var(--surface2);max-height:260px;overflow-y:auto"></div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin:14px 0 8px">Show grouped types as</div>
+      <div id="exportDisplayRadio" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:space-between;align-items:center;background:var(--surface2)">
+      <div id="exportSummary" style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="closeExportModal()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:12px;padding:6px 14px">Cancel</button>
+        <button onclick="runExport('csv')" style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:12px;font-weight:600;padding:6px 14px">📊 CSV</button>
+        <button onclick="runExport('xlsx')" style="background:var(--accent);border:none;border-radius:8px;color:#080c12;font-size:12px;font-weight:700;padding:6px 16px;cursor:pointer">📊 Excel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+.gs-row{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-radius:6px;transition:background .12s}
+.gs-row:hover{background:var(--surface2)}
+.gs-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.gs-row-name{flex:1;font-size:13px;color:var(--text)}
+.gs-row-count{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface3);padding:2px 8px;border-radius:10px}
+.gs-row.checked .gs-row-name{color:var(--accent);font-weight:600}
+.exp-radio{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;cursor:pointer;transition:all .12s;background:var(--surface2)}
+.exp-radio:hover{border-color:var(--accent);background:var(--accent-dim)}
+.exp-radio input{margin-top:3px;accent-color:var(--accent);cursor:pointer}
+.exp-radio-body{flex:1}
+.exp-radio-title{font-size:12.5px;color:var(--text);font-weight:500;margin-bottom:2px}
+.exp-radio-sub{font-size:11px;color:var(--muted);line-height:1.4}
+.exp-radio.selected{border-color:var(--accent);background:var(--accent-dim)}
+.exp-radio.selected .exp-radio-title{color:var(--accent);font-weight:600}
+/* Group row styling for the schedule table */
+tr.proc-group-row{background:rgba(0,200,255,.05) !important;cursor:pointer}
+tr.proc-group-row:hover{background:rgba(0,200,255,.08) !important}
+tr.proc-group-row td{font-weight:600 !important;border-top:1.5px solid rgba(0,200,255,.2);border-bottom:1.5px solid rgba(0,200,255,.2)}
+.proc-group-chev{display:inline-block;width:14px;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);margin-right:6px;transition:transform .15s;user-select:none}
+.proc-group-chev.expanded{transform:rotate(90deg)}
+.proc-group-tag{display:inline-block;background:rgba(0,200,255,.12);color:var(--accent);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.5px;padding:2px 7px;border-radius:8px;border:1px solid rgba(0,200,255,.3);margin-left:8px;font-weight:700;text-transform:uppercase}
+.proc-group-qty{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:6px;font-weight:500}
+tr.proc-group-child{display:none}
+tr.proc-group-child.shown{display:table-row}
+tr.proc-group-child td:first-child,tr.proc-group-child td:nth-child(2){opacity:.55}
+tr.proc-group-child td.equip-id{padding-left:24px !important}
+</style>
 <div id="batchBar">
   <span class="batch-count" id="batchCount">0 selected</span>
   <button onclick="toggleSelectAll(false)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 10px;font-family:'DM Mono',monospace">Deselect all</button>
