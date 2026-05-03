@@ -55,6 +55,40 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
 .fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;cursor:pointer}
 .fsel:focus{border-color:var(--accent);color:var(--text)}.fsel option{background:var(--surface2)}
 
+/* Sortable + filterable column headers (matches boards schedule pattern) */
+.th-stack{display:flex;flex-direction:column;gap:2px;align-items:stretch}
+.th-row{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.th-label{cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;padding:4px 0;transition:color .12s;flex:1;min-width:0;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.6px;color:var(--muted);text-transform:uppercase;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th-label:hover{color:var(--text)}
+.sort-arrow{font-size:9px;color:var(--accent);font-family:'DM Sans',sans-serif;flex-shrink:0}
+.sort-arrow.inactive{color:var(--muted);opacity:.4}
+.filter-icon{background:transparent;border:1px solid transparent;color:var(--muted);width:18px;height:18px;border-radius:3px;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;transition:all .12s;position:relative}
+.filter-icon:hover{color:var(--text);border-color:var(--border);background:var(--surface)}
+.filter-icon.open{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
+.filter-icon.filtered{color:var(--accent)}
+.filter-icon.filtered::after{content:'';position:absolute;width:6px;height:6px;border-radius:50%;background:var(--green);top:0;right:0;border:1.5px solid var(--surface2)}
+/* Filter dropdown panel */
+#filterDrop{position:fixed;z-index:9000;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.6);width:240px;max-height:380px;display:none;flex-direction:column;overflow:hidden;font-family:'DM Sans',sans-serif}
+#filterDrop[style*="display:block"],#filterDrop[style*="display: block"]{display:flex !important}
+.fd-search-wrap{padding:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.fd-search{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:5px;font-size:12px;outline:none;box-sizing:border-box;font-family:'DM Sans',sans-serif}
+.fd-search:focus{border-color:var(--accent)}
+.fd-row{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:12px;color:var(--text);user-select:none;transition:background .1s}
+.fd-row:hover{background:var(--surface2)}
+.fd-row input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;flex-shrink:0}
+.fd-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fd-all{font-weight:600;border-bottom:1px solid var(--border);background:var(--surface2)}
+.fd-list{overflow-y:auto;flex:1;min-height:80px;max-height:200px}
+.fd-empty{padding:20px;text-align:center;color:var(--muted);font-size:11px}
+.fd-actions{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--border);background:var(--surface2);flex-shrink:0}
+.fd-btn-clear{flex:1;background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s}
+.fd-btn-clear:hover{border-color:var(--danger);color:var(--danger)}
+.fd-btn-ok{flex:1;background:var(--accent);color:#0a0a0a;border:none;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.fd-btn-ok:hover{filter:brightness(1.1)}
+/* Reset header tag default styling so .th-stack lays out cleanly */
+#procThead th{padding-top:8px;padding-bottom:8px}
+#procThead th:nth-child(n+3){padding-left:10px;padding-right:8px}
+
 /* SYNC BANNER */
 .summary-group{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
 .summary-group-hdr{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;user-select:none;background:var(--surface2);border-bottom:1px solid var(--border)}
@@ -256,16 +290,7 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 <!-- TOOLBAR -->
 <div class="toolbar">
   <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="searchInput" placeholder="Search asset ID, location, manufacturer…" oninput="renderTable()"></div>
-  <select class="fsel" id="stFilter" onchange="renderTable()">
-    <option value="">All Statuses</option>
-    <option value="Not ordered">Not ordered</option>
-    <option value="Ordered">Ordered</option>
-    <option value="Ready">Ready</option>
-    <option value="Delivered">Delivered</option>
-    <option value="Supplied by others">Supplied by others</option>
-  </select>
-  <select class="fsel" id="typeFilter" onchange="renderTable()"><option value="">All Equipment Types</option></select>
-  <select class="fsel" id="locFilter" onchange="renderTable()"><option value="">All Locations</option></select>
+  <button class="bg bsm btn" onclick="clearAllColFilters()" id="clearFiltersBtn" style="display:none">✕ Clear filters</button>
   <!-- View toggle -->
   <div style="display:flex;align-items:center;gap:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;overflow:hidden;margin-left:auto;font-family:'DM Mono',monospace;font-size:11px">
     <button id="viewBtnFull" onclick="setView('full')" style="padding:5px 12px;border:none;cursor:pointer;background:var(--accent);color:#080c12;font-family:inherit;font-size:11px;font-weight:700;transition:all .13s">☰ Full</button>
@@ -590,30 +615,297 @@ function updateSummary(filtered){
   document.getElementById('sumOverdue').textContent=overdue;
 }
 
-// FILTERS
-function getFilteredItems(){
-  var q=(document.getElementById('searchInput').value||'').toLowerCase();
-  var sf=document.getElementById('stFilter').value;
-  var tf=document.getElementById('typeFilter').value;
-  var lf=document.getElementById('locFilter').value;
-  return items.filter(function(i){
-    return(!q||(i.equipId||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q))
-      &&(!sf||i.status===sf)
-      &&(!tf||i.equipType===tf)
-      &&(!lf||i.location===lf);
+// ──────────────────────────────────────────────────────────────────────────────
+// PER-COLUMN SORT + FILTER (matches boards schedule pattern)
+// ──────────────────────────────────────────────────────────────────────────────
+//
+// _sortKey   — column id currently sorted, or null = no sort (default order)
+// _sortDir   — 'asc' or 'desc'
+// _colFilters — { colId: { search:'', selected:[...] | null } }
+//   selected === null → no filter (all values pass)
+//   selected === []   → no values selected (filter hides everything)
+//   selected ⊃ value  → that row passes
+//
+// Persistence: per-project to localStorage so each project keeps its own sort/filter
+//   state across sessions, just like the boards schedule.
+var _sortKey=null;
+var _sortDir='asc';
+var _colFilters={};
+
+var SORT_FILTER_KEY=function(){return 'hvacnexus_proc_sortfilter_'+(_psPNum||'default');};
+
+function loadSortFilter(){
+  try{
+    var raw=localStorage.getItem(SORT_FILTER_KEY());
+    if(!raw)return;
+    var s=JSON.parse(raw);
+    _sortKey=s.sortKey||null;
+    _sortDir=s.sortDir||'asc';
+    _colFilters=s.colFilters||{};
+  }catch(e){}
+}
+function saveSortFilter(){
+  try{
+    localStorage.setItem(SORT_FILTER_KEY(),JSON.stringify({sortKey:_sortKey,sortDir:_sortDir,colFilters:_colFilters}));
+  }catch(e){}
+}
+
+// Get the displayed value for a column in a given item — must match what's rendered
+// in the table cell, otherwise filter checkboxes won't line up with what the user sees.
+function getColValue(item,colId){
+  var eq=_equipLookup[item.equipId]||{};
+  if(colId==='equipId')return String(item.equipId||'');
+  if(colId==='location')return String(eq.subLocation||item.location||'');
+  if(colId==='manufacturer')return String(eq.manufacturer||item.manufacturer||'');
+  if(colId==='model')return String(eq.model||item.model||'');
+  if(colId==='equipType')return String(eq.equipType||item.equipType||'');
+  if(colId==='subApprovalStatus')return String((_tsLookup[item.equipId]||{}).status||'');
+  if(colId==='subApprovalDate'){var d=(_tsLookup[item.equipId]||{}).approvedDate;return String(d||'');}
+  if(colId==='status')return String(item.status||'');
+  if(colId==='orderDate')return String(item.orderDate||'');
+  if(colId==='leadWeeks'){
+    var lw=item.leadWeeks?parseInt(item.leadWeeks,10):null;
+    var tsLw=(_tsLookup[item.equipId]||{}).leadTime?parseInt((_tsLookup[item.equipId]||{}).leadTime,10):null;
+    var eff=lw||tsLw||null;
+    return eff?String(eff):'';
+  }
+  if(colId==='eta')return String(item.eta||'');
+  if(colId==='deliveryDate')return String(item.deliveryDate||'');
+  if(colId==='comments')return String(item.comments||'');
+  return String(item[colId]||'');
+}
+
+function getDistinctValuesForCol(colId){
+  var seen={};
+  items.forEach(function(it){
+    if(!it.equipId||!it.equipId.trim())return;
+    var v=getColValue(it,colId);
+    var k=v===''?'(blank)':v;
+    seen[k]=true;
+  });
+  return Object.keys(seen).sort(function(a,b){
+    if(a==='(blank)')return 1;
+    if(b==='(blank)')return -1;
+    var an=parseFloat(a),bn=parseFloat(b);
+    if(!isNaN(an)&&!isNaN(bn))return an-bn;
+    return a.localeCompare(b);
   });
 }
 
-// POPULATE FILTER DROPDOWNS
+function rowMatchesColFilters(item){
+  var keys=Object.keys(_colFilters);
+  if(!keys.length)return true;
+  for(var i=0;i<keys.length;i++){
+    var k=keys[i];
+    var f=_colFilters[k];
+    if(!f||f.selected===null||f.selected===undefined)continue;
+    var v=getColValue(item,k);
+    var matchVal=v===''?'(blank)':v;
+    if(f.selected.indexOf(matchVal)<0)return false;
+  }
+  return true;
+}
+
+function hasActiveColFilters(){
+  var keys=Object.keys(_colFilters);
+  for(var i=0;i<keys.length;i++){
+    var f=_colFilters[keys[i]];
+    if(!f||f.selected===null||f.selected===undefined)continue;
+    var distinct=getDistinctValuesForCol(keys[i]);
+    if(f.selected.length<distinct.length)return true;
+  }
+  return false;
+}
+
+function setSort(colId){
+  if(_sortKey===colId){
+    if(_sortDir==='asc')_sortDir='desc';
+    else {_sortKey=null;_sortDir='asc';} // third click clears the sort
+  } else {
+    _sortKey=colId;_sortDir='asc';
+  }
+  saveSortFilter();
+  renderTable();
+}
+
+function applySortIfNeeded(arr){
+  if(!_sortKey)return arr;
+  var key=_sortKey,dir=_sortDir==='desc'?-1:1;
+  return arr.slice().sort(function(a,b){
+    var av=getColValue(a,key).toLowerCase();
+    var bv=getColValue(b,key).toLowerCase();
+    var an=parseFloat(av),bn=parseFloat(bv);
+    var bothNumeric=!isNaN(an)&&!isNaN(bn)&&isFinite(an)&&isFinite(bn)&&av.replace(/[\d.\-+\se]/g,'')==='';
+    if(bothNumeric){if(an<bn)return -1*dir;if(an>bn)return 1*dir;return 0;}
+    if(av<bv)return -1*dir;
+    if(av>bv)return 1*dir;
+    return 0;
+  });
+}
+
+// ── Filter dropdown ──
+var _filterDropOpen=null;
+
+function toggleFilterDrop(e,colId){
+  e.stopPropagation();
+  if(_filterDropOpen===colId){closeFilterDrop();return;}
+  _filterDropOpen=colId;
+  // Initialise selected set if not set yet
+  if(!_colFilters[colId]||_colFilters[colId].selected===null||_colFilters[colId].selected===undefined){
+    _colFilters[colId]={search:'',selected:getDistinctValuesForCol(colId)};
+  }
+  renderFilterDrop(e.currentTarget);
+}
+
+function renderFilterDrop(anchorEl){
+  if(!_filterDropOpen)return;
+  var colId=_filterDropOpen;
+  var distinct=getDistinctValuesForCol(colId);
+  var f=_colFilters[colId]||{search:'',selected:distinct.slice()};
+  var sel=f.selected||distinct.slice();
+  var search=(f.search||'').toLowerCase();
+  var visibleVals=distinct.filter(function(v){return !search||String(v).toLowerCase().indexOf(search)>=0;});
+  var allChecked=visibleVals.length>0&&visibleVals.every(function(v){return sel.indexOf(v)>=0;});
+  var someChecked=visibleVals.some(function(v){return sel.indexOf(v)>=0;});
+
+  var html='';
+  html+='<div class="fd-search-wrap"><input class="fd-search" placeholder="Search…" value="'+escH(f.search||'')+'" oninput="setFilterSearch(\''+colId+'\',this.value)"></div>';
+  html+='<label class="fd-row fd-all"><input type="checkbox" '+(allChecked?'checked':'')+' onchange="toggleFilterAll(\''+colId+'\',this.checked)"><span>(Select All'+(search?' Filtered':'')+')</span></label>';
+  if(!visibleVals.length){
+    html+='<div class="fd-empty">No matching values</div>';
+  } else {
+    html+='<div class="fd-list">';
+    visibleVals.forEach(function(v){
+      var checked=sel.indexOf(v)>=0;
+      var displayV=v==='(blank)'?'<span style="color:var(--muted);font-style:italic">(blank)</span>':escH(v);
+      html+='<label class="fd-row"><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleFilterValue(\''+colId+'\',\''+escFilterAttr(v)+'\',this.checked)"><span>'+displayV+'</span></label>';
+    });
+    html+='</div>';
+  }
+  html+='<div class="fd-actions"><button class="fd-btn-clear" onclick="clearFilterCol(\''+colId+'\')">Clear filter</button><button class="fd-btn-ok" onclick="closeFilterDrop()">Done</button></div>';
+
+  var fd=document.getElementById('filterDrop');
+  fd.innerHTML=html;
+  fd.style.display='block';
+  // Position
+  var rect=anchorEl.getBoundingClientRect();
+  var fdW=240,fdH=Math.min(360,fd.offsetHeight||360);
+  var left=rect.left;
+  var top=rect.bottom+4;
+  if(left+fdW>window.innerWidth)left=window.innerWidth-fdW-8;
+  if(top+fdH>window.innerHeight)top=Math.max(8,rect.top-fdH-4);
+  fd.style.left=left+'px';
+  fd.style.top=top+'px';
+  // Update header icon active state
+  document.querySelectorAll('.filter-icon').forEach(function(el){el.classList.remove('open');});
+  var headerIcon=document.querySelector('.filter-icon[data-col="'+colId+'"]');
+  if(headerIcon)headerIcon.classList.add('open');
+  setTimeout(function(){var s=fd.querySelector('.fd-search');if(s)s.focus();},0);
+}
+
+function escFilterAttr(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+
+function setFilterSearch(colId,val){
+  if(!_colFilters[colId])_colFilters[colId]={search:'',selected:getDistinctValuesForCol(colId)};
+  _colFilters[colId].search=val;
+  var anchorEl=document.querySelector('.filter-icon[data-col="'+colId+'"]');
+  if(anchorEl)renderFilterDrop(anchorEl);
+  setTimeout(function(){var s=document.querySelector('#filterDrop .fd-search');if(s){s.focus();var l=s.value.length;s.setSelectionRange(l,l);}},0);
+}
+
+function toggleFilterValue(colId,val,checked){
+  if(!_colFilters[colId])_colFilters[colId]={search:'',selected:getDistinctValuesForCol(colId)};
+  var sel=_colFilters[colId].selected||[];
+  if(checked){if(sel.indexOf(val)<0)sel.push(val);}
+  else {sel=sel.filter(function(v){return v!==val;});}
+  _colFilters[colId].selected=sel;
+  saveSortFilter();
+  renderTable();
+  var anchorEl=document.querySelector('.filter-icon[data-col="'+colId+'"]');
+  if(anchorEl)renderFilterDrop(anchorEl);
+}
+
+function toggleFilterAll(colId,checked){
+  if(!_colFilters[colId])_colFilters[colId]={search:'',selected:getDistinctValuesForCol(colId)};
+  var distinct=getDistinctValuesForCol(colId);
+  var search=(_colFilters[colId].search||'').toLowerCase();
+  var visibleVals=distinct.filter(function(v){return !search||String(v).toLowerCase().indexOf(search)>=0;});
+  var sel=_colFilters[colId].selected||[];
+  if(checked){
+    visibleVals.forEach(function(v){if(sel.indexOf(v)<0)sel.push(v);});
+  } else {
+    sel=sel.filter(function(v){return visibleVals.indexOf(v)<0;});
+  }
+  _colFilters[colId].selected=sel;
+  saveSortFilter();
+  renderTable();
+  var anchorEl=document.querySelector('.filter-icon[data-col="'+colId+'"]');
+  if(anchorEl)renderFilterDrop(anchorEl);
+}
+
+function clearFilterCol(colId){
+  delete _colFilters[colId];
+  saveSortFilter();
+  renderTable();
+  closeFilterDrop();
+}
+
+function clearAllColFilters(){
+  _colFilters={};
+  _sortKey=null;_sortDir='asc';
+  saveSortFilter();
+  renderTable();
+}
+
+function closeFilterDrop(){
+  _filterDropOpen=null;
+  var fd=document.getElementById('filterDrop');
+  if(fd)fd.style.display='none';
+  document.querySelectorAll('.filter-icon').forEach(function(el){el.classList.remove('open');});
+}
+
+// Build the inner HTML for a sortable + filterable header cell
+function renderHeaderCell(label,colId){
+  var sortIcon='';
+  if(_sortKey===colId){sortIcon=_sortDir==='asc'?' <span class="sort-arrow active">▲</span>':' <span class="sort-arrow active">▼</span>';}
+  else sortIcon=' <span class="sort-arrow inactive">↕</span>';
+  var f=_colFilters[colId];
+  var distinctCount=getDistinctValuesForCol(colId).length;
+  var hasFilter=f&&f.selected&&f.selected.length<distinctCount;
+  var filterIconCls='filter-icon'+(hasFilter?' filtered':'');
+  return '<div class="th-stack">'
+    +'<div class="th-row">'
+    +'<span class="th-label" onclick="setSort(\''+colId+'\')" title="Click to sort">'+escH(label)+sortIcon+'</span>'
+    +'<button class="'+filterIconCls+'" data-col="'+colId+'" onclick="toggleFilterDrop(event,\''+colId+'\')" title="Filter">▾</button>'
+    +'</div>'
+    +'</div>';
+}
+
+// Outside-click closer for the filter dropdown
+document.addEventListener('click',function(e){
+  if(!_filterDropOpen)return;
+  if(e.target.closest('#filterDrop')||e.target.closest('.filter-icon'))return;
+  closeFilterDrop();
+});
+
+// FILTERS — combine free-text search box with per-column filters and sort
+function getFilteredItems(){
+  var q=(document.getElementById('searchInput').value||'').toLowerCase();
+  var arr=items.filter(function(i){
+    if(q){
+      var hit=(i.equipId||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q);
+      if(!hit)return false;
+    }
+    return rowMatchesColFilters(i);
+  });
+  return applySortIfNeeded(arr);
+}
+
+// POPULATE FILTER DROPDOWNS — no-op (per-column filters replace the legacy global dropdowns)
 function populateFilters(){
-  var types=new Set(),locs=new Set();
-  items.forEach(function(i){if(i.equipType)types.add(i.equipType);if(i.location)locs.add(i.location);});
-  var tSel=document.getElementById('typeFilter'),tv=tSel.value;
-  tSel.innerHTML='<option value="">All Equipment Types</option>';
-  Array.from(types).sort().forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;if(t===tv)o.selected=true;tSel.appendChild(o);});
-  var lSel=document.getElementById('locFilter'),lv=lSel.value;
-  lSel.innerHTML='<option value="">All Locations</option>';
-  Array.from(locs).sort().forEach(function(l){var o=document.createElement('option');o.value=l;o.textContent=l;if(l===lv)o.selected=true;lSel.appendChild(o);});
+  // The clear-filters button visibility is the only thing that needs syncing each render
+  var btn=document.getElementById('clearFiltersBtn');
+  if(btn)btn.style.display=(hasActiveColFilters()||_sortKey)?'inline-flex':'none';
 }
 
 // RENDER TABLE
@@ -747,6 +1039,19 @@ function renderTable(){
   // Filter out items with no equipment ID
   filtered=filtered.filter(function(i){return i.equipId&&i.equipId.trim();});
 
+  // ─── Build sortable + filterable headers (lifted out of the row loop so they
+  //      still render even when there are zero rows in the filtered displayList) ───
+  if(thead){
+    var COL_WIDTHS={status:'140px',orderDate:'110px',leadWeeks:'110px',eta:'100px',deliveryDate:'110px'};
+    getOrderedCols().forEach(function(c){
+      if(!isColVisible(c.id))return;
+      var th2=document.createElement('th');
+      if(COL_WIDTHS[c.id])th2.style.width=COL_WIDTHS[c.id];
+      th2.innerHTML=renderHeaderCell(c.label,c.id);
+      thead.appendChild(th2);
+    });
+  }
+
   // ─── Apply bulk-grouping transform ───
   // Items whose equipType is in _groupedTypes collapse into a single virtual "group" entry
   // followed by its children. Children render with class "proc-group-child" so CSS controls
@@ -873,19 +1178,6 @@ function renderTable(){
     var delivCell=_editMode
       ?'<input type="date" class="proc-edit" value="'+(item.deliveryDate||'')+'" onchange="inlineUpdate(\''+item.id+'\',\'deliveryDate\',this.value)" style="min-width:110px"/>'
       :'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+(isDelivered?'var(--green)':'var(--muted)')+'">'+fmtD(item.deliveryDate||'')+'</span>';
-    // Build dynamic columns
-    var th=document.getElementById('procThead');
-    if(th&&th.children.length<=2){
-      // Build headers
-      var COL_WIDTHS={status:'140px',orderDate:'110px',leadWeeks:'110px',eta:'100px',deliveryDate:'110px'};
-      getOrderedCols().forEach(function(c){
-        if(!isColVisible(c.id))return;
-        var th2=document.createElement('th');
-        if(COL_WIDTHS[c.id])th2.style.width=COL_WIDTHS[c.id];
-        th2.textContent=c.label;
-        th.appendChild(th2);
-      });
-    }
     // Pull master fields from equipment schedule lookup
     var _eq=_equipLookup[item.equipId]||{};
     var _location=_eq.location||item.location||'—';
@@ -1266,6 +1558,7 @@ function exportCSV(){openExportModal();}
 (async function(){
   await load();
   if(typeof dbReady !== 'undefined') await dbReady;
+  loadSortFilter(); // restore per-project sort + column-filter state from localStorage
   // Load equipment schedule data for ID resolution
   var _equipData=null;
   try{
@@ -1795,6 +2088,9 @@ tr.proc-group-child.shown{display:table-row}
 tr.proc-group-child td:first-child,tr.proc-group-child td:nth-child(2){opacity:.55}
 tr.proc-group-child td.equip-id{padding-left:24px !important}
 </style>
+<!-- FILTER DROPDOWN PANEL — anchored to whichever column header was clicked -->
+<div id="filterDrop"></div>
+
 <div id="batchBar">
   <span class="batch-count" id="batchCount">0 selected</span>
   <button onclick="toggleSelectAll(false)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 10px;font-family:'DM Mono',monospace">Deselect all</button>
