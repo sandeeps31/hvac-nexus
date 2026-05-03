@@ -176,7 +176,7 @@ async function authGuard() {
 async function sbFetch(path, options = {}) {
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
   // Use session JWT if logged in, otherwise fall back to anon key
-  const token = _authSession ? _authSession.access_token : SUPABASE_ANON_KEY;
+  const token = sbGetAuthToken();
   const headers = {
     'apikey': SUPABASE_ANON_KEY,
     'Authorization': `Bearer ${token}`,
@@ -191,6 +191,71 @@ async function sbFetch(path, options = {}) {
   }
   const text = await res.text();
   return text ? JSON.parse(text) : null;
+}
+
+// ── Auth token resolver ──
+// Returns the current user's JWT if available, falling back to the anon key.
+// Single source of truth — every module should use this instead of fishing
+// the token out of localStorage themselves.
+function sbGetAuthToken() {
+  if (_authSession && _authSession.access_token) return _authSession.access_token;
+  try {
+    const ss = JSON.parse(localStorage.getItem('hvacnexus_session') || '{}');
+    if (ss.access_token) return ss.access_token;
+  } catch(e) {}
+  return SUPABASE_ANON_KEY;
+}
+
+// ── Storage upload ──
+// Uploads a File/Blob to a Supabase Storage bucket and returns the public URL.
+// bucket: bucket name (e.g. 'documents', 'hvacnex-photos')
+// path:   object path within the bucket (e.g. 'specifications/GCT001/abc.pdf')
+// file:   File or Blob
+// opts:   { contentType?, upsert? }
+async function sbUploadFile(bucket, path, file, opts) {
+  opts = opts || {};
+  const url = `${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`;
+  const headers = {
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${sbGetAuthToken()}`,
+    'Content-Type': opts.contentType || file.type || 'application/octet-stream'
+  };
+  if (opts.upsert) headers['x-upsert'] = 'true';
+  const res = await fetch(url, { method: 'POST', headers, body: file });
+  if (!res.ok) throw new Error(`Storage upload failed (${res.status}): ${await res.text()}`);
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+}
+
+// ── Storage download (authenticated) ──
+// Fetches a file from Supabase Storage as a Uint8Array, sending the user's JWT.
+// Use this for private buckets where the public URL alone isn't enough.
+async function sbDownloadFile(url) {
+  const headers = {
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${sbGetAuthToken()}`
+  };
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`Storage download failed (${res.status})`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+// ── Edge Function caller ──
+// Invokes a Supabase Edge Function. fnName is the function path (e.g. 'hyper-endpoint').
+// Returns the parsed JSON response.
+async function sbCallEdgeFunction(fnName, body) {
+  const url = `${SUPABASE_URL}/functions/v1/${fnName}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${sbGetAuthToken()}`,
+    'apikey': SUPABASE_ANON_KEY
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body || {})
+  });
+  if (!res.ok) throw new Error(`Edge function "${fnName}" failed (${res.status}): ${await res.text()}`);
+  return await res.json();
 }
 
 // ── Generic get/set for single-row tables (company-level) ──
@@ -502,17 +567,7 @@ async function uploadPhoto(file, folder) {
     folder = folder || 'general';
     var ext = file.name.split('.').pop() || 'jpg';
     var path = folder + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + '.' + ext;
-    var res = await fetch(SUPABASE_URL + '/storage/v1/object/' + PHOTO_BUCKET + '/' + path, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-        'Content-Type': file.type || 'image/jpeg'
-      },
-      body: file
-    });
-    if (!res.ok) { console.warn('Photo upload failed:', await res.text()); return null; }
-    return SUPABASE_URL + '/storage/v1/object/public/' + PHOTO_BUCKET + '/' + path;
+    return await sbUploadFile(PHOTO_BUCKET, path, file, { contentType: file.type || 'image/jpeg' });
   } catch(e) {
     console.warn('uploadPhoto error:', e.message);
     return null;
@@ -526,7 +581,7 @@ async function deletePhoto(url) {
     if (!path) return;
     await fetch(SUPABASE_URL + '/storage/v1/object/' + PHOTO_BUCKET + '/' + path, {
       method: 'DELETE',
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + sbGetAuthToken() }
     });
   } catch(e) { console.warn('deletePhoto error:', e.message); }
 }
@@ -644,20 +699,14 @@ function purgeOldDeletedFiles(filesArray,retentionDays){
 // ── AI Usage Logging ──
 async function dbLogAiUsage(projectNum,module,action,usage){
   try{
-    var companyId=null;
-    try{var sess=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');companyId=sess.company_id||null;}catch(e){}
+    var companyId=authGetCompanyId();
     var inputTokens=(usage&&usage.input_tokens)||0;
     var outputTokens=(usage&&usage.output_tokens)||0;
+    // Claude Sonnet 4 pricing: $3/M input, $15/M output
     var costUsd=((inputTokens/1000000)*3)+((outputTokens/1000000)*15);
-    var SUPA_URL='https://qbsjrccrgkbevncvxbio.supabase.co';
-    var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
-    var token=SUPA_KEY;
-    try{if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token)token=_authSession.access_token;
-      else{var ss=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(ss.access_token)token=ss.access_token;}
-    }catch(e){}
-    await fetch(SUPA_URL+'/rest/v1/ai_usage',{
+    await fetch(SUPABASE_URL+'/rest/v1/ai_usage',{
       method:'POST',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
+      headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+sbGetAuthToken(),'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({company_id:companyId,project_num:projectNum||null,module:module||'unknown',action:action||'query',model:'claude-sonnet-4-6',input_tokens:inputTokens,output_tokens:outputTokens,cost_usd:parseFloat(costUsd.toFixed(6)),created_at:new Date().toISOString()})
     });
   }catch(e){console.warn('AI usage log failed:',e.message);}

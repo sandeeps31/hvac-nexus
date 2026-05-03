@@ -494,8 +494,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 // ── CONFIG ──
-const SUPA_URL='https://qbsjrccrgkbevncvxbio.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+// Supabase URL/key are provided by db.js (module-level SUPABASE_URL / SUPABASE_ANON_KEY).
+// Auth token resolved via sbGetAuthToken(); storage uploads via sbUploadFile();
+// Edge Functions via sbCallEdgeFunction(). Do NOT hardcode keys here.
 const SUPA_BUCKET='documents';
 const AI_MODEL='claude-sonnet-4-20250514';
 
@@ -713,16 +714,7 @@ async function saveSpec(){
 // ── SUPABASE UPLOAD ──
 async function uploadSpecFile(file,docId){
   var path='specifications/'+_pNum+'/'+docId+'_'+Date.now()+'.pdf';
-  var token=SUPA_KEY;
-  try{var ss=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(ss.access_token)token=ss.access_token;}catch(e){}
-  if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token)token=_authSession.access_token;
-  var res=await fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET+'/'+path,{
-    method:'POST',
-    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/pdf','x-upsert':'true'},
-    body:file
-  });
-  if(!res.ok)throw new Error(await res.text());
-  return SUPA_URL+'/storage/v1/object/public/'+SUPA_BUCKET+'/'+path;
+  return await sbUploadFile(SUPA_BUCKET,path,file,{contentType:'application/pdf',upsert:true});
 }
 
 // ── PDF TEXT EXTRACTION ──
@@ -731,10 +723,8 @@ async function extractPdfText(fileOrUrl){
   if(fileOrUrl instanceof File){
     arrayBuffer=await fileOrUrl.arrayBuffer();
   } else {
-    var token=SUPA_KEY;
-    try{var ss=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(ss.access_token)token=ss.access_token;}catch(e){}
-    var r=await fetch(fileOrUrl,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token}});
-    arrayBuffer=await r.arrayBuffer();
+    var bytes=await sbDownloadFile(fileOrUrl);
+    arrayBuffer=bytes.buffer;
   }
   var pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
   var text='';
@@ -826,11 +816,7 @@ function viewRev(idx){_activeRevIdx=idx;renderDetail();}
 // ── PDF VIEWER ──
 async function loadPdf(url){
   try{
-    var token=SUPA_KEY;
-    try{var ss=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(ss.access_token)token=ss.access_token;}catch(e){}
-    if(typeof _authSession!=='undefined'&&_authSession&&_authSession.access_token)token=_authSession.access_token;
-    var resp=await fetch(url,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token}});
-    _pdfBytes=new Uint8Array(await resp.arrayBuffer());
+    _pdfBytes=await sbDownloadFile(url);
     _pdfDoc=await pdfjsLib.getDocument({data:_pdfBytes}).promise;
     _pdfTotal=_pdfDoc.numPages;_pdfPage=1;
     await renderPdfPage();
@@ -988,17 +974,12 @@ When answering:
 Keep answers concise but precise. This is a professional construction context.`;
 
     var messages=_aiHistory.slice(-8); // keep last 8 turns for context
-    var resp=await fetch('https://qbsjrccrgkbevncvxbio.supabase.co/functions/v1/hyper-endpoint',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
-      body:JSON.stringify({
-        model:AI_MODEL,
-        max_tokens:1500,
-        system:systemPrompt,
-        messages:messages
-      })
+    var data=await sbCallEdgeFunction('hyper-endpoint',{
+      model:AI_MODEL,
+      max_tokens:1500,
+      system:systemPrompt,
+      messages:messages
     });
-    var data=await resp.json();
     var answer=(data.content&&data.content[0]&&data.content[0].text)||'No response received.';
     // Log token usage
     if(data.usage)dbLogAiUsage(_pNum,'specifications','qa',data.usage);
@@ -1091,19 +1072,14 @@ async function runConflictDetection(){
       return s.title+' ('+s.docNo+'):\n'+text;
     }).join('\n\n---\n\n');
 
-    var resp=await fetch('https://qbsjrccrgkbevncvxbio.supabase.co/functions/v1/hyper-endpoint',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
-      body:JSON.stringify({
-        model:AI_MODEL,
-        max_tokens:2000,
-        messages:[{
-          role:'user',
-          content:`You are reviewing the following HVAC project specifications for conflicts and contradictions.\n\nSpecifications:\n${specSummaries}\n\nFind all conflicts, contradictions, or inconsistencies between these specifications. For each conflict:\n1. State which documents conflict\n2. Give the specific clauses or sections\n3. Describe the contradiction clearly\n4. Rate severity: HIGH (will cause variation/dispute), MEDIUM (needs clarification), LOW (minor inconsistency)\n\nRespond in JSON format only:\n{\n  "conflicts": [\n    {\n      "severity": "HIGH|MEDIUM|LOW",\n      "title": "brief title",\n      "description": "what conflicts",\n      "docs": ["Doc 1", "Doc 2"],\n      "clauses": ["Clause X", "Clause Y"]\n    }\n  ],\n  "summary": "overall summary"\n}`
-        }]
-      })
+    var data=await sbCallEdgeFunction('hyper-endpoint',{
+      model:AI_MODEL,
+      max_tokens:2000,
+      messages:[{
+        role:'user',
+        content:`You are reviewing the following HVAC project specifications for conflicts and contradictions.\n\nSpecifications:\n${specSummaries}\n\nFind all conflicts, contradictions, or inconsistencies between these specifications. For each conflict:\n1. State which documents conflict\n2. Give the specific clauses or sections\n3. Describe the contradiction clearly\n4. Rate severity: HIGH (will cause variation/dispute), MEDIUM (needs clarification), LOW (minor inconsistency)\n\nRespond in JSON format only:\n{\n  "conflicts": [\n    {\n      "severity": "HIGH|MEDIUM|LOW",\n      "title": "brief title",\n      "description": "what conflicts",\n      "docs": ["Doc 1", "Doc 2"],\n      "clauses": ["Clause X", "Clause Y"]\n    }\n  ],\n  "summary": "overall summary"\n}`
+      }]
     });
-    var data=await resp.json();
     var raw=data.content&&data.content[0]&&data.content[0].text||'{}';
     var clean=raw.replace(/```json|```/g,'').trim();
     var parsed=JSON.parse(clean);
@@ -1151,19 +1127,14 @@ async function generateComplianceChecklist(){
   results.innerHTML='<div style="text-align:center;padding:30px"><div class="spinner"></div><div style="margin-top:10px;font-size:12px;color:var(--muted)">Extracting mandatory requirements…</div></div>';
 
   try{
-    var resp=await fetch('https://qbsjrccrgkbevncvxbio.supabase.co/functions/v1/hyper-endpoint',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
-      body:JSON.stringify({
-        model:AI_MODEL,
-        max_tokens:2000,
-        messages:[{
-          role:'user',
-          content:`From the following HVAC specification, extract all mandatory requirements that must be demonstrated for compliance (requirements with "shall", "must", "is required", "to be", etc.).\n\nSpec: ${s.title} (${s.docNo})\n\n${rev.extractedText.substring(0,12000)}\n\nRespond in JSON only:\n{\n  "sections": [\n    {\n      "heading": "section name",\n      "clauses": [\n        {\n          "ref": "clause reference e.g. 15.4.1",\n          "requirement": "what must be done",\n          "evidence": "what evidence is needed"\n        }\n      ]\n    }\n  ]\n}`
-        }]
-      })
+    var data=await sbCallEdgeFunction('hyper-endpoint',{
+      model:AI_MODEL,
+      max_tokens:2000,
+      messages:[{
+        role:'user',
+        content:`From the following HVAC specification, extract all mandatory requirements that must be demonstrated for compliance (requirements with "shall", "must", "is required", "to be", etc.).\n\nSpec: ${s.title} (${s.docNo})\n\n${rev.extractedText.substring(0,12000)}\n\nRespond in JSON only:\n{\n  "sections": [\n    {\n      "heading": "section name",\n      "clauses": [\n        {\n          "ref": "clause reference e.g. 15.4.1",\n          "requirement": "what must be done",\n          "evidence": "what evidence is needed"\n        }\n      ]\n    }\n  ]\n}`
+      }]
     });
-    var data=await resp.json();
     var raw=data.content&&data.content[0]&&data.content[0].text||'{}';
     var clean=raw.replace(/```json|```/g,'').trim();
     var parsed=JSON.parse(clean);
