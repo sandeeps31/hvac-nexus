@@ -808,6 +808,21 @@ function escFilterAttr(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\
 function setFilterSearch(colId,val){
   if(!_colFilters[colId])_colFilters[colId]={search:'',selected:getDistinctValuesForCol(colId)};
   _colFilters[colId].search=val;
+  // When search has text, narrow `selected` to ONLY values matching that search.
+  // This matches Excel/Google Sheets UX: typing in the filter search auto-applies
+  // the narrow as the user types, rather than requiring them to also tick checkboxes.
+  // When search is cleared (val==''), restore the full set so the user sees all options
+  // again — they can then tick/untick individuals if they want a sub-selection.
+  var distinct=getDistinctValuesForCol(colId);
+  if(val&&val.trim()){
+    var search=val.toLowerCase();
+    _colFilters[colId].selected=distinct.filter(function(v){return String(v).toLowerCase().indexOf(search)>=0;});
+  } else {
+    // Search cleared — reset to full set so all rows show again
+    _colFilters[colId].selected=distinct.slice();
+  }
+  saveSortFilter();
+  renderTable();
   var anchorEl=document.querySelector('.filter-icon[data-col="'+colId+'"]');
   if(anchorEl)renderFilterDrop(anchorEl);
   setTimeout(function(){var s=document.querySelector('#filterDrop .fd-search');if(s){s.focus();var l=s.value.length;s.setSelectionRange(l,l);}},0);
