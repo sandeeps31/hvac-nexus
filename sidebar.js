@@ -94,7 +94,7 @@
       </div>
       <div class="sb-group-items" id="gitems-handover">
         <div class="sb-item" onclick="navTo('hvac-asset-register.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Asset register</span></div>
-        <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📖</span><span class="sb-item-label">O&amp;M manuals</span></div>
+        <div class="sb-item" onclick="navTo('hvac-om-manual.html')"><span class="sb-item-icon">📖</span><span class="sb-item-label">O&amp;M manuals</span></div>
         <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">🔧</span><span class="sb-item-label">Maintenance plan</span></div>
         <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">🎓</span><span class="sb-item-label">User training</span></div>
       </div>
