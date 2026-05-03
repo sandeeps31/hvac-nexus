@@ -41,6 +41,7 @@
       <div class="sb-group-items" id="gitems-procurement">
         <div class="sb-item" onclick="navTo('hvac-procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
         <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
+        <div class="sb-item" onclick="navTo('hvac-material-receiving.html')"><span class="sb-item-icon">🚚</span><span class="sb-item-label">Material receiving</span></div>
         <div class="sb-item" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span></div>
       </div>
     </div>
