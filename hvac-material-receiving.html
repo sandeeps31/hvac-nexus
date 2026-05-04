@@ -814,10 +814,13 @@ function getSuppliers(){
     if(!supp)return;
     var qty=parseInt(it.qty,10)||1;
     var del=parseInt(it.qtyDelivered,10)||0;
+    // Outstanding now driven by status — anything not 'Delivered' counts as still due.
+    // Aligns with getEligibleItems and lets PM re-open items via status alone.
+    var isDelivered=(it.status||'').trim()==='Delivered';
     if(!map[supp])map[supp]={name:supp,ordered:0,delivered:0,outstanding:0,types:{},rawItems:[]};
     map[supp].ordered+=qty;
     map[supp].delivered+=del;
-    map[supp].outstanding+=Math.max(qty-del,0);
+    map[supp].outstanding+=isDelivered?0:qty;
     map[supp].types[it.equipType||'(Untyped)']=true;
     map[supp].rawItems.push(it);
   });
@@ -961,8 +964,10 @@ function pickerSelectSupplier(name){
   if(!strictPos.length){
     var supplierItems=_items.filter(function(it){return (it.manufacturer||'').trim()===supp&&it.equipId;});
     var totalOut=supplierItems.reduce(function(s,it){
-      var qty=parseInt(it.qty,10)||1;var del=parseInt(it.qtyDelivered,10)||0;
-      return s+Math.max(qty-del,0);
+      // Outstanding driven by status — count anything not yet 'Delivered'
+      var qty=parseInt(it.qty,10)||1;
+      var isDelivered=(it.status||'').trim()==='Delivered';
+      return s+(isDelivered?0:qty);
     },0);
     if(totalOut>0&&!fuzzyPos.length){
       // No strict, no fuzzy, but still has outstanding equipment — keep the receive-without-PO option
@@ -976,8 +981,7 @@ function pickerSelectSupplier(name){
   // pick from any supplier if fuzzy didn't help. Plus "Receive without PO" if applicable.
   var hasOutstandingForSupplier=_items.some(function(it){
     if((it.manufacturer||'').trim()!==supp||!it.equipId)return false;
-    var qty=parseInt(it.qty,10)||1;var del=parseInt(it.qtyDelivered,10)||0;
-    return del<qty;
+    return (it.status||'').trim()!=='Delivered';
   });
   html+='<div class="picker-actions">';
   html+='<button class="picker-action-btn" onclick="openBrowseAllPos()">📋 Browse all open POs</button>';
@@ -1091,8 +1095,10 @@ function pickerSelectPo(poId){
     var t=it.equipType||'(Untyped)';
     if(!typeMap[t])typeMap[t]={count:0,outstanding:0};
     typeMap[t].count++;
-    var qty=parseInt(it.qty,10)||1;var del=parseInt(it.qtyDelivered,10)||0;
-    typeMap[t].outstanding+=Math.max(qty-del,0);
+    // Outstanding driven by status — not yet 'Delivered' counts as outstanding
+    var qty=parseInt(it.qty,10)||1;
+    var isDelivered=(it.status||'').trim()==='Delivered';
+    typeMap[t].outstanding+=isDelivered?0:qty;
   });
   var bestType=Object.keys(typeMap).sort(function(a,b){return typeMap[b].outstanding-typeMap[a].outstanding;})[0]||'(Untyped)';
   // Open receive modal with PO pre-stamped
@@ -1112,8 +1118,9 @@ function pickerReceiveWithoutPo(){
     var t=it.equipType||'(Untyped)';
     if(!typeMap[t])typeMap[t]={count:0,outstanding:0};
     typeMap[t].count++;
-    var qty=parseInt(it.qty,10)||1;var del=parseInt(it.qtyDelivered,10)||0;
-    typeMap[t].outstanding+=Math.max(qty-del,0);
+    var qty=parseInt(it.qty,10)||1;
+    var isDelivered=(it.status||'').trim()==='Delivered';
+    typeMap[t].outstanding+=isDelivered?0:qty;
   });
   var bestType=Object.keys(typeMap).sort(function(a,b){return typeMap[b].outstanding-typeMap[a].outstanding;})[0]||'(Untyped)';
   openReceiveModal(bestType);
@@ -1365,10 +1372,11 @@ function getEligibleItems(){
     if(!it.equipId||!it.equipId.trim())return false;
     if((it.manufacturer||'').trim()!==supp)return false;
     if((it.equipType||'(Untyped)')!==type)return false;
-    // Hide fully-received items — only outstanding items should appear in the receive list
-    var qty=parseInt(it.qty,10)||1;
-    var del=parseInt(it.qtyDelivered,10)||0;
-    if(del>=qty)return false;
+    // Status is the source of truth for "is this still due to arrive". PM can re-open
+    // a delivered item by changing its status back to Ordered (e.g. wrong item arrived,
+    // replacement coming) and it'll reappear here. Anything not currently 'Delivered'
+    // is eligible to receive — Ordered, Approved, RFQ, blank, etc.
+    if((it.status||'').trim()==='Delivered')return false;
     return true;
   });
 }
