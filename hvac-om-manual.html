@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-05-03 om-shell-v8 cover-locked-fields -->
+<!-- build: 2026-05-03 om-shell-v9 asset-pullin -->
 <html lang="en">
 <head>
 <link rel="stylesheet" href="theme.css">
@@ -116,6 +116,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .cvr-readonly.mono{font-family:'DM Mono',monospace}
 .cvr-locked-hint{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);flex-shrink:0;display:flex;align-items:center;gap:4px}
 .cvr-locked-hint::before{content:'🔒';font-size:10px;letter-spacing:0}
+
+/* Asset register preview table */
+.ar-tbl{width:100%;border-collapse:collapse;font-size:11.5px;font-family:'DM Sans',sans-serif}
+.ar-tbl thead{position:sticky;top:0;background:var(--surface3);z-index:1}
+.ar-tbl th{text-align:left;padding:8px 9px;font-family:'DM Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text2);border-bottom:1.5px solid var(--border);white-space:nowrap}
+.ar-tbl td{padding:7px 9px;color:var(--text);border-bottom:1px solid var(--border);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.ar-tbl tbody tr:hover{background:var(--surface3)}
+.ar-tbl tbody tr:last-child td{border-bottom:none}
+.ar-tbl td.ar-mono{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)}
+.ar-sn{font-family:'DM Mono',monospace;font-size:10.5px;padding:2px 7px;border-radius:4px;display:inline-block}
+.ar-sn.ok{background:rgba(0,229,160,.10);color:var(--green);border:1px solid rgba(0,229,160,.25)}
+.ar-sn.na{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.ar-sn.missing{color:var(--muted);font-style:italic}
 
 /* Frozen ribbon when viewing published rev */
 .frozen-ribbon{padding:8px 14px;background:rgba(0,200,255,.05);border-bottom:1px solid rgba(0,200,255,.12);display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--text2);flex-shrink:0}
@@ -482,9 +495,33 @@ function openPublishModal(){
 async function confirmPublish(){
   if(!manual || !manual.draft) return;
   var revLabel = manual.draft.revLabel;
+  showToast('Snapshotting data…');
+
+  // Snapshot pull-in source data into each pull-in card.
+  // (Other pull-in card types — equipsch, firereg, etc. — will be wired in later phases.)
+  for(var i=0; i<manual.cards.length; i++){
+    var card = manual.cards[i];
+    if(card.status === 'na') continue; // N/A cards skip snapshot
+    if(card.key === 'assets'){
+      try{
+        var assets = await buildAssetSnapshot();
+        card.content = card.content || {};
+        card.content.snapshot = {
+          assets: assets,
+          snapshotAt: new Date().toISOString()
+        };
+      }catch(e){
+        console.error('asset snapshot failed:', e);
+        showToast('⚠ Asset snapshot failed — published anyway with empty list');
+        card.content = card.content || {};
+        card.content.snapshot = { assets: [], snapshotAt: new Date().toISOString(), error: e.message };
+      }
+    }
+    // TODO Phase 3 cont'd: equipsch, firereg, commissioning, asbuilt, literature, warranties
+  }
+
   var snapshot = {
     cards: JSON.parse(JSON.stringify(manual.cards))
-    // TODO: pull-in snapshots will be populated here when pull-in cards are wired in Phase 3
   };
   manual.revisions.push({
     rev: revLabel,
@@ -794,12 +831,15 @@ function openCardEdit(key){
   var readonly = (viewingRevIdx !== null) || !manual.draft;
 
   document.getElementById('editModalTitle').textContent = (readonly?'View: ':'Edit: ') + c.title;
-  // Resize modal — cover sheet wants more room for the preview
+  // Resize modal — cover sheet and asset register want more room
   var modalEl = document.querySelector('#editModal .modal');
   if(modalEl){
     if(c.key==='cover') modalEl.style.maxWidth = '1080px';
+    else if(c.key==='assets') modalEl.style.maxWidth = '960px';
     else modalEl.style.maxWidth = '720px';
   }
+  // Reset asset cache each time card is opened so live data is fresh
+  _assetSnapshotCache = null;
   document.getElementById('editModalBody').innerHTML = renderCardEditor(c, readonly);
   // Hide save button when readonly
   var foot = document.querySelector('#editModal .mfoot');
@@ -811,6 +851,8 @@ function openCardEdit(key){
 
   // Cover-specific post-init (live preview)
   if(c.key==='cover' && !readonly){ initCoverEditor(); }
+  // Asset register: kick off async preview render
+  if(c.key==='assets'){ renderAssetPreview(readonly); }
 }
 
 // ── Renderers per card type ──
@@ -824,7 +866,7 @@ function renderCardEditor(c, ro){
     case 'suppliers':
     case 'maintenance':
     case 'spares':      return editorAi(c, ro);
-    case 'assets':
+    case 'assets':      return editorAssetRegister(c, ro);
     case 'equipsch':
     case 'firereg':
     case 'commissioning':
@@ -1184,6 +1226,212 @@ function editorPullIn(c, ro){
     '<div class="placeholder-block" style="margin-bottom:14px"><span class="pb-icon">🔗</span><strong>Pulled-in section.</strong> This card pulls live data from <strong>'+escHtml(c.source||'source module')+'</strong> while the manual is in draft. On publish, the data is snapshotted and frozen against this revision. The pull-in wiring will be built in Phase 3 — for now you can add notes or override text below.</div>'+
     '<label class="mlbl">Section Notes / Cover Page (optional)</label>'+
     '<textarea class="mi" id="ec_notes" rows="6" '+(ro?'readonly disabled':'')+' placeholder="Optional intro text shown on the chapter cover sheet…">'+escHtml((_editingCardDraft.notes)||'')+'</textarea>';
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ASSET REGISTER — pull-in card
+// ════════════════════════════════════════════════════════════════════
+// IMPORTANT: This logic mirrors buildAssets() in hvac-asset-register.html.
+// If you change the asset assembly logic there, update this function too.
+// TODO future: extract to shared assets-builder.js to avoid duplication.
+
+async function buildAssetSnapshot(){
+  // Fetches live data from Equipment, Tech Subs, ITP responses, plus asset_register overrides,
+  // and returns the resolved [{equipId, equipType, location, ...}] array.
+  var eq, ts, ir, ov;
+  try { eq = await dbGetEquipment(_pNum); } catch(e) { eq = null; }
+  try { ts = await dbGetTechSubmissions(_pNum); } catch(e) { ts = null; }
+  try { ir = await dbGetItpResponses(_pNum); } catch(e) { ir = null; }
+  try { ov = await dbGetAssetRegister(_pNum); } catch(e) { ov = null; }
+
+  var equipData = eq || {tabs:[]};
+  var techSubs  = Array.isArray(ts) ? ts : [];
+  var itpResp   = ir || {};
+  var overrides = ov || {};
+
+  // 1. Equipment rows
+  var equipRows = [];
+  (equipData.tabs||[]).forEach(function(tab){
+    (tab.rows||[]).filter(function(r){return !r._deleted;}).forEach(function(row){
+      var id = (row.equipId||row.tag||'').trim();
+      if(!id) return;
+      var r = Object.assign({}, row);
+      r._equipId = id;
+      r._equipType = tab.name||tab.label||tab.id||'';
+      equipRows.push(r);
+    });
+  });
+
+  // 2. Per-tab rowId → equipTag map
+  var tabRowMap = {};
+  (equipData.tabs||[]).forEach(function(tab){
+    var map = {};
+    (tab.rows||[]).filter(function(r){return !r._deleted;}).forEach(function(row){
+      var equipId = (row.equipId||row.tag||'').trim();
+      if(!equipId) return;
+      if(row.id) map[row.id] = equipId;
+      if(row._id) map[row._id] = equipId;
+    });
+    tabRowMap[tab.id] = map;
+    tabRowMap[tab.name] = map;
+    tabRowMap[tab.label] = map;
+  });
+
+  // 3. Tech sub warranty lookup
+  var tsWarranty = {};
+  techSubs.forEach(function(sub){
+    (sub.revisions||[]).forEach(function(rev){
+      var w = rev.warranty||{};
+      var partsYears = w.partsYears||sub.warrantyParts||'';
+      var labourYears = w.labourYears||sub.warrantyLabour||'';
+      if(!partsYears && !labourYears) return;
+      var linked = rev.linkedEquip;
+      var ids = (linked&&linked.ids) || [];
+      if(!ids.length && sub.linkedEquip && sub.linkedEquip.ids) ids = sub.linkedEquip.ids;
+      var typeId = (linked&&linked.typeId) || (sub.linkedEquip&&sub.linkedEquip.typeId) || '';
+      var rowMap = tabRowMap[typeId] || {};
+      ids.forEach(function(rawId){
+        var equipId = rowMap[rawId] || rawId;
+        tsWarranty[equipId] = {partsWarranty:partsYears, labourWarranty:labourYears};
+      });
+    });
+  });
+
+  // 4. ITP serial number lookup
+  var snLookup = {};
+  function scanObj(obj){
+    if(!obj || typeof obj!=='object') return;
+    if(Array.isArray(obj)){ obj.forEach(scanObj); return; }
+    if(obj.serialNo && obj.equipId){
+      var eid = (obj.equipId||'').trim();
+      if(eid && obj.serialNo && !snLookup[eid]) snLookup[eid] = obj.serialNo;
+    }
+    Object.values(obj).forEach(function(v){ if(v && typeof v==='object') scanObj(v); });
+  }
+  scanObj(itpResp);
+
+  // 5. Compose final asset list
+  function normLoc(s){
+    return String(s||'').replace(/\s+/g,' ').trim().toUpperCase().replace(/\bROM\s+P\b/g,'ROMP');
+  }
+
+  var assets = [];
+  equipRows.forEach(function(row){
+    var id = row._equipId;
+    var tw = tsWarranty[id] || {};
+    var or = overrides[id] || {};
+    var installDate = or.installDate || '';
+    assets.push({
+      equipId: id,
+      equipType: row._equipType||row.equipType||'',
+      location: normLoc(row.location||row.building||''),
+      manufacturer: row.manufacturer||row.make||'',
+      model: row.model||'',
+      serialNo: snLookup[id]||or.serialNo||'',
+      installDate: installDate,
+      warrantyStart: installDate,
+      partsWarranty: tw.partsWarranty||or.partsWarranty||'',
+      labourWarranty: tw.labourWarranty||or.labourWarranty||'',
+      lifeExpectancy: or.lifeExpectancy||''
+    });
+  });
+  return assets;
+}
+
+// Cache so re-renders within a modal session don't refetch
+var _assetSnapshotCache = null;
+async function getAssetsForCard(c, readonly){
+  // Read-only (viewing a published rev) → return frozen snapshot from card content
+  if(readonly){
+    return (c.content && c.content.snapshot && c.content.snapshot.assets) || [];
+  }
+  // Draft → live build (cache for the session)
+  if(_assetSnapshotCache) return _assetSnapshotCache;
+  _assetSnapshotCache = await buildAssetSnapshot();
+  return _assetSnapshotCache;
+}
+
+function editorAssetRegister(c, ro){
+  // Frame skeleton; data fills in async
+  var d = _editingCardDraft;
+  var notes = d.notes||'';
+  var snapshotAt = (c.content && c.content.snapshot && c.content.snapshot.snapshotAt) || '';
+  return ''+
+    (ro && snapshotAt
+      ? '<div style="background:rgba(0,200,255,.08);border:1px solid rgba(0,200,255,.25);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:var(--accent);display:flex;align-items:center;gap:9px"><span>📄</span><span>Frozen snapshot — captured '+escHtml(fmtDateLong(snapshotAt))+'.</span></div>'
+      : '')+
+    // Section intro
+    '<label class="mlbl" style="margin-top:0">Chapter Intro <span style="color:var(--muted);text-transform:none;letter-spacing:0;font-family:DM Sans,sans-serif;font-size:11px">— optional, appears on the chapter cover page</span></label>'+
+    '<textarea class="mi" id="ec_notes" rows="3" '+(ro?'readonly disabled':'')+' placeholder="e.g. The following table lists all HVAC assets installed under this contract, including manufacturer, model, serial number, location and warranty terms.">'+escHtml(notes)+'</textarea>'+
+
+    // Live data preview
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px;gap:10px">'+
+      '<div>'+
+        '<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">'+(ro?'Snapshot':'Live data')+'</div>'+
+        '<div style="font-size:13px;color:var(--text);margin-top:2px" id="ar-count-line">Loading…</div>'+
+      '</div>'+
+      (ro?'':'<button class="bg bsm btn" onclick="refreshAssetPreview()" title="Re-fetch from source modules">↻ Refresh</button>')+
+    '</div>'+
+
+    '<div id="ar-preview-wrap" style="border:1px solid var(--border);border-radius:8px;background:var(--surface2);overflow:hidden">'+
+      '<div style="padding:30px;text-align:center;color:var(--muted);font-size:12.5px">Loading assets…</div>'+
+    '</div>'+
+
+    (ro?'':'<div style="background:rgba(255,184,48,.06);border:1px solid rgba(255,184,48,.18);border-radius:8px;padding:10px 14px;margin-top:14px;font-size:12px;color:var(--text2);line-height:1.55"><strong style="color:var(--warn)">⚡ Live data:</strong> The table above reflects the current state of your <a href="hvac-asset-register.html" style="color:var(--accent)">Asset Register</a>, <a href="hvac-equipment-schedule.html" style="color:var(--accent)">Equipment Schedule</a>, and <a href="hvac-tech-submissions.html" style="color:var(--accent)">Tech Submissions</a>. On publish, this data is captured and frozen against the revision — published revs always show the data as it was at publish time.</div>');
+}
+
+async function refreshAssetPreview(){
+  _assetSnapshotCache = null;
+  await renderAssetPreview(false);
+}
+
+async function renderAssetPreview(readonly){
+  var c = getCard(_editingCardKey);
+  if(!c || c.key!=='assets') return;
+  var wrap = document.getElementById('ar-preview-wrap');
+  var countEl = document.getElementById('ar-count-line');
+  if(!wrap) return;
+  wrap.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted);font-size:12.5px">Loading assets…</div>';
+
+  var assets = await getAssetsForCard(c, readonly);
+  if(!assets.length){
+    wrap.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted);font-size:12.5px"><div style="font-size:24px;margin-bottom:8px">📋</div>No assets yet.<br><span style="font-size:11px">Asset data builds from the Equipment Schedule. Add equipment first.</span></div>';
+    if(countEl) countEl.textContent = '0 assets';
+    return;
+  }
+
+  // Group by equipType for the count line
+  var byType = {};
+  assets.forEach(function(a){ byType[a.equipType||'(uncategorised)'] = (byType[a.equipType||'(uncategorised)']||0) + 1; });
+  var typeCount = Object.keys(byType).length;
+  if(countEl) countEl.textContent = assets.length + ' asset' + (assets.length===1?'':'s') + ' across ' + typeCount + ' equipment type' + (typeCount===1?'':'s');
+
+  // Render full table
+  var rows = assets.map(function(a){
+    var snCell = a.serialNo
+      ? (a.serialNo==='N/A' ? '<span class="ar-sn na">N/A</span>' : '<span class="ar-sn ok">'+escHtml(a.serialNo)+'</span>')
+      : '<span class="ar-sn missing">—</span>';
+    return '<tr>'+
+      '<td class="ar-mono">'+escHtml(a.equipId)+'</td>'+
+      '<td>'+escHtml(a.equipType)+'</td>'+
+      '<td>'+escHtml(a.location)+'</td>'+
+      '<td>'+escHtml(a.manufacturer)+'</td>'+
+      '<td>'+escHtml(a.model)+'</td>'+
+      '<td>'+snCell+'</td>'+
+      '<td class="ar-mono">'+escHtml(a.installDate||'—')+'</td>'+
+      '<td class="ar-mono">'+escHtml(a.partsWarranty||'—')+'</td>'+
+      '<td class="ar-mono">'+escHtml(a.labourWarranty||'—')+'</td>'+
+      '<td class="ar-mono">'+escHtml(a.lifeExpectancy||'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  wrap.innerHTML = '<div style="max-height:380px;overflow:auto"><table class="ar-tbl">'+
+    '<thead><tr>'+
+      '<th>Equip ID</th><th>Type</th><th>Location</th><th>Manufacturer</th>'+
+      '<th>Model</th><th>Serial No</th><th>Install Date</th>'+
+      '<th>Parts Warr.</th><th>Labour Warr.</th><th>Life</th>'+
+    '</tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div>';
 }
 
 function editorCertificates(c, ro){
