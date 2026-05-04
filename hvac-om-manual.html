@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-05-03 om-shell-v5 compact-cards -->
+<!-- build: 2026-05-03 om-shell-v6 list-view -->
 <html lang="en">
 <head>
 <link rel="stylesheet" href="theme.css">
@@ -70,33 +70,46 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   .mobile-block{display:block}
 }
 
-/* Card grid */
-.body-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;padding-bottom:30px}
+/* List view */
+.body-grid{display:flex;flex-direction:column;gap:0;padding-bottom:30px;background:var(--surface);border:1px solid var(--border);border-radius:9px;overflow:hidden;max-width:980px}
 
-/* Compact card */
-.om-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 12px;display:flex;align-items:center;gap:9px;cursor:pointer;transition:border-color .12s,background .12s,opacity .2s;position:relative;min-height:54px}
-.om-card:hover{border-color:var(--accent);background:var(--surface2)}
-.om-card:hover .card-quick{opacity:1;pointer-events:auto}
-.om-card.dragging{opacity:.4}
-.om-card.drag-over{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
-.om-card.na{opacity:.5}
-.om-card.na:hover{opacity:.85}
+.om-row{display:flex;align-items:center;gap:11px;padding:0 14px 0 0;height:42px;cursor:pointer;transition:background .1s;position:relative;border-bottom:1px solid var(--border);background:var(--surface)}
+.om-row:last-child{border-bottom:none}
+.om-row:hover{background:var(--surface2)}
+.om-row.dragging{opacity:.4}
+.om-row.drag-over{background:var(--accent-dim)}
+.om-row.na{opacity:.55}
+.om-row.na:hover{opacity:.85}
 
-.card-num{flex-shrink:0;font-family:'DM Mono',monospace;font-size:10.5px;color:var(--muted);width:18px;text-align:right}
-.card-title{flex:1;min-width:0;font-size:13px;font-weight:500;color:var(--text);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.card-dot{flex-shrink:0;width:9px;height:9px;border-radius:50%;background:var(--danger)}
-.card-dot.draft{background:var(--warn)}
-.card-dot.complete{background:var(--green)}
-.card-dot.na{background:var(--muted)}
+/* Status bar — left edge */
+.row-status-bar{flex-shrink:0;width:3px;align-self:stretch;background:var(--danger);transition:background .15s}
+.row-status-bar.draft{background:var(--warn)}
+.row-status-bar.complete{background:var(--accent)}
+.row-status-bar.na{background:var(--muted)}
 
-/* Hover quick actions — overlay on the right */
-.card-quick{position:absolute;top:50%;right:10px;transform:translateY(-50%);display:flex;gap:3px;background:var(--surface);padding:3px;border-radius:6px;border:1px solid var(--border);opacity:0;pointer-events:none;transition:opacity .12s;z-index:5}
-.card-quick button{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:13px;padding:4px 7px;border-radius:4px;line-height:1;font-family:'DM Sans',sans-serif}
-.card-quick button:hover{background:var(--surface3);color:var(--accent)}
-.card-quick button.danger:hover{color:var(--danger)}
-.card-quick button.success:hover{color:var(--green)}
-.card-quick button[disabled]{opacity:.3;cursor:not-allowed}
-.card-quick button[disabled]:hover{background:transparent;color:var(--text2)}
+.row-num{flex-shrink:0;font-family:'DM Mono',monospace;font-size:10.5px;color:var(--muted);width:30px;text-align:center;letter-spacing:.5px;padding-left:8px}
+.row-title{flex:1;min-width:0;font-size:13.5px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-meta{flex-shrink:0;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:.3px;text-transform:uppercase;padding-right:6px}
+.om-row:hover .row-meta{color:var(--text2)}
+.om-row.na .row-meta{display:none}
+
+/* Action menu trigger */
+.row-menu-btn{flex-shrink:0;width:28px;height:28px;border-radius:6px;background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;line-height:1;opacity:.5;transition:all .12s;font-family:'DM Sans',sans-serif}
+.om-row:hover .row-menu-btn{opacity:1}
+.row-menu-btn:hover{background:var(--surface3);border-color:var(--border);color:var(--text)}
+.row-menu-btn.open{background:var(--surface3);border-color:var(--accent);color:var(--accent);opacity:1}
+
+/* Row action popover */
+.row-popover{position:absolute;top:100%;right:8px;margin-top:2px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:4px;display:flex;flex-direction:column;gap:1px;z-index:50;min-width:160px;box-shadow:0 6px 18px rgba(0,0,0,.4);display:none}
+.row-popover.open{display:flex}
+.row-popover button{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:12.5px;padding:8px 12px;border-radius:5px;text-align:left;display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;transition:all .1s}
+.row-popover button:hover{background:var(--surface);color:var(--text)}
+.row-popover button .pc-icon{flex-shrink:0;width:14px;text-align:center;font-size:13px}
+.row-popover button.danger:hover{color:var(--danger)}
+.row-popover button.success:hover{color:var(--green)}
+.row-popover button[disabled]{opacity:.35;cursor:not-allowed}
+.row-popover button[disabled]:hover{background:transparent;color:var(--text2)}
+.row-popover-divider{height:1px;background:var(--border);margin:3px 0}
 
 /* Frozen ribbon when viewing published rev */
 .frozen-ribbon{padding:8px 14px;background:rgba(0,200,255,.05);border-bottom:1px solid rgba(0,200,255,.12);display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--text2);flex-shrink:0}
@@ -554,7 +567,7 @@ function render(){
   } else {
     document.getElementById('mobileBlock').style.display = 'none';
     bodyHdr.style.display = 'flex';
-    grid.style.display = 'grid';
+    grid.style.display = 'flex';
     revBar.style.display = 'flex';
   }
 
@@ -648,32 +661,82 @@ function renderCards(){
 }
 
 function cardHtml(c, idx, readonly){
-  var dotCls = c.status==='complete' ? 'complete'
-             : c.status==='draft'    ? 'draft'
-             : c.status==='na'       ? 'na'
-             : 'empty';
+  var statusCls = c.status==='complete' ? 'complete'
+                : c.status==='draft'    ? 'draft'
+                : c.status==='na'       ? 'na'
+                : 'empty';
   var statusTitle = {empty:'Empty', draft:'Draft', complete:'Complete', na:'Not Applicable'}[c.status||'empty'] || 'Empty';
+  var typeLbl = {cover:'Cover', ai:'AI', 'pull-in':'Pulled', upload:'Upload', manual:'Manual'}[c.type] || '';
 
-  var quickHtml = '';
+  var menuHtml = '';
   if(!readonly){
     var disabledNa = c.status==='na';
+    var disabledDone = c.status==='na';
+    var doneLabel = c.status==='complete' ? 'Reopen' : 'Mark Complete';
     var doneIcon = c.status==='complete' ? '↻' : '✓';
-    var doneTitle = c.status==='complete' ? 'Reopen' : 'Mark Complete';
+    var naLabel = c.status==='na' ? 'Restore (no longer N/A)' : 'Mark Not Applicable';
     var naIcon = c.status==='na' ? '↻' : '⊘';
-    var naTitle = c.status==='na' ? 'Restore' : 'Mark N/A';
-    quickHtml = '<div class="card-quick" onclick="event.stopPropagation()">'+
-      '<button class="success" '+(disabledNa?'disabled':'')+' title="'+doneTitle+'" onclick="event.stopPropagation();markComplete(\''+c.key+'\')">'+doneIcon+'</button>'+
-      '<button class="danger" title="'+naTitle+'" onclick="event.stopPropagation();toggleNA(\''+c.key+'\')">'+naIcon+'</button>'+
-    '</div>';
+    menuHtml =
+      '<button class="row-menu-btn" id="rmb-'+c.key+'" onclick="event.stopPropagation();toggleRowMenu(\''+c.key+'\')" title="More actions">⋯</button>'+
+      '<div class="row-popover" id="rpop-'+c.key+'" onclick="event.stopPropagation()">'+
+        '<button onclick="rowAction(\''+c.key+'\',\'edit\')"><span class="pc-icon">✎</span>Open / Edit</button>'+
+        '<div class="row-popover-divider"></div>'+
+        '<button class="success" '+(disabledDone?'disabled':'')+' onclick="rowAction(\''+c.key+'\',\'done\')"><span class="pc-icon">'+doneIcon+'</span>'+doneLabel+'</button>'+
+        '<button class="danger" onclick="rowAction(\''+c.key+'\',\'na\')"><span class="pc-icon">'+naIcon+'</span>'+naLabel+'</button>'+
+      '</div>';
+  } else {
+    menuHtml = '<button class="row-menu-btn" onclick="event.stopPropagation();openCardEdit(\''+c.key+'\')" title="View">👁</button>';
   }
 
-  return '<div class="om-card '+(c.status==='na'?'na':'')+'" data-key="'+c.key+'" '+(!readonly?'draggable="true"':'')+' onclick="openCardEdit(\''+c.key+'\')" title="Click to '+(readonly?'view':'edit')+(readonly?'':' · drag to reorder')+'">'+
-    '<span class="card-num">'+(idx+1)+'</span>'+
-    '<span class="card-title">'+(c.icon||'')+' '+escHtml(c.title)+'</span>'+
-    '<span class="card-dot '+dotCls+'" title="'+statusTitle+'"></span>'+
-    quickHtml+
+  return '<div class="om-row '+(c.status==='na'?'na':'')+'" data-key="'+c.key+'" '+(!readonly?'draggable="true"':'')+' onclick="openCardEdit(\''+c.key+'\')" title="'+statusTitle+(readonly?'':' · click to edit · drag to reorder')+'">'+
+    '<span class="row-status-bar '+statusCls+'"></span>'+
+    '<span class="row-num">'+String(idx+1).padStart(2,'0')+'</span>'+
+    '<span class="row-title">'+escHtml(c.title)+'</span>'+
+    (typeLbl?'<span class="row-meta">'+typeLbl+'</span>':'')+
+    menuHtml+
   '</div>';
 }
+
+// Action menu: track currently-open menu and close on outside click
+var _openRowMenu = null;
+function toggleRowMenu(key){
+  // Close any other open menu
+  if(_openRowMenu && _openRowMenu !== key){
+    var prev = document.getElementById('rpop-'+_openRowMenu);
+    var prevBtn = document.getElementById('rmb-'+_openRowMenu);
+    if(prev) prev.classList.remove('open');
+    if(prevBtn) prevBtn.classList.remove('open');
+  }
+  var pop = document.getElementById('rpop-'+key);
+  var btn = document.getElementById('rmb-'+key);
+  if(!pop) return;
+  var willOpen = !pop.classList.contains('open');
+  pop.classList.toggle('open', willOpen);
+  if(btn) btn.classList.toggle('open', willOpen);
+  _openRowMenu = willOpen ? key : null;
+}
+function closeAllRowMenus(){
+  if(!_openRowMenu) return;
+  var pop = document.getElementById('rpop-'+_openRowMenu);
+  var btn = document.getElementById('rmb-'+_openRowMenu);
+  if(pop) pop.classList.remove('open');
+  if(btn) btn.classList.remove('open');
+  _openRowMenu = null;
+}
+function rowAction(key, action){
+  closeAllRowMenus();
+  if(action==='edit') openCardEdit(key);
+  else if(action==='done') markComplete(key);
+  else if(action==='na') toggleNA(key);
+}
+// Close menu on any document click outside
+document.addEventListener('click', function(e){
+  if(!_openRowMenu) return;
+  var pop = document.getElementById('rpop-'+_openRowMenu);
+  var btn = document.getElementById('rmb-'+_openRowMenu);
+  if(pop && (pop.contains(e.target) || (btn && btn.contains(e.target)))) return;
+  closeAllRowMenus();
+});
 
 // ════════════════════════════════════════════════════════════════════
 // CARD-LEVEL ACTIONS
@@ -966,7 +1029,7 @@ function openExportModal(){
 function wireDragDrop(){
   var grid = document.getElementById('cardGrid');
   var dragKey = null;
-  grid.querySelectorAll('.om-card').forEach(function(el){
+  grid.querySelectorAll('.om-row').forEach(function(el){
     el.addEventListener('dragstart', function(e){
       dragKey = el.getAttribute('data-key');
       el.classList.add('dragging');
@@ -975,12 +1038,12 @@ function wireDragDrop(){
     });
     el.addEventListener('dragend', function(){
       dragKey = null;
-      grid.querySelectorAll('.om-card').forEach(function(c){c.classList.remove('dragging','drag-over');});
+      grid.querySelectorAll('.om-row').forEach(function(c){c.classList.remove('dragging','drag-over');});
     });
     el.addEventListener('dragover', function(e){
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      grid.querySelectorAll('.om-card').forEach(function(c){c.classList.remove('drag-over');});
+      grid.querySelectorAll('.om-row').forEach(function(c){c.classList.remove('drag-over');});
       el.classList.add('drag-over');
     });
     el.addEventListener('drop', async function(e){
