@@ -611,6 +611,10 @@ var _pos=[];            // flat list of POs across all sections/groups, used for
 var _equipLookup={};    // equipId -> {location, subLocation, manufacturer, model, equipType} from equipment schedule (master)
 var _currentUserName=''; // auto-populated received-by — pulled from auth session
 var _activeSupplier=null;
+// When user picks a fuzzy-matched PO, this stores the PO's actual supplier name (which differs
+// from _activeSupplier — the searched/equipment-schedule supplier). Used in renderPoList so the
+// picked PO still appears in the modal's PO list. Null when no fuzzy mismatch in play.
+var _activePoSupplier=null;
 var _activeType=null;   // when receive modal is open: equipType being received
 var _activePoId=null;   // PO selected for the current receive — stamped onto the receipt
 var _selected=new Set();    // selected equipment ids in receive modal
@@ -844,6 +848,7 @@ function renderSupplierPanel(){
 function openSupplierPicker(){
   // Reset state — clear the search, clear any previously-selected supplier, hide PO section
   _activeSupplier=null;
+  _activePoSupplier=null;
   var inp=document.getElementById('suppPickInput');
   if(inp)inp.value='';
   document.getElementById('suppPickClear').classList.remove('show');
@@ -1073,7 +1078,23 @@ function browseAllSelectPo(poId){
 // (since one PO can span multiple types in our data model).
 function pickerSelectPo(poId){
   closeSupplierPicker();
-  // Compute the supplier's equipment types and pick the one with most outstanding
+  // Look up the picked PO so we can capture its actual supplier name. When the user picks
+  // a fuzzy match, the PO's supplier ("KS metal") differs from the searched supplier
+  // ("KS fabrication" — the one in the equipment schedule). We need both:
+  //   • _activeSupplier — used to filter procurement items (matches equipment schedule)
+  //   • _activePoSupplier — the PO's recorded supplier; renderPoList() includes its POs
+  // If they match (strict-match case), _activePoSupplier stays null.
+  var pickedPo=_pos.find(function(p){return p.id===poId;});
+  if(pickedPo){
+    var pickedSupp=(pickedPo.supplier||'').trim();
+    if(pickedSupp&&pickedSupp.toLowerCase()!==(_activeSupplier||'').toLowerCase()){
+      _activePoSupplier=pickedSupp;
+    } else {
+      _activePoSupplier=null;
+    }
+  }
+  // Compute the supplier's equipment types and pick the one with most outstanding.
+  // Filter by _activeSupplier (the equipment-schedule name) — that's how items are stored.
   var supplierItems=_items.filter(function(it){return (it.manufacturer||'').trim()===_activeSupplier&&it.equipId;});
   var typeMap={};
   supplierItems.forEach(function(it){
@@ -1144,6 +1165,7 @@ function openReceiveModal(type){
 function closeRecvModal(){
   _activeType=null;
   _activePoId=null;
+  _activePoSupplier=null;
   _selected.clear();
   _damaged.clear();
   _attachments=[];
@@ -1291,9 +1313,23 @@ function getPoStatus(po){
 function renderPoList(){
   var listEl=document.getElementById('poList');
   var infoEl=document.getElementById('poSelInfo');
+  // Pull POs for both:
+  //   • _activeSupplier — the equipment-schedule supplier (what user searched)
+  //   • _activePoSupplier — the actual PO supplier name when user picked a fuzzy match
+  // De-dupe by PO ID. If they're the same name, only one set is queried.
   var pos=getPosForSupplier(_activeSupplier);
-  // Hide fully-received POs from the list — they shouldn't muddy the picker
-  var visible=pos.filter(function(po){return getPoStatus(po)!=='received';});
+  if(_activePoSupplier&&_activePoSupplier.toLowerCase()!==(_activeSupplier||'').toLowerCase()){
+    var fuzzyPos=getPosForSupplier(_activePoSupplier);
+    var seen={};pos.forEach(function(p){seen[p.id]=1;});
+    fuzzyPos.forEach(function(p){if(!seen[p.id]){pos.push(p);seen[p.id]=1;}});
+  }
+  // Hide fully-received POs from the list — they shouldn't muddy the picker.
+  // Exception: keep the currently-selected PO visible even if it's marked received,
+  // so the user always sees what they tagged.
+  var visible=pos.filter(function(po){
+    if(po.id===_activePoId)return true;
+    return getPoStatus(po)!=='received';
+  });
   if(!pos.length){
     listEl.innerHTML='<div class="po-empty">No POs raised against '+escH(_activeSupplier||'this supplier')+' yet — receipt will save without a PO ref.</div>';
     infoEl.textContent='';
@@ -1304,20 +1340,33 @@ function renderPoList(){
     infoEl.textContent=pos.length+' PO'+(pos.length===1?'':'s')+' fully received';
     return;
   }
-  infoEl.textContent='Click to tag receipt';
+  // If we've pulled in fuzzy-supplier POs, show a hint label so user knows why
+  if(_activePoSupplier&&_activePoSupplier.toLowerCase()!==(_activeSupplier||'').toLowerCase()){
+    infoEl.innerHTML='Tagged via fuzzy match: <strong style="color:var(--warn,#ffb830)">'+escH(_activePoSupplier)+'</strong>';
+  } else {
+    infoEl.textContent='Click to tag receipt';
+  }
   listEl.innerHTML=visible.map(function(po){
     var status=getPoStatus(po);
     var chip=status==='partial'?'<span class="po-chip partial">Partial</span>':'<span class="po-chip open">Open</span>';
+    var poSupp=(po.supplier||'').trim();
+    var isFuzzy=poSupp&&poSupp.toLowerCase()!==(_activeSupplier||'').toLowerCase();
     var meta=[];
+    // For fuzzy-matched POs, show the actual supplier name in the meta line so user sees
+    // why this PO is in the list despite the supplier-name mismatch
+    if(isFuzzy)meta.push(escH(poSupp));
     if(po.orderDate)meta.push('Ordered '+fmtD(po.orderDate));
     if(po.delivery)meta.push('Due '+fmtD(po.delivery));
     if(po._group)meta.push(po._group);
     var costStr=po._totalCost?'$'+po._totalCost.toLocaleString('en-AU',{minimumFractionDigits:0,maximumFractionDigits:0}):'';
     var sel=_activePoId===po.id;
-    return '<div class="po-card'+(sel?' selected':'')+'" onclick="selectPo(\''+escFilterAttr(po.id)+'\')">'
+    var classes='po-card';
+    if(sel)classes+=' selected';
+    if(isFuzzy)classes+=' fuzzy';
+    return '<div class="'+classes+'" onclick="selectPo(\''+escFilterAttr(po.id)+'\')">'
       +'<div class="po-card-body">'
         +'<div class="po-card-id">'+escH(po.id)+'</div>'
-        +'<div class="po-card-meta">'+(meta.length?escH(meta.join(' · ')):'—')+'</div>'
+        +'<div class="po-card-meta">'+(meta.length?meta.join(' · '):'—')+'</div>'
       +'</div>'
       +'<div class="po-card-stats">'
         +(costStr?'<div class="po-card-cost">'+costStr+'</div>':'')
