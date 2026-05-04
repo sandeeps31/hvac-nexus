@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-05-03 om-shell-v9 asset-pullin -->
+<!-- build: 2026-05-03 om-shell-v10 inline-save-pullin -->
 <html lang="en">
 <head>
 <link rel="stylesheet" href="theme.css">
@@ -841,11 +841,16 @@ function openCardEdit(key){
   // Reset asset cache each time card is opened so live data is fresh
   _assetSnapshotCache = null;
   document.getElementById('editModalBody').innerHTML = renderCardEditor(c, readonly);
-  // Hide save button when readonly
+  // Footer buttons depend on card type
   var foot = document.querySelector('#editModal .mfoot');
-  foot.innerHTML = readonly
-    ? '<button class="bg bsm btn" onclick="closeM(\'editModal\')">Close</button>'
-    : '<button class="bg bsm btn" onclick="closeM(\'editModal\')">Cancel</button><button class="bp bsm btn" onclick="saveCardEdit()">💾 Save</button>';
+  // Pull-in cards (assets, equipsch, etc.) have inline-save for any editable bits — bottom footer is just Close
+  var INLINE_SAVE_CARDS = ['assets','equipsch','firereg','commissioning','asbuilt','literature','warranties'];
+  var inlineSave = INLINE_SAVE_CARDS.indexOf(c.key) >= 0;
+  if(readonly || inlineSave){
+    foot.innerHTML = '<button class="bg bsm btn" onclick="closeM(\'editModal\')">Close</button>';
+  } else {
+    foot.innerHTML = '<button class="bg bsm btn" onclick="closeM(\'editModal\')">Cancel</button><button class="bp bsm btn" onclick="saveCardEdit()">💾 Save</button>';
+  }
 
   document.getElementById('editModal').classList.add('open');
 
@@ -1352,7 +1357,7 @@ async function getAssetsForCard(c, readonly){
 }
 
 function editorAssetRegister(c, ro){
-  // Frame skeleton; data fills in async
+  // Layout: intro section (with own Save button) on top, view-only data table below.
   var d = _editingCardDraft;
   var notes = d.notes||'';
   var snapshotAt = (c.content && c.content.snapshot && c.content.snapshot.snapshotAt) || '';
@@ -1360,12 +1365,19 @@ function editorAssetRegister(c, ro){
     (ro && snapshotAt
       ? '<div style="background:rgba(0,200,255,.08);border:1px solid rgba(0,200,255,.25);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:var(--accent);display:flex;align-items:center;gap:9px"><span>📄</span><span>Frozen snapshot — captured '+escHtml(fmtDateLong(snapshotAt))+'.</span></div>'
       : '')+
-    // Section intro
-    '<label class="mlbl" style="margin-top:0">Chapter Intro <span style="color:var(--muted);text-transform:none;letter-spacing:0;font-family:DM Sans,sans-serif;font-size:11px">— optional, appears on the chapter cover page</span></label>'+
-    '<textarea class="mi" id="ec_notes" rows="3" '+(ro?'readonly disabled':'')+' placeholder="e.g. The following table lists all HVAC assets installed under this contract, including manufacturer, model, serial number, location and warranty terms.">'+escHtml(notes)+'</textarea>'+
 
-    // Live data preview
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px;gap:10px">'+
+    // ── Chapter intro section (own Save button) ──
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:10px">'+
+      '<label class="mlbl" style="margin-top:0;margin-bottom:0">Chapter Intro <span style="color:var(--muted);text-transform:none;letter-spacing:0;font-family:DM Sans,sans-serif;font-size:11px">— appears on the chapter cover page</span></label>'+
+      (ro?'':'<button class="bp bsm btn" onclick="saveAssetIntro()" id="ar-save-intro-btn">💾 Save</button>')+
+    '</div>'+
+    '<textarea class="mi" id="ec_notes" rows="3" '+(ro?'readonly disabled':'')+' placeholder="e.g. The following table lists all HVAC assets installed under this contract, with manufacturer, model, serial number, location and warranty terms.">'+escHtml(notes)+'</textarea>'+
+    (ro?'':'<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><button class="bg bsm btn" disabled title="AI generation arrives in Phase 4" style="opacity:.5">✨ Regenerate with AI</button><span style="font-size:11px;color:var(--muted);font-style:italic">AI generation arrives in Phase 4</span></div>')+
+
+    '<div style="height:1px;background:var(--border);margin:18px 0"></div>'+
+
+    // ── Data preview (view-only) ──
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px">'+
       '<div>'+
         '<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">'+(ro?'Snapshot':'Live data')+'</div>'+
         '<div style="font-size:13px;color:var(--text);margin-top:2px" id="ar-count-line">Loading…</div>'+
@@ -1378,6 +1390,32 @@ function editorAssetRegister(c, ro){
     '</div>'+
 
     (ro?'':'<div style="background:rgba(255,184,48,.06);border:1px solid rgba(255,184,48,.18);border-radius:8px;padding:10px 14px;margin-top:14px;font-size:12px;color:var(--text2);line-height:1.55"><strong style="color:var(--warn)">⚡ Live data:</strong> The table above reflects the current state of your <a href="hvac-asset-register.html" style="color:var(--accent)">Asset Register</a>, <a href="hvac-equipment-schedule.html" style="color:var(--accent)">Equipment Schedule</a>, and <a href="hvac-tech-submissions.html" style="color:var(--accent)">Tech Submissions</a>. On publish, this data is captured and frozen against the revision — published revs always show the data as it was at publish time.</div>');
+}
+
+// Save just the intro (data table is view-only — no save needed for it)
+async function saveAssetIntro(){
+  if(!_editingCardKey || !manual || !manual.draft) return;
+  var c = manual.cards.find(function(x){return x.key===_editingCardKey;});
+  if(!c) return;
+  var nt = document.getElementById('ec_notes');
+  if(nt){
+    _editingCardDraft.notes = nt.value;
+    c.content = Object.assign({}, c.content||{}, _editingCardDraft);
+    c.lastEdited = new Date().toISOString();
+    c.editedBy = getCurrentUserName();
+    if(c.status==='empty' && nt.value.trim()) c.status = 'draft';
+    await saveManual();
+    var btn = document.getElementById('ar-save-intro-btn');
+    if(btn){
+      var orig = btn.innerHTML;
+      btn.innerHTML = '✓ Saved';
+      btn.disabled = true;
+      setTimeout(function(){
+        if(btn.parentNode){ btn.innerHTML = orig; btn.disabled = false; }
+      }, 1500);
+    }
+    showToast('✓ Intro saved');
+  }
 }
 
 async function refreshAssetPreview(){
