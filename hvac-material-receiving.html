@@ -535,6 +535,7 @@ var _pNum='';
 var _items=[];          // procurement items (read from procurement_schedule)
 var _receipts=[];       // material_receipts list (read from new table)
 var _pos=[];            // flat list of POs across all sections/groups, used for the PO selector
+var _equipLookup={};    // equipId -> {location, subLocation, manufacturer, model, equipType} from equipment schedule (master)
 var _currentUserName=''; // auto-populated received-by — pulled from auth session
 var _activeSupplier=null;
 var _activeType=null;   // when receive modal is open: equipType being received
@@ -585,6 +586,13 @@ async function loadAll(){
     var poRaw=await dbGetPurchaseOrders(_pNum);
     _pos=flattenPos(poRaw);
   }catch(e){_pos=[];}
+  // Equipment schedule — master source for location, manufacturer, model, equipType per ID.
+  // Procurement items only carry these fields if a sync has run recently, so we read fresh
+  // every time receiving loads to ensure the receive list shows the most up-to-date locations.
+  try{
+    var eqRaw=await dbGetEquipment(_pNum);
+    _equipLookup=buildEquipLookup(eqRaw);
+  }catch(e){_equipLookup={};}
   // Current user — pulled from auth session, falls back to '' if not signed in
   _currentUserName=getCurrentUserName();
   // Receipts
@@ -593,6 +601,59 @@ async function loadAll(){
   renderRecent();
   // Update breadcrumb project name
   if(_proj){var bcl=document.querySelectorAll('.bc .bcl');if(bcl.length>1)bcl[1].textContent=_proj.name||_proj.projectName||'Project';}
+}
+
+// Build {equipId: {location, subLocation, manufacturer, model, equipType}} from the equipment
+// schedule's nested {tabs:[{rows:[{...}]}]} shape. Receivers see the fresh master data via
+// `getItemEnriched(it)` rather than the procurement item directly.
+function buildEquipLookup(eqRaw){
+  var lookup={};
+  if(!eqRaw||!Array.isArray(eqRaw.tabs))return lookup;
+  eqRaw.tabs.forEach(function(tab){
+    if(!Array.isArray(tab.rows))return;
+    var typeLabel=tab.name||tab.type||'Equipment';
+    tab.rows.forEach(function(row){
+      if(row._deleted)return;
+      var id=String(row.tag||row.equipment_id||'').trim();
+      if(!id)return;
+      // Try multiple field-name aliases since templates use different keys
+      var location=_pickField(row,['location','Location']);
+      var subLocation=_pickField(row,['sublocation','subLocation','sub_location','Sub Location','Sub location']);
+      var mfr=_pickField(row,['manufacturer','make','maker','Manufacturer','Make']);
+      var model=_pickField(row,['model','Model']);
+      lookup[id]={
+        location:location,
+        subLocation:subLocation,
+        manufacturer:mfr,
+        model:model,
+        equipType:typeLabel
+      };
+    });
+  });
+  return lookup;
+}
+function _pickField(row,keys){
+  for(var i=0;i<keys.length;i++){
+    var v=row[keys[i]];
+    if(v!=null&&String(v).trim()!=='')return String(v).trim();
+  }
+  return '';
+}
+
+// Resolve a procurement item's display fields against the equipment-schedule master.
+// Falls back to whatever the procurement record carried if the equipment schedule entry
+// is missing (e.g. equipment ID was added directly in procurement before equipment sync).
+function getItemEnriched(item){
+  var eq=_equipLookup[item.equipId]||{};
+  return {
+    equipId:item.equipId||'',
+    // Prefer the more specific sub-location, fall back to the room/zone, then to the procurement
+    // record's own location, finally a blank string. This matches the proc schedule's resolution.
+    location:eq.subLocation||eq.location||item.location||'',
+    manufacturer:eq.manufacturer||item.manufacturer||'',
+    model:eq.model||item.model||'',
+    equipType:eq.equipType||item.equipType||''
+  };
 }
 
 // Flatten the nested PO data structure produced by hvac-procurement-pos.html.
@@ -960,9 +1021,12 @@ var _recvColFilters={};
 var _recvFilterDropOpen=null;
 
 function _recvGetColValue(item,colId){
-  if(colId==='equipId')return String(item.equipId||'');
-  if(colId==='location')return String(item.location||'');
-  if(colId==='equipType')return String(item.equipType||'');
+  // Resolve via equipment-schedule lookup so location/type pulled in correctly even if
+  // the procurement record's own copy of those fields is stale.
+  var enr=getItemEnriched(item);
+  if(colId==='equipId')return String(enr.equipId||'');
+  if(colId==='location')return String(enr.location||'');
+  if(colId==='equipType')return String(enr.equipType||'');
   return '';
 }
 
@@ -1068,7 +1132,7 @@ function _recvRenderFilterDrop(anchorEl){
     });
     html+='</div>';
   }
-  html+='<div class="fd-actions"><button class="fd-btn-clear" onclick="clearRecvFilterCol(\''+colId+'\')">Clear filter</button><button class="fd-btn-ok" onclick="closeRecvFilterDrop()">Done</button></div>';
+  html+='<div class="fd-actions"><button class="fd-btn-clear" onclick="clearRecvFilterCol(\''+colId+'\')">Clear filter</button><button class="fd-btn-ok" onclick="closeRecvFilterDrop()">Apply</button></div>';
 
   var fd=document.getElementById('recvFilterDrop');
   fd.innerHTML=html;
@@ -1170,13 +1234,16 @@ function _recvHdrCell(label,colId){
 
 function renderRecvList(){
   var items=getEligibleItems();
-  // Free-text search applies to BOTH equipment ID, location, and equipment type — single search box, multi-field
+  // Free-text search applies to BOTH equipment ID, location, and equipment type — single search box, multi-field.
+  // Reads location/type via the equipment schedule lookup so search hits work even when the
+  // procurement record's own copy of those fields is empty.
   var search=(document.getElementById('recvSearch').value||'').trim().toLowerCase();
   if(search){
     items=items.filter(function(it){
-      return (it.equipId||'').toLowerCase().includes(search)
-        ||(it.location||'').toLowerCase().includes(search)
-        ||(it.equipType||'').toLowerCase().includes(search);
+      var enr=getItemEnriched(it);
+      return (enr.equipId||'').toLowerCase().includes(search)
+        ||(enr.location||'').toLowerCase().includes(search)
+        ||(enr.equipType||'').toLowerCase().includes(search);
     });
   }
   // Apply per-column filters
@@ -1211,9 +1278,10 @@ function renderRecvList(){
     if(sel)classes.push('selected');
     if(dmg)classes.push('damaged');
     var cb=sel?(dmg?'!':'✓'):'';
-    var loc=it.location||'';
+    var enr=getItemEnriched(it);
+    var loc=enr.location||'';
     var locCls='recv-item-loc'+(loc?'':' empty');
-    var typ=it.equipType||'';
+    var typ=enr.equipType||'';
     var typCls='recv-item-type'+(typ?'':' empty');
     return '<div class="'+classes.join(' ')+'" data-id="'+escH(it.id)+'" onclick="toggleSelect(\''+escH(it.id).replace(/'/g,"\\'")+'\')">'
       +'<div class="recv-item-cb">'+cb+'</div>'

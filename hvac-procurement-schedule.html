@@ -599,7 +599,7 @@ function saveSortFilter(){
 function getColValue(item,colId){
   var eq=_equipLookup[item.equipId]||{};
   if(colId==='equipId')return String(item.equipId||'');
-  if(colId==='location')return String(eq.subLocation||item.location||'');
+  if(colId==='location')return String(eq.subLocation||eq.location||item.location||'');
   if(colId==='manufacturer')return String(eq.manufacturer||item.manufacturer||'');
   if(colId==='model')return String(eq.model||item.model||'');
   if(colId==='equipType')return String(eq.equipType||item.equipType||'');
@@ -726,7 +726,7 @@ function renderFilterDrop(anchorEl){
     });
     html+='</div>';
   }
-  html+='<div class="fd-actions"><button class="fd-btn-clear" onclick="clearFilterCol(\''+colId+'\')">Clear filter</button><button class="fd-btn-ok" onclick="closeFilterDrop()">Done</button></div>';
+  html+='<div class="fd-actions"><button class="fd-btn-clear" onclick="clearFilterCol(\''+colId+'\')">Clear filter</button><button class="fd-btn-ok" onclick="closeFilterDrop()">Apply</button></div>';
 
   var fd=document.getElementById('filterDrop');
   fd.innerHTML=html;
@@ -1140,7 +1140,11 @@ function renderTable(){
     // Pull master fields from equipment schedule lookup
     var _eq=_equipLookup[item.equipId]||{};
     var _location=_eq.location||item.location||'—';
-    var _subLocation=_eq.subLocation||item.location||'—';
+    // Prefer sub-location when set, otherwise fall back to the main location field.
+    // Some equipment templates (Dampers, Grilles, FCUs) only define `location`;
+    // others (mixed-tenant tabs) define both `location` (zone/building) and `sublocation` (room).
+    // Receiver wants the most specific text available, so check both.
+    var _subLocation=_eq.subLocation||_eq.location||item.location||'—';
     var _manufacturer=_eq.manufacturer||item.manufacturer||'—';
     var _model=_eq.model||item.model||'—';
     var _equipType=_eq.equipType||item.equipType||'—';
