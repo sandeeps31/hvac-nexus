@@ -456,7 +456,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
     <div class="recv-actions">
       <span class="recv-actions-msg" id="recvSaveMsg"></span>
       <button class="bg btn" onclick="closeRecvModal()">Cancel</button>
-      <button class="bp btn" id="recvSaveBtn" onclick="saveReceipt()">Save Receipt</button>
+      <button class="bp btn" id="recvSaveBtn" onclick="saveReceipt()">Receive Goods</button>
     </div>
   </div>
 </div>
@@ -1255,9 +1255,19 @@ function renderRecvList(){
     items.sort(function(a,b){return (a.equipId||'').localeCompare(b.equipId||'');});
   }
   var listEl=document.getElementById('recvList');
+  // Master checkbox state — reflects whether all currently visible items are selected.
+  // - 'none' → none of the visible items are selected → empty box
+  // - 'all'  → every visible item is selected → ticked
+  // - 'some' → mixed → indeterminate
+  var visibleSelected=items.filter(function(it){return _selected.has(it.id);}).length;
+  var masterState=visibleSelected===0?'none':(visibleSelected===items.length?'all':'some');
+  var masterChecked=masterState==='all';
+  var masterIndet=masterState==='some';
   // Sticky header row — always rendered, even when zero results
   var hdrHtml='<div class="recv-list-hdr">'
-    +'<div class="recv-list-hdr-cb"></div>'
+    +'<div class="recv-list-hdr-cb">'
+      +'<input type="checkbox" id="recvMasterCb" '+(masterChecked?'checked':'')+' onclick="event.stopPropagation();toggleRecvMaster(this.checked)" title="Select / clear all visible items" style="cursor:pointer;accent-color:var(--accent);width:16px;height:16px;vertical-align:middle">'
+    +'</div>'
     +'<div class="recv-list-hdr-cell">'+_recvHdrCell('Equipment ID','equipId')+'</div>'
     +'<div class="recv-list-hdr-cell">'+_recvHdrCell('Location','location')+'</div>'
     +'<div class="recv-list-hdr-cell">'+_recvHdrCell('Equipment Type','equipType')+'</div>'
@@ -1291,7 +1301,36 @@ function renderRecvList(){
       +'<button class="recv-item-flag" onclick="event.stopPropagation();toggleDamaged(\''+escH(it.id).replace(/'/g,"\\'")+'\')" title="'+(dmg?'Damaged — click to clear':'Flag as damaged')+'">'+(dmg?'⚠':'⚑')+'</button>'
       +'</div>';
   }).join('');
+  // Native checkbox `indeterminate` has to be set via JS (HTML attribute doesn't exist).
+  // Reflects the partial-selection state visually so user knows clicking will select all.
+  var masterCb=document.getElementById('recvMasterCb');
+  if(masterCb)masterCb.indeterminate=masterIndet;
   updateRecvSummary();
+}
+
+// Master checkbox handler — the whole point of this checkbox is "given the currently visible
+// (filtered + searched) items, select all of them or clear all of them in one click".
+// It always operates on the visible set, never on hidden items, so the user's filter-then-select
+// workflow doesn't accidentally pick up items they can't see.
+function toggleRecvMaster(checked){
+  // Recompute the visible items the same way renderRecvList does — must stay in sync.
+  var items=getEligibleItems();
+  var search=(document.getElementById('recvSearch').value||'').trim().toLowerCase();
+  if(search){
+    items=items.filter(function(it){
+      var enr=getItemEnriched(it);
+      return (enr.equipId||'').toLowerCase().includes(search)
+        ||(enr.location||'').toLowerCase().includes(search)
+        ||(enr.equipType||'').toLowerCase().includes(search);
+    });
+  }
+  items=items.filter(_recvRowMatchesFilters);
+  if(checked){
+    items.forEach(function(it){_selected.add(it.id);});
+  } else {
+    items.forEach(function(it){_selected.delete(it.id);_damaged.delete(it.id);});
+  }
+  renderRecvList();
 }
 function toggleSelect(id){
   if(_selected.has(id)){_selected.delete(id);_damaged.delete(id);}
@@ -1577,7 +1616,7 @@ async function saveReceipt(){
     console.error(e);
     showToast('Save failed: '+(e&&e.message||'unknown'),'error');
   }finally{
-    btn.disabled=false;btn.textContent='Save Receipt';
+    btn.disabled=false;btn.textContent='Receive Goods';
   }
 }
 
