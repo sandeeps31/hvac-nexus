@@ -144,6 +144,38 @@ input[type=number]{-moz-appearance:textfield}
 .po-recv-chip{display:inline-block;padding:3px 9px;border-radius:11px;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap}
 .po-recv-chip.received{background:rgba(0,229,160,.12);color:var(--green,#00e5a0);border:1px solid rgba(0,229,160,.35)}
 .po-recv-chip.partial{background:rgba(255,184,48,.1);color:var(--warn,#ffb830);border:1px solid rgba(255,184,48,.35)}
+
+/* ─── RECEIVED GOODS SIDE PANEL ─── */
+.rsp-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:998;opacity:0;pointer-events:none;transition:opacity .2s ease}
+.rsp-overlay.open{opacity:1;pointer-events:auto}
+.rsp-panel{position:fixed;top:0;right:0;bottom:0;width:560px;max-width:96vw;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 36px rgba(0,0,0,.6);z-index:999;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.rsp-panel.open{transform:translateX(0)}
+.rsp-hdr{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px;flex-shrink:0;background:var(--surface2)}
+.rsp-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text);margin:6px 0 4px;font-family:'DM Mono',monospace;color:var(--accent)}
+.rsp-sub{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rsp-close{background:transparent;border:1px solid var(--border);color:var(--muted);width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:20px;line-height:1;flex-shrink:0;transition:all .12s}
+.rsp-close:hover{border-color:var(--text);color:var(--text);background:var(--surface3)}
+.rsp-body{padding:18px 22px;overflow-y:auto;flex:1}
+.rsp-receipt{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.rsp-receipt:last-child{margin-bottom:0}
+.rsp-receipt-hdr{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.rsp-meta-cell{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rsp-meta-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.7px;color:var(--muted);text-transform:uppercase}
+.rsp-meta-val{font-size:12.5px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rsp-notes{font-size:12px;color:var(--text2);margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.rsp-notes .rsp-meta-lbl{display:inline-block;margin-right:6px}
+.rsp-eq-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.rsp-eq-table thead th{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.7px;color:var(--muted);text-transform:uppercase;font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+.rsp-eq-table tbody tr{border-bottom:1px solid var(--border)}
+.rsp-eq-table tbody tr:last-child{border-bottom:none}
+.rsp-eq-table td{padding:8px}
+.rsp-eq-id{font-family:'DM Mono',monospace;color:var(--accent);font-weight:600}
+.rsp-eq-loc{color:var(--text2)}
+.rsp-eq-tick{text-align:center;width:50px}
+@media (max-width:600px){
+  .rsp-panel{width:100vw}
+  .rsp-receipt-hdr{grid-template-columns:1fr;gap:8px}
+}
 .ra{display:flex;gap:5px;justify-content:flex-end;opacity:0;transition:opacity .13s}
 tr:hover .ra{opacity:1}
 .ia{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .12s}
@@ -315,7 +347,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
           <th class="r" style="min-width:120px;cursor:pointer" onclick="sortList('cost')">Order Cost (ex GST) <span id="sort-ind-cost"></span></th>
           <th style="width:120px;cursor:pointer" onclick="sortList('orderDate')">Order Date <span id="sort-ind-orderDate"></span></th>
           <th style="width:120px;cursor:pointer" onclick="sortList('delivery')">Delivery <span id="sort-ind-delivery"></span></th>
-          <th style="width:140px">Receipt status</th>
         </tr></thead>
         <tbody id="poBody"></tbody>
       </table></div>
@@ -331,6 +362,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
           <div class="po-page-title" id="po-page-title" style="flex:1">New Purchase Order</div>
           <button class="bg bsm btn" id="emailPOBtn" onclick="emailPO()" style="display:none;color:var(--accent);border-color:rgba(0,200,255,.3)">✉️ Email</button>
           <button class="bg bsm btn" id="exportPOBtn" onclick="printPO()" style="display:none;color:var(--text2);border-color:var(--border)">⬇️ Export PDF</button>
+          <button class="bg bsm btn" id="recvGoodsBtn" onclick="openRecvSidePanel()" style="display:none;color:var(--accent);border-color:rgba(0,229,160,.35)">📦 Received goods</button>
           <button class="bg bsm btn" id="editPOBtn" onclick="enterPOEditMode()" style="display:none">✏️ Edit PO</button>
         </div>
         <div class="meta-row">
@@ -615,6 +647,108 @@ async function loadReceiptsForPos(){
   }catch(e){_receiptsForPos=[];}
 }
 
+// Equipment schedule lookup — used to resolve location for each equipment ID in
+// the "Received goods" side panel. Equipment schedule is the master source of location
+// data; receipts only carry equipId, so we build {equipId → {location, equipType}} on load.
+var _equipLookupForPos={};
+async function loadEquipmentForPos(){
+  try{
+    var raw=await dbGetEquipment(_poPNum);
+    _equipLookupForPos=_buildEquipLookupForPos(raw);
+  }catch(e){_equipLookupForPos={};}
+}
+function _buildEquipLookupForPos(eqRaw){
+  var lookup={};
+  if(!eqRaw||!Array.isArray(eqRaw.tabs))return lookup;
+  eqRaw.tabs.forEach(function(tab){
+    if(!Array.isArray(tab.rows))return;
+    var typeLabel=tab.name||tab.type||'Equipment';
+    tab.rows.forEach(function(row){
+      if(row._deleted)return;
+      var id=String(row.tag||row.equipment_id||'').trim();
+      if(!id)return;
+      var location=_pickEqField(row,['location','Location']);
+      var subLocation=_pickEqField(row,['sublocation','subLocation','sub_location','Sub Location','Sub location']);
+      lookup[id]={
+        location:subLocation||location||'',
+        equipType:typeLabel
+      };
+    });
+  });
+  return lookup;
+}
+function _pickEqField(row,keys){
+  for(var i=0;i<keys.length;i++){
+    var v=row[keys[i]];
+    if(v!=null&&String(v).trim()!=='')return String(v).trim();
+  }
+  return '';
+}
+
+// ── RECEIVED GOODS SIDE PANEL ──
+// Shows all deliveries against the currently-open PO, grouped by receipt event.
+// Header per receipt: Delivery Date | Received By | Docket Number.
+// Body per receipt: list of equipment received with location + green tick.
+// Read-only — for editing/deleting, user goes to the Material Receiving page.
+function openRecvSidePanel(){
+  if(!editingPO||!editingPO.pid){console.warn('No PO open');return;}
+  var poId=editingPO.pid;
+  var po=null;
+  // Find the PO so we can show its supplier in the panel header
+  var grp=getGrp(editingPO.sid,editingPO.gid);
+  if(grp&&grp.pos)po=grp.pos.find(function(p){return p.id===poId;});
+  var receipts=_receiptsForPos.filter(function(r){return r.poId===poId;});
+  // Sort by deliveryDate descending — most recent delivery first
+  receipts.sort(function(a,b){return (b.deliveryDate||'').localeCompare(a.deliveryDate||'');});
+  // Title shows PO number; subtitle shows total deliveries + total items
+  var totalItems=receipts.reduce(function(s,r){return s+(r.itemCount||(r.items||[]).length);},0);
+  var titleEl=document.getElementById('recvPanelTitle');
+  var subEl=document.getElementById('recvPanelSub');
+  if(titleEl)titleEl.textContent=poId;
+  if(subEl)subEl.textContent=receipts.length+' deliver'+(receipts.length===1?'y':'ies')+' · '+totalItems+' item'+(totalItems===1?'':'s')+(po?' · '+(po.supplier||''):'');
+  var bodyEl=document.getElementById('recvPanelBody');
+  if(!receipts.length){
+    bodyEl.innerHTML='<div style="padding:40px 24px;text-align:center;color:var(--muted)">'
+      +'<div style="font-size:32px;opacity:.5;margin-bottom:10px">📦</div>'
+      +'<div style="font-size:13px">No deliveries received against this PO yet.</div>'
+      +'</div>';
+  } else {
+    bodyEl.innerHTML=receipts.map(function(r){
+      // One section per receipt event. Header shows delivery date, received-by, docket.
+      // Items grid shows equipment ID + location + green tick.
+      var docketHtml=r.docketNumber?escH(r.docketNumber):'<span style="color:var(--muted);font-style:italic">—</span>';
+      var docketLink=r.docketUrl?'<a href="'+escH(r.docketUrl)+'" target="_blank" style="color:var(--accent);text-decoration:none;font-size:11px;margin-left:6px">📄 View</a>':'';
+      var photoCount=(r.photos||[]).length;
+      var photoLine=photoCount?'<span style="color:var(--muted);font-size:11px;margin-left:8px">'+photoCount+' photo'+(photoCount===1?'':'s')+'</span>':'';
+      var itemRows=(r.items||[]).map(function(it){
+        var loc=(_equipLookupForPos[it.equipId]||{}).location||'';
+        var locDisplay=loc?escH(loc):'<span style="color:var(--muted);font-style:italic">—</span>';
+        var dmg=it.condition==='Damaged';
+        return '<tr>'
+          +'<td class="rsp-eq-id">'+escH(it.equipId||'—')+'</td>'
+          +'<td class="rsp-eq-loc">'+locDisplay+'</td>'
+          +'<td class="rsp-eq-tick">'+(dmg?'<span title="Received but flagged damaged" style="color:var(--warn,#ffb830);font-size:14px">⚠</span>':'<span title="Received OK" style="color:var(--green,#00e5a0);font-size:14px">✓</span>')+'</td>'
+          +'</tr>';
+      }).join('');
+      return '<div class="rsp-receipt">'
+        +'<div class="rsp-receipt-hdr">'
+          +'<div class="rsp-meta-cell"><span class="rsp-meta-lbl">Delivery Date</span><span class="rsp-meta-val">'+fmtD(r.deliveryDate)+'</span></div>'
+          +'<div class="rsp-meta-cell"><span class="rsp-meta-lbl">Received By</span><span class="rsp-meta-val">'+escH(r.receivedBy||'—')+'</span></div>'
+          +'<div class="rsp-meta-cell"><span class="rsp-meta-lbl">Docket #</span><span class="rsp-meta-val">'+docketHtml+docketLink+photoLine+'</span></div>'
+        +'</div>'
+        +(r.notes?'<div class="rsp-notes"><span class="rsp-meta-lbl">Notes</span> '+escH(r.notes)+'</div>':'')
+        +'<table class="rsp-eq-table"><thead><tr><th>Equipment ID</th><th>Location</th><th style="width:50px;text-align:center">Received</th></tr></thead><tbody>'+itemRows+'</tbody></table>'
+      +'</div>';
+    }).join('');
+  }
+  document.getElementById('recvSidePanel').classList.add('open');
+  document.getElementById('recvSidePanelOverlay').classList.add('open');
+}
+function closeRecvSidePanel(){
+  document.getElementById('recvSidePanel').classList.remove('open');
+  document.getElementById('recvSidePanelOverlay').classList.remove('open');
+}
+
 // Returns 'open' | 'partial' | 'received' for a given PO based on stamped receipts
 function getPoReceiptStatus(po){
   if(!po||!po.id)return 'open';
@@ -781,12 +915,6 @@ function renderList(){
   }
   document.getElementById('poBody').innerHTML=all.map(p=>{
     const items=p.lineItems||[],sub=liSub(items),gst=liGST(items),tot=liTot(items);
-    const recvStatus=getPoReceiptStatus(p);
-    const recvChip=recvStatus==='received'
-      ? '<span class="po-recv-chip received">✓ Fully received</span>'
-      : recvStatus==='partial'
-        ? '<span class="po-recv-chip partial">Partial</span>'
-        : '';
     return `<tr onclick="openPOReadOnly('${p._secId}','${p._grpId}','${p.id}')">
       <td class="po-num-c">${p.id}</td>
       <td style="font-weight:500;color:var(--text)">${p.supplier||'—'}</td>
@@ -794,7 +922,6 @@ function renderList(){
       <td class="r" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">${fmtZ(sub)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.orderDate)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.delivery)}</td>
-      <td>${recvChip}</td>
     </tr>`;
   }).join('');
 }
@@ -822,6 +949,7 @@ function openNewPO(preCatVal){
   document.getElementById('editPOBtn').style.display='none';
   document.getElementById('emailPOBtn').style.display='none';
   document.getElementById('exportPOBtn').style.display='none';
+  document.getElementById('recvGoodsBtn').style.display='none';
   setFieldsReadOnly(false);
   var _today=new Date();var _dd=String(_today.getDate()).padStart(2,'0');var _mm=String(_today.getMonth()+1).padStart(2,'0');var _yyyy=_today.getFullYear();
   document.getElementById('po-order-date').value=_yyyy+'-'+_mm+'-'+_dd;
@@ -874,6 +1002,10 @@ function openPOReadOnly(sid,gid,pid){
   document.getElementById('deletePOBtn').style.display='none';
   document.getElementById('emailPOBtn').style.display='';
   document.getElementById('exportPOBtn').style.display='';
+  // Show "Received goods" button only if this PO has at least one receipt stamped against it.
+  // No point cluttering the toolbar for POs nothing's been received against yet.
+  var hasReceipts=_receiptsForPos.some(function(r){return r.poId===pid;});
+  document.getElementById('recvGoodsBtn').style.display=hasReceipts?'':'none';
 }
 
 function enterPOEditMode(){
@@ -884,6 +1016,7 @@ function enterPOEditMode(){
   document.getElementById('deletePOBtn').style.display='';
   document.getElementById('emailPOBtn').style.display='none';
   document.getElementById('exportPOBtn').style.display='none';
+  document.getElementById('recvGoodsBtn').style.display='none';
 }
 
 function setFieldsReadOnly(ro){
@@ -1374,6 +1507,7 @@ window.addEventListener('DOMContentLoaded', async function(){
   await loadSubVarPos();
   await loadBudgetData();
   await loadReceiptsForPos();
+  await loadEquipmentForPos();
   const saved = await loadData();
   if(saved?.sections){ sections = saved.sections; }
   var params = new URLSearchParams(window.location.search);
@@ -1513,6 +1647,22 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
 })();
 
 </script>
+<!-- RECEIVED GOODS SIDE PANEL — slides in from the right when "📦 Received goods" is clicked.
+     Read-only audit view of all deliveries against the open PO. Editing/deletion happens
+     in the Material Receiving page; this is just for visibility from the procurement side. -->
+<div class="rsp-overlay" id="recvSidePanelOverlay" onclick="closeRecvSidePanel()"></div>
+<div class="rsp-panel" id="recvSidePanel" role="dialog" aria-labelledby="recvPanelTitle">
+  <div class="rsp-hdr">
+    <div style="flex:1;min-width:0">
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">Received Goods</div>
+      <div class="rsp-title" id="recvPanelTitle">—</div>
+      <div class="rsp-sub" id="recvPanelSub">—</div>
+    </div>
+    <button class="rsp-close" onclick="closeRecvSidePanel()" title="Close">×</button>
+  </div>
+  <div class="rsp-body" id="recvPanelBody"></div>
+</div>
+
 </body>
 </html><script>
 // ── SIDEBAR FIX: ensure main content clears sidebar ──

@@ -927,8 +927,8 @@ function pickerSelectSupplier(name){
   document.getElementById('suppPickEmpty').style.display='none';
   document.getElementById('suppPickPoSection').style.display='';
   var supp=name;
-  // Strict matches first
-  var strictPos=getPosForSupplier(supp).filter(function(po){return getPoStatus(po)!=='received';});
+  // Strict matches first — all POs for this supplier, no status filtering
+  var strictPos=getPosForSupplier(supp);
   // Fuzzy matches second — POs whose supplier name is similar but not identical.
   // Handles cases like "KS fabrication" in equipment schedule vs "KS metal" on PO,
   // or typos like "Holyaoke" vs "Holyoake".
@@ -992,8 +992,6 @@ function pickerSelectSupplier(name){
 // Renders a single PO card. `fuzzy` flag changes the visual treatment so user can tell
 // which POs are exact-name matches vs similar-name maybes.
 function _renderPickerPoCard(po,fuzzy){
-  var status=getPoStatus(po);
-  var chip=status==='partial'?'<span class="po-chip partial">Partial</span>':'<span class="po-chip open">Open</span>';
   var meta=[];
   if(fuzzy)meta.push(escH(po.supplier||'—')); // show actual supplier name on fuzzy matches so user sees the mismatch
   if(po.orderDate)meta.push('Ordered '+fmtD(po.orderDate));
@@ -1005,10 +1003,7 @@ function _renderPickerPoCard(po,fuzzy){
       +'<div class="po-card-id">'+escH(po.id)+'</div>'
       +'<div class="po-card-meta">'+(meta.length?meta.join(' · '):'—')+'</div>'
     +'</div>'
-    +'<div class="po-card-stats">'
-      +(costStr?'<div class="po-card-cost">'+costStr+'</div>':'')
-      +chip
-    +'</div>'
+    +(costStr?'<div class="po-card-stats"><div class="po-card-cost">'+costStr+'</div></div>':'')
     +'</div>';
 }
 
@@ -1024,8 +1019,6 @@ function openBrowseAllPos(){
   } else {
     if(statsEl)statsEl.textContent=pos.length+' open PO'+(pos.length===1?'':'s')+' across all suppliers';
     listEl.innerHTML=pos.map(function(po){
-      var status=getPoStatus(po);
-      var chip=status==='partial'?'<span class="po-chip partial">Partial</span>':'<span class="po-chip open">Open</span>';
       var meta=[];
       meta.push(escH(po.supplier||'—'));
       if(po.orderDate)meta.push('Ordered '+fmtD(po.orderDate));
@@ -1036,10 +1029,7 @@ function openBrowseAllPos(){
           +'<div class="po-card-id">'+escH(po.id)+'</div>'
           +'<div class="po-card-meta">'+meta.join(' · ')+'</div>'
         +'</div>'
-        +'<div class="po-card-stats">'
-          +(costStr?'<div class="po-card-cost">'+costStr+'</div>':'')
-          +chip
-        +'</div>'
+        +(costStr?'<div class="po-card-stats"><div class="po-card-cost">'+costStr+'</div></div>':'')
         +'</div>';
     }).join('');
   }
@@ -1258,7 +1248,7 @@ function _fuzzyScore(query,candidate){
 }
 
 // Return POs whose supplier name fuzzy-matches the searched name. Excludes exact matches
-// (caller handles those separately) and fully-received POs. Sorted by score descending.
+// (caller handles those separately). Sorted by score descending.
 function getFuzzyPosForSupplier(supplier){
   if(!supplier)return [];
   var s=supplier.toLowerCase();
@@ -1267,7 +1257,6 @@ function getFuzzyPosForSupplier(supplier){
     var poSupp=(po.supplier||'').trim();
     if(!poSupp)return;
     if(poSupp.toLowerCase()===s)return; // exact match — handled by getPosForSupplier
-    if(getPoStatus(po)==='received')return; // hide fully-received
     var score=_fuzzyScore(supplier,poSupp);
     if(score>0)hits.push({po:po,score:score});
   });
@@ -1275,16 +1264,12 @@ function getFuzzyPosForSupplier(supplier){
   return hits.map(function(h){return h.po;});
 }
 
-// All open POs across every supplier — used for the "Browse all open POs" manual override.
-// Sorted by status (Open first), then by order date descending.
+// All POs across every supplier — used for the "Browse all open POs" manual override.
+// Sorted by order date descending (newest first).
 function getAllOpenPos(){
-  return _pos.filter(function(po){return getPoStatus(po)!=='received';})
-    .sort(function(a,b){
-      var statusOrder={'open':0,'partial':1,'received':2};
-      var sa=statusOrder[getPoStatus(a)]||0,sb=statusOrder[getPoStatus(b)]||0;
-      if(sa!==sb)return sa-sb;
-      return (b.orderDate||'').localeCompare(a.orderDate||'');
-    });
+  return _pos.slice().sort(function(a,b){
+    return (b.orderDate||'').localeCompare(a.orderDate||'');
+  });
 }
 
 // "Fully received" heuristic — a PO is considered fully received when every receipt
@@ -1323,21 +1308,11 @@ function renderPoList(){
     var seen={};pos.forEach(function(p){seen[p.id]=1;});
     fuzzyPos.forEach(function(p){if(!seen[p.id]){pos.push(p);seen[p.id]=1;}});
   }
-  // Hide fully-received POs from the list — they shouldn't muddy the picker.
-  // Exception: keep the currently-selected PO visible even if it's marked received,
-  // so the user always sees what they tagged.
-  var visible=pos.filter(function(po){
-    if(po.id===_activePoId)return true;
-    return getPoStatus(po)!=='received';
-  });
+  // Show all POs regardless of received status — receivers don't need to know what's
+  // been claimed/invoiced, they just record what arrived. Status chips removed too.
   if(!pos.length){
     listEl.innerHTML='<div class="po-empty">No POs raised against '+escH(_activeSupplier||'this supplier')+' yet — receipt will save without a PO ref.</div>';
     infoEl.textContent='';
-    return;
-  }
-  if(!visible.length){
-    listEl.innerHTML='<div class="po-empty">All POs for '+escH(_activeSupplier||'this supplier')+' are fully received — receipt will save without a PO ref.</div>';
-    infoEl.textContent=pos.length+' PO'+(pos.length===1?'':'s')+' fully received';
     return;
   }
   // If we've pulled in fuzzy-supplier POs, show a hint label so user knows why
@@ -1346,9 +1321,7 @@ function renderPoList(){
   } else {
     infoEl.textContent='Click to tag receipt';
   }
-  listEl.innerHTML=visible.map(function(po){
-    var status=getPoStatus(po);
-    var chip=status==='partial'?'<span class="po-chip partial">Partial</span>':'<span class="po-chip open">Open</span>';
+  listEl.innerHTML=pos.map(function(po){
     var poSupp=(po.supplier||'').trim();
     var isFuzzy=poSupp&&poSupp.toLowerCase()!==(_activeSupplier||'').toLowerCase();
     var meta=[];
@@ -1368,10 +1341,7 @@ function renderPoList(){
         +'<div class="po-card-id">'+escH(po.id)+'</div>'
         +'<div class="po-card-meta">'+(meta.length?meta.join(' · '):'—')+'</div>'
       +'</div>'
-      +'<div class="po-card-stats">'
-        +(costStr?'<div class="po-card-cost">'+costStr+'</div>':'')
-        +chip
-      +'</div>'
+      +(costStr?'<div class="po-card-stats"><div class="po-card-cost">'+costStr+'</div></div>':'')
       +'</div>';
   }).join('');
 }
