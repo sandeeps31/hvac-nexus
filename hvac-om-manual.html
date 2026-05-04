@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-05-03 om-shell-v6 list-view -->
+<!-- build: 2026-05-03 om-shell-v7 cover-renderer -->
 <html lang="en">
 <head>
 <link rel="stylesheet" href="theme.css">
@@ -382,7 +382,7 @@ var DEFAULT_CARDS = [
 window.addEventListener('DOMContentLoaded', async function(){
   if(typeof dbReady!=='undefined') await dbReady;
   document.getElementById('bcProj').textContent = _pName;
-  await loadManual();
+  await Promise.all([loadManual(), loadCompanySettings()]);
   render();
   attachSidebarObserver();
   checkViewport();
@@ -428,7 +428,7 @@ async function startFirstDraft(){
   manual = {
     cards: JSON.parse(JSON.stringify(DEFAULT_CARDS)).map(function(c){
       c.status = 'empty';
-      c.content = {};
+      c.content = c.key==='cover' ? { layout:'modern' } : {};
       c.lastEdited = null;
       return c;
     }),
@@ -787,6 +787,12 @@ function openCardEdit(key){
   var readonly = (viewingRevIdx !== null) || !manual.draft;
 
   document.getElementById('editModalTitle').textContent = (readonly?'View: ':'Edit: ') + c.title;
+  // Resize modal — cover sheet wants more room for the preview
+  var modalEl = document.querySelector('#editModal .modal');
+  if(modalEl){
+    if(c.key==='cover') modalEl.style.maxWidth = '1080px';
+    else modalEl.style.maxWidth = '720px';
+  }
   document.getElementById('editModalBody').innerHTML = renderCardEditor(c, readonly);
   // Hide save button when readonly
   var foot = document.querySelector('#editModal .mfoot');
@@ -795,6 +801,9 @@ function openCardEdit(key){
     : '<button class="bg bsm btn" onclick="closeM(\'editModal\')">Cancel</button><button class="bp bsm btn" onclick="saveCardEdit()">💾 Save</button>';
 
   document.getElementById('editModal').classList.add('open');
+
+  // Cover-specific post-init (live preview)
+  if(c.key==='cover' && !readonly){ initCoverEditor(); }
 }
 
 // ── Renderers per card type ──
@@ -819,19 +828,304 @@ function renderCardEditor(c, ro){
   return '<div class="placeholder-block">No editor defined for this card type yet.</div>';
 }
 
+// ════════════════════════════════════════════════════════════════════
+// COVER SHEET — tabbed editor with layout picker + live preview
+// ════════════════════════════════════════════════════════════════════
+var _companySettingsCache = null;
+async function loadCompanySettings(){
+  try{ _companySettingsCache = await dbGetCompanySettings(); }catch(e){ _companySettingsCache = null; }
+  return _companySettingsCache || {};
+}
+
+// Merge data from company settings + project + manual overrides + rev info into a single object the layouts can render from.
+function getCoverData(){
+  var s = _companySettingsCache || {};
+  var d = _editingCardDraft || {};
+  // Rev/date — auto computed, never user-set
+  var revLabel='', issueDate='';
+  if(viewingRevIdx!==null){
+    var rv = manual.revisions[viewingRevIdx];
+    revLabel = rv.rev || '';
+    issueDate = rv.date || '';
+  } else if(manual.draft){
+    revLabel = manual.draft.revLabel + ' Draft';
+    issueDate = todayStr();
+  } else if(manual.revisions && manual.revisions.length){
+    var lr = manual.revisions[manual.revisions.length-1];
+    revLabel = lr.rev || '';
+    issueDate = lr.date || '';
+  }
+  return {
+    layout: d.layout || 'modern',
+    manualTitle: d.title || 'Mechanical Services Installation, Operation & Maintenance Manual',
+    coLogo: s.coLogo || '',
+    coName: s.coName || '',
+    coTrading: s.coTrading || '',
+    coAbn: s.coAbn || '',
+    offices: Array.isArray(s.officeAddresses) ? s.officeAddresses : [],
+    footerLogos: Array.isArray(s.footerLogos) ? s.footerLogos : [],
+    projectName: d.projectName || _pName || '',
+    projectNumber: d.projectNumber || _pNum || '',
+    docNo: (manual && manual.docNo) || ('OM-'+(_pNum||'XXXX')),
+    siteAddress: d.siteAddress || '',
+    revLabel: revLabel,
+    issueDate: fmtDateLong(issueDate)
+  };
+}
+
+function fmtDateLong(d){
+  if(!d) return '';
+  try{
+    var p = String(d).split('T')[0].split('-');
+    if(p.length!==3) return d;
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var m = months[parseInt(p[1],10)-1] || p[1];
+    return p[2]+' '+m+' '+p[0];
+  }catch(e){ return d; }
+}
+
+// ── LAYOUT TEMPLATES ──
+// Each takes a data object from getCoverData() and returns HTML for a single A4-portrait page.
+// Both use inline styles so they render anywhere (modal preview, eventual PDF export).
+
+function coverLayoutModern(d, scale){
+  scale = scale || 1;
+  var officesHtml = (d.offices||[]).slice(0,4).map(function(o){
+    var label = (o.label||'').trim();
+    var addr  = (o.address||'').trim();
+    if(!addr) return '';
+    var firstLine = addr.split(',')[0] || addr;
+    var rest = addr.substring(firstLine.length).replace(/^,\s*/,'');
+    return '<div><div style="font-weight:500;color:#34495e">'+escHtml(label||firstLine)+'</div><div>'+escHtml(label?addr:rest)+'</div></div>';
+  }).filter(Boolean).join('');
+  var logosHtml = (d.footerLogos||[]).slice(0,5).map(function(l){
+    return '<div style="width:'+(28*scale)+'px;height:'+(28*scale)+'px;background:#fff;border-radius:'+(3*scale)+'px;padding:'+(2*scale)+'px;display:flex;align-items:center;justify-content:center"><img src="'+escAttr(l.src)+'" style="max-width:100%;max-height:100%;object-fit:contain"/></div>';
+  }).join('');
+  var logoBlock = d.coLogo
+    ? '<img src="'+escAttr(d.coLogo)+'" style="max-height:'+(40*scale)+'px;max-width:'+(140*scale)+'px;object-fit:contain"/>'
+    : '<div style="font-family:Syne,sans-serif;font-size:'+(20*scale)+'px;font-weight:700;color:#34495e">'+escHtml(d.coName||'COMPANY')+'</div>';
+
+  return '<div style="background:#fff;color:#2c3e50;width:100%;height:100%;display:flex;flex-direction:column;font-family:Inter,DM Sans,sans-serif;overflow:hidden;box-sizing:border-box">'+
+    '<div style="height:'+(8*scale)+'px;background:#5cb84a;flex-shrink:0"></div>'+
+    '<div style="padding:'+(28*scale)+'px '+(38*scale)+'px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:'+(20*scale)+'px">'+
+      '<div>'+logoBlock+'</div>'+
+      '<div style="text-align:right;font-size:'+(10*scale)+'px;color:#7f8c8d;line-height:1.5">'+
+        (d.coName?'<div style="font-weight:500;color:#34495e">'+escHtml(d.coName)+'</div>':'')+
+        (d.coTrading?'<div style="font-style:italic">'+escHtml(d.coTrading)+'</div>':'')+
+        (d.coAbn?'<div><strong>ABN:</strong> '+escHtml(d.coAbn)+'</div>':'')+
+      '</div>'+
+    '</div>'+
+    '<div style="padding:0 '+(38*scale)+'px;margin-top:auto;margin-bottom:auto;display:flex;flex-direction:column">'+
+      '<div style="font-size:'+(11*scale)+'px;letter-spacing:'+(2.5*scale)+'px;color:#7f8c8d;margin-bottom:'+(18*scale)+'px">MECHANICAL SERVICES</div>'+
+      '<div style="font-size:'+(30*scale)+'px;font-weight:500;color:#34495e;line-height:1.2;margin-bottom:'+(30*scale)+'px">'+escHtml(d.manualTitle)+'</div>'+
+      '<div style="height:1px;background:#ecf0f1;margin-bottom:'+(22*scale)+'px"></div>'+
+      '<div style="font-size:'+(11*scale)+'px;letter-spacing:'+(2.5*scale)+'px;color:#7f8c8d;margin-bottom:'+(5*scale)+'px">PROJECT</div>'+
+      '<div style="font-size:'+(22*scale)+'px;font-weight:500;color:#34495e;line-height:1.3">'+escHtml(d.projectName||'—')+'</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:'+(14*scale)+'px '+(22*scale)+'px;margin-top:'+(18*scale)+'px">'+
+        coverField('PROJECT NO', d.projectNumber, scale, true)+
+        coverField('DOC NO', d.docNo, scale, true)+
+        coverField('REVISION', d.revLabel||'—', scale, true)+
+        coverField('ISSUE DATE', d.issueDate||'—', scale, true)+
+      '</div>'+
+      '<div style="margin-top:'+(22*scale)+'px">'+
+        '<div style="font-size:'+(9*scale)+'px;letter-spacing:'+(2*scale)+'px;color:#7f8c8d;margin-bottom:'+(5*scale)+'px">SITE ADDRESS</div>'+
+        '<div style="font-size:'+(14*scale)+'px;color:#34495e;line-height:1.45;white-space:pre-wrap">'+escHtml(d.siteAddress||'—')+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="padding:'+(15*scale)+'px '+(38*scale)+'px '+(20*scale)+'px;display:flex;justify-content:space-between;align-items:flex-end;gap:'+(14*scale)+'px">'+
+      '<div style="display:flex;gap:'+(14*scale)+'px;font-size:'+(8*scale)+'px;color:#7f8c8d;line-height:1.3;flex-wrap:wrap">'+(officesHtml||'<div style="font-style:italic;color:#bbb">Office addresses set in Company Settings</div>')+'</div>'+
+      '<div style="display:flex;gap:'+(5*scale)+'px;align-items:flex-end">'+logosHtml+'</div>'+
+    '</div>'+
+    '<div style="height:'+(5*scale)+'px;background:#34495e;flex-shrink:0"></div>'+
+  '</div>';
+}
+
+function coverLayoutBold(d, scale){
+  scale = scale || 1;
+  var logosHtml = (d.footerLogos||[]).slice(0,5).map(function(l){
+    return '<div style="width:'+(22*scale)+'px;height:'+(22*scale)+'px;background:#fff;border-radius:'+(3*scale)+'px;padding:'+(2*scale)+'px;display:flex;align-items:center;justify-content:center"><img src="'+escAttr(l.src)+'" style="max-width:100%;max-height:100%;object-fit:contain"/></div>';
+  }).join('');
+  var officeLine = (d.offices||[]).slice(0,4).map(function(o){
+    var label = (o.label||'').trim();
+    if(label) return label;
+    return ((o.address||'').split(',')[0] || '').trim();
+  }).filter(Boolean).join(' · ');
+  var logoBlock = d.coLogo
+    ? '<img src="'+escAttr(d.coLogo)+'" style="max-height:'+(38*scale)+'px;max-width:'+(140*scale)+'px;object-fit:contain;filter:brightness(0) invert(1)"/>'
+    : '<div style="font-family:Syne,sans-serif;font-size:'+(20*scale)+'px;font-weight:700;color:#fff">'+escHtml(d.coName||'COMPANY')+'</div>';
+
+  return '<div style="background:#fff;color:#2c3e50;width:100%;height:100%;display:flex;flex-direction:column;font-family:Inter,DM Sans,sans-serif;overflow:hidden;box-sizing:border-box">'+
+    '<div style="background:#34495e;color:#fff;padding:'+(28*scale)+'px '+(38*scale)+'px '+(34*scale)+'px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:'+(32*scale)+'px;gap:'+(20*scale)+'px">'+
+        '<div>'+logoBlock+'</div>'+
+        '<div style="text-align:right;font-size:'+(9*scale)+'px;color:rgba(255,255,255,.7);line-height:1.5">'+
+          (d.coName?'<div style="font-weight:500;color:#fff">'+escHtml(d.coName)+'</div>':'')+
+          (d.coTrading?'<div style="font-style:italic">'+escHtml(d.coTrading)+'</div>':'')+
+          (d.coAbn?'<div><strong>ABN:</strong> '+escHtml(d.coAbn)+'</div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div style="font-size:'+(10*scale)+'px;letter-spacing:'+(2.8*scale)+'px;color:#5cb84a;margin-bottom:'+(8*scale)+'px">MECHANICAL SERVICES</div>'+
+      '<div style="font-size:'+(26*scale)+'px;font-weight:500;color:#fff;line-height:1.2">'+escHtml(d.manualTitle)+'</div>'+
+    '</div>'+
+    '<div style="flex:1;padding:'+(34*scale)+'px '+(38*scale)+'px;display:flex;flex-direction:column">'+
+      '<div style="margin-bottom:'+(28*scale)+'px">'+
+        '<div style="font-size:'+(10*scale)+'px;letter-spacing:'+(2.5*scale)+'px;color:#7f8c8d;margin-bottom:'+(6*scale)+'px">PROJECT</div>'+
+        '<div style="font-size:'+(28*scale)+'px;font-weight:500;color:#34495e;line-height:1.2">'+escHtml(d.projectName||'—')+'</div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:'+(16*scale)+'px '+(24*scale)+'px;margin-bottom:'+(28*scale)+'px">'+
+        coverField('PROJECT NO', d.projectNumber, scale, false)+
+        coverField('DOC NO', d.docNo, scale, false)+
+        coverField('REVISION', d.revLabel||'—', scale, false)+
+        coverField('ISSUE DATE', d.issueDate||'—', scale, false)+
+      '</div>'+
+      '<div style="border-top:1px solid #ecf0f1;padding-top:'+(18*scale)+'px">'+
+        '<div style="font-size:'+(9*scale)+'px;letter-spacing:'+(2*scale)+'px;color:#7f8c8d;margin-bottom:'+(5*scale)+'px">SITE ADDRESS</div>'+
+        '<div style="font-size:'+(14*scale)+'px;color:#34495e;line-height:1.45;white-space:pre-wrap">'+escHtml(d.siteAddress||'—')+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="background:#f7f8f9;padding:'+(13*scale)+'px '+(38*scale)+'px;display:flex;justify-content:space-between;align-items:center;gap:'+(14*scale)+'px">'+
+      '<div style="font-size:'+(9*scale)+'px;color:#7f8c8d;line-height:1.3">'+escHtml(officeLine||'')+'</div>'+
+      '<div style="display:flex;gap:'+(5*scale)+'px;align-items:flex-end">'+logosHtml+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function coverField(label, value, scale, smallish){
+  var lblSize = smallish ? 9*scale : 10*scale;
+  var lblSpacing = smallish ? 2*scale : 2.2*scale;
+  var valSize = smallish ? 14*scale : 14*scale;
+  return '<div>'+
+    '<div style="font-size:'+lblSize+'px;letter-spacing:'+lblSpacing+'px;color:#7f8c8d;margin-bottom:'+(3*scale)+'px">'+escHtml(label)+'</div>'+
+    '<div style="font-family:DM Mono,monospace;font-size:'+valSize+'px;font-weight:500;color:#34495e">'+escHtml(value||'—')+'</div>'+
+  '</div>';
+}
+
+function renderCoverPreview(scale){
+  var d = getCoverData();
+  if(d.layout==='bold') return coverLayoutBold(d, scale);
+  return coverLayoutModern(d, scale);
+}
+
+// ── EDITOR ──
 function editorCover(c, ro){
   var d = _editingCardDraft;
-  var roAttr = ro?'readonly disabled':'';
+  if(ro){
+    // Read-only view: just the preview, full-size
+    return '<div style="display:flex;justify-content:center;padding:6px"><div style="width:520px;aspect-ratio:210/297;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff" id="cvr-preview-ro">'+renderCoverPreview(0.65)+'</div></div>';
+  }
+  // Edit mode: side-by-side. Left = controls, right = live preview.
+  var layout = d.layout || 'modern';
   return ''+
-    '<div class="placeholder-block" style="margin-bottom:14px"><span class="pb-icon">📕</span>The cover sheet auto-populates from <strong>Company Settings</strong> (logo, ABN, addresses, accreditation logos) and the <strong>Project record</strong> (project no, project name, site address). Override here only if needed for this manual.</div>'+
-    '<label class="mlbl">Manual Title</label>'+
-    '<input class="mi" id="ec_title" value="'+escAttr(d.title||'Mechanical Services Installation, Operation & Maintenance Manual')+'" '+roAttr+'/>'+
-    '<label class="mlbl">Project Name (override — defaults to project record)</label>'+
-    '<input class="mi" id="ec_pname" value="'+escAttr(d.projectName||'')+'" placeholder="'+escAttr(_pName)+'" '+roAttr+'/>'+
-    '<label class="mlbl">Project Number (override)</label>'+
-    '<input class="mi mono" id="ec_pnum" value="'+escAttr(d.projectNumber||'')+'" placeholder="'+escAttr(_pNum)+'" '+roAttr+'/>'+
-    '<label class="mlbl">Site Address</label>'+
-    '<textarea class="mi" id="ec_addr" rows="2" '+roAttr+'>'+escHtml(d.siteAddress||'')+'</textarea>';
+    '<div style="display:grid;grid-template-columns:1fr 1.05fr;gap:22px;align-items:flex-start">'+
+      // ── LEFT: controls ──
+      '<div style="display:flex;flex-direction:column;gap:14px;min-width:0">'+
+        // Layout picker
+        '<div>'+
+          '<label class="mlbl" style="margin-top:0">Layout</label>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'+
+            coverLayoutOption('modern', 'Modern', layout==='modern')+
+            coverLayoutOption('bold', 'Bold', layout==='bold')+
+          '</div>'+
+        '</div>'+
+        // Manual title
+        '<div>'+
+          '<label class="mlbl" style="margin-top:0">Manual Title</label>'+
+          '<input class="mi" id="ec_title" value="'+escAttr(d.title||'Mechanical Services Installation, Operation & Maintenance Manual')+'" oninput="updateCoverPreview()"/>'+
+        '</div>'+
+        // Project name override
+        '<div>'+
+          '<label class="mlbl" style="margin-top:0">Project Name <span style="color:var(--muted);text-transform:none;letter-spacing:0;font-family:DM Sans,sans-serif">— defaults from project record</span></label>'+
+          '<input class="mi" id="ec_pname" value="'+escAttr(d.projectName||'')+'" placeholder="'+escAttr(_pName)+'" oninput="updateCoverPreview()"/>'+
+        '</div>'+
+        // Project number override
+        '<div>'+
+          '<label class="mlbl" style="margin-top:0">Project Number</label>'+
+          '<input class="mi mono" id="ec_pnum" value="'+escAttr(d.projectNumber||'')+'" placeholder="'+escAttr(_pNum)+'" oninput="updateCoverPreview()"/>'+
+        '</div>'+
+        // Site address
+        '<div>'+
+          '<label class="mlbl" style="margin-top:0">Site Address</label>'+
+          '<textarea class="mi" id="ec_addr" rows="2" placeholder="e.g. Level 23, 100 Mount St, North Sydney NSW 2060" oninput="updateCoverPreview()">'+escHtml(d.siteAddress||'')+'</textarea>'+
+        '</div>'+
+        // Source-data hint
+        '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 12px;font-size:11.5px;color:var(--muted);line-height:1.55;margin-top:4px">'+
+          '<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-bottom:4px">Auto-populated from</div>'+
+          '<div>Logo, ABN, trading name, addresses &amp; accreditation logos pull from <a href="hvac-settings.html" style="color:var(--accent)">Company Settings</a>.</div>'+
+          '<div style="margin-top:4px">Rev no &amp; issue date are set automatically based on the manual\'s draft / publish state.</div>'+
+        '</div>'+
+      '</div>'+
+      // ── RIGHT: live preview ──
+      '<div style="position:sticky;top:0">'+
+        '<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Preview</div>'+
+        '<div style="background:repeating-linear-gradient(45deg,var(--surface2),var(--surface2) 6px,var(--surface3) 6px,var(--surface3) 12px);border-radius:8px;padding:14px;display:flex;justify-content:center">'+
+          '<div id="cvr-preview" style="width:100%;max-width:430px;aspect-ratio:210/297;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.4)">'+
+            renderCoverPreview(0.55)+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+}
+
+function coverLayoutOption(key, label, selected){
+  // Tiny preview thumbnail
+  var thumb = '<div style="width:100%;aspect-ratio:210/297;background:#fff;border-radius:4px;overflow:hidden;display:flex;flex-direction:column;font-size:5px">'+
+    (key==='modern'
+      ? '<div style="height:6%;background:#5cb84a"></div>'+
+        '<div style="flex:1;padding:8% 10%;display:flex;flex-direction:column;justify-content:space-between">'+
+          '<div style="display:flex;justify-content:space-between"><div style="width:25%;height:14%;background:#34495e;border-radius:1px"></div><div style="width:30%;height:6%;background:#bbb;border-radius:1px"></div></div>'+
+          '<div><div style="height:4%;width:30%;background:#bbb;border-radius:1px;margin-bottom:5%"></div><div style="height:10%;background:#34495e;border-radius:1px;margin-bottom:8%"></div><div style="height:1px;background:#ecf0f1;margin-bottom:5%"></div><div style="height:6%;width:50%;background:#34495e;border-radius:1px;margin-bottom:4%"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:3%;margin-bottom:5%"><div style="height:4%;background:#bbb;border-radius:1px"></div><div style="height:4%;background:#bbb;border-radius:1px"></div><div style="height:4%;background:#bbb;border-radius:1px"></div><div style="height:4%;background:#bbb;border-radius:1px"></div></div></div>'+
+          '<div style="display:flex;gap:4%"><div style="width:6%;height:6%;background:#5cb84a;border-radius:50%"></div><div style="width:6%;height:6%;background:#34495e;border-radius:1px"></div></div>'+
+        '</div>'+
+        '<div style="height:3%;background:#34495e"></div>'
+      : '<div style="background:#34495e;color:#fff;padding:8% 10% 12%">'+
+          '<div style="display:flex;justify-content:space-between;margin-bottom:14%"><div style="width:25%;height:8%;background:#5cb84a;border-radius:1px"></div><div style="width:30%;height:5%;background:rgba(255,255,255,.5);border-radius:1px"></div></div>'+
+          '<div style="height:4%;width:35%;background:#5cb84a;border-radius:1px;margin-bottom:3%"></div><div style="height:8%;width:80%;background:#fff;border-radius:1px"></div>'+
+        '</div>'+
+        '<div style="flex:1;padding:8% 10%;display:flex;flex-direction:column;gap:5%">'+
+          '<div><div style="height:4%;width:25%;background:#bbb;border-radius:1px;margin-bottom:3%"></div><div style="height:8%;background:#34495e;border-radius:1px"></div></div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5%"><div style="height:6%;background:#bbb;border-radius:1px"></div><div style="height:6%;background:#bbb;border-radius:1px"></div><div style="height:6%;background:#bbb;border-radius:1px"></div><div style="height:6%;background:#bbb;border-radius:1px"></div></div>'+
+          '<div style="border-top:1px solid #ecf0f1;padding-top:4%"><div style="height:4%;width:30%;background:#bbb;border-radius:1px;margin-bottom:3%"></div><div style="height:5%;width:70%;background:#34495e;border-radius:1px"></div></div>'+
+        '</div>'+
+        '<div style="height:6%;background:#f7f8f9"></div>')+
+    '</div>';
+  return '<label style="cursor:pointer;display:flex;flex-direction:column;gap:6px;padding:8px;border:1.5px solid '+(selected?'var(--accent)':'var(--border)')+';border-radius:8px;background:'+(selected?'var(--accent-dim)':'var(--surface2)')+';transition:all .12s;align-items:center">'+
+    '<input type="radio" name="cvr-layout" value="'+key+'" '+(selected?'checked':'')+' onchange="setCoverLayout(\''+key+'\')" style="display:none"/>'+
+    '<div style="width:78px">'+thumb+'</div>'+
+    '<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:'+(selected?'var(--accent)':'var(--text))')+'">'+
+      '<span style="width:11px;height:11px;border-radius:50%;border:1.5px solid '+(selected?'var(--accent)':'var(--muted)')+';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">'+(selected?'<span style="width:5px;height:5px;border-radius:50%;background:var(--accent)"></span>':'')+'</span>'+
+      escHtml(label)+
+    '</div>'+
+  '</label>';
+}
+
+function setCoverLayout(layout){
+  _editingCardDraft.layout = layout;
+  // Re-render the editor (so the radio cards update)
+  document.getElementById('editModalBody').innerHTML = renderCardEditor(getCard(_editingCardKey), false);
+}
+
+// Wire up live preview updates from the input fields
+function updateCoverPreview(){
+  // Sync inputs into _editingCardDraft, then re-render preview
+  var body = document.getElementById('editModalBody');
+  var t = body.querySelector('#ec_title');     if(t) _editingCardDraft.title = t.value;
+  var pn = body.querySelector('#ec_pname');    if(pn) _editingCardDraft.projectName = pn.value;
+  var pnum = body.querySelector('#ec_pnum');   if(pnum) _editingCardDraft.projectNumber = pnum.value;
+  var ad = body.querySelector('#ec_addr');     if(ad) _editingCardDraft.siteAddress = ad.value;
+  var prev = document.getElementById('cvr-preview');
+  if(prev) prev.innerHTML = renderCoverPreview(0.55);
+}
+
+async function initCoverEditor(){
+  // Make sure company settings are loaded for the preview
+  if(!_companySettingsCache){
+    await loadCompanySettings();
+    // Re-render so the preview picks up the now-loaded settings
+    var c = getCard(_editingCardKey);
+    if(c && _editingCardKey==='cover'){
+      document.getElementById('editModalBody').innerHTML = renderCardEditor(c, false);
+    }
+  }
 }
 
 function editorContacts(c, ro){
