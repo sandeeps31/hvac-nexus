@@ -196,6 +196,23 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
 .po-chip.open{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.3)}
 .po-empty{padding:14px;text-align:center;color:var(--muted);font-size:11.5px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px}
 
+/* Fuzzy match section header — separates "definite matches" from "possibly the same supplier" */
+.picker-fuzzy-hdr{display:flex;align-items:center;gap:8px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.2px;color:var(--warn,#ffb830);text-transform:uppercase;margin:14px 0 8px;padding-top:10px;border-top:1px dashed var(--border)}
+.picker-fuzzy-icon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(255,184,48,.12);border:1px solid rgba(255,184,48,.35);color:var(--warn,#ffb830);font-size:14px;font-family:'DM Sans',sans-serif;font-weight:700}
+.picker-fuzzy-help{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:11px;cursor:help}
+.picker-fuzzy-help:hover{color:var(--text);border-color:var(--text)}
+
+/* Fuzzy PO card — amber-tinted border to distinguish from strict matches */
+.po-card.fuzzy{border-color:rgba(255,184,48,.3);background:rgba(255,184,48,.04)}
+.po-card.fuzzy:hover{border-color:rgba(255,184,48,.6);background:rgba(255,184,48,.08)}
+
+/* Action row at the bottom of the supplier picker — Browse all POs + Receive without PO */
+.picker-actions{display:flex;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap}
+.picker-action-btn{flex:1;min-width:160px;background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:all .12s;font-weight:500}
+.picker-action-btn:hover{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+.picker-action-btn.primary{background:var(--accent);color:#080c12;border-color:var(--accent);font-weight:700}
+.picker-action-btn.primary:hover{filter:brightness(1.1);color:#080c12;border-color:var(--accent);background:var(--accent)}
+
 /* Received-by display value (read-only — pulled from session) */
 .recv-meta-cell .recv-meta-val{font-size:13px;color:var(--text);font-weight:500}
 
@@ -437,6 +454,25 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
 
     <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:8px">
       <button class="bg btn" onclick="closeSupplierPicker()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- BROWSE ALL OPEN POs MODAL — manual override for severe supplier-name mismatches.
+     Opens on top of the supplier picker; user picks a PO from any supplier and proceeds. -->
+<div class="mo" id="browseAllPosModal" style="z-index:650">
+  <div class="modal" style="width:600px;max-width:96vw">
+    <div class="recv-modal-hdr" style="margin-bottom:12px;padding-bottom:12px">
+      <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text)">Browse All Open POs</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px" id="browseAllPosStats">—</div>
+    </div>
+    <div class="hero-input-wrap" style="margin-bottom:12px">
+      <span class="hero-icon">🔍</span>
+      <input class="hero-input" id="browseAllPosSearch" placeholder="Filter by PO number, supplier, group…" oninput="filterBrowseAllPos()" style="font-size:14px;padding:11px 14px 11px 42px">
+    </div>
+    <div class="po-list" id="browseAllPosList" style="max-height:50vh"></div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:8px">
+      <button class="bg btn" onclick="closeBrowseAllPos()">Cancel</button>
     </div>
   </div>
 </div>
@@ -884,49 +920,152 @@ function pickerSelectSupplier(name){
   document.getElementById('suppPickClear').classList.add('show');
   document.getElementById('suppPickResults').classList.remove('show');
   document.getElementById('suppPickEmpty').style.display='none';
-  // Render PO list for this supplier — only those with outstanding qty
+  document.getElementById('suppPickPoSection').style.display='';
   var supp=name;
-  var pos=getPosForSupplier(supp).filter(function(po){return getPoStatus(po)!=='received';});
+  // Strict matches first
+  var strictPos=getPosForSupplier(supp).filter(function(po){return getPoStatus(po)!=='received';});
+  // Fuzzy matches second — POs whose supplier name is similar but not identical.
+  // Handles cases like "KS fabrication" in equipment schedule vs "KS metal" on PO,
+  // or typos like "Holyaoke" vs "Holyoake".
+  var fuzzyPos=getFuzzyPosForSupplier(supp);
   var titleEl=document.getElementById('suppPickPoTitle');
   var listEl=document.getElementById('suppPickPoList');
-  document.getElementById('suppPickPoSection').style.display='';
-  if(!pos.length){
-    // No open POs — but supplier may still have outstanding items not tied to a PO.
-    // Offer to receive without a PO ref.
+
+  var html='';
+
+  // Section 1: strict matches
+  if(strictPos.length){
+    titleEl.textContent=strictPos.length+' open PO'+(strictPos.length===1?'':'s')+' for '+supp;
+    html+=strictPos.map(function(po){return _renderPickerPoCard(po,false);}).join('');
+  } else {
     titleEl.innerHTML='No open POs for '+escH(supp);
+  }
+
+  // Section 2: fuzzy matches — appears below strict matches if any. Distinct visual treatment
+  // (warm amber tint) so user clearly sees these are "possibly related" not "definitely matching".
+  if(fuzzyPos.length){
+    html+='<div class="picker-fuzzy-hdr">'
+      +'<span class="picker-fuzzy-icon">≈</span>'
+      +'Possibly the same supplier?'
+      +'<span class="picker-fuzzy-help" title="These POs have similar supplier names — likely the same physical company under a different spelling. Tag one if it matches your delivery docket.">?</span>'
+      +'</div>';
+    html+=fuzzyPos.map(function(po){return _renderPickerPoCard(po,true);}).join('');
+  }
+
+  // Section 3: receive without PO when supplier has outstanding items but nothing matched
+  if(!strictPos.length){
     var supplierItems=_items.filter(function(it){return (it.manufacturer||'').trim()===supp&&it.equipId;});
     var totalOut=supplierItems.reduce(function(s,it){
       var qty=parseInt(it.qty,10)||1;var del=parseInt(it.qtyDelivered,10)||0;
       return s+Math.max(qty-del,0);
     },0);
-    if(totalOut>0){
-      listEl.innerHTML='<div class="po-empty" style="margin-bottom:8px">'+totalOut+' item'+(totalOut===1?'':'s')+' outstanding from '+escH(supp)+' but no open POs to attribute against.</div>'
-        +'<button class="btn bp" style="width:100%" onclick="pickerReceiveWithoutPo()">Receive without PO →</button>';
-    } else {
-      listEl.innerHTML='<div class="po-empty">All items from '+escH(supp)+' are fully received.</div>';
+    if(totalOut>0&&!fuzzyPos.length){
+      // No strict, no fuzzy, but still has outstanding equipment — keep the receive-without-PO option
+      html+='<div class="po-empty" style="margin-top:8px">'+totalOut+' item'+(totalOut===1?'':'s')+' outstanding from '+escH(supp)+' but no open POs to attribute against.</div>';
+    } else if(totalOut===0&&!fuzzyPos.length){
+      html+='<div class="po-empty">All items from '+escH(supp)+' are fully received.</div>';
     }
-    return;
   }
-  titleEl.textContent=pos.length+' open PO'+(pos.length===1?'':'s')+' for '+supp;
-  listEl.innerHTML=pos.map(function(po){
-    var status=getPoStatus(po);
-    var chip=status==='partial'?'<span class="po-chip partial">Partial</span>':'<span class="po-chip open">Open</span>';
-    var meta=[];
-    if(po.orderDate)meta.push('Ordered '+fmtD(po.orderDate));
-    if(po.delivery)meta.push('Due '+fmtD(po.delivery));
-    if(po._group)meta.push(po._group);
-    var costStr=po._totalCost?'$'+po._totalCost.toLocaleString('en-AU',{minimumFractionDigits:0,maximumFractionDigits:0}):'';
-    return '<div class="po-card" onclick="pickerSelectPo(\''+escFilterAttr(po.id)+'\')">'
-      +'<div class="po-card-body">'
-        +'<div class="po-card-id">'+escH(po.id)+'</div>'
-        +'<div class="po-card-meta">'+(meta.length?escH(meta.join(' · ')):'—')+'</div>'
-      +'</div>'
-      +'<div class="po-card-stats">'
-        +(costStr?'<div class="po-card-cost">'+costStr+'</div>':'')
-        +chip
-      +'</div>'
-      +'</div>';
-  }).join('');
+
+  // Section 4: manual override links — always show "Browse all open POs" so user can
+  // pick from any supplier if fuzzy didn't help. Plus "Receive without PO" if applicable.
+  var hasOutstandingForSupplier=_items.some(function(it){
+    if((it.manufacturer||'').trim()!==supp||!it.equipId)return false;
+    var qty=parseInt(it.qty,10)||1;var del=parseInt(it.qtyDelivered,10)||0;
+    return del<qty;
+  });
+  html+='<div class="picker-actions">';
+  html+='<button class="picker-action-btn" onclick="openBrowseAllPos()">📋 Browse all open POs</button>';
+  if(hasOutstandingForSupplier){
+    html+='<button class="picker-action-btn primary" onclick="pickerReceiveWithoutPo()">Receive without PO →</button>';
+  }
+  html+='</div>';
+
+  listEl.innerHTML=html;
+}
+
+// Renders a single PO card. `fuzzy` flag changes the visual treatment so user can tell
+// which POs are exact-name matches vs similar-name maybes.
+function _renderPickerPoCard(po,fuzzy){
+  var status=getPoStatus(po);
+  var chip=status==='partial'?'<span class="po-chip partial">Partial</span>':'<span class="po-chip open">Open</span>';
+  var meta=[];
+  if(fuzzy)meta.push(escH(po.supplier||'—')); // show actual supplier name on fuzzy matches so user sees the mismatch
+  if(po.orderDate)meta.push('Ordered '+fmtD(po.orderDate));
+  if(po.delivery)meta.push('Due '+fmtD(po.delivery));
+  if(po._group)meta.push(po._group);
+  var costStr=po._totalCost?'$'+po._totalCost.toLocaleString('en-AU',{minimumFractionDigits:0,maximumFractionDigits:0}):'';
+  return '<div class="po-card'+(fuzzy?' fuzzy':'')+'" onclick="pickerSelectPo(\''+escFilterAttr(po.id)+'\')">'
+    +'<div class="po-card-body">'
+      +'<div class="po-card-id">'+escH(po.id)+'</div>'
+      +'<div class="po-card-meta">'+(meta.length?meta.join(' · '):'—')+'</div>'
+    +'</div>'
+    +'<div class="po-card-stats">'
+      +(costStr?'<div class="po-card-cost">'+costStr+'</div>':'')
+      +chip
+    +'</div>'
+    +'</div>';
+}
+
+// "Browse all open POs" — opens a secondary modal listing every open PO across every supplier.
+// Allows user to manually tag a PO when name mismatch is too severe for fuzzy match.
+function openBrowseAllPos(){
+  var pos=getAllOpenPos();
+  var listEl=document.getElementById('browseAllPosList');
+  var statsEl=document.getElementById('browseAllPosStats');
+  if(!pos.length){
+    listEl.innerHTML='<div class="po-empty">No open POs across any supplier.</div>';
+    if(statsEl)statsEl.textContent='';
+  } else {
+    if(statsEl)statsEl.textContent=pos.length+' open PO'+(pos.length===1?'':'s')+' across all suppliers';
+    listEl.innerHTML=pos.map(function(po){
+      var status=getPoStatus(po);
+      var chip=status==='partial'?'<span class="po-chip partial">Partial</span>':'<span class="po-chip open">Open</span>';
+      var meta=[];
+      meta.push(escH(po.supplier||'—'));
+      if(po.orderDate)meta.push('Ordered '+fmtD(po.orderDate));
+      if(po.delivery)meta.push('Due '+fmtD(po.delivery));
+      var costStr=po._totalCost?'$'+po._totalCost.toLocaleString('en-AU',{minimumFractionDigits:0,maximumFractionDigits:0}):'';
+      return '<div class="po-card" onclick="browseAllSelectPo(\''+escFilterAttr(po.id)+'\')">'
+        +'<div class="po-card-body">'
+          +'<div class="po-card-id">'+escH(po.id)+'</div>'
+          +'<div class="po-card-meta">'+meta.join(' · ')+'</div>'
+        +'</div>'
+        +'<div class="po-card-stats">'
+          +(costStr?'<div class="po-card-cost">'+costStr+'</div>':'')
+          +chip
+        +'</div>'
+        +'</div>';
+    }).join('');
+  }
+  // Pre-populate search filter
+  var searchInp=document.getElementById('browseAllPosSearch');
+  if(searchInp)searchInp.value='';
+  document.getElementById('browseAllPosModal').classList.add('open');
+  setTimeout(function(){if(searchInp)searchInp.focus();},80);
+}
+function closeBrowseAllPos(){
+  document.getElementById('browseAllPosModal').classList.remove('open');
+}
+// Live filter the all-POs list by typing
+function filterBrowseAllPos(){
+  var inp=document.getElementById('browseAllPosSearch');
+  var q=(inp.value||'').toLowerCase().trim();
+  var listEl=document.getElementById('browseAllPosList');
+  if(!listEl)return;
+  var cards=listEl.querySelectorAll('.po-card');
+  var visible=0;
+  cards.forEach(function(card){
+    if(!q){card.style.display='';visible++;return;}
+    var text=card.textContent.toLowerCase();
+    if(text.indexOf(q)>=0){card.style.display='';visible++;}
+    else card.style.display='none';
+  });
+}
+// User picked a PO from the manual override list — close both modals, open receive modal.
+function browseAllSelectPo(poId){
+  closeBrowseAllPos();
+  pickerSelectPo(poId);
 }
 
 // User picked a PO — close picker, open receive modal pre-tagged with this PO.
@@ -1022,6 +1161,108 @@ function getPosForSupplier(supplier){
   if(!supplier)return [];
   var s=supplier.toLowerCase();
   return _pos.filter(function(po){return (po.supplier||'').toLowerCase()===s;});
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// FUZZY supplier matching — handles typos and inconsistent spellings between
+// procurement schedule and the PO module (e.g. "KS fabrication" vs "KS metal",
+// "Holyoake" vs "Holyaoke"). Returns POs whose supplier name is similar enough
+// to the searched supplier that they're likely the same physical company.
+// ──────────────────────────────────────────────────────────────────────────────
+//
+// Strategy combines three signals:
+//   1. Token overlap — at least one shared word (case-insensitive, ignoring tiny
+//      noise words like "the", "ltd", "pty", "&")
+//   2. Levenshtein edit distance — names with ≤ 2 char differences (catches typos
+//      like "Holyaoke" ↔ "Holyoake")
+//   3. Common-prefix — supplier names that share the same first 4+ characters
+//      (catches "KS fabrication" ↔ "KS metal" — same prefix often indicates same company)
+//
+// Anything matching at least one signal is returned, scored by total signal strength.
+
+var _FUZZY_NOISE_WORDS={'the':1,'a':1,'an':1,'and':1,'&':1,'ltd':1,'pty':1,'pty.':1,
+  'inc':1,'inc.':1,'co':1,'co.':1,'company':1,'corp':1,'corp.':1,'group':1,'limited':1,
+  'pl':1,'p/l':1,'aust':1,'australia':1,'aus':1,'au':1};
+
+function _fuzzyTokens(name){
+  if(!name)return [];
+  return String(name).toLowerCase()
+    .replace(/[^a-z0-9 ]+/g,' ') // strip punctuation
+    .split(/\s+/)
+    .filter(function(t){return t&&!_FUZZY_NOISE_WORDS[t]&&t.length>=2;});
+}
+
+// Levenshtein distance — how many single-char edits to turn a into b. Iterative DP, O(n*m) memory.
+function _editDistance(a,b){
+  if(a===b)return 0;
+  if(!a)return b.length;
+  if(!b)return a.length;
+  var prev=[];for(var i=0;i<=b.length;i++)prev[i]=i;
+  for(var i=1;i<=a.length;i++){
+    var curr=[i];
+    for(var j=1;j<=b.length;j++){
+      var cost=a[i-1]===b[j-1]?0:1;
+      curr[j]=Math.min(curr[j-1]+1,prev[j]+1,prev[j-1]+cost);
+    }
+    prev=curr;
+  }
+  return prev[b.length];
+}
+
+// Returns a score 0..3 indicating fuzzy similarity. Higher = more likely the same supplier.
+// 0 = no match, definitely different. ≥ 1 = at least one signal matched.
+function _fuzzyScore(query,candidate){
+  if(!query||!candidate)return 0;
+  var qLower=query.toLowerCase().trim();
+  var cLower=candidate.toLowerCase().trim();
+  if(qLower===cLower)return 3; // exact match — but caller already filters these out
+  var score=0;
+  // Token overlap
+  var qTokens=_fuzzyTokens(query);
+  var cTokens=_fuzzyTokens(candidate);
+  var sharedTokens=qTokens.filter(function(t){return cTokens.indexOf(t)>=0;});
+  if(sharedTokens.length>0)score++;
+  // Edit distance — only compute on first 25 chars to keep it cheap, and only if lengths are similar
+  var qShort=qLower.slice(0,25),cShort=cLower.slice(0,25);
+  if(Math.abs(qShort.length-cShort.length)<=3){
+    var dist=_editDistance(qShort,cShort);
+    if(dist<=2&&qShort.length>=4)score++;
+  }
+  // Shared prefix — same first 4+ chars, often means same company under different trading names
+  var prefixLen=0;
+  while(prefixLen<qLower.length&&prefixLen<cLower.length&&qLower[prefixLen]===cLower[prefixLen])prefixLen++;
+  if(prefixLen>=4)score++;
+  return score;
+}
+
+// Return POs whose supplier name fuzzy-matches the searched name. Excludes exact matches
+// (caller handles those separately) and fully-received POs. Sorted by score descending.
+function getFuzzyPosForSupplier(supplier){
+  if(!supplier)return [];
+  var s=supplier.toLowerCase();
+  var hits=[];
+  _pos.forEach(function(po){
+    var poSupp=(po.supplier||'').trim();
+    if(!poSupp)return;
+    if(poSupp.toLowerCase()===s)return; // exact match — handled by getPosForSupplier
+    if(getPoStatus(po)==='received')return; // hide fully-received
+    var score=_fuzzyScore(supplier,poSupp);
+    if(score>0)hits.push({po:po,score:score});
+  });
+  hits.sort(function(a,b){return b.score-a.score;});
+  return hits.map(function(h){return h.po;});
+}
+
+// All open POs across every supplier — used for the "Browse all open POs" manual override.
+// Sorted by status (Open first), then by order date descending.
+function getAllOpenPos(){
+  return _pos.filter(function(po){return getPoStatus(po)!=='received';})
+    .sort(function(a,b){
+      var statusOrder={'open':0,'partial':1,'received':2};
+      var sa=statusOrder[getPoStatus(a)]||0,sb=statusOrder[getPoStatus(b)]||0;
+      if(sa!==sb)return sa-sb;
+      return (b.orderDate||'').localeCompare(a.orderDate||'');
+    });
 }
 
 // "Fully received" heuristic — a PO is considered fully received when every receipt
