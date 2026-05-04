@@ -140,6 +140,10 @@ input[type=number]{-moz-appearance:textfield}
 .inv-var-warn{color:var(--warn);background:var(--warn-dim)}
 .inv-var-danger{color:var(--danger);background:var(--danger-dim)}
 .po-num-c{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:600}
+/* Receipt-status chip on the PO list — populated from material_receipts.poId stamped at receive time */
+.po-recv-chip{display:inline-block;padding:3px 9px;border-radius:11px;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap}
+.po-recv-chip.received{background:rgba(0,229,160,.12);color:var(--green,#00e5a0);border:1px solid rgba(0,229,160,.35)}
+.po-recv-chip.partial{background:rgba(255,184,48,.1);color:var(--warn,#ffb830);border:1px solid rgba(255,184,48,.35)}
 .ra{display:flex;gap:5px;justify-content:flex-end;opacity:0;transition:opacity .13s}
 tr:hover .ra{opacity:1}
 .ia{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .12s}
@@ -311,7 +315,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
           <th class="r" style="min-width:120px;cursor:pointer" onclick="sortList('cost')">Order Cost (ex GST) <span id="sort-ind-cost"></span></th>
           <th style="width:120px;cursor:pointer" onclick="sortList('orderDate')">Order Date <span id="sort-ind-orderDate"></span></th>
           <th style="width:120px;cursor:pointer" onclick="sortList('delivery')">Delivery <span id="sort-ind-delivery"></span></th>
-          <th style="width:20px"></th>
+          <th style="width:140px">Receipt status</th>
         </tr></thead>
         <tbody id="poBody"></tbody>
       </table></div>
@@ -596,6 +600,48 @@ async function loadData(){try{const s=await dbGetPurchaseOrders(_poPNum);if(s)re
 var _budgetData=null;
 async function loadBudgetData(){try{var b=await dbGetBudget(_poPNum);_budgetData=b||null;}catch(e){_budgetData=null;}}
 async function loadSubVarPos(){try{var d=await dbGetSubVariations(_poPNum);subVarPos=(d&&Array.isArray(d.subVarPos))?d.subVarPos:[];}catch(e){subVarPos=[];}}
+
+// Material receipts feed the per-PO "Fully received / Partial / Open" chip rendered in
+// the PO list. Each receipt has a `poId` field stamped on it by the receiving module
+// when the storeman selects a PO at delivery time. A PO is considered "Fully received"
+// when the total receivedQty across its stamped receipts meets or exceeds the PO's
+// total line-item qty. This is a quantity-based heuristic since line items are budget
+// descriptions, not equipment IDs.
+var _receiptsForPos=[];
+async function loadReceiptsForPos(){
+  try{
+    var r=await dbGetProject('material_receipts',_poPNum);
+    _receiptsForPos=Array.isArray(r)?r:[];
+  }catch(e){_receiptsForPos=[];}
+}
+
+// Returns 'open' | 'partial' | 'received' for a given PO based on stamped receipts
+function getPoReceiptStatus(po){
+  if(!po||!po.id)return 'open';
+  var receipts=_receiptsForPos.filter(function(r){return r.poId===po.id;});
+  if(!receipts.length)return 'open';
+  // Sum total ordered qty from line items
+  var totalOrdered=0;
+  (po.lineItems||[]).forEach(function(li){
+    var q=parseFloat(li.qty);
+    if(!isNaN(q))totalOrdered+=q;
+  });
+  if(totalOrdered<=0){
+    // No quantities on the PO — fall back to "has at least one receipt" = Partial.
+    // We can't tell if it's fully received without ordered qty, so call it Partial.
+    return 'partial';
+  }
+  // Sum total received qty across all receipts tagged with this PO
+  var totalReceived=0;
+  receipts.forEach(function(r){
+    (r.items||[]).forEach(function(ri){
+      var rq=parseFloat(ri.receivedQty);
+      if(!isNaN(rq))totalReceived+=rq;
+    });
+  });
+  if(totalReceived>=totalOrdered)return 'received';
+  return 'partial';
+}
 function saveSubVarPos(){dbGetSubVariations(_poPNum).then(function(d){var data=d||{};data.subVarPos=subVarPos;dbSetSubVariations(_poPNum,data).catch(function(e){console.error(e);});}).catch(function(e){console.error(e);});}
 function getSavedSuppliers(){
   try{var d=dbGetCurrentProject();var p=d.num||d.number||'GCT001';var k='hvacnexus_po_suppliers_'+p;var s=localStorage.getItem(k);return s?JSON.parse(s):[];}catch(e){return [];}
@@ -735,6 +781,12 @@ function renderList(){
   }
   document.getElementById('poBody').innerHTML=all.map(p=>{
     const items=p.lineItems||[],sub=liSub(items),gst=liGST(items),tot=liTot(items);
+    const recvStatus=getPoReceiptStatus(p);
+    const recvChip=recvStatus==='received'
+      ? '<span class="po-recv-chip received">✓ Fully received</span>'
+      : recvStatus==='partial'
+        ? '<span class="po-recv-chip partial">Partial</span>'
+        : '';
     return `<tr onclick="openPOReadOnly('${p._secId}','${p._grpId}','${p.id}')">
       <td class="po-num-c">${p.id}</td>
       <td style="font-weight:500;color:var(--text)">${p.supplier||'—'}</td>
@@ -742,7 +794,7 @@ function renderList(){
       <td class="r" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">${fmtZ(sub)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.orderDate)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${fmtD(p.delivery)}</td>
-      <td></td>
+      <td>${recvChip}</td>
     </tr>`;
   }).join('');
 }
@@ -1321,6 +1373,7 @@ window.addEventListener('DOMContentLoaded', async function(){
   _poPNum = (dbGetCurrentProject()||{}).num || PROJECT_NO;
   await loadSubVarPos();
   await loadBudgetData();
+  await loadReceiptsForPos();
   const saved = await loadData();
   if(saved?.sections){ sections = saved.sections; }
   var params = new URLSearchParams(window.location.search);
