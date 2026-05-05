@@ -31,6 +31,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
 /* MAIN */
 .main{margin-left:230px;height:100vh;display:flex;flex-direction:column;overflow:hidden;transition:margin-left .25s}
+
+/* TAB BAR */
+.tab-bar{display:flex;align-items:center;border-bottom:1px solid var(--border);background:var(--surface);padding:0 22px;gap:0;flex-shrink:0}
+.tab-btn{padding:11px 18px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:8px;margin-bottom:-1px}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-btn-icon{font-size:14px}
+.tab-btn-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);background:var(--surface2);padding:2px 7px;border-radius:10px;margin-left:2px}
+.tab-btn.active .tab-btn-count{color:var(--accent);background:var(--accent-dim)}
+.tab-pane{flex:1;display:none;flex-direction:column;overflow:hidden;min-height:0}
+.tab-pane.active{display:flex}
+.tab-toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px 22px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;gap:12px}
+.tab-toolbar-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text)}
+.tab-toolbar-actions{display:flex;gap:8px;align-items:center}
+.tab-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);flex-direction:column;gap:10px;padding:40px}
+.tab-empty-icon{font-size:42px;opacity:.6}
+.tab-empty-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text2)}
+.tab-empty-sub{font-size:12.5px;text-align:center;max-width:380px;line-height:1.5}
 .topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:14px;flex-shrink:0;background:var(--surface)}
 .bc{display:flex;align-items:center;gap:7px;font-size:13px;flex:1}
 .bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
@@ -147,50 +165,82 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <span class="bcl" id="bc-proj">Greenfield Commercial Tower</span><span class="bcs">›</span>
       <span class="bcc">Pre-Commissioning</span>
     </div>
-    <div style="display:flex;gap:8px">
-      <button class="bg bsm btn" onclick="openAddEquipModal()">＋ Add Equipment</button>
-      <button class="bp bsm btn" id="signoffBtn" onclick="signOffSelected()" style="display:none">✓ Sign Off Selected</button>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab-btn" data-tab="areas" onclick="switchTab('areas')"><span class="tab-btn-icon">📋</span>Area Checklists<span class="tab-btn-count" id="tabCount-areas">0</span></button>
+    <button class="tab-btn" data-tab="itp" onclick="switchTab('itp')"><span class="tab-btn-icon">📌</span>ITP Register<span class="tab-btn-count" id="tabCount-itp">0</span></button>
+    <button class="tab-btn" data-tab="equipment" onclick="switchTab('equipment')"><span class="tab-btn-icon">🔩</span>Equipment Pre-Cx<span class="tab-btn-count" id="tabCount-equipment">0</span></button>
+  </div>
+
+  <!-- TAB: AREA CHECKLISTS -->
+  <div class="tab-pane" id="tab-areas">
+    <div class="tab-empty">
+      <div class="tab-empty-icon">📋</div>
+      <div class="tab-empty-title">Area Checklists — coming next</div>
+      <div class="tab-empty-sub">TAB readiness checklists by area, sectioned by trade (mechanical, sheet metal, plumber, electrical &amp; BMS). Areas pulled from Project Settings.</div>
     </div>
   </div>
 
-  <!-- STATS BAR -->
-  <div class="stats-bar" id="statsBar">
-    <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text2)">Pre-Commissioning Checks</span>
-    <span class="stat-pill" id="stat-total">0 items</span>
-    <span class="stat-pill green" id="stat-pass">0 pass</span>
-    <span class="stat-pill red" id="stat-fail">0 fail</span>
-    <span class="stat-pill warn" id="stat-pending">0 pending</span>
+  <!-- TAB: ITP REGISTER -->
+  <div class="tab-pane" id="tab-itp">
+    <div class="tab-empty">
+      <div class="tab-empty-icon">📌</div>
+      <div class="tab-empty-title">ITP Register — coming next</div>
+      <div class="tab-empty-sub">Live register pulled from ITP pins on drawings. Filter by area, service type, and status. Will feed into the commissioning tracker.</div>
+    </div>
   </div>
 
-  <!-- BODY -->
-  <div class="body-wrap">
-    <!-- EQUIPMENT LIST -->
-    <div class="equip-panel">
-      <div class="equip-panel-hdr">
-        <span class="equip-panel-title">Equipment</span>
-        <div class="search-box" style="flex:1;margin-left:10px"><input type="text" id="equipSearch" placeholder="Filter…" oninput="renderEquipList()"></div>
+  <!-- TAB: EQUIPMENT PRE-CX -->
+  <div class="tab-pane" id="tab-equipment">
+    <!-- Toolbar -->
+    <div class="tab-toolbar">
+      <span class="tab-toolbar-title">Equipment Pre-Commissioning Checks</span>
+      <div class="tab-toolbar-actions">
+        <button class="bg bsm btn" onclick="openAddEquipModal()">＋ Add Equipment</button>
+        <button class="bp bsm btn" id="signoffBtn" onclick="signOffSelected()" style="display:none">✓ Sign Off Selected</button>
       </div>
-      <div class="equip-list" id="equipList"></div>
     </div>
 
-    <!-- CHECKLIST -->
-    <div class="checklist-panel" id="checklistPanel">
-      <div class="checklist-empty" id="checklistEmpty">
-        <div style="font-size:32px">🔩</div>
-        <div style="font-size:13px">Select equipment from the list to view its pre-cx checklist</div>
-      </div>
-      <div id="checklistView" style="display:none;flex:1;flex-direction:column;overflow:hidden">
-        <div class="checklist-hdr">
-          <div>
-            <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800" id="cx-equip-title">—</div>
-            <div style="font-size:12px;color:var(--text2);margin-top:2px" id="cx-equip-meta">—</div>
-          </div>
-          <div style="margin-left:auto;display:flex;gap:8px">
-            <button class="bg bsm btn" onclick="exportEquipChecklist()">⬇ Export</button>
-            <button class="bg bsm btn" onclick="openAddItemModal()">＋ Add Check</button>
-          </div>
+    <!-- STATS BAR -->
+    <div class="stats-bar" id="statsBar">
+      <span class="stat-pill" id="stat-total">0 items</span>
+      <span class="stat-pill green" id="stat-pass">0 pass</span>
+      <span class="stat-pill red" id="stat-fail">0 fail</span>
+      <span class="stat-pill warn" id="stat-pending">0 pending</span>
+    </div>
+
+    <!-- BODY -->
+    <div class="body-wrap">
+      <!-- EQUIPMENT LIST -->
+      <div class="equip-panel">
+        <div class="equip-panel-hdr">
+          <span class="equip-panel-title">Equipment</span>
+          <div class="search-box" style="flex:1;margin-left:10px"><input type="text" id="equipSearch" placeholder="Filter…" oninput="renderEquipList()"></div>
         </div>
-        <div id="checklistContent" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px"></div>
+        <div class="equip-list" id="equipList"></div>
+      </div>
+
+      <!-- CHECKLIST -->
+      <div class="checklist-panel" id="checklistPanel">
+        <div class="checklist-empty" id="checklistEmpty">
+          <div style="font-size:32px">🔩</div>
+          <div style="font-size:13px">Select equipment from the list to view its pre-cx checklist</div>
+        </div>
+        <div id="checklistView" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+          <div class="checklist-hdr">
+            <div>
+              <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800" id="cx-equip-title">—</div>
+              <div style="font-size:12px;color:var(--text2);margin-top:2px" id="cx-equip-meta">—</div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <button class="bg bsm btn" onclick="exportEquipChecklist()">⬇ Export</button>
+              <button class="bg bsm btn" onclick="openAddItemModal()">＋ Add Check</button>
+            </div>
+          </div>
+          <div id="checklistContent" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -317,7 +367,35 @@ function nid(){return Date.now()+'_'+Math.random().toString(36).slice(2,7);}
 (function(){
   if(proj.name)document.getElementById('bc-proj').textContent=proj.name;
   renderEquipList();renderStats();
+  initTabs();
 })();
+
+// ── TABS ──
+var TABS=['areas','itp','equipment'];
+var DEFAULT_TAB='itp';
+function switchTab(name){
+  if(TABS.indexOf(name)<0)name=DEFAULT_TAB;
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tab===name);});
+  document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.toggle('active',p.id==='tab-'+name);});
+  if(window.location.hash!=='#'+name)history.replaceState(null,'','#'+name);
+}
+function initTabs(){
+  var hash=(window.location.hash||'').replace('#','');
+  switchTab(TABS.indexOf(hash)>=0?hash:DEFAULT_TAB);
+  window.addEventListener('hashchange',function(){
+    var h=(window.location.hash||'').replace('#','');
+    if(TABS.indexOf(h)>=0)switchTab(h);
+  });
+  updateTabCounts();
+}
+function updateTabCounts(){
+  // Equipment count = total equipment items
+  var eqEl=document.getElementById('tabCount-equipment');
+  if(eqEl)eqEl.textContent=equipment.length;
+  // Areas + ITP placeholders for now — wire up when those tabs are built
+  var aEl=document.getElementById('tabCount-areas');if(aEl)aEl.textContent='0';
+  var iEl=document.getElementById('tabCount-itp');if(iEl)iEl.textContent='0';
+}
 
 function goProject(){window.location.href='project.html?id='+(proj.id||'gct001');}
 
@@ -334,6 +412,7 @@ function renderStats(){
   document.getElementById('stat-fail').className='stat-pill'+(fail>0?' red':'');
   document.getElementById('stat-pass').className='stat-pill'+(pass>0?' green':'');
   document.getElementById('stat-pending').className='stat-pill'+(pending>0?' warn':'');
+  if(typeof updateTabCounts==='function')updateTabCounts();
 }
 
 // EQUIP LIST
