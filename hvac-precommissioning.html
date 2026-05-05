@@ -79,7 +79,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .acc-progress-fill.complete{background:var(--green)}
 .acc-progress-text{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap}
 .status-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px;white-space:nowrap}
-.sb-draft{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.sb-notstarted{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.25)}
 .sb-progress{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
 .sb-complete{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
 .act-btns-grid{display:flex;gap:4px;justify-content:flex-end;flex-wrap:nowrap}
@@ -140,6 +140,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .field-input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color .15s;box-sizing:border-box}
 .field-input:focus{border-color:var(--accent)}
 .field-select{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer;box-sizing:border-box}
+
+/* Searchable area dropdown */
+.acc-dd-opt:hover{background:var(--surface2)}
+.acc-dd-opt:last-child{border-bottom:none !important}
 
 /* LAYOUT */
 .body-wrap{flex:1;display:flex;overflow:hidden}
@@ -273,9 +277,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
             <tr>
               <th style="width:120px">Checklist No.</th>
               <th>Area</th>
-              <th>Template</th>
               <th style="width:160px">Progress</th>
-              <th style="width:110px">Status</th>
+              <th style="width:120px">Status</th>
               <th style="width:110px">Created</th>
               <th style="width:130px">Last Modified</th>
               <th style="width:160px;text-align:right">Actions</th>
@@ -294,7 +297,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
           <span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="accEditorTitle">—</span>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <span class="status-badge sb-draft" id="accEditorStatus">—</span>
+          <span class="status-badge sb-notstarted" id="accEditorStatus">—</span>
           <span style="font-family:'DM Mono',monospace;font-size:10.5px;color:var(--muted);margin-left:8px" id="accEditorProgress">0/0</span>
         </div>
       </div>
@@ -769,14 +772,14 @@ function _accCounts(c){
 }
 function _accStatus(c){
   var k=_accCounts(c);
-  if(k.signedSections===k.totalSections&&k.totalSections>0)return'complete';
+  if(k.totalSections>0&&k.signedSections===k.totalSections)return'completed';
   if(k.checkedItems>0||k.signedSections>0)return'in_progress';
-  return'draft';
+  return'not_started';
 }
 function _accStatusBadge(status){
-  if(status==='complete')return'<span class="status-badge sb-complete">Complete</span>';
+  if(status==='completed')return'<span class="status-badge sb-complete">Completed</span>';
   if(status==='in_progress')return'<span class="status-badge sb-progress">In Progress</span>';
-  return'<span class="status-badge sb-draft">Draft</span>';
+  return'<span class="status-badge sb-notstarted">Not Started</span>';
 }
 
 // ── Register view ──
@@ -790,11 +793,11 @@ function renderAccRegister(){
   });
   document.getElementById('accCount').textContent=filtered.length+' of '+accList.length+' checklist'+(accList.length!==1?'s':'');
   if(!accList.length){
-    body.innerHTML='<tr><td colspan="8"><div class="acc-empty"><div class="acc-empty-icon">📋</div><div class="acc-empty-title">No area checklists yet</div><div class="acc-empty-sub">Create a checklist for a specific area (floor, plant room, zone). The project pre-cx template is snapshotted at creation, so future template edits won\'t affect existing checklists.</div></div></td></tr>';
+    body.innerHTML='<tr><td colspan="7"><div class="acc-empty"><div class="acc-empty-icon">📋</div><div class="acc-empty-title">No area checklists yet</div><div class="acc-empty-sub">Create a checklist for a specific area (floor, plant room, zone). The project pre-cx template is snapshotted at creation, so future template edits won\'t affect existing checklists.</div></div></td></tr>';
     return;
   }
   if(!filtered.length){
-    body.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px">No checklists match the search.</td></tr>';
+    body.innerHTML='<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px">No checklists match the search.</td></tr>';
     return;
   }
   body.innerHTML=filtered.map(function(c){
@@ -805,7 +808,6 @@ function renderAccRegister(){
     return '<tr style="cursor:pointer" onclick="accOpenEditor(\''+c.id+'\')">'
       +'<td><span class="acc-num">'+_accEsc(c.checklistNo||'—')+'</span></td>'
       +'<td><span class="acc-area">'+_accEsc(c.area||'—')+'</span></td>'
-      +'<td><span class="acc-tplname">'+_accEsc(c.templateName||'—')+'</span></td>'
       +'<td><div class="acc-progress"><div class="acc-progress-bar"><div class="acc-progress-fill'+pctClass+'" style="width:'+pct+'%"></div></div><span class="acc-progress-text">'+k.checkedItems+'/'+k.totalItems+'</span></div></td>'
       +'<td>'+_accStatusBadge(status)+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+_accFmtDate(c.createdAt)+'</td>'
@@ -814,7 +816,6 @@ function renderAccRegister(){
         +'<div class="act-btns-grid" style="display:inline-flex">'
           +'<button class="act-btn" onclick="accOpenEditor(\''+c.id+'\')" title="Edit"><span class="tip">Edit</span>✏️</button>'
           +'<button class="act-btn" onclick="accExportPDF(\''+c.id+'\')" title="Export PDF"><span class="tip">Export PDF</span>📄</button>'
-          +'<button class="act-btn" onclick="accRevHist(\''+c.id+'\')" title="Revision history"><span class="tip">Revision history</span>🕐</button>'
           +'<button class="act-btn danger" onclick="accDelete(\''+c.id+'\')" title="Delete"><span class="tip">Delete</span>🗑</button>'
         +'</div>'
       +'</td>'
@@ -823,6 +824,7 @@ function renderAccRegister(){
 }
 
 // ── Create modal ──
+var _accAreaSelectedIdx=-1;   // for keyboard navigation in the dropdown
 function openCreateAccModal(){
   if(!accProjTemplate){
     if(confirm('No project pre-cx template assigned yet. Open Project Settings to import one from the company library?')){
@@ -830,36 +832,145 @@ function openCreateAccModal(){
     }
     return;
   }
-  // Populate area dropdown
-  var sel=document.getElementById('newAccAreaSelect');
-  var existingAreas=accProjAreas.slice();
-  // Sort + dedupe
-  existingAreas.sort();
-  sel.innerHTML='<option value="">— Pick an area —</option>'
-    +existingAreas.map(function(a){return '<option value="'+_accEsc(a)+'">'+_accEsc(a)+'</option>';}).join('')
-    +'<option value="__custom__">+ Type a new area name…</option>';
-  sel.value='';
-  var custom=document.getElementById('newAccAreaCustom');
-  custom.style.display='none';custom.value='';
+  // Reset area input
+  var input=document.getElementById('newAccAreaInput');
+  input.value='';
+  _accAreaSelectedIdx=-1;
+  document.getElementById('newAccAreaDropdown').style.display='none';
   // Template info
   var k={secs:(accProjTemplate.sections||[]).length,items:(accProjTemplate.sections||[]).reduce(function(n,s){return n+(s.items||[]).length;},0)};
   document.getElementById('newAccTemplateInfo').innerHTML=
     '<strong>'+_accEsc(accProjTemplate.name||'Untitled')+'</strong>'
     +'<div style="font-family:DM Mono,monospace;font-size:10.5px;color:var(--muted);margin-top:3px">'+k.secs+' section'+(k.secs!==1?'s':'')+' · '+k.items+' item'+(k.items!==1?'s':'')+'</div>';
   document.getElementById('createAccModal').classList.add('open');
+  setTimeout(function(){input.focus();},80);
 }
-function closeCreateAccModal(){document.getElementById('createAccModal').classList.remove('open');}
-function onAccAreaSelectChange(){
-  var sel=document.getElementById('newAccAreaSelect');
-  var custom=document.getElementById('newAccAreaCustom');
-  if(sel.value==='__custom__'){custom.style.display='';setTimeout(function(){custom.focus();},50);}
-  else{custom.style.display='none';custom.value='';}
+function closeCreateAccModal(){
+  document.getElementById('createAccModal').classList.remove('open');
+  document.getElementById('newAccAreaDropdown').style.display='none';
 }
+
+// ── Searchable area dropdown ──
+function _accFilteredAreas(){
+  var q=(document.getElementById('newAccAreaInput').value||'').trim().toLowerCase();
+  var areas=accProjAreas.slice().sort();
+  if(!q)return areas;
+  return areas.filter(function(a){return a.toLowerCase().indexOf(q)>=0;});
+}
+
+function openAccAreaDropdown(){
+  renderAccAreaDropdown();
+}
+
+function onAccAreaInput(){
+  _accAreaSelectedIdx=-1;
+  renderAccAreaDropdown();
+}
+
+function renderAccAreaDropdown(){
+  var dd=document.getElementById('newAccAreaDropdown');
+  var input=document.getElementById('newAccAreaInput');
+  var q=(input.value||'').trim();
+  var matches=_accFilteredAreas();
+  var html='';
+  if(matches.length){
+    html+=matches.map(function(a,i){
+      // Highlight matching substring
+      var label=_accEsc(a);
+      if(q){
+        var lower=a.toLowerCase(),idx=lower.indexOf(q.toLowerCase());
+        if(idx>=0){
+          label=_accEsc(a.slice(0,idx))+'<strong style="color:var(--accent)">'+_accEsc(a.slice(idx,idx+q.length))+'</strong>'+_accEsc(a.slice(idx+q.length));
+        }
+      }
+      var sel=(i===_accAreaSelectedIdx)?' style="background:var(--accent-dim);color:var(--accent)"':'';
+      return '<div class="acc-dd-opt" data-idx="'+i+'"'+sel+' onmousedown="event.preventDefault();accAreaPick(\''+_accEsc(a).replace(/'/g,'&#39;')+'\')" onmouseover="_accAreaHover('+i+')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">'+label+'</div>';
+    }).join('');
+  }
+  // Always show "use this as a new area" option if there's text
+  if(q){
+    var existsExact=matches.some(function(a){return a.toLowerCase()===q.toLowerCase();});
+    if(!existsExact){
+      var newIdx=matches.length;
+      var sel=(newIdx===_accAreaSelectedIdx)?' style="background:var(--accent-dim);color:var(--accent)"':'';
+      html+='<div class="acc-dd-opt" data-idx="'+newIdx+'"'+sel+' onmousedown="event.preventDefault();accAreaPickNew()" onmouseover="_accAreaHover('+newIdx+')" style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text2)">'
+        +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--accent);margin-right:8px">+ NEW</span>'
+        +'Use "<strong>'+_accEsc(q)+'</strong>" as a new area name'
+      +'</div>';
+    }
+  } else if(!matches.length){
+    html='<div style="padding:14px;text-align:center;color:var(--muted);font-size:12.5px">No areas defined in Project Settings yet. Type a name to create one.</div>';
+  }
+  dd.innerHTML=html;
+  dd.style.display='block';
+  // Scroll selected into view
+  if(_accAreaSelectedIdx>=0){
+    var selEl=dd.querySelector('[data-idx="'+_accAreaSelectedIdx+'"]');
+    if(selEl)selEl.scrollIntoView({block:'nearest'});
+  }
+}
+
+function _accAreaHover(idx){
+  _accAreaSelectedIdx=idx;
+  renderAccAreaDropdown();
+}
+
+function accAreaPick(name){
+  document.getElementById('newAccAreaInput').value=name;
+  document.getElementById('newAccAreaDropdown').style.display='none';
+}
+function accAreaPickNew(){
+  // The text already in the input is the new name — just close the dropdown
+  document.getElementById('newAccAreaDropdown').style.display='none';
+}
+
+function onAccAreaKeydown(e){
+  var dd=document.getElementById('newAccAreaDropdown');
+  if(dd.style.display==='none')return;
+  var matches=_accFilteredAreas();
+  var q=(document.getElementById('newAccAreaInput').value||'').trim();
+  var hasNewOption=q&&!matches.some(function(a){return a.toLowerCase()===q.toLowerCase();});
+  var totalCount=matches.length+(hasNewOption?1:0);
+  if(totalCount===0)return;
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    _accAreaSelectedIdx=Math.min(_accAreaSelectedIdx+1,totalCount-1);
+    renderAccAreaDropdown();
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    _accAreaSelectedIdx=Math.max(_accAreaSelectedIdx-1,0);
+    renderAccAreaDropdown();
+  } else if(e.key==='Enter'){
+    e.preventDefault();
+    if(_accAreaSelectedIdx<0){
+      // No selection — accept whatever is typed (or first match)
+      if(matches.length>0)accAreaPick(matches[0]);
+      else dd.style.display='none';
+    } else if(_accAreaSelectedIdx<matches.length){
+      accAreaPick(matches[_accAreaSelectedIdx]);
+    } else {
+      accAreaPickNew();
+    }
+  } else if(e.key==='Escape'){
+    e.preventDefault();
+    dd.style.display='none';
+    e.stopPropagation(); // don't close the modal
+  }
+}
+
+// Close dropdown when clicking outside the input/dropdown
+document.addEventListener('click',function(e){
+  var input=document.getElementById('newAccAreaInput');
+  var dd=document.getElementById('newAccAreaDropdown');
+  if(!input||!dd)return;
+  if(e.target!==input&&!dd.contains(e.target)){
+    dd.style.display='none';
+  }
+});
+
 async function confirmCreateAcc(){
   if(!accProjTemplate){alert('No project template available.');return;}
-  var sel=document.getElementById('newAccAreaSelect');
-  var custom=document.getElementById('newAccAreaCustom');
-  var area=(sel.value==='__custom__')?(custom.value||'').trim():sel.value;
+  var area=(document.getElementById('newAccAreaInput').value||'').trim();
   if(!area){alert('Please select or type an area name.');return;}
   // Build snapshot of template — deep copy so future template edits don't change this checklist
   var snapshot=JSON.parse(JSON.stringify(accProjTemplate.sections||[]));
@@ -1073,7 +1184,6 @@ async function accClearSign(sectionId){
 
 // ── Stub actions ──
 function accExportPDF(id){showToast('PDF export — coming soon');}
-function accRevHist(id){showToast('Revision history — coming soon');}
 async function accDelete(id){
   var c=accList.find(function(x){return x.id===id;});if(!c)return;
   if(!confirm('Delete checklist '+(c.checklistNo||'')+' for '+(c.area||'')+'? This cannot be undone.'))return;
@@ -1113,13 +1223,12 @@ function showToast(msg){
       <div style="font-size:12px;color:var(--text2);margin-top:3px">A checklist is created from the project's pre-cx template. The template is snapshotted — future template edits won't change this checklist.</div>
     </div>
     <div style="padding:14px 22px;flex:1;overflow-y:auto">
-      <div style="margin-bottom:14px">
+      <div style="margin-bottom:14px;position:relative">
         <label class="field-lbl">Area</label>
-        <select class="field-select" id="newAccAreaSelect" onchange="onAccAreaSelectChange()">
-          <option value="">— Pick an area —</option>
-          <option value="__custom__">+ Type a new area name…</option>
-        </select>
-        <input type="text" class="field-input" id="newAccAreaCustom" placeholder="e.g. Level 5, Plant Room" style="display:none;margin-top:8px">
+        <input type="text" class="field-input" id="newAccAreaInput" placeholder="Search or type a new area name…" autocomplete="off"
+               oninput="onAccAreaInput()" onfocus="openAccAreaDropdown()" onkeydown="onAccAreaKeydown(event)">
+        <div id="newAccAreaDropdown" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface);border:1.5px solid var(--border);border-radius:8px;max-height:280px;overflow-y:auto;z-index:10;box-shadow:0 8px 20px rgba(0,0,0,.4)"></div>
+        <div id="newAccAreaHint" style="font-size:11px;color:var(--muted);margin-top:5px">Pick an existing area or type a new name.</div>
       </div>
       <div style="margin-bottom:6px">
         <label class="field-lbl">Template</label>
