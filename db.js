@@ -173,9 +173,28 @@ async function authGuard() {
 }
 
 // ── Core fetch wrapper ──
+// Auto-refreshes expired JWTs on 401 and retries once. This catches the race
+// condition where a page-level auth guard hasn't finished refreshing when
+// the first data calls fire — and any other case where the token went stale.
 async function sbFetch(path, options = {}) {
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
-  // Use session JWT if logged in, otherwise fall back to anon key
+  let res = await _sbFetchOnce(url, options);
+  if (res.status === 401 && options._retried !== true) {
+    // Try to refresh the JWT once, then retry the original request
+    const refreshed = await sbTryRefreshSession();
+    if (refreshed) {
+      res = await _sbFetchOnce(url, { ...options, _retried: true });
+    }
+  }
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Supabase error ${res.status}: ${err}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function _sbFetchOnce(url, options) {
   const token = sbGetAuthToken();
   const headers = {
     'apikey': SUPABASE_ANON_KEY,
@@ -184,13 +203,82 @@ async function sbFetch(path, options = {}) {
     'Prefer': options.prefer || 'return=representation',
     ...options.headers
   };
-  const res = await fetch(url, { ...options, headers });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Supabase error ${res.status}: ${err}`);
-  }
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
+  // Strip our internal _retried flag from the fetch options
+  const { _retried, prefer, headers: _h, ...rest } = options;
+  return await fetch(url, { ...rest, headers });
+}
+
+// ── JWT refresh ──
+// Attempts to refresh the session using the stored refresh_token.
+// Returns true if refresh succeeded (new session is now in localStorage and _authSession).
+// Returns false if there's no refresh token, OR forces a logout + redirect to login if refresh fails.
+// Multiple concurrent calls share the same in-flight promise.
+let _sbRefreshInFlight = null;
+let _sbForcedLogout = false;
+async function sbTryRefreshSession() {
+  if (_sbRefreshInFlight) return _sbRefreshInFlight;
+  _sbRefreshInFlight = (async () => {
+    try {
+      const stored = localStorage.getItem('hvacnexus_session');
+      if (!stored) {
+        // No session at all — force logout
+        sbForceLogout('No session found');
+        return false;
+      }
+      const sess = JSON.parse(stored);
+      if (!sess.refresh_token) {
+        sbForceLogout('Session has no refresh token');
+        return false;
+      }
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: sess.refresh_token })
+      });
+      if (!r.ok) {
+        // Refresh token rejected (expired, revoked, invalid) — force logout
+        sbForceLogout('Refresh token rejected (' + r.status + ')');
+        return false;
+      }
+      const d = await r.json();
+      localStorage.setItem('hvacnexus_session', JSON.stringify(d));
+      _authSession = d;
+      return true;
+    } catch(e) {
+      console.warn('sbTryRefreshSession failed:', e);
+      sbForceLogout('Refresh threw: ' + e.message);
+      return false;
+    } finally {
+      // Clear the in-flight promise after a tick so subsequent calls re-evaluate
+      setTimeout(() => { _sbRefreshInFlight = null; }, 0);
+    }
+  })();
+  return _sbRefreshInFlight;
+}
+
+// ── Force logout ──
+// Clears local session and redirects to login. De-duplicated so concurrent
+// failed requests don't pile up redirects.
+function sbForceLogout(reason) {
+  if (_sbForcedLogout) return;
+  _sbForcedLogout = true;
+  console.warn('Forcing logout:', reason);
+  try {
+    localStorage.removeItem('hvacnexus_session');
+    localStorage.removeItem('hvacnexus_company_id');
+  } catch(e) {}
+  _authSession = null;
+  // Show a brief toast before redirect so the user knows what happened
+  try {
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #ff4d6d;color:#ff4d6d;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:99999;white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.4)';
+    t.textContent = '⚠ Session expired — redirecting to sign-in…';
+    document.body.appendChild(t);
+  } catch(e) {}
+  // Short delay so toast is visible, then redirect
+  setTimeout(() => {
+    window.location.href = 'hvac-login.html';
+  }, 1200);
 }
 
 // ── Auth token resolver ──
