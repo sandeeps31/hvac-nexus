@@ -339,8 +339,35 @@ Project Manager</textarea>
         </div>
       </div>
     </div>
+
+    <!-- PRE-CX CHECKLIST TEMPLATE -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-hdr">
+        <div class="card-hdr-title">Area Pre-Commissioning Checklist</div>
+        <div class="card-hdr-sub">One template applied to every area in this project. Pulled from the company library and editable per-project.</div>
+      </div>
+      <div class="card-body" id="precxCardBody">
+        <div style="color:var(--muted);font-size:13px">Loading…</div>
+      </div>
+    </div>
   </div>
 
+</div>
+
+<!-- PRE-CX TEMPLATE PICKER MODAL -->
+<div class="mo" id="precxPickerModal" onclick="if(event.target===this)closePrecxPicker()">
+  <div class="modal">
+    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border)">
+      <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800">Pull from Company Library</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:3px">Pick a template to copy into this project. You'll be able to edit the project copy without affecting the company master.</div>
+    </div>
+    <div style="padding:14px 22px;flex:1;overflow-y:auto;max-height:60vh" id="precxPickerList">
+      <div style="color:var(--muted);font-size:13px">Loading templates…</div>
+    </div>
+    <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button class="bg bsm btn" onclick="closePrecxPicker()">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <!-- ADD TEAM MEMBER MODAL -->
@@ -379,6 +406,7 @@ var SUBBIES_SK = 'hvacnexus_proj_subbies_' + projectId;
 
 // ASYNC INIT
 var projects=[], proj={}, settings={}, team=[], subbies=[], contacts=[], areas=[];
+var _projPrecxTemplate=null; // current project's pre-cx template (deep copy of a company template)
 (async function(){
   try{var ps=await dbGetProjects();if(ps&&Array.isArray(ps))projects=ps;}catch(e){}
   proj=(Array.isArray(projects)?projects:[]).find(function(p){return p.id===projectId;})||{};
@@ -389,7 +417,13 @@ var projects=[], proj={}, settings={}, team=[], subbies=[], contacts=[], areas=[
   try{var sd=await dbGetProject('proj_settings',projectId+'_subbies');if(sd)subbies=sd;}catch(e){}
   try{var cd=await dbGetCompanySettings();if(cd&&cd.contacts)contacts=cd.contacts;}catch(e){}
   try{var ad=await dbGetProject('proj_settings',projectId+'_areas');if(ad)areas=ad;}catch(e){}
-  loadFields();renderTeam();renderSubbies();renderAreas();
+  // Pre-Cx project template (keyed by proj.num to match the precommissioning module)
+  try{
+    var pn=proj.num||projectId;
+    var pt=await dbGetProjectPrecxTemplate(pn);
+    _projPrecxTemplate=(pt&&typeof pt==='object'&&pt.sections)?pt:null;
+  }catch(e){}
+  loadFields();renderTeam();renderSubbies();renderAreas();renderPrecxCard();
 })();
 
 function v(id){ var el=document.getElementById(id); return el?el.value:''; }
@@ -576,6 +610,106 @@ function areaAddChild(parentId){
 function getAllLocationPaths(){var paths=[];function walk(nodes,prefix){(nodes||[]).forEach(function(node){if(!node.name)return;var path=prefix?prefix+' > '+node.name:node.name;paths.push(path);if(node.children&&node.children.length)walk(node.children,path);});}walk(areas,'');return paths;}
 function addArea(){areaAddRoot();}
 
+// ── PRE-CX TEMPLATE (project-level) ──
+function _precxNid(){return Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);}
+function _precxProjNum(){return proj.num||projectId;}
+function _precxCounts(t){
+  if(!t||!Array.isArray(t.sections))return{secs:0,items:0};
+  var secs=t.sections.length;
+  var items=t.sections.reduce(function(n,s){return n+((s.items||[]).length);},0);
+  return{secs:secs,items:items};
+}
+
+function renderPrecxCard(){
+  var body=document.getElementById('precxCardBody');
+  if(!body)return;
+  var t=_projPrecxTemplate;
+  if(!t){
+    body.innerHTML=
+      '<div style="font-size:13px;color:var(--text2);margin-bottom:14px">No template assigned to this project yet. Pull one from the company library to get started — you\'ll be able to edit the project copy without affecting the master.</div>'+
+      '<button class="btn bp bsm" onclick="openPrecxPicker()">Pull from Company Library →</button>';
+    return;
+  }
+  var c=_precxCounts(t);
+  var saved=t.savedAt?new Date(t.savedAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'—';
+  var pulledFrom=t.pulledFrom?'Pulled from <strong>'+escH(t.pulledFrom)+'</strong>':'Custom project template';
+  body.innerHTML=
+    '<div style="display:flex;align-items:center;gap:14px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:14px">'+
+      '<div style="font-size:24px">📋</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-family:\'Syne\',sans-serif;font-size:14px;font-weight:700">'+escH(t.name||'Untitled')+'</div>'+
+        '<div style="font-family:\'DM Mono\',monospace;font-size:10.5px;color:var(--muted);margin-top:2px">'+c.secs+' section'+(c.secs!==1?'s':'')+' · '+c.items+' item'+(c.items!==1?'s':'')+' · Last saved '+saved+'</div>'+
+        '<div style="font-size:11.5px;color:var(--text2);margin-top:3px">'+pulledFrom+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button class="btn bp bsm" onclick="navTo(\'hvac-project-precx-template.html\')">✎ Edit Project Template</button>'+
+      '<button class="btn bg bsm" onclick="openPrecxPicker()">Replace from Library</button>'+
+      '<button class="btn bg bsm" style="color:var(--danger);border-color:rgba(255,77,109,.3)" onclick="removeProjPrecxTemplate()">Remove</button>'+
+    '</div>';
+}
+
+async function openPrecxPicker(){
+  document.getElementById('precxPickerModal').classList.add('open');
+  var listEl=document.getElementById('precxPickerList');
+  listEl.innerHTML='<div style="color:var(--muted);font-size:13px">Loading templates…</div>';
+  var lib=[];
+  try{lib=await dbGetPrecxTemplateLibrary();}catch(e){console.error(e);}
+  if(!Array.isArray(lib))lib=[];
+  if(!lib.length){
+    listEl.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center">No templates in the company library yet. <a href="hvac-precx-templates.html" style="color:var(--accent);text-decoration:none">Open the Pre-Cx Builder</a> to create one.</div>';
+    return;
+  }
+  listEl.innerHTML=lib.map(function(tpl){
+    var c=_precxCounts(tpl);
+    return '<div style="padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;cursor:pointer;transition:all .13s" '+
+      'onmouseover="this.style.borderColor=\'var(--accent)\';this.style.background=\'var(--accent-dim)\'" '+
+      'onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'transparent\'" '+
+      'onclick="pullTemplateFromLibrary(\''+escH(tpl.id||'')+'\')">'+
+      '<div style="font-family:\'Syne\',sans-serif;font-size:13px;font-weight:700">'+escH(tpl.name||'Untitled')+'</div>'+
+      (tpl.description?'<div style="font-size:11.5px;color:var(--text2);margin-top:3px">'+escH(tpl.description)+'</div>':'')+
+      '<div style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted);margin-top:5px">'+c.secs+' section'+(c.secs!==1?'s':'')+' · '+c.items+' item'+(c.items!==1?'s':'')+'</div>'+
+    '</div>';
+  }).join('');
+}
+function closePrecxPicker(){document.getElementById('precxPickerModal').classList.remove('open');}
+
+async function pullTemplateFromLibrary(tplId){
+  if(_projPrecxTemplate){
+    if(!confirm('Replace the current project template with the selected one? Edits to the existing project template will be lost.'))return;
+  }
+  var lib=[];
+  try{lib=await dbGetPrecxTemplateLibrary();}catch(e){console.error(e);}
+  var src=(Array.isArray(lib)?lib:[]).find(function(t){return t.id===tplId;});
+  if(!src){alert('Template not found in library.');return;}
+  // Deep copy with regenerated internal IDs so edits never bleed back to the company library
+  var copy=JSON.parse(JSON.stringify(src));
+  copy.pulledFrom=src.name||'Untitled';        // remember source name
+  copy.pulledFromId=src.id;                    // and source id
+  copy.pulledAt=new Date().toISOString();
+  copy.savedAt=new Date().toISOString();
+  // Regenerate sections + items ids
+  (copy.sections||[]).forEach(function(s){
+    s.id=_precxNid();
+    (s.items||[]).forEach(function(it){it.id=_precxNid();});
+  });
+  // Save under project_num (matches what the precommissioning module reads)
+  await dbSetProjectPrecxTemplate(_precxProjNum(),copy);
+  _projPrecxTemplate=copy;
+  closePrecxPicker();
+  renderPrecxCard();
+  showToast('✓ Template pulled — open Edit to customise');
+}
+
+async function removeProjPrecxTemplate(){
+  if(!_projPrecxTemplate)return;
+  if(!confirm('Remove the project pre-commissioning template? This cannot be undone. The company library template is not affected.'))return;
+  await dbSetProjectPrecxTemplate(_precxProjNum(),null);
+  _projPrecxTemplate=null;
+  renderPrecxCard();
+  showToast('✓ Project template removed');
+}
+
 function showToast(msg) {
   var t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#0e1520;border:1px solid #00e5a0;color:#00e5a0;font-family:DM Mono,monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;white-space:nowrap;pointer-events:none';
@@ -591,7 +725,7 @@ document.querySelector('.bc-proj-name').onclick = function(){ window.location.hr
 // INIT
 // Init handled in async IIFE above
 
-document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeTeamModal(); });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeTeamModal(); closePrecxPicker(); } });
 
 // SIDEBAR
 var SBK='hvacnexus_sb_collapsed';

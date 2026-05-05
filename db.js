@@ -570,6 +570,14 @@ async function dbSetPrecxTemplateLibrary(data) {
   return await dbSet('precx_template_library', data);
 }
 
+// ── Project Pre-Cx Template (project-scoped, single duplicated template per project) ──
+async function dbGetProjectPrecxTemplate(projectNum) {
+  return await dbGetProject('project_precx_template', projectNum);
+}
+async function dbSetProjectPrecxTemplate(projectNum, data) {
+  return await dbSetProject('project_precx_template', projectNum, data);
+}
+
 
 // ═══════════════════════════════════════════════════
 // PHOTO STORAGE HELPERS
