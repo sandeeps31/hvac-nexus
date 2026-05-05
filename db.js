@@ -281,9 +281,17 @@ async function dbSet(table, data) {
         body: JSON.stringify({ data, updated_at: new Date().toISOString() })
       });
     } else {
+      // INSERT — include company_id so RLS allows it on company-scoped tables
+      const body = { data };
+      let cid = null;
+      try {
+        if (typeof authGetCompanyId === 'function') cid = authGetCompanyId();
+        if (!cid) cid = localStorage.getItem('hvacnexus_company_id');
+      } catch(e) {}
+      if (cid) body.company_id = cid;
       await sbFetch(table, {
         method: 'POST',
-        body: JSON.stringify({ data })
+        body: JSON.stringify(body)
       });
     }
     return true;
