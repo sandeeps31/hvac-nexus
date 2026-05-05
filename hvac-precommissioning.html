@@ -142,7 +142,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .field-select{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer;box-sizing:border-box}
 
 /* Searchable area dropdown */
+.acc-dd-opt{transition:background .1s,color .1s}
 .acc-dd-opt:hover{background:var(--surface2)}
+.acc-dd-opt.selected{background:var(--accent-dim) !important;color:var(--accent)}
 .acc-dd-opt:last-child{border-bottom:none !important}
 
 /* LAYOUT */
@@ -883,8 +885,8 @@ function renderAccAreaDropdown(){
           label=_accEsc(a.slice(0,idx))+'<strong style="color:var(--accent)">'+_accEsc(a.slice(idx,idx+q.length))+'</strong>'+_accEsc(a.slice(idx+q.length));
         }
       }
-      var sel=(i===_accAreaSelectedIdx)?' style="background:var(--accent-dim);color:var(--accent)"':'';
-      return '<div class="acc-dd-opt" data-idx="'+i+'"'+sel+' onmousedown="event.preventDefault();accAreaPick(\''+_accEsc(a).replace(/'/g,'&#39;')+'\')" onmouseover="_accAreaHover('+i+')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">'+label+'</div>';
+      var selCls=(i===_accAreaSelectedIdx)?' selected':'';
+      return '<div class="acc-dd-opt'+selCls+'" data-idx="'+i+'" onmousedown="event.preventDefault();accAreaPick(\''+_accEsc(a).replace(/'/g,'&#39;')+'\')" onmouseenter="_accAreaHover('+i+')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">'+label+'</div>';
     }).join('');
   }
   // Always show "use this as a new area" option if there's text
@@ -892,8 +894,8 @@ function renderAccAreaDropdown(){
     var existsExact=matches.some(function(a){return a.toLowerCase()===q.toLowerCase();});
     if(!existsExact){
       var newIdx=matches.length;
-      var sel=(newIdx===_accAreaSelectedIdx)?' style="background:var(--accent-dim);color:var(--accent)"':'';
-      html+='<div class="acc-dd-opt" data-idx="'+newIdx+'"'+sel+' onmousedown="event.preventDefault();accAreaPickNew()" onmouseover="_accAreaHover('+newIdx+')" style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text2)">'
+      var selCls=(newIdx===_accAreaSelectedIdx)?' selected':'';
+      html+='<div class="acc-dd-opt'+selCls+'" data-idx="'+newIdx+'" onmousedown="event.preventDefault();accAreaPickNew()" onmouseenter="_accAreaHover('+newIdx+')" style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text2)">'
         +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--accent);margin-right:8px">+ NEW</span>'
         +'Use "<strong>'+_accEsc(q)+'</strong>" as a new area name'
       +'</div>';
@@ -911,8 +913,16 @@ function renderAccAreaDropdown(){
 }
 
 function _accAreaHover(idx){
+  if(idx===_accAreaSelectedIdx)return;
   _accAreaSelectedIdx=idx;
-  renderAccAreaDropdown();
+  // Update only the CSS class on existing elements (no DOM rebuild)
+  var dd=document.getElementById('newAccAreaDropdown');
+  if(!dd)return;
+  dd.querySelectorAll('.acc-dd-opt').forEach(function(el){
+    var i=parseInt(el.getAttribute('data-idx'),10);
+    if(i===idx){el.classList.add('selected');}
+    else{el.classList.remove('selected');}
+  });
 }
 
 function accAreaPick(name){
