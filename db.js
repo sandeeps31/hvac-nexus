@@ -554,6 +554,14 @@ async function dbSetPrecxTemplate(data) {
   return await dbSet('precx_template', data);
 }
 
+// ── Pre-Cx Template Library (company-level, multiple templates) ──
+async function dbGetPrecxTemplateLibrary() {
+  return await dbGet('precx_template_library') || [];
+}
+async function dbSetPrecxTemplateLibrary(data) {
+  return await dbSet('precx_template_library', data);
+}
+
 
 // ═══════════════════════════════════════════════════
 // PHOTO STORAGE HELPERS
