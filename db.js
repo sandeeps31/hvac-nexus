@@ -666,6 +666,14 @@ async function dbSetProjectPrecxTemplate(projectNum, data) {
   return await dbSetProject('project_precx_template', projectNum, data);
 }
 
+// ── Project Pre-Cx Area Checklists (project-scoped, array of checklist instances per project) ──
+async function dbGetProjectPrecxAreaChecklists(projectNum) {
+  return await dbGetProject('project_precx_area_checklists', projectNum) || [];
+}
+async function dbSetProjectPrecxAreaChecklists(projectNum, data) {
+  return await dbSetProject('project_precx_area_checklists', projectNum, data);
+}
+
 
 // ═══════════════════════════════════════════════════
 // PHOTO STORAGE HELPERS
