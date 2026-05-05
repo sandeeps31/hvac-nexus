@@ -308,174 +308,36 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
   <!-- TAB: EQUIPMENT PRE-CX -->
   <div class="tab-pane" id="tab-equipment">
-    <!-- Toolbar -->
-    <div class="tab-toolbar">
-      <span class="tab-toolbar-title">Equipment Pre-Commissioning Checks</span>
-      <div class="tab-toolbar-actions">
-        <button class="bg bsm btn" onclick="openAddEquipModal()">＋ Add Equipment</button>
-        <button class="bp bsm btn" id="signoffBtn" onclick="signOffSelected()" style="display:none">✓ Sign Off Selected</button>
-      </div>
+    <div class="acc-toolbar">
+      <div class="acc-search"><span style="color:var(--muted)">🔍</span><input type="text" id="eqpSrch" placeholder="Search equipment, drawing, ITP…" oninput="renderEqpRegister()"></div>
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="eqpCount"></span>
+      <button class="bg bsm btn" onclick="loadEqpAndRender()" title="Refresh from drawings">🔄 Refresh</button>
     </div>
-
-    <!-- STATS BAR -->
-    <div class="stats-bar" id="statsBar">
-      <span class="stat-pill" id="stat-total">0 items</span>
-      <span class="stat-pill green" id="stat-pass">0 pass</span>
-      <span class="stat-pill red" id="stat-fail">0 fail</span>
-      <span class="stat-pill warn" id="stat-pending">0 pending</span>
-    </div>
-
-    <!-- BODY -->
-    <div class="body-wrap">
-      <!-- EQUIPMENT LIST -->
-      <div class="equip-panel">
-        <div class="equip-panel-hdr">
-          <span class="equip-panel-title">Equipment</span>
-          <div class="search-box" style="flex:1;margin-left:10px"><input type="text" id="equipSearch" placeholder="Filter…" oninput="renderEquipList()"></div>
-        </div>
-        <div class="equip-list" id="equipList"></div>
-      </div>
-
-      <!-- CHECKLIST -->
-      <div class="checklist-panel" id="checklistPanel">
-        <div class="checklist-empty" id="checklistEmpty">
-          <div style="font-size:32px">🔩</div>
-          <div style="font-size:13px">Select equipment from the list to view its pre-cx checklist</div>
-        </div>
-        <div id="checklistView" style="display:none;flex:1;flex-direction:column;overflow:hidden">
-          <div class="checklist-hdr">
-            <div>
-              <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800" id="cx-equip-title">—</div>
-              <div style="font-size:12px;color:var(--text2);margin-top:2px" id="cx-equip-meta">—</div>
-            </div>
-            <div style="margin-left:auto;display:flex;gap:8px">
-              <button class="bg bsm btn" onclick="exportEquipChecklist()">⬇ Export</button>
-              <button class="bg bsm btn" onclick="openAddItemModal()">＋ Add Check</button>
-            </div>
-          </div>
-          <div id="checklistContent" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ADD EQUIPMENT MODAL -->
-<div class="mo" id="addEquipModal" onclick="if(event.target===this)closeEquipModal()">
-  <div class="modal">
-    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800" id="equipModalTitle">Add Equipment</h3>
-    </div>
-    <div style="overflow-y:auto;flex:1;padding:18px 22px;display:flex;flex-direction:column;gap:14px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div><label class="ml">Equipment Tag *</label><input class="mi" id="eq-tag" placeholder="e.g. FCU-L01-001"></div>
-        <div><label class="ml">Equipment Type</label>
-          <select class="ms" id="eq-type">
-            <option>FCU</option><option>AHU</option><option>Chiller</option><option>Cooling Tower</option>
-            <option>Pump</option><option>Fan</option><option>VAV</option><option>Other</option>
-          </select>
-        </div>
-      </div>
-      <div><label class="ml">Description</label><input class="mi" id="eq-desc" placeholder="Equipment description"></div>
-      <div><label class="ml">Location / Area</label><input class="mi" id="eq-location" placeholder="e.g. Level 2, Zone A"></div>
-      <div>
-        <label class="ml">Pre-load checklist template</label>
-        <select class="ms" id="eq-template">
-          <option value="fcu">FCU — Standard Pre-Cx Checks</option>
-          <option value="ahu">AHU — Standard Pre-Cx Checks</option>
-          <option value="pump">Pump — Standard Pre-Cx Checks</option>
-          <option value="blank">Blank (manual checks only)</option>
-        </select>
-      </div>
-    </div>
-    <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
-      <button class="bg bsm btn" onclick="closeEquipModal()">Cancel</button>
-      <button class="bp bsm btn" onclick="saveEquip()">Add Equipment</button>
-    </div>
-  </div>
-</div>
-
-<!-- ADD CHECK ITEM MODAL -->
-<div class="mo" id="addItemModal" onclick="if(event.target===this)closeItemModal()">
-  <div class="modal">
-    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800">Add Check Item</h3>
-    </div>
-    <div style="overflow-y:auto;flex:1;padding:18px 22px;display:flex;flex-direction:column;gap:14px">
-      <div><label class="ml">Description *</label><input class="mi" id="item-desc" placeholder="Check item description"></div>
-      <div><label class="ml">Section</label>
-        <select class="ms" id="item-section">
-          <option>Static Checks</option><option>Electrical Checks</option><option>Controls Checks</option>
-          <option>Mechanical Checks</option><option>Safety Checks</option><option>Other</option>
-        </select>
-      </div>
-    </div>
-    <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
-      <button class="bg bsm btn" onclick="closeItemModal()">Cancel</button>
-      <button class="bp bsm btn" onclick="saveItem()">Add Check</button>
+    <div class="acc-page">
+      <table class="acc-tbl" id="eqpTbl">
+        <thead>
+          <tr>
+            <th style="width:140px">Equipment Tag</th>
+            <th style="width:160px">Drawing</th>
+            <th>Pre-Cx ITP</th>
+            <th style="width:120px">Status</th>
+            <th style="width:130px">Last Updated</th>
+            <th style="width:140px;text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="eqpBody"></tbody>
+      </table>
     </div>
   </div>
 </div>
 
 <script>
-var _selEquip=null;
 
-// TEMPLATES
-var TEMPLATES={
-  fcu:[
-    {section:'Static Checks',desc:'Verify unit is installed per drawing and specification'},
-    {section:'Static Checks',desc:'Check coil connections — flow/return correct'},
-    {section:'Static Checks',desc:'Condensate drain connected and clear'},
-    {section:'Static Checks',desc:'Filter installed and clean'},
-    {section:'Static Checks',desc:'Access panels installed'},
-    {section:'Electrical Checks',desc:'Power supply connected and correct voltage'},
-    {section:'Electrical Checks',desc:'Wiring to controls panel complete'},
-    {section:'Electrical Checks',desc:'Earth/ground connection verified'},
-    {section:'Controls Checks',desc:'BMS connection established'},
-    {section:'Controls Checks',desc:'Thermostat/controller installed and responsive'},
-    {section:'Controls Checks',desc:'Manual on/off function tested'},
-    {section:'Mechanical Checks',desc:'Fan belt tension correct (if applicable)'},
-    {section:'Mechanical Checks',desc:'No visible leaks at connections'},
-    {section:'Safety Checks',desc:'Isolating valves accessible and tagged'},
-  ],
-  ahu:[
-    {section:'Static Checks',desc:'Unit installed level and properly supported'},
-    {section:'Static Checks',desc:'Ductwork connections complete and sealed'},
-    {section:'Static Checks',desc:'Filters installed — correct type and rating'},
-    {section:'Static Checks',desc:'Access doors operable'},
-    {section:'Electrical Checks',desc:'Motor wiring complete and correct rotation verified'},
-    {section:'Electrical Checks',desc:'VFD installed and wired (if applicable)'},
-    {section:'Controls Checks',desc:'Damper actuators installed and operational'},
-    {section:'Controls Checks',desc:'BMS I/O points verified'},
-    {section:'Mechanical Checks',desc:'Belt/drive coupling aligned and tensioned'},
-    {section:'Mechanical Checks',desc:'Drain pan clean and connected'},
-    {section:'Safety Checks',desc:'Fire/smoke dampers installed where required'},
-  ],
-  pump:[
-    {section:'Static Checks',desc:'Pump installed per drawing — flow direction correct'},
-    {section:'Static Checks',desc:'Isolation valves installed — inlet and outlet'},
-    {section:'Static Checks',desc:'Pressure gauges fitted at inlet and outlet'},
-    {section:'Electrical Checks',desc:'Motor wired and rotation verified (jog test)'},
-    {section:'Electrical Checks',desc:'Overload protection set correctly'},
-    {section:'Controls Checks',desc:'BMS on/off command verified'},
-    {section:'Controls Checks',desc:'Differential pressure sensor calibrated'},
-    {section:'Mechanical Checks',desc:'Coupling aligned — within tolerance'},
-    {section:'Mechanical Checks',desc:'No visible leaks at pipework joints'},
-    {section:'Safety Checks',desc:'Safety relief valve fitted and set'},
-  ],
-  blank:[]
-};
-
-// DATA
+// ── SHARED HELPERS (used by both Equipment + Area Checklists) ──
 var proj=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');
 var pKey=proj.num||'GCT001';
-// DK replaced by Supabase
-var equipment=[];
-async function load(){try{var p=await dbGetProject('precx_data',pKey+'_equip');equipment=Array.isArray(p)?p:[];}catch(e){equipment=[];}}
-function save(){dbSetProject('precx_data',pKey+'_equip',equipment).catch(e=>console.error(e));}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function nid(){return Date.now()+'_'+Math.random().toString(36).slice(2,7);}
-(async function(){if(typeof dbReady!=="undefined")await dbReady;await load();renderEquipList();renderStats();})();
 
 // ── TABS ──
 var TABS=['areas','equipment'];
@@ -484,7 +346,6 @@ var DEFAULT_TAB='areas';
 // INIT
 (function(){
   if(proj.name)document.getElementById('bc-proj').textContent=proj.name;
-  renderEquipList();renderStats();
   initTabs();
 })();
 
@@ -504,192 +365,155 @@ function initTabs(){
   updateTabCounts();
 }
 function updateTabCounts(){
-  // Equipment count = total equipment items
+  // Equipment count = total pre-cx ITP rows (one per equipment+ITP combo)
   var eqEl=document.getElementById('tabCount-equipment');
-  if(eqEl)eqEl.textContent=equipment.length;
+  if(eqEl)eqEl.textContent=(typeof eqpRows!=='undefined'?eqpRows.length:0);
   // Areas = number of area checklists
   var aEl=document.getElementById('tabCount-areas');
   if(aEl)aEl.textContent=(typeof accList!=='undefined'?accList.length:0);
 }
-
 function goProject(){window.location.href='project.html?id='+(proj.id||'gct001');}
 
+// ──────────────────────────────────────────────────────────
+// EQUIPMENT PRE-CX  (auto-derived from drawings → ITP pins)
+// ──────────────────────────────────────────────────────────
+// Pulls every ITP pin where the linked ITP template's category === 'Pre-Commissioning'.
+// One row per (equipment, ITP) combination — so a piece of equipment with 2 pre-cx ITPs
+// shows on 2 rows.  Read-only register; editing happens in the ITP form.
 
-// STATS
-function renderStats(){
-  var total=0,pass=0,fail=0;
-  equipment.forEach(function(eq){(eq.checks||[]).forEach(function(c){total++;if(c.result==='PASS')pass++;else if(c.result==='FAIL')fail++;});});
-  var pending=total-pass-fail;
-  document.getElementById('stat-total').textContent=total+' item'+(total!==1?'s':'');
-  document.getElementById('stat-pass').textContent=pass+' pass';
-  document.getElementById('stat-fail').textContent=fail+' fail';
-  document.getElementById('stat-pending').textContent=pending+' pending';
-  document.getElementById('stat-fail').className='stat-pill'+(fail>0?' red':'');
-  document.getElementById('stat-pass').className='stat-pill'+(pass>0?' green':'');
-  document.getElementById('stat-pending').className='stat-pill'+(pending>0?' warn':'');
+var eqpRows=[];        // [{ pinId, equipTag, drawingName, drawingId, itpNo, itpType, itpRef, status, lastUpdated }]
+var eqpDrawings=[];    // raw drawings array
+var eqpItpTpls=[];     // project ITP templates (for category lookup)
+var eqpResponses={};   // {pinId: {status, ...}}
+
+// Map pin status → 3-state convention used elsewhere on this page
+var EQP_STATUS_MAP={'not-started':'not_started','in-progress':'in_progress','action':'in_progress','closed':'completed'};
+function eqpStatusBadge(status){
+  if(status==='completed')return'<span class="status-badge sb-complete">Completed</span>';
+  if(status==='in_progress')return'<span class="status-badge sb-progress">In Progress</span>';
+  return'<span class="status-badge sb-notstarted">Not Started</span>';
+}
+function eqpFmtDate(iso){
+  if(!iso)return '—';
+  var d=new Date(iso);
+  if(isNaN(d.getTime()))return '—';
+  return d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+}
+
+async function loadEqpAndRender(){
+  await loadEqpData();
+  renderEqpRegister();
   if(typeof updateTabCounts==='function')updateTabCounts();
 }
 
-// EQUIP LIST
-function renderEquipList(){
-  var q=(document.getElementById('equipSearch').value||'').toLowerCase();
-  var el=document.getElementById('equipList');
-  var filtered=equipment.filter(function(e){return !q||(e.tag||'').toLowerCase().includes(q)||(e.desc||'').toLowerCase().includes(q);});
-  if(!filtered.length){el.innerHTML='<div style="padding:20px 16px;text-align:center;color:var(--muted);font-size:12px">No equipment added yet</div>';return;}
-  el.innerHTML=filtered.map(function(eq){
-    var checks=eq.checks||[];
-    var done=checks.filter(function(c){return c.result==='PASS'||c.result==='FAIL';}).length;
-    var pct=checks.length?Math.round(done/checks.length*100):0;
-    var isActive=_selEquip&&_selEquip.id===eq.id;
-    return'<div class="equip-item'+(isActive?' active':'')+'" onclick="selectEquip(\''+eq.id+'\')">'
-      +'<div class="equip-tag">'+escH(eq.tag||'')+'</div>'
-      +'<div class="equip-name">'+escH(eq.desc||eq.type||'')+'</div>'
-      +'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+escH(eq.location||'')+'</div>'
-      +'<div class="equip-progress"><div class="equip-progress-bar" style="width:'+pct+'%"></div></div>'
-      +'<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);margin-top:3px">'+done+'/'+checks.length+' checked</div>'
-      +'</div>';
-  }).join('');
+async function loadEqpData(){
+  // Drawings (with embedded pins)
+  try{eqpDrawings=await dbGetDrawings(pKey);if(!Array.isArray(eqpDrawings))eqpDrawings=[];}catch(e){eqpDrawings=[];console.error(e);}
+  // Project ITP templates (need itpCategory + itpType for each itpNo)
+  try{eqpItpTpls=await dbGetItpProjectTemplates(pKey);if(!Array.isArray(eqpItpTpls))eqpItpTpls=[];}catch(e){eqpItpTpls=[];console.error(e);}
+  // ITP responses (status per pinId)
+  try{eqpResponses=await dbGetItpResponses(pKey);if(!eqpResponses||typeof eqpResponses!=='object')eqpResponses={};}catch(e){eqpResponses={};console.error(e);}
+  // Build flat row list
+  eqpRows=_eqpBuildRows();
 }
 
-// SELECT EQUIP
-function selectEquip(id){
-  _selEquip=equipment.find(function(e){return e.id===id;});
-  if(!_selEquip)return;
-  document.getElementById('checklistEmpty').style.display='none';
-  var cv=document.getElementById('checklistView');cv.style.display='flex';cv.style.flexDirection='column';
-  document.getElementById('cx-equip-title').textContent=(_selEquip.tag||'')+((_selEquip.desc)?' — '+_selEquip.desc:'');
-  document.getElementById('cx-equip-meta').textContent=(_selEquip.type||'')+(_selEquip.location?' · '+_selEquip.location:'');
-  renderEquipList();
-  renderChecklist();
+// Map itpNo -> itpCategory
+function _eqpCategoryByItpNo(){
+  var map={};
+  (eqpItpTpls||[]).forEach(function(t){
+    if(t&&t.itpNo)map[t.itpNo]=t.itpCategory||'';
+  });
+  return map;
 }
 
-// CHECKLIST
-function renderChecklist(){
-  if(!_selEquip)return;
-  var checks=_selEquip.checks||[];
-  var sections={};
-  checks.forEach(function(c){if(!sections[c.section])sections[c.section]=[];sections[c.section].push(c);});
-  var order=['Static Checks','Electrical Checks','Controls Checks','Mechanical Checks','Safety Checks','Other'];
-  var allSections=Object.keys(sections).sort(function(a,b){var ai=order.indexOf(a),bi=order.indexOf(b);return(ai<0?99:ai)-(bi<0?99:bi);});
-  var content=document.getElementById('checklistContent');
-  if(!checks.length){
-    content.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px;font-size:13px">No checks added yet — click <strong>＋ Add Check</strong> to add items</div>';
+function _eqpBuildRows(){
+  var catMap=_eqpCategoryByItpNo();
+  var rows=[];
+  (eqpDrawings||[]).forEach(function(drw){
+    (drw.pins||[]).forEach(function(pin){
+      if(!pin||pin.type!=='itp')return;
+      if(pin.deleted)return;
+      var resp=(eqpResponses&&eqpResponses[pin.id])||{};
+      // Pin's ITPs array: [{itpNo, itpType, ref}] — ITP-pin can reference multiple ITP templates
+      var itps=Array.isArray(pin.itps)&&pin.itps.length?pin.itps:(pin.itpTypeLabel?[{itpNo:'',itpType:pin.itpTypeLabel,ref:pin.ref}]:[]);
+      itps.forEach(function(itp){
+        var cat=catMap[itp.itpNo]||'';
+        // Filter: only Pre-Commissioning ITPs
+        if(cat.toLowerCase()!=='pre-commissioning')return;
+        var rawStatus=resp.status||'not-started';
+        rows.push({
+          pinId:pin.id,
+          equipTag:pin.equip||'—',
+          drawingName:drw.title||drw.name||drw.fileName||'—',
+          drawingId:drw.id||'',
+          itpNo:itp.itpNo||'',
+          itpType:itp.itpType||'',
+          itpRef:itp.ref||pin.ref||'',
+          status:EQP_STATUS_MAP[rawStatus]||'not_started',
+          lastUpdated:resp.updatedAt||resp.lastUpdated||drw.updatedAt||''
+        });
+      });
+    });
+  });
+  // Sort: equip ascending, then itpRef
+  rows.sort(function(a,b){
+    var ae=(a.equipTag||'').toLowerCase(),be=(b.equipTag||'').toLowerCase();
+    if(ae<be)return -1;if(ae>be)return 1;
+    return (a.itpRef||'').localeCompare(b.itpRef||'');
+  });
+  return rows;
+}
+
+function renderEqpRegister(){
+  var body=document.getElementById('eqpBody');
+  if(!body)return;
+  var srch=(document.getElementById('eqpSrch').value||'').toLowerCase();
+  var filtered=eqpRows.filter(function(r){
+    if(!srch)return true;
+    return ((r.equipTag||'').toLowerCase().indexOf(srch)>=0
+      ||(r.drawingName||'').toLowerCase().indexOf(srch)>=0
+      ||(r.itpType||'').toLowerCase().indexOf(srch)>=0
+      ||(r.itpRef||'').toLowerCase().indexOf(srch)>=0);
+  });
+  document.getElementById('eqpCount').textContent=filtered.length+' of '+eqpRows.length+' equipment';
+  if(!eqpRows.length){
+    body.innerHTML='<tr><td colspan="6"><div class="acc-empty"><div class="acc-empty-icon">🔩</div><div class="acc-empty-title">No pre-commissioning ITPs found</div><div class="acc-empty-sub">This list is auto-populated from drawings. Drop an ITP pin on a drawing where the ITP template\'s category is <strong>Pre-Commissioning</strong>, and it will appear here.</div></div></td></tr>';
     return;
   }
-  content.innerHTML=allSections.map(function(sec){
-    var items=sections[sec];
-    var pass=items.filter(function(c){return c.result==='PASS';}).length;
-    return'<div class="section-block">'
-      +'<div class="section-hdr" onclick="toggleSection(this)">'
-        +'<span class="section-hdr-title">'+escH(sec)+'</span>'
-        +'<span class="section-count">'+pass+'/'+items.length+'</span>'
-        +'<span class="section-chev">▾</span>'
-      +'</div>'
-      +'<div class="section-body">'
-        +'<div class="check-row-hdr">'
-          +'<div style="border-left:none">Check Item</div>'
-          +'<div>Result</div>'
-          +'<div>Signed Off By</div>'
-          +'<div>Date</div>'
-          +'<div>Actions</div>'
+  if(!filtered.length){
+    body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px">No equipment matches the search.</td></tr>';
+    return;
+  }
+  body.innerHTML=filtered.map(function(r){
+    var itpLabel=(r.itpRef?'<span class="acc-num">'+escH(r.itpRef)+'</span> ':'')+'<span style="color:var(--text)">'+escH(r.itpType||'—')+'</span>';
+    return '<tr>'
+      +'<td><span class="acc-area">'+escH(r.equipTag)+'</span></td>'
+      +'<td style="color:var(--text2);font-size:12.5px">'+escH(r.drawingName)+'</td>'
+      +'<td>'+itpLabel+'</td>'
+      +'<td>'+eqpStatusBadge(r.status)+'</td>'
+      +'<td style="color:var(--text2);font-size:12px">'+eqpFmtDate(r.lastUpdated)+'</td>'
+      +'<td style="text-align:right">'
+        +'<div class="act-btns-grid" style="display:inline-flex">'
+          +'<button class="bp bsm btn" onclick="eqpOpenItp(\''+escH(r.pinId)+'\',\''+escH(r.drawingId)+'\',\''+escH(r.itpNo).replace(/\u0027/g,"\\'")+'\')">Open in ITP</button>'
         +'</div>'
-        +items.map(function(c){
-          return'<div class="check-row">'
-            +'<div class="check-desc">'+escH(c.desc||'')+'</div>'
-            +'<div class="check-cell">'
-              +'<div class="result-btns">'
-                +'<button class="result-btn'+(c.result==='PASS'?' pass':'')+'" onclick="setResult(\''+c.id+'\',\'PASS\')">PASS</button>'
-                +'<button class="result-btn'+(c.result==='FAIL'?' fail':'')+'" onclick="setResult(\''+c.id+'\',\'FAIL\')">FAIL</button>'
-                +'<button class="result-btn'+(c.result==='N/A'?' na':'')+'" onclick="setResult(\''+c.id+'\',\'N/A\')">N/A</button>'
-              +'</div>'
-            +'</div>'
-            +'<div class="check-cell"><input class="signoff-input" placeholder="Name" value="'+escH(c.signedBy||'')+'" onchange="setField(\''+c.id+'\',\'signedBy\',this.value)"></div>'
-            +'<div class="check-cell"><input class="date-input" type="date" value="'+escH(c.date||'')+'" onchange="setField(\''+c.id+'\',\'date\',this.value)"></div>'
-            +'<div class="check-cell"><button class="act-btn danger" onclick="deleteCheck(\''+c.id+'\')" title="Delete">✕</button></div>'
-            +'</div>';
-        }).join('')
-      +'</div>'
-      +'</div>';
+      +'</td>'
+    +'</tr>';
   }).join('');
 }
 
-function toggleSection(hdr){
-  var body=hdr.nextElementSibling;
-  var chev=hdr.querySelector('.section-chev');
-  var hidden=body.style.display==='none';
-  body.style.display=hidden?'':'none';
-  if(chev)chev.style.transform=hidden?'':'rotate(-90deg)';
+function eqpOpenItp(pinId,drawingId,itpNo){
+  var url='hvac-itp-form.html?pinId='+encodeURIComponent(pinId)
+    +'&drawingId='+encodeURIComponent(drawingId)
+    +'&p='+encodeURIComponent(pKey)
+    +(itpNo?'&itpNo='+encodeURIComponent(itpNo):'');
+  window.location.href=url;
 }
 
-function setResult(checkId,result){
-  if(!_selEquip)return;
-  var c=(_selEquip.checks||[]).find(function(x){return x.id===checkId;});
-  if(!c)return;
-  c.result=c.result===result?'':result;
-  if(c.result&&!c.date)c.date=new Date().toISOString().split('T')[0];
-  save();renderChecklist();renderEquipList();renderStats();
-}
-
-function setField(checkId,field,val){
-  if(!_selEquip)return;
-  var c=(_selEquip.checks||[]).find(function(x){return x.id===checkId;});
-  if(c)c[field]=val;
-  save();renderStats();
-}
-
-function deleteCheck(checkId){
-  if(!_selEquip)return;
-  if(!confirm('Remove this check item?'))return;
-  _selEquip.checks=(_selEquip.checks||[]).filter(function(c){return c.id!==checkId;});
-  save();renderChecklist();renderEquipList();renderStats();
-}
-
-// ADD EQUIPMENT
-function openAddEquipModal(){document.getElementById('eq-tag').value='';document.getElementById('eq-desc').value='';document.getElementById('eq-location').value='';document.getElementById('addEquipModal').classList.add('open');}
-function closeEquipModal(){document.getElementById('addEquipModal').classList.remove('open');}
-function saveEquip(){
-  var tag=document.getElementById('eq-tag').value.trim();
-  if(!tag){alert('Equipment tag is required.');return;}
-  var tmpl=document.getElementById('eq-template').value;
-  var checks=(TEMPLATES[tmpl]||[]).map(function(t){return{id:nid(),section:t.section,desc:t.desc,result:'',signedBy:'',date:'',notes:''};});
-  var eq={id:nid(),tag:tag,type:document.getElementById('eq-type').value,desc:document.getElementById('eq-desc').value.trim(),location:document.getElementById('eq-location').value.trim(),checks:checks,created:new Date().toISOString().split('T')[0]};
-  equipment.push(eq);
-  save();closeEquipModal();renderEquipList();renderStats();
-  selectEquip(eq.id);
-  showToast('Equipment added — '+checks.length+' checks loaded');
-}
-
-// ADD CHECK ITEM
-function openAddItemModal(){document.getElementById('item-desc').value='';document.getElementById('addItemModal').classList.add('open');}
-function closeItemModal(){document.getElementById('addItemModal').classList.remove('open');}
-function saveItem(){
-  if(!_selEquip)return;
-  var desc=document.getElementById('item-desc').value.trim();
-  if(!desc){alert('Description is required.');return;}
-  if(!_selEquip.checks)_selEquip.checks=[];
-  _selEquip.checks.push({id:nid(),section:document.getElementById('item-section').value,desc:desc,result:'',signedBy:'',date:'',notes:''});
-  save();closeItemModal();renderChecklist();renderEquipList();renderStats();
-  showToast('Check item added');
-}
-
-// EXPORT
-function exportEquipChecklist(){
-  if(!_selEquip)return;
-  var rows=['Equipment Tag,Description,Section,Check Item,Result,Signed By,Date'];
-  (_selEquip.checks||[]).forEach(function(c){rows.push([_selEquip.tag,_selEquip.desc,c.section,c.desc,c.result,c.signedBy,c.date].map(function(v){return'"'+(v||'').replace(/"/g,'""')+'"';}).join(','));});
-  var blob=new Blob([rows.join('\n')],{type:'text/csv'});
-  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(_selEquip.tag||'precx')+'_checklist.csv';a.click();
-  showToast('Checklist exported');
-}
-
-function signOffSelected(){
-  if(!_selEquip)return;
-  var name=prompt('Sign off all pending items as:');if(!name)return;
-  var today=new Date().toISOString().split('T')[0];
-  (_selEquip.checks||[]).forEach(function(c){if(!c.result){c.result='PASS';c.signedBy=name;c.date=today;}});
-  save();renderChecklist();renderEquipList();renderStats();
-  showToast('Items signed off by '+name);
-}
+// Boot equipment register (parallel to area checklists boot)
+(async function(){
+  if(typeof dbReady!=='undefined')await dbReady;
+  await loadEqpAndRender();
+})();
 
 // ──────────────────────────────────────────────────────────
 // AREA CHECKLISTS (project-scoped, derived from project precx template)
