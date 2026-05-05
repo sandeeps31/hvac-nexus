@@ -79,7 +79,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .act-btn.warn:hover{border-color:var(--warn);color:var(--warn);background:var(--warn-dim)}
 .act-btn .tip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface2);color:var(--text);font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:500}
 .act-btn:hover .tip{opacity:1}
-.act-btns-grid{display:grid;grid-template-columns:repeat(3,28px);gap:4px}
+.act-btns-grid{display:grid;grid-template-columns:repeat(5,28px);gap:4px;justify-content:flex-end}
 
 /* Empty state */
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;gap:16px;color:var(--muted)}
@@ -249,8 +249,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
   <div class="topbar">
     <div class="bc">
-      <span class="bcl" onclick="navTo('hvac-itp.html')">ITP Register</span><span class="bcs">›</span>
-      <span class="bcc" id="bcCurr">Project Templates</span>
+      <span class="bcl" onclick="navTo('index.html')">My Projects</span><span class="bcs">›</span>
+      <span id="bcProjBlock"><span class="bcl" id="bcProjName" onclick="bcProjClick()">Project</span><span class="bcs">›</span></span>
+      <span class="bcl" id="bcParent" onclick="bcParentClick()">Project Settings</span><span class="bcs">›</span>
+      <span class="bcc" id="bcCurr">ITP Templates</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="bg bsm btn" id="backToRegBtn" style="display:none" onclick="showRegister()">← Back to Templates</button>
@@ -286,7 +288,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
             <th style="width:110px">Created</th>
             <th style="width:110px">Last Modified</th>
             <th style="width:110px">Last Used</th>
-            <th style="width:130px;text-align:right">Actions</th>
+            <th style="width:200px;text-align:right">Actions</th>
           </tr>
         </thead>
         <tbody id="regBody"></tbody>
@@ -621,7 +623,7 @@ function showRegister(){
   document.getElementById('publishBtn').style.display='none';
   document.getElementById('newItpBtn').style.display='';
   document.getElementById('importBtn').style.display=currentLevel==='project'?'':'none';
-  var _bc=document.getElementById('bcCurr');if(_bc)_bc.textContent='Project Templates';
+  var _bc=document.getElementById('bcCurr');if(_bc)_bc.textContent='ITP Templates';
   activeItpId=null;
   renderRegister();
 }
@@ -1249,7 +1251,13 @@ function showToast(msg){
 function bcParentClick(){
   var params=new URLSearchParams(window.location.search);
   if(params.get('mode')==='company')navTo('hvac-settings.html');
-  else navTo('hvac-itp.html');
+  else navTo('hvac-project-settings.html');
+}
+
+function bcProjClick(){
+  var pid=(_proj&&(_proj.id||_proj.num))||'';
+  if(pid)navTo('project.html?id='+encodeURIComponent(pid));
+  else navTo('index.html');
 }
 
 // ── INIT ──
@@ -1272,13 +1280,18 @@ var _cachedCS = {};
     templates=companyTemplates;
     document.getElementById('importBtn').style.display='none';
     document.getElementById('newItpBtn').textContent='＋ New Company Template';
+    // Company mode: hide project name segment, parent is Company Settings
+    var _pb=document.getElementById('bcProjBlock');if(_pb)_pb.style.display='none';
     document.getElementById('bcParent').textContent='Company Settings';
-    document.getElementById('bcCurr').textContent='Project Templates';
+    document.getElementById('bcCurr').textContent='ITP Templates';
   } else {
     currentLevel='project';
     var _ib=document.getElementById('importBtn');if(_ib)_ib.style.display='';
-    var _bp=document.getElementById('bcParent');if(_bp)_bp.textContent='ITP Register';
-    document.getElementById('bcCurr').textContent='Project Templates';
+    // Project mode: show full chain — populate project name from current project
+    var _pn=document.getElementById('bcProjName');
+    if(_pn){_pn.textContent=(_proj&&(_proj.name||_proj.num))||'Project';}
+    var _bp=document.getElementById('bcParent');if(_bp)_bp.textContent='Project Settings';
+    document.getElementById('bcCurr').textContent='ITP Templates';
   }
   renderRegister();
 })();

@@ -65,7 +65,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .imported-badge{font-family:'DM Mono',monospace;font-size:9px;padding:1px 7px;border-radius:5px;background:var(--purple-dim,rgba(167,139,250,.15));border:1px solid rgba(167,139,250,.25);color:var(--purple,#c4b5fd);margin-left:6px;vertical-align:middle}
 
 /* Action icon buttons */
-.act-btns-grid{display:grid;grid-template-columns:repeat(2,28px);gap:4px;justify-content:flex-end}
+.act-btns-grid{display:grid;grid-template-columns:repeat(4,28px);gap:4px;justify-content:flex-end}
 .act-btn{width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .13s;position:relative}
 .act-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 .act-btn.danger:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-dim)}
@@ -169,6 +169,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
   <div class="topbar">
     <div class="bc">
+      <span class="bcl" onclick="navTo('index.html')">My Projects</span><span class="bcs">›</span>
+      <span class="bcl" id="bcProjName" onclick="bcProjClick()">Project</span><span class="bcs">›</span>
       <span class="bcl" onclick="navTo('hvac-project-settings.html')">Project Settings</span><span class="bcs">›</span>
       <span class="bcc" id="bcCurr">Pre-Commissioning Templates</span>
     </div>
@@ -176,7 +178,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <button class="bg bsm btn" id="backToRegBtn" style="display:none" onclick="showRegister()">← Back to Templates</button>
       <span class="save-pill" id="saveStatus" style="display:none">No changes</span>
       <button class="bp bsm btn" id="saveBtn" style="display:none" onclick="saveTemplate()">💾 Save</button>
-      <button class="bp bsm btn" id="pullBtn" onclick="openPickerModal()">⬇ Pull from Company Library</button>
+      <button class="bp bsm btn" id="pullBtn" onclick="openPickerModal()">⬇ Import from Company Library</button>
     </div>
   </div>
 
@@ -195,7 +197,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
             <th style="width:80px">Version</th>
             <th style="width:90px">Status</th>
             <th style="width:140px">Last Modified</th>
-            <th style="width:140px;text-align:right">Actions</th>
+            <th style="width:160px;text-align:right">Actions</th>
           </tr>
         </thead>
         <tbody id="regBody"></tbody>
@@ -219,7 +221,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 <div class="mo" id="pickerModal" onclick="if(event.target===this)closePickerModal()">
   <div class="modal">
     <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800">Pull from Company Library</div>
+      <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800">Import from Company Library</div>
       <div style="font-size:12px;color:var(--text2);margin-top:3px">Pick a template to copy into this project. The project copy is editable without affecting the master.</div>
     </div>
     <div style="padding:14px 22px;flex:1;overflow-y:auto;max-height:60vh" id="pickerList">
@@ -269,6 +271,9 @@ function templateHasContent(t){
   if(typeof dbReady!=='undefined')await dbReady;
   try{proj=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');}catch(e){proj={};}
   pNum=proj.num||'';
+  // Populate project name in breadcrumb
+  var _pn=document.getElementById('bcProjName');
+  if(_pn)_pn.textContent=(proj.name||proj.num||'Project');
   if(!pNum){
     document.getElementById('regBody').innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">No project selected</div><div class="empty-sub">Pick a project from the dashboard, then return here.</div></div></td></tr>';
     document.getElementById('pullBtn').disabled=true;
@@ -277,6 +282,12 @@ function templateHasContent(t){
   await loadTemplate();
   renderRegister();
 })();
+
+function bcProjClick(){
+  var pid=(proj&&(proj.id||proj.num))||'';
+  if(pid)navTo('project.html?id='+encodeURIComponent(pid));
+  else navTo('index.html');
+}
 
 async function loadTemplate(){
   try{
@@ -292,7 +303,7 @@ function renderRegister(){
   var srch=(document.getElementById('srch').value||'').toLowerCase();
 
   if(!template){
-    body.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No project template yet</div><div class="empty-sub">Pull a template from the company library to get started. You\'ll be able to edit the project copy without affecting the master.</div></div></td></tr>';
+    body.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No project template yet</div><div class="empty-sub">Import a template from the company library to get started. You\'ll be able to edit the project copy without affecting the master.</div></div></td></tr>';
     countEl.textContent='0 templates';
     return;
   }
@@ -319,8 +330,8 @@ function renderRegister(){
     +'<td onclick="event.stopPropagation()">'
       +'<div class="act-btns-grid">'
         +'<button class="act-btn" onclick="openEditor()" title="Edit"><span class="tip">Edit</span>✏️</button>'
-        +'<button class="act-btn warn" onclick="openPickerModal()" title="Replace from Library"><span class="tip">Replace</span>⇄</button>'
-        +'<button class="act-btn" onclick="duplicateAsNew()" title="Save copy in company library"><span class="tip">Save to Library</span>⧉</button>'
+        +'<button class="act-btn" onclick="exportPDF()" title="Export PDF"><span class="tip">Export PDF</span>📄</button>'
+        +'<button class="act-btn" onclick="openRevHist()" title="Revision history"><span class="tip">Revision history</span>🕐</button>'
         +'<button class="act-btn danger" onclick="deleteTemplate()" title="Delete"><span class="tip">Delete</span>🗑</button>'
       +'</div>'
     +'</td>'
@@ -365,10 +376,9 @@ function renderEditor(){
   var html='';
 
   if(template.pulledFrom){
-    var pulledDate=template.pulledAt?fmtDate(template.pulledAt):'';
     html+='<div class="info-banner">'
       +'<span class="info-banner-icon">ℹ️</span>'
-      +'<span>Pulled from company template <strong>'+escH(template.pulledFrom)+'</strong>'+(pulledDate?' on '+pulledDate:'')+'. Edits here only affect this project.</span>'
+      +'<span>Imported from company template. Edits here only affect this project.</span>'
     +'</div>';
   }
 
@@ -574,29 +584,17 @@ async function pullFromLibrary(tplId){
   template=copy;
   closePickerModal();
   renderRegister();
-  showToast('✓ Template pulled — open Edit to customise');
+  showToast('✓ Template imported — open Edit to customise');
 }
 
-// ── DUPLICATE AS NEW (push to company library) ──
-async function duplicateAsNew(){
-  if(!template)return;
-  if(!confirm('Save this project template as a new template in the company library?'))return;
-  var lib=[];
-  try{lib=await dbGetPrecxTemplateLibrary();}catch(e){console.error(e);}
-  if(!Array.isArray(lib))lib=[];
-  var copy=JSON.parse(JSON.stringify(template));
-  copy.id=nid();
-  copy.name=(template.name||'Untitled')+' (from project '+pNum+')';
-  copy.createdAt=nowISO();
-  copy.savedAt=nowISO();
-  delete copy.pulledFrom;delete copy.pulledFromId;delete copy.pulledAt;
-  (copy.sections||[]).forEach(function(s){
-    s.id=nid();
-    (s.items||[]).forEach(function(it){it.id=nid();});
-  });
-  lib.unshift(copy);
-  await dbSetPrecxTemplateLibrary(lib);
-  showToast('✓ Saved to company library as "'+copy.name+'"');
+// ── EXPORT PDF (stub for now) ──
+function exportPDF(){
+  showToast('PDF export — coming soon');
+}
+
+// ── REVISION HISTORY (stub for now) ──
+function openRevHist(){
+  showToast('Revision history — coming soon');
 }
 
 // ── DELETE ──
