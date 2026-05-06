@@ -125,19 +125,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .acc-signoff-block-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .acc-signoff-block-wrap.filled{border-color:rgba(0,229,160,.3);background:linear-gradient(180deg,var(--green-dim) 0%,var(--surface) 60%)}
 .acc-signoff-block-hdr{display:flex;align-items:center;gap:8px}
-.acc-signoff-trade-select{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;outline:none}
-.acc-signoff-trade-select:focus{border-color:var(--accent)}
-.acc-signoff-trade-select:disabled{opacity:.5}
+.acc-signoff-company-input{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;padding:7px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;outline:none;transition:border-color .15s}
+.acc-signoff-company-input:focus{border-color:var(--accent);background:var(--surface)}
+.acc-signoff-company-input::placeholder{color:var(--muted);font-weight:400}
 .acc-signoff-pending{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .acc-signoff-pending-note{font-size:12px;color:var(--muted);font-style:italic;flex:1}
 .acc-signoff-filled{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .acc-signoff-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
 .acc-signoff-name{font-size:13px;font-weight:600;color:var(--text)}
 .acc-signoff-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)}
-.acc-signoff-sig-img{height:38px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px;max-width:140px}
+.acc-signoff-sig-img{height:60px;background:#fff;border:1px solid var(--border);border-radius:6px;padding:4px;width:200px;object-fit:contain;display:block}
 .acc-add-signoff-btn{align-self:flex-start;padding:8px 14px;border:1.5px dashed var(--accent);background:var(--accent-dim);color:var(--accent);font-family:'DM Mono',monospace;font-size:11px;font-weight:600;border-radius:6px;cursor:pointer;transition:all .13s;margin-top:4px}
 .acc-add-signoff-btn:hover{background:var(--accent);color:#080c12}
-.acc-failed-warning{padding:8px 12px;background:var(--danger-dim);border:1px solid rgba(255,77,109,.25);border-radius:6px;font-size:12px;color:var(--danger);margin-bottom:6px}
 
 /* SIGNATURE PAD MODAL */
 .sigpad-canvas{width:100%;height:180px;background:#fff;border:1.5px solid var(--border);border-radius:8px;cursor:crosshair;touch-action:none}
@@ -547,22 +546,10 @@ var accProjAreas=[];             // areas list from project settings
 var _accCurrentId=null;          // currently-edited checklist id
 var _accSigContext=null;         // {checklistId, sectionId, blockId} when signing
 
-// Trades available for sign-off (PM picks per signature block in the editor)
-var TRADES=[
-  'Mechanical Contractor',
-  'Sheet Metal Contractor',
-  'Plumber',
-  'Electrician',
-  'BMS Contractor',
-  'Electrician & BMS Contractor',
-  'Commissioning Agent',
-  'Project Manager',
-  'Other'
-];
-
 // Migrate legacy state: old single-signoff per section → new signoffs[] array
 // Old shape:  state[secId] = { items: {itemId: true}, signedBy, signedDate, signaturePNG, comments }
-// New shape:  state[secId] = { items: {itemId: 'yes'|'no'|'na'}, signoffs: [{id, trade, signedBy, signedDate, signaturePNG}], comments }
+// Newer shape: state[secId].signoffs[].trade  (fixed-list trade)
+// Current shape: state[secId] = { items: {itemId: 'yes'|'no'|'na'}, signoffs: [{id, company, signedBy, signedDate, signaturePNG}], comments }
 function _accMigrateState(c){
   if(!c||!c.state)return;
   Object.keys(c.state).forEach(function(secId){
@@ -577,20 +564,28 @@ function _accMigrateState(c){
       });
     }
     // Migrate sign-offs: legacy single-block → signoffs[] array
-    if(Array.isArray(s.signoffs))return;
-    s.signoffs=[];
-    if(s.signedBy||s.signedDate||s.signaturePNG){
-      var sec=(c.templateSections||[]).find(function(x){return x.id===secId;});
-      var legacyTrade=(sec&&sec.trade)||'';
-      s.signoffs.push({
-        id:_accNid(),
-        trade:legacyTrade,
-        signedBy:s.signedBy||'',
-        signedDate:s.signedDate||'',
-        signaturePNG:s.signaturePNG||''
-      });
+    if(!Array.isArray(s.signoffs)){
+      s.signoffs=[];
+      if(s.signedBy||s.signedDate||s.signaturePNG){
+        var sec=(c.templateSections||[]).find(function(x){return x.id===secId;});
+        var legacyTrade=(sec&&sec.trade)||'';
+        s.signoffs.push({
+          id:_accNid(),
+          company:legacyTrade,
+          signedBy:s.signedBy||'',
+          signedDate:s.signedDate||'',
+          signaturePNG:s.signaturePNG||''
+        });
+      }
+      delete s.signedBy;delete s.signedDate;delete s.signaturePNG;
     }
-    delete s.signedBy;delete s.signedDate;delete s.signaturePNG;
+    // Newer migration: convert .trade → .company on existing signoff blocks
+    s.signoffs.forEach(function(b){
+      if(b.trade&&!b.company){
+        b.company=b.trade;
+      }
+      delete b.trade;
+    });
   });
 }
 
@@ -644,24 +639,9 @@ async function saveAcc(){
 // ── Compute progress + status for a checklist ──
 // Item value: 'yes' | 'no' | 'na' | undefined
 // Item is "addressed" when value is yes/no/na (not blank).
-// Item is "passing" when value is yes/na (no failures).
-// A section can be signed when:
-//   - every item is yes or na (no blanks, no NOs) AND
-//   - it has at least one signature block configured AND
-//   - every configured block is fully signed
-function _accSectionPassing(sec,sState){
-  // Every item must be yes or na (no blanks, no NOs)
-  var items=sec.items||[];
-  if(!items.length)return true;
-  var values=(sState&&sState.items)||{};
-  for(var i=0;i<items.length;i++){
-    var v=values[items[i].id];
-    if(v!=='yes'&&v!=='na')return false;
-  }
-  return true;
-}
+// Sign-off is independent of item state — different trades sign for different items
+// of work, and a trade may sign even if some items are blank or marked No.
 function _accSectionSigned(sec,sState){
-  if(!_accSectionPassing(sec,sState))return false;
   var blocks=(sState&&sState.signoffs)||[];
   if(!blocks.length)return false;
   return blocks.every(function(b){return !!(b.signedBy&&b.signedDate&&b.signaturePNG);});
@@ -945,9 +925,7 @@ function renderAccEditor(){
   var k=_accCounts(c);
   var status=_accStatus(c);
   document.getElementById('accEditorStatus').outerHTML=_accStatusBadge(status).replace('class="status-badge','id="accEditorStatus" class="status-badge');
-  var progressTxt=k.addressedItems+'/'+k.totalItems+' items · '+k.signedSections+'/'+k.totalSections+' signed';
-  if(k.noItems>0)progressTxt+=' · ⚠ '+k.noItems+' failed';
-  document.getElementById('accEditorProgress').textContent=progressTxt;
+  document.getElementById('accEditorProgress').textContent=k.addressedItems+'/'+k.totalItems+' items · '+k.signedSections+'/'+k.totalSections+' signed';
   var body=document.getElementById('accEditorBody');
   var html='';
   // META block
@@ -992,23 +970,14 @@ function renderAccEditor(){
       : 'Section Sign-off';
     html+='<div class="acc-signoff-list">';
     html+='<div class="acc-signoff-list-hdr">'+_accEsc(signoffHdr)+'</div>';
-    // Show a warning if any items are marked "No" — section can't be completed until they're resolved
-    var noCount=0;
-    (sec.items||[]).forEach(function(it){
-      var v=(sState.items||{})[it.id];
-      if(v==='no')noCount++;
-    });
-    if(noCount>0){
-      html+='<div class="acc-failed-warning">⚠ '+noCount+' item'+(noCount!==1?'s':'')+' marked <strong>No</strong> — resolve before signing off the section.</div>';
-    }
     if(!blocks.length){
-      html+='<div class="acc-signoff-empty">No sign-offs configured. Click below to add one for each trade that needs to sign this section.</div>';
+      html+='<div class="acc-signoff-empty">No sign-offs configured. Click below to add one for each company that needs to sign this section.</div>';
     }else{
       blocks.forEach(function(b){
         html+=_accRenderSignoffBlock(sec.id,b);
       });
     }
-    html+='<button class="acc-add-signoff-btn" onclick="accAddSignoffBlock(\''+sec.id+'\')">＋ Add Signature Block</button>';
+    html+='<button class="acc-add-signoff-btn" onclick="accAddSignoffBlock(\''+sec.id+'\')">＋ Add Company</button>';
     html+='</div>'; // /acc-signoff-list
 
     html+='</div>'; // /acc-section
@@ -1016,30 +985,16 @@ function renderAccEditor(){
   body.innerHTML=html;
 }
 
-// ── Multi-trade sign-off blocks ──
+// ── Multi-company sign-off blocks ──
 // Renders one signature block (filled or unfilled) within the section's sign-off list.
 function _accRenderSignoffBlock(secId,block){
-  var c=_accCurrent();
-  // Build trade dropdown — disable trades already used by OTHER blocks in this section
-  var sState=(c&&c.state&&c.state[secId])||{};
-  var usedByOthers={};
-  (sState.signoffs||[]).forEach(function(b){
-    if(b.id!==block.id&&b.trade)usedByOthers[b.trade]=true;
-  });
-  var tradeOpts=TRADES.map(function(tr){
-    var disabled=usedByOthers[tr]?' disabled':'';
-    var sel=block.trade===tr?' selected':'';
-    return '<option value="'+_accEsc(tr)+'"'+sel+disabled+'>'+_accEsc(tr)+(usedByOthers[tr]?' (already used)':'')+'</option>';
-  }).join('');
-
   var isFilled=!!(block.signedBy&&block.signedDate&&block.signaturePNG);
   var html='<div class="acc-signoff-block-wrap'+(isFilled?' filled':'')+'">';
-  // Header row: trade dropdown + delete button
+  // Header row: company input + delete button
   html+='<div class="acc-signoff-block-hdr">'
-    +'<select class="acc-signoff-trade-select" onchange="accSetSignoffTrade(\''+secId+'\',\''+block.id+'\',this.value)">'
-      +'<option value="">— Pick trade —</option>'
-      +tradeOpts
-    +'</select>'
+    +'<input class="acc-signoff-company-input" type="text" placeholder="Company name (e.g. Smith Mechanical Pty Ltd)" '
+      +'value="'+_accEsc(block.company||block.trade||'')+'" '
+      +'onchange="accSetSignoffCompany(\''+secId+'\',\''+block.id+'\',this.value)">'
     +'<button class="act-btn-edit danger" onclick="accDeleteSignoffBlock(\''+secId+'\',\''+block.id+'\')" title="Remove this signature block">✕</button>'
   +'</div>';
   // Body: either a filled signature display or a Sign button
@@ -1051,10 +1006,10 @@ function _accRenderSignoffBlock(secId,block){
       +'<button class="bg bsm btn" style="margin-left:auto" onclick="accOpenSign(\''+secId+'\',\''+block.id+'\')">Re-sign</button>'
     +'</div>';
   }else{
-    var note=block.trade?'Ready to sign as '+_accEsc(block.trade):'Pick a trade above, then sign';
+    var note=(block.company||block.trade)?'Ready to sign as '+_accEsc(block.company||block.trade):'Enter a company name above, then sign';
     html+='<div class="acc-signoff-pending">'
       +'<span class="acc-signoff-pending-note">'+note+'</span>'
-      +'<button class="bp bsm btn" '+(block.trade?'':'disabled')+' onclick="accOpenSign(\''+secId+'\',\''+block.id+'\')">✎ Sign</button>'
+      +'<button class="bp bsm btn" '+((block.company||block.trade)?'':'disabled')+' onclick="accOpenSign(\''+secId+'\',\''+block.id+'\')">✎ Sign</button>'
     +'</div>';
   }
   html+='</div>';
@@ -1068,7 +1023,7 @@ async function accAddSignoffBlock(secId){
   if(!Array.isArray(c.state[secId].signoffs))c.state[secId].signoffs=[];
   c.state[secId].signoffs.push({
     id:_accNid(),
-    trade:'',
+    company:'',
     signedBy:'',
     signedDate:'',
     signaturePNG:''
@@ -1078,12 +1033,14 @@ async function accAddSignoffBlock(secId){
   renderAccEditor();
 }
 
-async function accSetSignoffTrade(secId,blockId,trade){
+async function accSetSignoffCompany(secId,blockId,company){
   var c=_accCurrent();if(!c)return;
   var blocks=(c.state&&c.state[secId]&&c.state[secId].signoffs)||[];
   var b=blocks.find(function(x){return x.id===blockId;});
   if(!b)return;
-  b.trade=trade;
+  b.company=company;
+  // Clear legacy trade field if present
+  delete b.trade;
   c.updatedAt=new Date().toISOString();
   await saveAcc();
   renderAccEditor();
@@ -1129,10 +1086,11 @@ function accOpenSign(sectionId,blockId){
   var sState=(c.state&&c.state[sectionId])||{};
   var block=(sState.signoffs||[]).find(function(b){return b.id===blockId;});
   if(!block){alert('Signature block not found.');return;}
-  if(!block.trade){alert('Pick a trade for this signature block first.');return;}
+  var company=block.company||block.trade||'';
+  if(!company){alert('Enter a company name for this signature block first.');return;}
   _accSigContext={checklistId:c.id,sectionId:sectionId,blockId:blockId};
   document.getElementById('sigpadTitle').textContent='Sign: '+(sec.title||'Section');
-  document.getElementById('sigpadSubtitle').textContent='Sign-off by: '+block.trade;
+  document.getElementById('sigpadSubtitle').textContent='Sign-off by: '+company;
   // Pre-fill with existing values
   var defaultName=(typeof authGetUserName==='function'?authGetUserName():'')||'';
   document.getElementById('sigpadName').value=block.signedBy||defaultName;
