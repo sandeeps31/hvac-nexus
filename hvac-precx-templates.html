@@ -179,7 +179,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
             <span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="editorTitle">—</span>
           </div>
           <div class="editor-toolbar-actions">
-            <button class="bg bsm btn" onclick="importFromXLSX()">⬆ Import from Excel</button>
+            <button class="bg bsm btn" onclick="openImportModal()">⬆ Import from Excel</button>
             <button class="bg bsm btn" onclick="duplicateTemplate()">⧉ Duplicate</button>
             <button class="btn bsm bdanger" onclick="deleteTemplate()">🗑 Delete</button>
             <button class="bp bsm btn" onclick="saveTemplate()">💾 Save</button>
@@ -190,6 +190,56 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- IMPORT FROM EXCEL HELP MODAL -->
+<div class="mo" id="importHelpModal" onclick="if(event.target===this)closeImportModal()">
+  <div class="modal" style="width:600px">
+    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800">Import from Excel</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:3px">Upload a .xlsx file to create a new template from its content.</div>
+    </div>
+    <div style="padding:16px 22px;flex:1;overflow-y:auto;font-size:13px;color:var(--text2);line-height:1.6">
+      <div style="margin-bottom:14px">Your file should have a sheet named <strong style="color:var(--text)">Template</strong> (or it will use the first sheet) with these columns:</div>
+
+      <table style="width:100%;border-collapse:collapse;margin-bottom:18px;font-size:12px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <thead>
+          <tr style="background:var(--surface2)">
+            <th style="padding:7px 10px;text-align:left;font-family:DM Mono,monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">TYPE</th>
+            <th style="padding:7px 10px;text-align:left;font-family:DM Mono,monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">NAME</th>
+            <th style="padding:7px 10px;text-align:left;font-family:DM Mono,monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">TRADE <span style="text-transform:none;color:var(--muted);letter-spacing:0">(optional)</span></th>
+          </tr>
+        </thead>
+        <tbody style="font-family:'DM Sans',sans-serif">
+          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:600">SECTION</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">General / Documentation</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2)">Mechanical Contractor</td></tr>
+          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2)">ITEM</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">Approved HVAC shop drawings available</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2)">ITEM</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">Equipment submittals approved</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)"></td></tr>
+          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:600">SECTION</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">Mechanical Completion – Air Side</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2)">Sheet Metal Contractor</td></tr>
+          <tr><td style="padding:6px 10px;color:var(--text2)">ITEM</td><td style="padding:6px 10px">AHUs installed and aligned</td><td style="padding:6px 10px"></td></tr>
+        </tbody>
+      </table>
+
+      <div style="margin-bottom:6px"><strong style="color:var(--text)">Rules:</strong></div>
+      <ul style="margin:0 0 16px 18px;padding:0;font-size:12.5px">
+        <li><strong style="color:var(--text)">SECTION</strong> rows start a new section. Items below them belong to that section.</li>
+        <li><strong style="color:var(--text)">ITEM</strong> rows add a check-line to the current section.</li>
+        <li>The <strong style="color:var(--text)">TRADE</strong> column is only read on SECTION rows — it sets the sign-off trade.</li>
+        <li>Rows with empty NAME are ignored. Rows above the header are also ignored.</li>
+        <li>Trades should match one of: Mechanical Contractor, Sheet Metal Contractor, Plumber, Electrician, BMS Contractor, Electrician &amp; BMS Contractor, Commissioning Agent, Project Manager, Other.</li>
+      </ul>
+
+      <div style="padding:10px 12px;background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);border-radius:7px;font-size:12.5px">
+        <strong style="color:var(--accent)">💡 Tip:</strong> Click "Download Sample" below to grab a starter spreadsheet. Edit it, then upload.
+      </div>
+    </div>
+    <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:space-between;align-items:center;flex-shrink:0">
+      <button class="bg bsm btn" onclick="downloadSampleXLSX()">⬇ Download Sample</button>
+      <div style="display:flex;gap:8px">
+        <button class="bg bsm btn" onclick="closeImportModal()">Cancel</button>
+        <button class="bp bsm btn" onclick="triggerImportFilePicker()">Choose File…</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -489,8 +539,63 @@ async function deleteTemplate(){
 }
 
 // ── IMPORT FROM XLSX ──
-function importFromXLSX(){
-  document.getElementById('xlsxImportFile').click();
+function openImportModal(){
+  document.getElementById('importHelpModal').classList.add('open');
+}
+function closeImportModal(){
+  document.getElementById('importHelpModal').classList.remove('open');
+}
+function triggerImportFilePicker(){
+  // Lazy-load XLSX lib so the upload click handler can use it immediately
+  if(!window.XLSX){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=function(){document.getElementById('xlsxImportFile').click();};
+    document.head.appendChild(s);
+  } else {
+    document.getElementById('xlsxImportFile').click();
+  }
+}
+function downloadSampleXLSX(){
+  var loadAndBuild=function(){
+    var rows=[
+      ['TYPE','NAME','TRADE'],
+      ['SECTION','General / Documentation','Mechanical Contractor'],
+      ['ITEM','Approved HVAC shop drawings available (latest revision)',''],
+      ['ITEM','Approved TAB procedures submitted',''],
+      ['ITEM','Equipment submittals approved (AHUs, pumps, FCUs, VAVs, etc.)',''],
+      ['ITEM','Control sequences approved',''],
+      ['SECTION','Mechanical Completion – Air Side','Sheet Metal Contractor'],
+      ['ITEM','AHUs installed and aligned',''],
+      ['ITEM','Filters installed (clean)',''],
+      ['ITEM','Coils clean and undamaged',''],
+      ['ITEM','Drain traps installed & primed',''],
+      ['SECTION','Mechanical Completion – Water Side','Plumber'],
+      ['ITEM','Pumps installed and aligned',''],
+      ['ITEM','Hydrostatic testing completed',''],
+      ['ITEM','System flushed and chemically cleaned',''],
+      ['SECTION','Electrical & Controls','Electrician & BMS Contractor'],
+      ['ITEM','All equipment permanently powered',''],
+      ['ITEM','VSD parameters programmed',''],
+      ['ITEM','BMS operational',''],
+      ['ITEM','Safeties tested','']
+    ];
+    var ws=XLSX.utils.aoa_to_sheet(rows);
+    // Set column widths so it's readable
+    ws['!cols']=[{wch:10},{wch:60},{wch:30}];
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Template');
+    XLSX.writeFile(wb,'precx-template-sample.xlsx');
+    showToast('✓ Sample downloaded');
+  };
+  if(!window.XLSX){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=loadAndBuild;
+    document.head.appendChild(s);
+  } else {
+    loadAndBuild();
+  }
 }
 function handleXLSXImport(input){
   var file=input.files&&input.files[0];
@@ -509,6 +614,7 @@ function processXLSX(file){
     try{
       var wb=XLSX.read(e.target.result,{type:'array'});
       var sheetName=wb.SheetNames.indexOf('Template')>=0?'Template':wb.SheetNames[0];
+      if(!sheetName){alert('Could not read this file — no sheets found.');return;}
       var ws=wb.Sheets[sheetName];
       var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
       var headerRow=-1;
@@ -516,10 +622,13 @@ function processXLSX(file){
         var rr=rows[i].map(function(c){return String(c).trim().toUpperCase();});
         if(rr.indexOf('TYPE')>=0&&rr.indexOf('NAME')>=0){headerRow=i;break;}
       }
-      if(headerRow<0){showToast('⚠ Could not find TYPE and NAME columns');return;}
+      if(headerRow<0){
+        alert('Could not find required columns. Your sheet must have a header row with columns labelled TYPE and NAME (within the first 5 rows). See the import help for the expected format.');
+        return;
+      }
       var hdrs=rows[headerRow].map(function(c){return String(c).trim().toUpperCase();});
       var iType=hdrs.indexOf('TYPE'),iName=hdrs.indexOf('NAME'),iTrade=hdrs.indexOf('TRADE');
-      var sections=[],cur=null;
+      var sections=[],cur=null,skipped=0;
       for(var i=headerRow+1;i<rows.length;i++){
         var type=String(rows[i][iType]||'').trim().toUpperCase();
         var name=String(rows[i][iName]||'').trim();
@@ -530,10 +639,16 @@ function processXLSX(file){
           sections.push(cur);
         }else if(type==='ITEM'&&cur){
           cur.items.push({id:nid(),desc:name});
+        }else if(type==='ITEM'&&!cur){
+          skipped++; // Item before any section
         }
       }
-      if(!sections.length){showToast('⚠ No SECTION rows found');return;}
+      if(!sections.length){
+        alert('No SECTION rows were found. Make sure your file has at least one row with TYPE = SECTION before any items.');
+        return;
+      }
       // Create new template from import
+      var totalItems=sections.reduce(function(n,s){return n+s.items.length;},0);
       var t={
         id:nid(),
         name:file.name.replace(/\.xlsx$/i,'')||'Imported Template',
@@ -546,8 +661,15 @@ function processXLSX(file){
       _selId=t.id;
       _dirty=true;
       renderLibList();renderEditor();updateSaveStatus();
-      showToast('✓ Imported '+sections.length+' sections — review and save');
-    }catch(err){showToast('⚠ Import error: '+err.message);console.error(err);}
+      closeImportModal();
+      var msg='✓ Imported '+sections.length+' section'+(sections.length!==1?'s':'')+', '+totalItems+' item'+(totalItems!==1?'s':'');
+      if(skipped>0)msg+=' ('+skipped+' item row'+(skipped!==1?'s':'')+' skipped — appeared before any SECTION)';
+      msg+=' — review and save';
+      showToast(msg);
+    }catch(err){
+      console.error(err);
+      alert('Could not parse this file:\n\n'+err.message+'\n\nMake sure it\'s a valid .xlsx file and matches the expected format.');
+    }
   };
   r.readAsArrayBuffer(file);
 }
