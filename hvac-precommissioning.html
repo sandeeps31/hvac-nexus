@@ -100,7 +100,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .acc-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
 .acc-section-hdr{padding:11px 14px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
 .acc-section-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;flex:1}
-.acc-section-trade{font-family:'DM Mono',monospace;font-size:10px;padding:3px 9px;border-radius:5px;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.2)}
+.acc-section-trade{font-family:'DM Mono',monospace;font-size:10px;padding:3px 9px;border-radius:5px;background:var(--surface3);color:var(--text2);border:1px solid var(--border)}
+.acc-section-trade.signed{background:var(--green-dim);color:var(--green);border-color:rgba(0,229,160,.25)}
 .acc-section-body{padding:8px 0}
 .acc-item-row{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .13s}
 .acc-item-row:hover{background:var(--surface2)}
@@ -109,12 +110,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .acc-item-text{font-size:13px;color:var(--text2);line-height:1.5}
 .acc-item-row.checked .acc-item-text{color:var(--text);text-decoration:line-through;text-decoration-color:rgba(0,229,160,.4)}
 
-.acc-signoff{padding:14px;background:var(--surface2);border-top:1px dashed var(--border);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.acc-signoff-pending{color:var(--muted);font-size:12.5px;font-style:italic;flex:1}
-.acc-signoff-block{display:flex;align-items:center;gap:14px;flex:1;flex-wrap:wrap}
+/* Multi-block sign-off layout */
+.acc-signoff-list{padding:12px 14px;background:var(--surface2);border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:10px}
+.acc-signoff-empty{font-size:12px;color:var(--muted);font-style:italic;padding:6px 0}
+.acc-signoff-block-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.acc-signoff-block-wrap.filled{border-color:rgba(0,229,160,.3);background:linear-gradient(180deg,var(--green-dim) 0%,var(--surface) 60%)}
+.acc-signoff-block-hdr{display:flex;align-items:center;gap:8px}
+.acc-signoff-trade-select{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;outline:none}
+.acc-signoff-trade-select:focus{border-color:var(--accent)}
+.acc-signoff-trade-select:disabled{opacity:.5}
+.acc-signoff-pending{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.acc-signoff-pending-note{font-size:12px;color:var(--muted);font-style:italic;flex:1}
+.acc-signoff-filled{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.acc-signoff-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
 .acc-signoff-name{font-size:13px;font-weight:600;color:var(--text)}
 .acc-signoff-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)}
 .acc-signoff-sig-img{height:38px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px;max-width:140px}
+.acc-add-signoff-btn{align-self:flex-start;padding:7px 12px;border:1px dashed var(--border);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;border-radius:6px;cursor:pointer;transition:all .13s}
+.acc-add-signoff-btn:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
 
 /* SIGNATURE PAD MODAL */
 .sigpad-canvas{width:100%;height:180px;background:#fff;border:1.5px solid var(--border);border-radius:8px;cursor:crosshair;touch-action:none}
@@ -522,7 +535,46 @@ var accList=[];                  // array of checklist instances
 var accProjTemplate=null;        // project's pre-cx template
 var accProjAreas=[];             // areas list from project settings
 var _accCurrentId=null;          // currently-edited checklist id
-var _accSigContext=null;         // {checklistId, sectionId} when signing
+var _accSigContext=null;         // {checklistId, sectionId, blockId} when signing
+
+// Trades available for sign-off (PM picks per signature block in the editor)
+var TRADES=[
+  'Mechanical Contractor',
+  'Sheet Metal Contractor',
+  'Plumber',
+  'Electrician',
+  'BMS Contractor',
+  'Electrician & BMS Contractor',
+  'Commissioning Agent',
+  'Project Manager',
+  'Other'
+];
+
+// Migrate legacy state: old single-signoff per section → new signoffs[] array
+// Old shape:  state[secId] = { items, signedBy, signedDate, signaturePNG, comments }
+// New shape:  state[secId] = { items, signoffs: [{id, trade, signedBy, signedDate, signaturePNG}], comments }
+function _accMigrateState(c){
+  if(!c||!c.state)return;
+  Object.keys(c.state).forEach(function(secId){
+    var s=c.state[secId];
+    if(!s||typeof s!=='object')return;
+    if(Array.isArray(s.signoffs))return; // already new shape
+    s.signoffs=[];
+    if(s.signedBy||s.signedDate||s.signaturePNG){
+      // Find this section in the template snapshot to get the legacy trade (if any)
+      var sec=(c.templateSections||[]).find(function(x){return x.id===secId;});
+      var legacyTrade=(sec&&sec.trade)||'';
+      s.signoffs.push({
+        id:_accNid(),
+        trade:legacyTrade,
+        signedBy:s.signedBy||'',
+        signedDate:s.signedDate||'',
+        signaturePNG:s.signaturePNG||''
+      });
+    }
+    delete s.signedBy;delete s.signedDate;delete s.signaturePNG;
+  });
+}
 
 function _accNid(){return Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);}
 function _accEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -558,6 +610,8 @@ function _accFlattenAreas(nodes,prefix){
 
 async function loadAcc(){
   try{accList=await dbGetProjectPrecxAreaChecklists(pKey);if(!Array.isArray(accList))accList=[];}catch(e){accList=[];console.error(e);}
+  // Migrate any legacy state shape on load
+  accList.forEach(_accMigrateState);
   try{accProjTemplate=await dbGetProjectPrecxTemplate(pKey);if(!accProjTemplate||!Array.isArray(accProjTemplate.sections))accProjTemplate=null;}catch(e){accProjTemplate=null;}
   try{
     var areasRaw=await dbGetProject('proj_settings',(proj.id||'gct001')+'_areas');
@@ -570,9 +624,19 @@ async function saveAcc(){
 }
 
 // ── Compute progress + status for a checklist ──
+// A section is considered "signed" when:
+//   - it has at least one signature block configured AND
+//   - every configured block has name + date + signature
+// Sections with no signature blocks configured never reach "signed".
+function _accSectionSigned(sec,sState){
+  var blocks=(sState&&sState.signoffs)||[];
+  if(!blocks.length)return false;
+  return blocks.every(function(b){return !!(b.signedBy&&b.signedDate&&b.signaturePNG);});
+}
 function _accCounts(c){
-  if(!c||!Array.isArray(c.templateSections))return{totalItems:0,checkedItems:0,totalSections:0,signedSections:0};
+  if(!c||!Array.isArray(c.templateSections))return{totalItems:0,checkedItems:0,totalSections:0,signedSections:0,configuredSignoffs:0,filledSignoffs:0};
   var totalItems=0,checkedItems=0,totalSections=c.templateSections.length,signedSections=0;
+  var configuredSignoffs=0,filledSignoffs=0;
   c.templateSections.forEach(function(sec){
     (sec.items||[]).forEach(function(it){
       totalItems++;
@@ -580,14 +644,18 @@ function _accCounts(c){
       if(s.items&&s.items[it.id])checkedItems++;
     });
     var ss=(c.state&&c.state[sec.id])||{};
-    if(ss.signedBy&&ss.signedDate)signedSections++;
+    var blocks=ss.signoffs||[];
+    configuredSignoffs+=blocks.length;
+    blocks.forEach(function(b){if(b.signedBy&&b.signedDate&&b.signaturePNG)filledSignoffs++;});
+    if(_accSectionSigned(sec,ss))signedSections++;
   });
-  return{totalItems:totalItems,checkedItems:checkedItems,totalSections:totalSections,signedSections:signedSections};
+  return{totalItems:totalItems,checkedItems:checkedItems,totalSections:totalSections,signedSections:signedSections,configuredSignoffs:configuredSignoffs,filledSignoffs:filledSignoffs};
 }
 function _accStatus(c){
   var k=_accCounts(c);
+  // Completed = every section has all its signoffs filled (and at least one signoff per section)
   if(k.totalSections>0&&k.signedSections===k.totalSections)return'completed';
-  if(k.checkedItems>0||k.signedSections>0)return'in_progress';
+  if(k.checkedItems>0||k.filledSignoffs>0)return'in_progress';
   return'not_started';
 }
 function _accStatusBadge(status){
@@ -855,10 +923,13 @@ function renderAccEditor(){
   // SECTIONS
   (c.templateSections||[]).forEach(function(sec){
     var sState=(c.state&&c.state[sec.id])||{};
+    if(!Array.isArray(sState.signoffs))sState.signoffs=[];
+    var blocks=sState.signoffs;
+    var allSigned=_accSectionSigned(sec,sState);
     html+='<div class="acc-section">'
       +'<div class="acc-section-hdr">'
         +'<span class="acc-section-title">'+_accEsc(sec.title||'Untitled section')+'</span>'
-        +(sec.trade?'<span class="acc-section-trade">'+_accEsc(sec.trade)+'</span>':'')
+        +(blocks.length?'<span class="acc-section-trade'+(allSigned?' signed':'')+'">'+blocks.length+' sign-off'+(blocks.length!==1?'s':'')+(allSigned?' ✓':'')+'</span>':'')
       +'</div>'
       +'<div class="acc-section-body">';
     (sec.items||[]).forEach(function(it){
@@ -868,26 +939,111 @@ function renderAccEditor(){
         +'<div class="acc-item-text">'+_accEsc(it.desc||'')+'</div>'
       +'</div>';
     });
-    // SIGN-OFF block
-    html+='<div class="acc-signoff">';
-    if(sState.signedBy&&sState.signedDate){
-      html+='<div class="acc-signoff-block">'
-        +'<div><div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px">Signed by</div><span class="acc-signoff-name">'+_accEsc(sState.signedBy)+'</span></div>'
-        +'<div><div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px">Date</div><span class="acc-signoff-date">'+_accFmtDate(sState.signedDate)+'</span></div>';
-      if(sState.signaturePNG){
-        html+='<div><div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px">Signature</div><img class="acc-signoff-sig-img" src="'+_accEsc(sState.signaturePNG)+'" alt="signature"></div>';
-      }
-      html+='<button class="bg bsm btn" style="margin-left:auto" onclick="accOpenSign(\''+sec.id+'\')">Re-sign</button>'
-        +'<button class="btn bsm bdanger" onclick="accClearSign(\''+sec.id+'\')">Clear</button>'
-      +'</div>';
+    html+='</div>'; // /acc-section-body
+
+    // SIGN-OFF AREA — list of blocks + "Add Signature Block" button
+    html+='<div class="acc-signoff-list">';
+    if(!blocks.length){
+      html+='<div class="acc-signoff-empty">No sign-offs configured for this section yet.</div>';
     }else{
-      html+='<span class="acc-signoff-pending">Not yet signed off' +(sec.trade?' by '+_accEsc(sec.trade):'')+ '</span>'
-        +'<button class="bp bsm btn" onclick="accOpenSign(\''+sec.id+'\')">✎ Sign Section</button>';
+      blocks.forEach(function(b){
+        html+=_accRenderSignoffBlock(sec.id,b);
+      });
     }
-    html+='</div>';
-    html+='</div></div>';
+    html+='<button class="acc-add-signoff-btn" onclick="accAddSignoffBlock(\''+sec.id+'\')">＋ Add Signature Block</button>';
+    html+='</div>'; // /acc-signoff-list
+
+    html+='</div>'; // /acc-section
   });
   body.innerHTML=html;
+}
+
+// ── Multi-trade sign-off blocks ──
+// Renders one signature block (filled or unfilled) within the section's sign-off list.
+function _accRenderSignoffBlock(secId,block){
+  var c=_accCurrent();
+  // Build trade dropdown — disable trades already used by OTHER blocks in this section
+  var sState=(c&&c.state&&c.state[secId])||{};
+  var usedByOthers={};
+  (sState.signoffs||[]).forEach(function(b){
+    if(b.id!==block.id&&b.trade)usedByOthers[b.trade]=true;
+  });
+  var tradeOpts=TRADES.map(function(tr){
+    var disabled=usedByOthers[tr]?' disabled':'';
+    var sel=block.trade===tr?' selected':'';
+    return '<option value="'+_accEsc(tr)+'"'+sel+disabled+'>'+_accEsc(tr)+(usedByOthers[tr]?' (already used)':'')+'</option>';
+  }).join('');
+
+  var isFilled=!!(block.signedBy&&block.signedDate&&block.signaturePNG);
+  var html='<div class="acc-signoff-block-wrap'+(isFilled?' filled':'')+'">';
+  // Header row: trade dropdown + delete button
+  html+='<div class="acc-signoff-block-hdr">'
+    +'<select class="acc-signoff-trade-select" onchange="accSetSignoffTrade(\''+secId+'\',\''+block.id+'\',this.value)">'
+      +'<option value="">— Pick trade —</option>'
+      +tradeOpts
+    +'</select>'
+    +'<button class="act-btn-edit danger" onclick="accDeleteSignoffBlock(\''+secId+'\',\''+block.id+'\')" title="Remove this signature block">✕</button>'
+  +'</div>';
+  // Body: either a filled signature display or a Sign button
+  if(isFilled){
+    html+='<div class="acc-signoff-filled">'
+      +'<div><div class="acc-signoff-lbl">Signed by</div><div class="acc-signoff-name">'+_accEsc(block.signedBy)+'</div></div>'
+      +'<div><div class="acc-signoff-lbl">Date</div><div class="acc-signoff-date">'+_accFmtDate(block.signedDate)+'</div></div>'
+      +'<div><div class="acc-signoff-lbl">Signature</div><img class="acc-signoff-sig-img" src="'+_accEsc(block.signaturePNG)+'" alt="signature"></div>'
+      +'<button class="bg bsm btn" style="margin-left:auto" onclick="accOpenSign(\''+secId+'\',\''+block.id+'\')">Re-sign</button>'
+    +'</div>';
+  }else{
+    var note=block.trade?'Ready to sign as '+_accEsc(block.trade):'Pick a trade above, then sign';
+    html+='<div class="acc-signoff-pending">'
+      +'<span class="acc-signoff-pending-note">'+note+'</span>'
+      +'<button class="bp bsm btn" '+(block.trade?'':'disabled')+' onclick="accOpenSign(\''+secId+'\',\''+block.id+'\')">✎ Sign</button>'
+    +'</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+async function accAddSignoffBlock(secId){
+  var c=_accCurrent();if(!c)return;
+  if(!c.state)c.state={};
+  if(!c.state[secId])c.state[secId]={items:{}};
+  if(!Array.isArray(c.state[secId].signoffs))c.state[secId].signoffs=[];
+  c.state[secId].signoffs.push({
+    id:_accNid(),
+    trade:'',
+    signedBy:'',
+    signedDate:'',
+    signaturePNG:''
+  });
+  c.updatedAt=new Date().toISOString();
+  await saveAcc();
+  renderAccEditor();
+}
+
+async function accSetSignoffTrade(secId,blockId,trade){
+  var c=_accCurrent();if(!c)return;
+  var blocks=(c.state&&c.state[secId]&&c.state[secId].signoffs)||[];
+  var b=blocks.find(function(x){return x.id===blockId;});
+  if(!b)return;
+  b.trade=trade;
+  c.updatedAt=new Date().toISOString();
+  await saveAcc();
+  renderAccEditor();
+}
+
+async function accDeleteSignoffBlock(secId,blockId){
+  var c=_accCurrent();if(!c)return;
+  var blocks=(c.state&&c.state[secId]&&c.state[secId].signoffs)||[];
+  var b=blocks.find(function(x){return x.id===blockId;});
+  if(!b)return;
+  // Warn if already signed
+  if(b.signedBy&&b.signedDate&&b.signaturePNG){
+    if(!confirm('This signature block has been signed by '+(b.signedBy||'someone')+'. Remove it anyway?\n\nThis cannot be undone.'))return;
+  }
+  c.state[secId].signoffs=blocks.filter(function(x){return x.id!==blockId;});
+  c.updatedAt=new Date().toISOString();
+  await saveAcc();
+  renderAccEditor();
 }
 
 async function accToggleItem(secId,itId){
@@ -904,23 +1060,23 @@ async function accToggleItem(secId,itId){
 
 // ── Signature pad ──
 var _sigCtx=null,_sigDrawing=false,_sigLastX=0,_sigLastY=0,_sigDirty=false;
-function accOpenSign(sectionId){
+function accOpenSign(sectionId,blockId){
   var c=_accCurrent();if(!c)return;
   var sec=(c.templateSections||[]).find(function(s){return s.id===sectionId;});
   if(!sec)return;
-  _accSigContext={checklistId:c.id,sectionId:sectionId};
-  document.getElementById('sigpadTitle').textContent='Sign: '+(sec.title||'Section');
-  document.getElementById('sigpadSubtitle').textContent='Sign-off by: '+(sec.trade||'—');
-  // Pre-fill with existing values
   var sState=(c.state&&c.state[sectionId])||{};
+  var block=(sState.signoffs||[]).find(function(b){return b.id===blockId;});
+  if(!block){alert('Signature block not found.');return;}
+  if(!block.trade){alert('Pick a trade for this signature block first.');return;}
+  _accSigContext={checklistId:c.id,sectionId:sectionId,blockId:blockId};
+  document.getElementById('sigpadTitle').textContent='Sign: '+(sec.title||'Section');
+  document.getElementById('sigpadSubtitle').textContent='Sign-off by: '+block.trade;
+  // Pre-fill with existing values
   var defaultName=(typeof authGetUserName==='function'?authGetUserName():'')||'';
-  document.getElementById('sigpadName').value=sState.signedBy||defaultName;
-  document.getElementById('sigpadDate').value=sState.signedDate||(new Date().toISOString().slice(0,10));
+  document.getElementById('sigpadName').value=block.signedBy||defaultName;
+  document.getElementById('sigpadDate').value=block.signedDate||(new Date().toISOString().slice(0,10));
   // Reset canvas
   var canvas=document.getElementById('sigpadCanvas');
-  // Match canvas internal size to displayed size for crisp drawing
-  var rect=canvas.getBoundingClientRect();
-  // Note: rect may be 0,0 because modal isn't visible yet — we set it after open
   document.getElementById('sigpadModal').classList.add('open');
   setTimeout(function(){
     var r=canvas.getBoundingClientRect();
@@ -929,10 +1085,10 @@ function accOpenSign(sectionId){
     _sigCtx.lineWidth=2;_sigCtx.lineCap='round';_sigCtx.lineJoin='round';_sigCtx.strokeStyle='#0a0e14';
     sigpadClear();
     // If existing signature, draw it
-    if(sState.signaturePNG){
+    if(block.signaturePNG){
       var img=new Image();
       img.onload=function(){_sigCtx.drawImage(img,0,0,canvas.width,canvas.height);};
-      img.src=sState.signaturePNG;
+      img.src=block.signaturePNG;
       _sigDirty=true;
     }
     _bindSigEvents(canvas);
@@ -982,26 +1138,18 @@ async function sigpadSave(){
   var c=accList.find(function(x){return x.id===_accSigContext.checklistId;});
   if(!c){closeSigpadModal();return;}
   if(!c.state)c.state={};
-  if(!c.state[_accSigContext.sectionId])c.state[_accSigContext.sectionId]={items:{}};
-  c.state[_accSigContext.sectionId].signedBy=name;
-  c.state[_accSigContext.sectionId].signedDate=date;
-  c.state[_accSigContext.sectionId].signaturePNG=pngData;
+  if(!c.state[_accSigContext.sectionId])c.state[_accSigContext.sectionId]={items:{},signoffs:[]};
+  if(!Array.isArray(c.state[_accSigContext.sectionId].signoffs))c.state[_accSigContext.sectionId].signoffs=[];
+  var block=c.state[_accSigContext.sectionId].signoffs.find(function(b){return b.id===_accSigContext.blockId;});
+  if(!block){closeSigpadModal();alert('Signature block was removed before saving. Please add it again.');return;}
+  block.signedBy=name;
+  block.signedDate=date;
+  block.signaturePNG=pngData;
   c.updatedAt=new Date().toISOString();
   await saveAcc();
   closeSigpadModal();
   renderAccEditor();
-  showToast('✓ Section signed');
-}
-async function accClearSign(sectionId){
-  if(!confirm('Clear this section\'s sign-off?'))return;
-  var c=_accCurrent();if(!c||!c.state||!c.state[sectionId])return;
-  delete c.state[sectionId].signedBy;
-  delete c.state[sectionId].signedDate;
-  delete c.state[sectionId].signaturePNG;
-  c.updatedAt=new Date().toISOString();
-  await saveAcc();
-  renderAccEditor();
-  showToast('✓ Sign-off cleared');
+  showToast('✓ Signed by '+name);
 }
 
 // ── Stub actions ──

@@ -208,15 +208,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
           <tr style="background:var(--surface2)">
             <th style="padding:7px 10px;text-align:left;font-family:DM Mono,monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">TYPE</th>
             <th style="padding:7px 10px;text-align:left;font-family:DM Mono,monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">NAME</th>
-            <th style="padding:7px 10px;text-align:left;font-family:DM Mono,monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)">TRADE <span style="text-transform:none;color:var(--muted);letter-spacing:0">(optional)</span></th>
           </tr>
         </thead>
         <tbody style="font-family:'DM Sans',sans-serif">
-          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:600">SECTION</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">General / Documentation</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2)">Mechanical Contractor</td></tr>
-          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2)">ITEM</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">Approved HVAC shop drawings available</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)"></td></tr>
-          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2)">ITEM</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">Equipment submittals approved</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)"></td></tr>
-          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:600">SECTION</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">Mechanical Completion – Air Side</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2)">Sheet Metal Contractor</td></tr>
-          <tr><td style="padding:6px 10px;color:var(--text2)">ITEM</td><td style="padding:6px 10px">AHUs installed and aligned</td><td style="padding:6px 10px"></td></tr>
+          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:600">SECTION</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">General / Documentation</td></tr>
+          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2)">ITEM</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">Approved HVAC shop drawings available</td></tr>
+          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2)">ITEM</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">Equipment submittals approved</td></tr>
+          <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:600">SECTION</td><td style="padding:6px 10px;border-bottom:1px solid var(--border)">Mechanical Completion – Air Side</td></tr>
+          <tr><td style="padding:6px 10px;color:var(--text2)">ITEM</td><td style="padding:6px 10px">AHUs installed and aligned</td></tr>
         </tbody>
       </table>
 
@@ -224,9 +223,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <ul style="margin:0 0 16px 18px;padding:0;font-size:12.5px">
         <li><strong style="color:var(--text)">SECTION</strong> rows start a new section. Items below them belong to that section.</li>
         <li><strong style="color:var(--text)">ITEM</strong> rows add a check-line to the current section.</li>
-        <li>The <strong style="color:var(--text)">TRADE</strong> column is only read on SECTION rows — it sets the sign-off trade.</li>
         <li>Rows with empty NAME are ignored. Rows above the header are also ignored.</li>
-        <li>Trades should match one of: Mechanical Contractor, Sheet Metal Contractor, Plumber, Electrician, BMS Contractor, Electrician &amp; BMS Contractor, Commissioning Agent, Project Manager, Other.</li>
+        <li>Sign-off trades are configured per-section when filling out an area checklist (not in the template).</li>
       </ul>
 
       <div style="padding:10px 12px;background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);border-radius:7px;font-size:12.5px">
@@ -251,18 +249,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 var library=[];          // [{id,name,description,sections:[{id,title,trade,items:[{id,desc}]}],savedAt,createdAt}]
 var _selId=null;         // currently selected template id
 var _dirty=false;        // unsaved edits flag
-
-var TRADES=[
-  'Mechanical Contractor',
-  'Sheet Metal Contractor',
-  'Plumber',
-  'Electrician',
-  'BMS Contractor',
-  'Electrician & BMS Contractor',
-  'Commissioning Agent',
-  'Project Manager',
-  'Other'
-];
 
 function nid(){return Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);}
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -380,9 +366,6 @@ function renderEditor(){
 }
 
 function renderSectionCard(sec,sIdx,total){
-  var tradeOpts=TRADES.map(function(tr){
-    return '<option value="'+escH(tr)+'"'+(sec.trade===tr?' selected':'')+'>'+escH(tr)+'</option>';
-  }).join('');
   var html='<div class="section-card" data-sec-id="'+sec.id+'" draggable="true" '
     +'ondragstart="secDragStart(event,\''+sec.id+'\')" '
     +'ondragend="secDragEnd(event)" '
@@ -392,10 +375,6 @@ function renderSectionCard(sec,sIdx,total){
     +'<div class="section-card-hdr">'
       +'<span class="drag-handle" title="Drag to reorder">⋮⋮</span>'
       +'<input class="field-input" placeholder="Section title (e.g. General / Documentation)" value="'+escH(sec.title||'')+'" oninput="updateSection(\''+sec.id+'\',\'title\',this.value)">'
-      +'<select class="field-select" onchange="updateSection(\''+sec.id+'\',\'trade\',this.value)">'
-        +'<option value="">— Sign-off trade —</option>'
-        +tradeOpts
-      +'</select>'
       +'<div class="section-meta">'
         +'<button class="act-btn" '+(sIdx===0?'disabled':'')+' onclick="moveSection(\''+sec.id+'\',-1)" title="Move up">↑</button>'
         +'<button class="act-btn" '+(sIdx===total-1?'disabled':'')+' onclick="moveSection(\''+sec.id+'\',1)" title="Move down">↓</button>'
@@ -426,7 +405,7 @@ function updateMeta(field,val){
 function addSection(){
   var t=getSelected();if(!t)return;
   if(!t.sections)t.sections=[];
-  t.sections.push({id:nid(),title:'',trade:'',items:[]});
+  t.sections.push({id:nid(),title:'',items:[]});
   markDirty();renderEditor();
 }
 function updateSection(secId,field,val){
@@ -559,30 +538,30 @@ function triggerImportFilePicker(){
 function downloadSampleXLSX(){
   var loadAndBuild=function(){
     var rows=[
-      ['TYPE','NAME','TRADE'],
-      ['SECTION','General / Documentation','Mechanical Contractor'],
-      ['ITEM','Approved HVAC shop drawings available (latest revision)',''],
-      ['ITEM','Approved TAB procedures submitted',''],
-      ['ITEM','Equipment submittals approved (AHUs, pumps, FCUs, VAVs, etc.)',''],
-      ['ITEM','Control sequences approved',''],
-      ['SECTION','Mechanical Completion – Air Side','Sheet Metal Contractor'],
-      ['ITEM','AHUs installed and aligned',''],
-      ['ITEM','Filters installed (clean)',''],
-      ['ITEM','Coils clean and undamaged',''],
-      ['ITEM','Drain traps installed & primed',''],
-      ['SECTION','Mechanical Completion – Water Side','Plumber'],
-      ['ITEM','Pumps installed and aligned',''],
-      ['ITEM','Hydrostatic testing completed',''],
-      ['ITEM','System flushed and chemically cleaned',''],
-      ['SECTION','Electrical & Controls','Electrician & BMS Contractor'],
-      ['ITEM','All equipment permanently powered',''],
-      ['ITEM','VSD parameters programmed',''],
-      ['ITEM','BMS operational',''],
-      ['ITEM','Safeties tested','']
+      ['TYPE','NAME'],
+      ['SECTION','General / Documentation'],
+      ['ITEM','Approved HVAC shop drawings available (latest revision)'],
+      ['ITEM','Approved TAB procedures submitted'],
+      ['ITEM','Equipment submittals approved (AHUs, pumps, FCUs, VAVs, etc.)'],
+      ['ITEM','Control sequences approved'],
+      ['SECTION','Mechanical Completion – Air Side'],
+      ['ITEM','AHUs installed and aligned'],
+      ['ITEM','Filters installed (clean)'],
+      ['ITEM','Coils clean and undamaged'],
+      ['ITEM','Drain traps installed & primed'],
+      ['SECTION','Mechanical Completion – Water Side'],
+      ['ITEM','Pumps installed and aligned'],
+      ['ITEM','Hydrostatic testing completed'],
+      ['ITEM','System flushed and chemically cleaned'],
+      ['SECTION','Electrical & Controls'],
+      ['ITEM','All equipment permanently powered'],
+      ['ITEM','VSD parameters programmed'],
+      ['ITEM','BMS operational'],
+      ['ITEM','Safeties tested']
     ];
     var ws=XLSX.utils.aoa_to_sheet(rows);
     // Set column widths so it's readable
-    ws['!cols']=[{wch:10},{wch:60},{wch:30}];
+    ws['!cols']=[{wch:10},{wch:60}];
     var wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'Template');
     XLSX.writeFile(wb,'precx-template-sample.xlsx');
@@ -627,15 +606,14 @@ function processXLSX(file){
         return;
       }
       var hdrs=rows[headerRow].map(function(c){return String(c).trim().toUpperCase();});
-      var iType=hdrs.indexOf('TYPE'),iName=hdrs.indexOf('NAME'),iTrade=hdrs.indexOf('TRADE');
+      var iType=hdrs.indexOf('TYPE'),iName=hdrs.indexOf('NAME');
       var sections=[],cur=null,skipped=0;
       for(var i=headerRow+1;i<rows.length;i++){
         var type=String(rows[i][iType]||'').trim().toUpperCase();
         var name=String(rows[i][iName]||'').trim();
-        var trade=iTrade>=0?String(rows[i][iTrade]||'').trim():'';
         if(!name)continue;
         if(type==='SECTION'){
-          cur={id:nid(),title:name,trade:trade,items:[]};
+          cur={id:nid(),title:name,items:[]};
           sections.push(cur);
         }else if(type==='ITEM'&&cur){
           cur.items.push({id:nid(),desc:name});
