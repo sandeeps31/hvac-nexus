@@ -393,14 +393,16 @@ function renderEditor(){
 }
 
 function renderSectionCard(sec,sIdx,total){
-  var html='<div class="section-card" data-sec-id="'+sec.id+'" draggable="true" '
+  var html='<div class="section-card" data-sec-id="'+sec.id+'" '
     +'ondragstart="secDragStart(event,\''+sec.id+'\')" '
     +'ondragend="secDragEnd(event)" '
     +'ondragover="secDragOver(event)" '
     +'ondragleave="secDragLeave(event)" '
     +'ondrop="secDrop(event,\''+sec.id+'\')">'
     +'<div class="section-card-hdr">'
-      +'<span class="drag-handle" title="Drag to reorder">⋮⋮</span>'
+      +'<span class="drag-handle" title="Drag to reorder" '
+        +'onmousedown="this.closest(\'.section-card\').setAttribute(\'draggable\',\'true\')" '
+        +'onmouseup="this.closest(\'.section-card\').setAttribute(\'draggable\',\'false\')">⋮⋮</span>'
       +'<input class="field-input" placeholder="Section title (e.g. General / Documentation)" value="'+escH(sec.title||'')+'" oninput="updateSection(\''+sec.id+'\',\'title\',this.value)">'
       +'<div class="section-meta">'
         +'<button class="act-btn-edit" '+(sIdx===0?'disabled':'')+' onclick="moveSection(\''+sec.id+'\',-1)" title="Move up">↑</button>'
@@ -481,7 +483,12 @@ function deleteItem(secId,itId){
 // ── DRAG & DROP ──
 var _dragSecId=null;
 function secDragStart(e,id){_dragSecId=id;e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
-function secDragEnd(e){e.currentTarget.classList.remove('dragging');document.querySelectorAll('.section-card.drag-over').forEach(function(el){el.classList.remove('drag-over');});_dragSecId=null;}
+function secDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  e.currentTarget.setAttribute('draggable','false');
+  document.querySelectorAll('.section-card.drag-over').forEach(function(el){el.classList.remove('drag-over');});
+  _dragSecId=null;
+}
 function secDragOver(e){if(!_dragSecId)return;e.preventDefault();e.currentTarget.classList.add('drag-over');e.dataTransfer.dropEffect='move';}
 function secDragLeave(e){e.currentTarget.classList.remove('drag-over');}
 function secDrop(e,targetId){
