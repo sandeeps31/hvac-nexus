@@ -83,8 +83,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .section-card-hdr .field-input{flex:1;background:var(--surface);font-weight:600}
 .section-card-hdr .field-select{width:200px;flex-shrink:0;background:var(--surface)}
 .section-card-body{padding:12px 14px;display:flex;flex-direction:column;gap:6px}
-.item-row{display:flex;align-items:center;gap:8px}
+.item-row{display:flex;align-items:center;gap:8px;border-radius:6px;padding:2px 0;transition:background .13s}
 .item-row .field-input{flex:1}
+.item-drag-handle{cursor:grab;color:var(--muted);font-size:13px;padding:0 5px;flex-shrink:0;user-select:none;opacity:.5;transition:opacity .13s}
+.item-drag-handle:hover{opacity:1;color:var(--accent)}
+.item-drag-handle:active{cursor:grabbing}
+.item-row.dragging{opacity:.4}
+.item-row.drag-over{background:var(--accent-dim);box-shadow:inset 0 2px 0 var(--accent)}
 .act-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:13px;cursor:pointer;transition:all .13s;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
 .act-btn:hover{color:var(--accent);border-color:var(--accent)}
 .act-btn.danger:hover{color:var(--danger);border-color:var(--danger)}
@@ -385,7 +390,15 @@ function renderSectionCard(sec,sIdx,total){
     +'</div>'
     +'<div class="section-card-body">';
   (sec.items||[]).forEach(function(it){
-    html+='<div class="item-row">'
+    html+='<div class="item-row" data-item-id="'+it.id+'" data-sec-id="'+sec.id+'" '
+      +'ondragstart="itemDragStart(event,\''+sec.id+'\',\''+it.id+'\')" '
+      +'ondragend="itemDragEnd(event)" '
+      +'ondragover="itemDragOver(event)" '
+      +'ondragleave="itemDragLeave(event)" '
+      +'ondrop="itemDrop(event,\''+sec.id+'\',\''+it.id+'\')">'
+      +'<span class="item-drag-handle" title="Drag to reorder" '
+        +'onmousedown="this.closest(\'.item-row\').setAttribute(\'draggable\',\'true\')" '
+        +'onmouseup="this.closest(\'.item-row\').setAttribute(\'draggable\',\'false\')">⋮⋮</span>'
       +'<input class="field-input" placeholder="Check item description" value="'+escH(it.desc||'')+'" oninput="updateItem(\''+sec.id+'\',\''+it.id+'\',this.value)">'
       +'<button class="act-btn danger" onclick="deleteItem(\''+sec.id+'\',\''+it.id+'\')" title="Delete item">✕</button>'
     +'</div>';
@@ -475,6 +488,49 @@ function secDrop(e,targetId){
   var moved=t.sections.splice(fromIdx,1)[0];
   t.sections.splice(toIdx,0,moved);
   _dragSecId=null;
+  markDirty();renderEditor();
+}
+
+// Item-row drag (within same section only)
+var _dragItemId=null,_dragItemSecId=null;
+function itemDragStart(e,secId,itemId){
+  _dragItemSecId=secId;_dragItemId=itemId;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed='move';
+  e.stopPropagation(); // don't bubble to section drag
+}
+function itemDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  e.currentTarget.setAttribute('draggable','false');
+  document.querySelectorAll('.item-row.drag-over').forEach(function(el){el.classList.remove('drag-over');});
+  _dragItemId=null;_dragItemSecId=null;
+}
+function itemDragOver(e){
+  if(!_dragItemId)return;
+  // Only allow dropping within the same section
+  var thisSecId=e.currentTarget.getAttribute('data-sec-id');
+  if(thisSecId!==_dragItemSecId)return;
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.add('drag-over');
+  e.dataTransfer.dropEffect='move';
+}
+function itemDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function itemDrop(e,targetSecId,targetItemId){
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.remove('drag-over');
+  if(!_dragItemId||_dragItemId===targetItemId)return;
+  if(_dragItemSecId!==targetSecId)return; // disallow cross-section
+  var t=getSelected();if(!t||!t.sections)return;
+  var sec=t.sections.find(function(s){return s.id===targetSecId;});
+  if(!sec||!Array.isArray(sec.items))return;
+  var fromIdx=sec.items.findIndex(function(it){return it.id===_dragItemId;});
+  var toIdx=sec.items.findIndex(function(it){return it.id===targetItemId;});
+  if(fromIdx<0||toIdx<0)return;
+  var moved=sec.items.splice(fromIdx,1)[0];
+  sec.items.splice(toIdx,0,moved);
+  _dragItemId=null;_dragItemSecId=null;
   markDirty();renderEditor();
 }
 
