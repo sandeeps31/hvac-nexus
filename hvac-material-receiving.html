@@ -136,14 +136,36 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);opacity:.
 .log-act-btn{background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;font-size:13px;width:28px;height:28px;border-radius:5px;transition:all .12s;padding:0;display:inline-flex;align-items:center;justify-content:center}
 .log-act-btn:hover{border-color:var(--border);background:var(--surface2);color:var(--text)}
 .log-act-btn.del:hover{border-color:var(--danger,#ff4d6d);color:var(--danger,#ff4d6d);background:rgba(255,77,109,.08)}
+/* Attachment icon column — shows 📎 with optional count badge when receipt has docket file/photos */
+.log-table th.log-attach-th{width:46px;text-align:center;font-size:13px;letter-spacing:0;font-weight:400;color:var(--muted);opacity:.7}
+.log-table td.log-attach{width:46px;text-align:center;padding:13px 6px}
+.log-table td.log-attach a{display:inline-flex;align-items:center;gap:3px;color:var(--accent);text-decoration:none;font-size:14px;padding:4px 6px;border-radius:5px;transition:background .12s;position:relative}
+.log-table td.log-attach a:hover{background:var(--surface3)}
+.log-table td.log-attach .log-attach-count{font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);background:var(--accent-dim);padding:1px 4px;border-radius:8px;font-weight:700}
 .log-empty{padding:60px 24px;text-align:center;color:var(--muted)}
 .log-empty-icon{font-size:42px;margin-bottom:12px;opacity:.4}
 .log-empty-title{font-size:15px;color:var(--text);margin-bottom:6px;font-weight:500}
 .log-empty-sub{font-size:12.5px;color:var(--muted);max-width:420px;margin:0 auto;line-height:1.5}
+
+/* ─── EQUIPMENT COLUMNS in expanded receipt detail row ─── */
+/* Multi-column grid: groups equipment IDs by detected prefix. Auto-fills the available
+   width with columns of min 160px each, so reflows to 1-2 cols on narrow screens. */
+.eqcols{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.eqcol{background:var(--surface);border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.eqcol-hdr{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 10px;background:var(--surface3);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10.5px;color:var(--text);font-weight:600;letter-spacing:.3px}
+.eqcol-hdr-other{color:var(--muted);text-transform:uppercase;letter-spacing:.7px;font-size:10px}
+.eqcol-prefix{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eqcol-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);background:var(--accent-dim);padding:1px 7px;border-radius:9px;font-weight:700;flex-shrink:0}
+.eqcol-list{padding:4px 0;max-height:280px;overflow-y:auto}
+.eqcol-item{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--text2);padding:4px 10px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid transparent;transition:background .1s}
+.eqcol-item:hover{background:var(--surface2);color:var(--text)}
+.eqcol-item.dmg{color:var(--warn,#ffb830);font-weight:500}
+
 @media (max-width:820px){
   .log-table th.hide-mobile,.log-table td.hide-mobile{display:none}
   .log-table td,.log-table th{padding:10px 8px}
   .log-table td.log-supplier{font-size:13px}
+  .eqcols{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
 }
 
 /* ─── ORIGINAL EMPTY STATE (still used inside picker modal) ─── */
@@ -2106,27 +2128,32 @@ function renderLog(){
     var docketHtml=r.docketNumber
       ?escH(r.docketNumber)
       :'<span style="color:var(--muted);font-style:italic">—</span>';
+    // Attachment icon — only shows when receipt has a docket file attached.
+    // Tiny visual cue so PMs can see at a glance which deliveries have paperwork on file.
+    var attachCount=(r.docketUrl?1:0)+((r.photos||[]).length);
+    var attachCell=attachCount
+      ?'<td class="log-attach"><a href="'+(r.docketUrl?escH(r.docketUrl):'#')+'" target="_blank" onclick="event.stopPropagation()" title="'+(r.docketUrl?'View docket':'')+(attachCount>1?(' · '+(attachCount-1)+' photo'+(attachCount-1===1?'':'s')):'')+'">📎'+(attachCount>1?'<span class="log-attach-count">'+attachCount+'</span>':'')+'</a></td>'
+      :'<td class="log-attach"></td>';
     return '<tr onclick="toggleLogRow(\''+escFilterAttr(r.id)+'\')">'
       +'<td class="log-date">'+fmtD(r.deliveryDate)+'</td>'
       +'<td class="log-supplier">'+escH(r.supplier||'—')+'</td>'
       +'<td class="log-type hide-mobile">'+escH(r.equipType||'—')+'</td>'
       +poRefHtml
       +'<td class="log-count">'+r.itemCount+' item'+(r.itemCount===1?'':'s')+dmgChip+'</td>'
+      +attachCell
       +'<td class="log-by hide-mobile">'+escH(r.receivedBy||'—')+'</td>'
       +'<td class="log-docket hide-mobile">'+docketHtml+'</td>'
       +'<td class="log-actions">'
         +'<button class="log-act-btn del" onclick="event.stopPropagation();confirmDeleteReceipt(\''+escFilterAttr(r.id)+'\')" title="Delete this receipt">🗑️</button>'
       +'</td>'
       +'</tr>'
-      // Detail row — equipment IDs received, hidden by default, shown when row clicked
+      // Detail row — equipment IDs grouped into columns by detected prefix.
+      // Hidden by default, shown when the parent row is clicked.
       +'<tr class="log-detail-row" id="logDetail_'+escH(r.id)+'" style="display:none;background:var(--surface2)">'
-        +'<td colspan="8" style="padding:14px 18px;border-top:1px solid var(--border)">'
+        +'<td colspan="9" style="padding:14px 18px;border-top:1px solid var(--border)">'
           +(r.notes?'<div style="font-size:12px;color:var(--text2);margin-bottom:8px"><strong style="color:var(--muted);font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase">Notes:</strong> '+escH(r.notes)+'</div>':'')
-          +'<div style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace;letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Equipment received</div>'
-          +'<div style="display:flex;flex-wrap:wrap;gap:5px">'+(r.items||[]).map(function(i){
-            var cls=i.condition==='Damaged'?' dmg':'';
-            return '<span class="hist-card-item'+cls+'">'+escH(i.equipId)+(i.condition==='Damaged'?' ⚠':'')+'</span>';
-          }).join('')+'</div>'
+          +'<div style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace;letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px">Equipment received</div>'
+          +_renderEquipColumns(r.items||[])
           +(r.docketUrl||(r.photos&&r.photos.length)?'<div style="margin-top:10px;font-size:11.5px">'+(r.docketUrl?'<a href="'+escH(r.docketUrl)+'" target="_blank" style="color:var(--accent);text-decoration:none">📄 View docket</a>':'')+(r.photos&&r.photos.length?(r.docketUrl?' · ':'')+'<span style="color:var(--muted)">'+r.photos.length+' photo'+(r.photos.length===1?'':'s')+' attached</span>':'')+'</div>':'')
         +'</td>'
       +'</tr>';
@@ -2137,10 +2164,90 @@ function renderLog(){
     +'<th class="hide-mobile">Type</th>'
     +'<th>PO Ref</th>'
     +'<th>Items</th>'
+    +'<th class="log-attach-th" title="Has attachment">📎</th>'
     +'<th class="hide-mobile">Received by</th>'
     +'<th class="hide-mobile">Docket #</th>'
     +'<th></th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+// ─── Group equipment IDs by detected prefix and render as columns ───
+//
+// Splits each ID into prefix + suffix at the rightmost number sequence (with optional trailing
+// letters). Groups items sharing a prefix. Prefixes with only 1 item collapse into a shared
+// "Other" column to avoid one-column-per-item clutter.
+//
+// Examples of prefix detection:
+//   "RAD 1.5-35"      → prefix "RAD 1.5-"        suffix "35"
+//   "SAD(M) 1.5-37"   → prefix "SAD(M) 1.5-"     suffix "37"
+//   "OAD 1.5-35A"     → prefix "OAD 1.5-"        suffix "35A"
+//   "BL-VAV-3.2-001"  → prefix "BL-VAV-3.2-"     suffix "001"
+//   "Z104"            → prefix "Z"               suffix "104"
+//   "Standalone-X"    → prefix "Standalone-X"    suffix ""    (no number → goes to Other)
+function _splitEquipId(id){
+  var s=String(id||'').trim();
+  if(!s)return {prefix:'',suffix:''};
+  // Match the rightmost sequence: digits optionally followed by trailing letter(s).
+  // Captures position so we can split on it without regex anchoring fuss.
+  var m=s.match(/(\d+[A-Za-z]*)$/);
+  if(!m)return {prefix:s,suffix:''};
+  var idx=s.length-m[1].length;
+  return {prefix:s.slice(0,idx),suffix:m[1]};
+}
+
+// Natural sort suffixes: numeric portion first, then trailing letters.
+// "35" < "36" < "35A" < "35B" < "100".
+function _suffixCompare(a,b){
+  var ma=a.match(/^(\d+)([A-Za-z]*)$/);var mb=b.match(/^(\d+)([A-Za-z]*)$/);
+  if(!ma||!mb)return a.localeCompare(b);
+  var na=parseInt(ma[1],10),nb=parseInt(mb[1],10);
+  if(na!==nb)return na-nb;
+  return ma[2].localeCompare(mb[2]);
+}
+
+function _renderEquipColumns(items){
+  if(!items.length)return '<div style="color:var(--muted);font-size:12px;font-style:italic">No items</div>';
+  // Bucket items by their detected prefix
+  var buckets={};
+  var bucketOrder=[]; // preserve first-seen order for stable rendering
+  items.forEach(function(it){
+    var split=_splitEquipId(it.equipId);
+    var key=split.prefix||'(other)';
+    if(!buckets[key]){buckets[key]={prefix:split.prefix,items:[]};bucketOrder.push(key);}
+    buckets[key].items.push({equipId:it.equipId,suffix:split.suffix,condition:it.condition});
+  });
+  // Pull single-item buckets (and the "(other)" no-prefix bucket) into a shared Other column
+  var groupCols=[];
+  var otherItems=[];
+  bucketOrder.forEach(function(key){
+    var b=buckets[key];
+    if(b.items.length<=1||key==='(other)'){
+      otherItems=otherItems.concat(b.items);
+    } else {
+      // Sort within the group naturally by suffix
+      b.items.sort(function(a,b){return _suffixCompare(a.suffix,b.suffix);});
+      groupCols.push(b);
+    }
+  });
+  // Sort the Other bucket alphabetically by full equipId
+  otherItems.sort(function(a,b){return (a.equipId||'').localeCompare(b.equipId||'');});
+
+  // Render each column. Damaged items get a ⚠ inline beside the ID.
+  function renderCol(prefix,items,isOther){
+    var headerHtml=isOther
+      ?'<div class="eqcol-hdr eqcol-hdr-other">Other<span class="eqcol-count">'+items.length+'</span></div>'
+      :'<div class="eqcol-hdr"><span class="eqcol-prefix">'+escH(prefix)+'</span><span class="eqcol-count">'+items.length+'</span></div>';
+    var listHtml=items.map(function(i){
+      var dmg=i.condition==='Damaged';
+      return '<div class="eqcol-item'+(dmg?' dmg':'')+'">'+escH(i.equipId)+(dmg?' ⚠':'')+'</div>';
+    }).join('');
+    return '<div class="eqcol">'+headerHtml+'<div class="eqcol-list">'+listHtml+'</div></div>';
+  }
+  var html='<div class="eqcols">';
+  groupCols.forEach(function(g){html+=renderCol(g.prefix,g.items,false);});
+  if(otherItems.length)html+=renderCol(null,otherItems,true);
+  html+='</div>';
+  return html;
 }
 
 // Click a row to toggle the detail (equipment IDs + docket link). Lightweight inline expand
