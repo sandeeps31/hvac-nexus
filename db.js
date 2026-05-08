@@ -674,6 +674,24 @@ async function dbSetProjectPrecxAreaChecklists(projectNum, data) {
   return await dbSetProject('project_precx_area_checklists', projectNum, data);
 }
 
+// ── Project Plan Templates (company-level, multiple master templates) ──
+async function dbGetProjectPlanTemplates() {
+  return await dbGet('project_plan_templates') || [];
+}
+async function dbSetProjectPlanTemplates(data) {
+  return await dbSet('project_plan_templates', data);
+}
+
+// ── Project Plans (project-scoped, array of plans per project) ──
+// Each project can have multiple plans (e.g. "Main works", "Plant room", "Tenancy fitout L3")
+// Each plan has phases → stages → items
+async function dbGetProjectPlans(projectNum) {
+  return await dbGetProject('project_plans', projectNum) || [];
+}
+async function dbSetProjectPlans(projectNum, data) {
+  return await dbSetProject('project_plans', projectNum, data);
+}
+
 
 // ═══════════════════════════════════════════════════
 // PHOTO STORAGE HELPERS

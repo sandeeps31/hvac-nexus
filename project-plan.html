@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Project plan · HVAC Nexus</title>
+<link rel="stylesheet" href="hvac-shared.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --pp-row-grid: 28px 1fr 110px 150px 36px 28px;
+  }
+
+  /* Plan header bar */
+  .pp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+  .pp-header-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+  .pp-proj-tag { font-size: 12px; color: var(--muted); }
+  .pp-plan-switcher-wrap { display: flex; align-items: center; gap: 4px; }
+  .pp-plan-switcher-wrap select {
+    font-size: 14px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    max-width: 240px;
+  }
+  .pp-plan-menu-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 9px;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 13px;
+  }
+  .pp-plan-menu-btn:hover { background: var(--bg-hover); }
+  .pp-header-right { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* Stats strip */
+  .pp-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    padding: 12px 18px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+  .pp-stat {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 12px;
+  }
+  .pp-stat-lbl { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .pp-stat-val { font-size: 22px; font-weight: 600; }
+  .pp-stat.done .pp-stat-val { color: var(--success, #16a34a); }
+  .pp-stat.prog .pp-stat-val { color: var(--info, #2563eb); }
+  .pp-stat.overdue .pp-stat-val { color: var(--danger, #dc2626); }
+
+  /* Phase tabs */
+  .pp-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 18px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .pp-tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .pp-tab:hover { color: var(--text); }
+  .pp-tab.active { color: var(--text); font-weight: 500; border-bottom-color: var(--accent, #2563eb); }
+  .pp-tab-count { font-size: 11px; color: var(--muted); background: var(--bg); padding: 1px 7px; border-radius: 10px; }
+  .pp-tab.active .pp-tab-count { color: var(--text); }
+
+  /* Filters */
+  .pp-filters {
+    display: flex;
+    gap: 8px;
+    padding: 12px 18px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .pp-filters input,
+  .pp-filters select {
+    font-size: 13px;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .pp-filters input { flex: 1; min-width: 180px; }
+
+  /* Stage groups */
+  .pp-content { padding: 14px 18px 60px; }
+  .pp-stage {
+    margin-bottom: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .pp-stage-hdr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg);
+    cursor: pointer;
+    user-select: none;
+  }
+  .pp-stage-hdr:hover { background: var(--bg-hover); }
+  .pp-chev { font-size: 11px; color: var(--muted); min-width: 10px; }
+  .pp-stage-name { font-size: 14px; font-weight: 500; }
+  .pp-stage-count { font-size: 11px; color: var(--muted); }
+  .pp-progbar {
+    height: 4px;
+    width: 90px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .pp-progbar-fill {
+    height: 100%;
+    background: var(--success, #16a34a);
+    transition: width .2s;
+  }
+  .pp-stage-menu {
+    color: var(--muted);
+    cursor: pointer;
+    padding: 2px 8px;
+    font-size: 16px;
+    border-radius: 4px;
+  }
+  .pp-stage-menu:hover { background: var(--border); color: var(--text); }
+  .pp-stage-items { padding: 4px 0; }
+
+  /* Item rows */
+  .pp-item {
+    display: grid;
+    grid-template-columns: var(--pp-row-grid);
+    gap: 10px;
+    padding: 9px 14px;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .pp-item:last-child { border-bottom: none; }
+  .pp-item:hover { background: var(--bg); }
+  .pp-item-overdue { background: rgba(220, 38, 38, 0.04); }
+  .pp-check { margin: 0; cursor: pointer; }
+  .pp-item-main { cursor: pointer; min-width: 0; }
+  .pp-item-desc { color: var(--text); }
+  .pp-item-strike { text-decoration: line-through; color: var(--muted); }
+  .pp-item-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .pp-status {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .pp-st-todo { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+  .pp-st-prog { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+  .pp-st-done { background: rgba(22, 163, 74, 0.1); color: #16a34a; }
+  .pp-st-nr   { background: var(--bg); color: var(--muted); }
+  .pp-st-blk  { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+  .pp-assignee { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pp-link { text-align: center; }
+  .pp-link a { text-decoration: none; font-size: 14px; }
+  .pp-item-menu {
+    color: var(--muted);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 16px;
+    border-radius: 4px;
+    text-align: center;
+  }
+  .pp-item-menu:hover { background: var(--border); color: var(--text); }
+
+  .pp-add-item-row {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+  .pp-add-item-row a {
+    color: var(--accent, #2563eb);
+    cursor: pointer;
+  }
+  .pp-add-item-row a:hover { text-decoration: underline; }
+
+  .pp-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .pp-empty .btn { margin: 0 4px; }
+  .pp-empty-stage {
+    padding: 14px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .pp-empty-stage a {
+    color: var(--accent, #2563eb);
+    cursor: pointer;
+  }
+
+  /* Buttons */
+  .btn {
+    font-size: 13px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn.primary {
+    background: var(--accent, #2563eb);
+    color: white;
+    border-color: var(--accent, #2563eb);
+  }
+  .btn.primary:hover { opacity: 0.9; }
+
+  /* Pop menu */
+  .pp-popmenu {
+    position: fixed;
+    z-index: 9999;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    min-width: 180px;
+    padding: 4px 0;
+    font-size: 13px;
+  }
+  .pp-popitem {
+    padding: 8px 14px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .pp-popitem:hover { background: var(--bg); }
+  .pp-popitem-danger { color: var(--danger, #dc2626); }
+  .pp-popitem-danger:hover { background: rgba(220, 38, 38, 0.08); }
+
+  /* Modal */
+  .pp-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 1000;
+    padding: 60px 20px 20px;
+    overflow-y: auto;
+  }
+  .pp-modal {
+    background: var(--card);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    width: 100%;
+    max-width: 560px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+  }
+  .pp-modal-hdr {
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pp-modal-body {
+    padding: 16px 20px;
+  }
+  .pp-modal-ftr {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .pp-lbl {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin: 10px 0 4px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .pp-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .pp-input:focus { outline: 2px solid var(--accent, #2563eb); outline-offset: -1px; }
+  .pp-row { display: flex; gap: 12px; margin-bottom: 4px; }
+  .pp-row > div { min-width: 0; }
+  .pp-meta-box {
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Responsive: collapse columns on narrow screens */
+  @media (max-width: 800px) {
+    :root { --pp-row-grid: 24px 1fr 90px 28px 24px; }
+    .pp-assignee { display: none; }
+    .pp-stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+  <div id="app-sidebar"></div>
+  <div class="main" id="mainWrap">
+
+    <div class="pp-header">
+      <div class="pp-header-left">
+        <div>
+          <div class="pp-proj-tag" id="pp-proj-tag">—</div>
+          <div class="pp-plan-switcher-wrap" style="margin-top:2px;">
+            <select id="pp-plan-switcher" onchange="ppOnPlanChange(this.value)"></select>
+            <button class="pp-plan-menu-btn" onclick="ppPlanMenu(event)" title="Plan options">▾</button>
+          </div>
+        </div>
+      </div>
+      <div class="pp-header-right">
+        <button class="btn" onclick="ppImportExcel()">Import .xlsx</button>
+        <button class="btn" onclick="ppExportExcel()">Export .xlsx</button>
+        <button class="btn primary" onclick="ppNewPlan()">+ New plan</button>
+      </div>
+    </div>
+
+    <div class="pp-stats">
+      <div class="pp-stat"><div class="pp-stat-lbl">Total items</div><div class="pp-stat-val" id="pp-stat-total">0</div></div>
+      <div class="pp-stat done"><div class="pp-stat-lbl">Done</div><div class="pp-stat-val" id="pp-stat-done">0</div></div>
+      <div class="pp-stat prog"><div class="pp-stat-lbl">In progress</div><div class="pp-stat-val" id="pp-stat-prog">0</div></div>
+      <div class="pp-stat overdue"><div class="pp-stat-lbl">Overdue</div><div class="pp-stat-val" id="pp-stat-overdue">0</div></div>
+    </div>
+
+    <div class="pp-tabs" id="pp-phase-tabs"></div>
+
+    <div class="pp-filters">
+      <input id="pp-search" type="text" placeholder="Search items..." oninput="ppOnSearch(this.value)" />
+      <select id="pp-filter-status" onchange="ppOnFilterStatus(this.value)">
+        <option value="all">All status</option>
+        <option value="to_do">To do</option>
+        <option value="in_progress">In progress</option>
+        <option value="done">Done</option>
+        <option value="not_required">Not required</option>
+        <option value="blocked">Blocked</option>
+        <option value="overdue">Overdue only</option>
+      </select>
+      <select id="pp-filter-assignee" onchange="ppOnFilterAssignee(this.value)">
+        <option value="all">All assignees</option>
+      </select>
+    </div>
+
+    <div class="pp-content" id="pp-content"></div>
+
+  </div>
+
+  <div class="pp-modal-overlay" id="pp-modal" onclick="if(event.target===this) ppCloseModal()">
+    <div class="pp-modal" id="pp-modal-content"></div>
+  </div>
+
+  <script src="db.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="project-plan.js"></script>
+</body>
+</html>
