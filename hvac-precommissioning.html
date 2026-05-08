@@ -649,9 +649,36 @@ async function loadAcc(){
   }catch(e){accProjAreas=[];}
 }
 
-async function saveAcc(){
-  try{await dbSetProjectPrecxAreaChecklists(pKey,accList);}catch(e){console.error(e);showToast('⚠ Save failed');}
+// Debounced save — batches rapid changes into a single network round-trip.
+// Call queueSaveAcc() from any handler that mutates accList. Save fires 250ms
+// after the last call, so a burst of clicks coalesces into one save.
+var _saveAccTimer=null;
+var _saveAccInFlight=false;
+var _saveAccPending=false;
+async function _saveAccNow(){
+  if(_saveAccInFlight){_saveAccPending=true;return;}
+  _saveAccInFlight=true;
+  try{
+    await dbSetProjectPrecxAreaChecklists(pKey,accList);
+  }catch(e){
+    console.error(e);
+    showToast('⚠ Save failed');
+  }finally{
+    _saveAccInFlight=false;
+    if(_saveAccPending){_saveAccPending=false;_saveAccNow();}
+  }
 }
+function queueSaveAcc(){
+  if(_saveAccTimer)clearTimeout(_saveAccTimer);
+  _saveAccTimer=setTimeout(function(){_saveAccTimer=null;_saveAccNow();},250);
+}
+// Backwards-compat alias for handlers that already await saveAcc()
+async function saveAcc(){return queueSaveAcc();}
+
+// Flush pending saves before the user navigates away
+window.addEventListener('beforeunload',function(){
+  if(_saveAccTimer){clearTimeout(_saveAccTimer);_saveAccNow();}
+});
 
 // ── Compute progress + status for a checklist ──
 // Item value: 'yes' | 'no' | 'na' | undefined
@@ -1101,26 +1128,120 @@ async function accDeleteSignoffBlock(secId,blockId){
   renderAccEditor();
 }
 
-async function accSetItemValue(secId,itId,value){
+function accSetItemValue(secId,itId,value){
   var c=_accCurrent();if(!c)return;
   if(!c.state)c.state={};
   if(!c.state[secId])c.state[secId]={items:{},signoffs:[]};
   if(!c.state[secId].items)c.state[secId].items={};
-  // Click the same value again to clear
+  // Toggle: clicking the same value clears it
+  var newValue;
   if(c.state[secId].items[itId]===value){
     delete c.state[secId].items[itId];
+    newValue='';
   } else {
     c.state[secId].items[itId]=value;
+    newValue=value;
   }
   c.updatedAt=new Date().toISOString();
-  await saveAcc();
-  renderAccEditor();
+  queueSaveAcc();              // debounced — fires 250ms after last click
+  _accUpdateItemRowDOM(secId,itId,newValue);
+  _accUpdateSectionHeaderDOM(secId);
+  _accUpdateEditorTopbarDOM();
+}
+
+// Update only the affected item row in-place (no full re-render).
+function _accUpdateItemRowDOM(secId,itId,newValue){
+  // Find the row by walking the buttons we have inline data for
+  var btns=document.querySelectorAll('button.acc-yna-btn');
+  for(var i=0;i<btns.length;i++){
+    var b=btns[i];
+    var oc=b.getAttribute('onclick')||'';
+    if(oc.indexOf("'"+secId+"'")>=0&&oc.indexOf("'"+itId+"'")>=0){
+      var row=b.closest('.acc-item-row');
+      if(!row)continue;
+      // Reset row class
+      row.classList.remove('yes','no','na');
+      if(newValue==='yes')row.classList.add('yes');
+      else if(newValue==='no')row.classList.add('no');
+      else if(newValue==='na')row.classList.add('na');
+      // Reset all 3 buttons in this row
+      var rowBtns=row.querySelectorAll('button.acc-yna-btn');
+      rowBtns.forEach(function(rb){
+        rb.classList.remove('active');
+        if(rb.classList.contains('yes')&&newValue==='yes')rb.classList.add('active');
+        else if(rb.classList.contains('no')&&newValue==='no')rb.classList.add('active');
+        else if(rb.classList.contains('na')&&newValue==='na')rb.classList.add('active');
+      });
+      return;
+    }
+  }
+}
+
+// Update the section header progress bar/count, sign-off badge, and Mark-N/A button visibility.
+function _accUpdateSectionHeaderDOM(secId){
+  var c=_accCurrent();if(!c)return;
+  var sec=(c.templateSections||[]).find(function(s){return s.id===secId;});
+  if(!sec)return;
+  var sState=(c.state&&c.state[secId])||{};
+  var totalItems=(sec.items||[]).length;
+  var addressed=0,blanks=0;
+  (sec.items||[]).forEach(function(it){
+    var v=(sState.items||{})[it.id];
+    if(v==='yes'||v==='na')addressed++;
+    else if(!v)blanks++;
+  });
+  var pct=totalItems?Math.round(addressed/totalItems*100):0;
+  var sectionEl=document.querySelector('.acc-section[data-sec-id="'+secId+'"]');
+  if(!sectionEl)return;
+  var fillEl=sectionEl.querySelector('.acc-section-progress-fill');
+  var textEl=sectionEl.querySelector('.acc-section-progress-text');
+  if(fillEl){
+    fillEl.style.width=pct+'%';
+    fillEl.classList.toggle('complete',addressed===totalItems&&totalItems>0);
+  }
+  if(textEl)textEl.textContent=addressed+'/'+totalItems;
+  // Toggle Mark-blanks-N/A button visibility based on remaining blanks
+  var hdr=sectionEl.querySelector('.acc-section-hdr');
+  if(hdr){
+    var existingBtn=hdr.querySelector('.acc-section-na-btn');
+    if(blanks>0&&!existingBtn){
+      var b=document.createElement('button');
+      b.className='acc-section-na-btn';
+      b.textContent='Mark blanks N/A';
+      b.title='Set all unanswered items to N/A and collapse';
+      b.onclick=function(e){e.stopPropagation();accMarkSectionNA(secId);};
+      hdr.appendChild(b);
+    } else if(blanks===0&&existingBtn){
+      existingBtn.remove();
+    }
+  }
+  // Update sign-off badge "✓" suffix if section is now signed
+  var blocks=sState.signoffs||[];
+  var allSigned=_accSectionSigned(sec,sState);
+  var tradeEl=hdr&&hdr.querySelector('.acc-section-trade');
+  if(tradeEl&&blocks.length){
+    tradeEl.textContent=blocks.length+' sign-off'+(blocks.length!==1?'s':'')+(allSigned?' ✓':'');
+    tradeEl.classList.toggle('signed',allSigned);
+  }
+}
+
+// Update the editor top-bar progress text + status badge.
+function _accUpdateEditorTopbarDOM(){
+  var c=_accCurrent();if(!c)return;
+  var k=_accCounts(c);
+  var status=_accStatus(c);
+  var statusEl=document.getElementById('accEditorStatus');
+  if(statusEl){
+    statusEl.outerHTML=_accStatusBadge(status).replace('class="status-badge','id="accEditorStatus" class="status-badge');
+  }
+  var progEl=document.getElementById('accEditorProgress');
+  if(progEl)progEl.textContent=k.addressedItems+'/'+k.totalItems+' items · '+k.signedSections+'/'+k.totalSections+' signed';
 }
 
 // ── Section collapse / expand ──
 // Click anywhere on the header (except inner buttons that stopPropagation) toggles collapsed state.
 // State persists on the checklist itself so it survives reloads.
-async function accToggleSection(e,secId){
+function accToggleSection(e,secId){
   // Ignore clicks on buttons inside the header (they should call stopPropagation themselves but be defensive)
   if(e&&e.target){
     var t=e.target;
@@ -1130,8 +1251,14 @@ async function accToggleSection(e,secId){
   if(!c.collapsed)c.collapsed={};
   c.collapsed[secId]=!c.collapsed[secId];
   c.updatedAt=new Date().toISOString();
-  await saveAcc();
-  renderAccEditor();
+  queueSaveAcc();
+  // Toggle CSS class directly + update chevron
+  var sectionEl=document.querySelector('.acc-section[data-sec-id="'+secId+'"]');
+  if(sectionEl){
+    sectionEl.classList.toggle('collapsed',!!c.collapsed[secId]);
+    var chev=sectionEl.querySelector('.acc-section-chevron');
+    if(chev)chev.textContent=c.collapsed[secId]?'▶':'▼';
+  }
 }
 
 // ── Mark Section N/A ──
