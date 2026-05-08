@@ -98,10 +98,25 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .acc-meta-val{font-size:13px;font-weight:600;color:var(--text)}
 
 .acc-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:visible}
-.acc-section-hdr{padding:11px 14px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;border-radius:var(--radius) var(--radius) 0 0}
-.acc-section-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;flex:1}
-.acc-section-trade{font-family:'DM Mono',monospace;font-size:10px;padding:3px 9px;border-radius:5px;background:var(--surface3);color:var(--text2);border:1px solid var(--border)}
+.acc-section-hdr{padding:11px 14px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;user-select:none;transition:background .13s}
+.acc-section-hdr:hover{background:var(--surface3)}
+.acc-section.collapsed .acc-section-hdr{border-bottom:none;border-radius:var(--radius)}
+.acc-section.collapsed .acc-section-collapse-wrap{display:none}
+.acc-section-chevron{font-size:10px;color:var(--muted);width:14px;flex-shrink:0;transition:transform .15s}
+.acc-section-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Per-section progress bar in the header */
+.acc-section-progress{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.acc-section-progress-bar{width:90px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden}
+.acc-section-progress-fill{height:100%;background:var(--accent);transition:width .25s}
+.acc-section-progress-fill.complete{background:var(--green)}
+.acc-section-progress-text{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--muted);white-space:nowrap;min-width:36px;text-align:right}
+
+.acc-section-trade{font-family:'DM Mono',monospace;font-size:10px;padding:3px 9px;border-radius:5px;background:var(--surface3);color:var(--text2);border:1px solid var(--border);flex-shrink:0}
 .acc-section-trade.signed{background:var(--green-dim);color:var(--green);border-color:rgba(0,229,160,.25)}
+
+.acc-section-na-btn{font-family:'DM Mono',monospace;font-size:10px;padding:4px 9px;border-radius:5px;background:transparent;color:var(--muted);border:1px solid var(--border);cursor:pointer;transition:all .13s;flex-shrink:0;white-space:nowrap}
+.acc-section-na-btn:hover{color:var(--text);border-color:var(--text2);background:var(--surface3)}
 .acc-section-body{padding:6px 0}
 .acc-item-row{display:flex;align-items:center;gap:14px;padding:9px 14px;transition:background .13s;border-left:3px solid transparent}
 .acc-item-row:hover{background:var(--surface2)}
@@ -552,6 +567,8 @@ var _accSigContext=null;         // {checklistId, sectionId, blockId} when signi
 // Current shape: state[secId] = { items: {itemId: 'yes'|'no'|'na'}, signoffs: [{id, company, signedBy, signedDate, signaturePNG}], comments }
 function _accMigrateState(c){
   if(!c||!c.state)return;
+  // Initialise collapsed map (per-section UI state)
+  if(!c.collapsed||typeof c.collapsed!=='object')c.collapsed={};
   Object.keys(c.state).forEach(function(secId){
     var s=c.state[secId];
     if(!s||typeof s!=='object')return;
@@ -941,12 +958,34 @@ function renderAccEditor(){
     if(!Array.isArray(sState.signoffs))sState.signoffs=[];
     var blocks=sState.signoffs;
     var allSigned=_accSectionSigned(sec,sState);
-    html+='<div class="acc-section">'
-      +'<div class="acc-section-hdr">'
+    // Per-section progress count: items with Yes or N/A = "addressed"
+    var totalItems=(sec.items||[]).length;
+    var addressed=0,blanks=0;
+    (sec.items||[]).forEach(function(it){
+      var v=(sState.items||{})[it.id];
+      if(v==='yes'||v==='na')addressed++;
+      else if(!v)blanks++;
+    });
+    var pct=totalItems?Math.round(addressed/totalItems*100):0;
+    var pctClass=(addressed===totalItems&&totalItems>0)?' complete':'';
+    // Collapsed state — stored on the checklist itself so it persists across reloads/saves
+    var isCollapsed=!!(c.collapsed&&c.collapsed[sec.id]);
+
+    html+='<div class="acc-section'+(isCollapsed?' collapsed':'')+'" data-sec-id="'+sec.id+'">'
+      +'<div class="acc-section-hdr" onclick="accToggleSection(event,\''+sec.id+'\')">'
+        +'<span class="acc-section-chevron">'+(isCollapsed?'▶':'▼')+'</span>'
         +'<span class="acc-section-title">'+_accEsc(sec.title||'Untitled section')+'</span>'
+        +'<div class="acc-section-progress">'
+          +'<div class="acc-section-progress-bar"><div class="acc-section-progress-fill'+pctClass+'" style="width:'+pct+'%"></div></div>'
+          +'<span class="acc-section-progress-text">'+addressed+'/'+totalItems+'</span>'
+        +'</div>'
         +(blocks.length?'<span class="acc-section-trade'+(allSigned?' signed':'')+'">'+blocks.length+' sign-off'+(blocks.length!==1?'s':'')+(allSigned?' ✓':'')+'</span>':'')
-      +'</div>'
-      +'<div class="acc-section-body">';
+        +(blanks>0?'<button class="acc-section-na-btn" onclick="event.stopPropagation();accMarkSectionNA(\''+sec.id+'\')" title="Set all unanswered items to N/A and collapse">Mark blanks N/A</button>':'')
+      +'</div>';
+
+    // Body + signoff (hidden when collapsed but kept in DOM so layout doesn't reflow on toggle)
+    html+='<div class="acc-section-collapse-wrap">';
+    html+='<div class="acc-section-body">';
     (sec.items||[]).forEach(function(it){
       var v=(sState.items&&sState.items[it.id])||'';
       var rowCls='acc-item-row';
@@ -980,6 +1019,7 @@ function renderAccEditor(){
     html+='<button class="acc-add-signoff-btn" onclick="accAddSignoffBlock(\''+sec.id+'\')">＋ Add Signature Block</button>';
     html+='</div>'; // /acc-signoff-list
 
+    html+='</div>'; // /acc-section-collapse-wrap
     html+='</div>'; // /acc-section
   });
   body.innerHTML=html;
@@ -1075,6 +1115,51 @@ async function accSetItemValue(secId,itId,value){
   c.updatedAt=new Date().toISOString();
   await saveAcc();
   renderAccEditor();
+}
+
+// ── Section collapse / expand ──
+// Click anywhere on the header (except inner buttons that stopPropagation) toggles collapsed state.
+// State persists on the checklist itself so it survives reloads.
+async function accToggleSection(e,secId){
+  // Ignore clicks on buttons inside the header (they should call stopPropagation themselves but be defensive)
+  if(e&&e.target){
+    var t=e.target;
+    if(t.tagName==='BUTTON'||t.closest('button'))return;
+  }
+  var c=_accCurrent();if(!c)return;
+  if(!c.collapsed)c.collapsed={};
+  c.collapsed[secId]=!c.collapsed[secId];
+  c.updatedAt=new Date().toISOString();
+  await saveAcc();
+  renderAccEditor();
+}
+
+// ── Mark Section N/A ──
+// Sets every BLANK item in the section to N/A (does NOT overwrite existing Yes/No),
+// then auto-collapses the section.
+async function accMarkSectionNA(secId){
+  var c=_accCurrent();if(!c)return;
+  var sec=(c.templateSections||[]).find(function(s){return s.id===secId;});
+  if(!sec)return;
+  if(!c.state)c.state={};
+  if(!c.state[secId])c.state[secId]={items:{},signoffs:[]};
+  if(!c.state[secId].items)c.state[secId].items={};
+  // Set blank items to N/A
+  var setCount=0;
+  (sec.items||[]).forEach(function(it){
+    if(!c.state[secId].items[it.id]){
+      c.state[secId].items[it.id]='na';
+      setCount++;
+    }
+  });
+  if(!setCount){showToast('No blank items in this section');return;}
+  // Auto-collapse
+  if(!c.collapsed)c.collapsed={};
+  c.collapsed[secId]=true;
+  c.updatedAt=new Date().toISOString();
+  await saveAcc();
+  renderAccEditor();
+  showToast('✓ Set '+setCount+' item'+(setCount!==1?'s':'')+' to N/A');
 }
 
 // ── Signature pad ──
