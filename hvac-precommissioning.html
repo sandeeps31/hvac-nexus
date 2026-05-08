@@ -346,7 +346,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   <!-- TAB: EQUIPMENT PRE-CX -->
   <div class="tab-pane" id="tab-equipment">
     <div class="acc-toolbar">
-      <div class="acc-search"><span style="color:var(--muted)">🔍</span><input type="text" id="eqpSrch" placeholder="Search equipment, drawing, ITP…" oninput="renderEqpRegister()"></div>
+      <div class="acc-search"><span style="color:var(--muted)">🔍</span><input type="text" id="eqpSrch" placeholder="Search equipment, ITP, location…" oninput="renderEqpRegister()"></div>
       <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="eqpCount"></span>
       <button class="bg bsm btn" onclick="loadEqpAndRender()" title="Refresh from drawings">🔄 Refresh</button>
     </div>
@@ -354,12 +354,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <table class="acc-tbl" id="eqpTbl">
         <thead>
           <tr>
-            <th style="width:140px">Equipment Tag</th>
-            <th style="width:160px">Drawing</th>
-            <th>Pre-Cx ITP</th>
+            <th style="width:120px">ITP Ref</th>
+            <th>ITP Type</th>
+            <th style="width:140px">Equipment ID</th>
+            <th style="width:160px">Location</th>
             <th style="width:120px">Status</th>
-            <th style="width:130px">Last Updated</th>
-            <th style="width:140px;text-align:right">Actions</th>
           </tr>
         </thead>
         <tbody id="eqpBody"></tbody>
@@ -422,6 +421,7 @@ var eqpRows=[];        // [{ pinId, equipTag, drawingName, drawingId, itpNo, itp
 var eqpDrawings=[];    // raw drawings array
 var eqpItpTpls=[];     // project ITP templates (for category lookup)
 var eqpResponses={};   // {pinId: {status, ...}}
+var eqpEquipSchedule=null;  // equipment schedule (tabs[].rows[]) — used to look up location by equipId
 
 // Map pin status → 3-state convention used elsewhere on this page
 var EQP_STATUS_MAP={'not-started':'not_started','in-progress':'in_progress','action':'in_progress','closed':'completed'};
@@ -450,8 +450,31 @@ async function loadEqpData(){
   try{eqpItpTpls=await dbGetItpProjectTemplates(pKey);if(!Array.isArray(eqpItpTpls))eqpItpTpls=[];}catch(e){eqpItpTpls=[];console.error(e);}
   // ITP responses (status per pinId)
   try{eqpResponses=await dbGetItpResponses(pKey);if(!eqpResponses||typeof eqpResponses!=='object')eqpResponses={};}catch(e){eqpResponses={};console.error(e);}
+  // Equipment schedule — used to look up Location by Equipment ID (matches hvac-itp-form.html behaviour)
+  try{eqpEquipSchedule=await dbGetEquipment(pKey);}catch(e){eqpEquipSchedule=null;console.error(e);}
   // Build flat row list
   eqpRows=_eqpBuildRows();
+}
+
+// Look up Location for an equipment tag by walking the equipment schedule.
+// Mirrors getEquipData() in hvac-itp-form.html. Returns the equipment row or null.
+function _eqpFindEquipRow(equipId){
+  if(!equipId||!eqpEquipSchedule||!Array.isArray(eqpEquipSchedule.tabs))return null;
+  var key=equipId.toLowerCase();
+  for(var i=0;i<eqpEquipSchedule.tabs.length;i++){
+    var tab=eqpEquipSchedule.tabs[i];
+    var rows=tab.rows||[];
+    for(var j=0;j<rows.length;j++){
+      var r=rows[j];
+      if(((r.tag||r.equipId||'').toLowerCase())===key)return r;
+    }
+  }
+  return null;
+}
+function _eqpLocationForEquip(equipId){
+  var r=_eqpFindEquipRow(equipId);
+  if(!r)return '';
+  return r.location||r.room||'';
 }
 
 // Map itpNo -> itpCategory
@@ -481,6 +504,7 @@ function _eqpBuildRows(){
         rows.push({
           pinId:pin.id,
           equipTag:pin.equip||'—',
+          location:_eqpLocationForEquip(pin.equip||''),
           drawingName:drw.title||drw.name||drw.fileName||'—',
           drawingId:drw.id||'',
           itpNo:itp.itpNo||'',
@@ -508,32 +532,27 @@ function renderEqpRegister(){
   var filtered=eqpRows.filter(function(r){
     if(!srch)return true;
     return ((r.equipTag||'').toLowerCase().indexOf(srch)>=0
-      ||(r.drawingName||'').toLowerCase().indexOf(srch)>=0
+      ||(r.location||'').toLowerCase().indexOf(srch)>=0
       ||(r.itpType||'').toLowerCase().indexOf(srch)>=0
       ||(r.itpRef||'').toLowerCase().indexOf(srch)>=0);
   });
   document.getElementById('eqpCount').textContent=filtered.length+' of '+eqpRows.length+' equipment';
   if(!eqpRows.length){
-    body.innerHTML='<tr><td colspan="6"><div class="acc-empty"><div class="acc-empty-icon">🔩</div><div class="acc-empty-title">No pre-commissioning ITPs found</div><div class="acc-empty-sub">This list is auto-populated from drawings. Drop an ITP pin on a drawing where the ITP template\'s category is <strong>Pre-Commissioning</strong>, and it will appear here.</div></div></td></tr>';
+    body.innerHTML='<tr><td colspan="5"><div class="acc-empty"><div class="acc-empty-icon">🔩</div><div class="acc-empty-title">No pre-commissioning ITPs found</div><div class="acc-empty-sub">This list is auto-populated from drawings. Drop an ITP pin on a drawing where the ITP template\'s category is <strong>Pre-Commissioning</strong>, and it will appear here.</div></div></td></tr>';
     return;
   }
   if(!filtered.length){
-    body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px">No equipment matches the search.</td></tr>';
+    body.innerHTML='<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px">No equipment matches the search.</td></tr>';
     return;
   }
   body.innerHTML=filtered.map(function(r){
-    var itpLabel=(r.itpRef?'<span class="acc-num">'+escH(r.itpRef)+'</span> ':'')+'<span style="color:var(--text)">'+escH(r.itpType||'—')+'</span>';
-    return '<tr>'
-      +'<td><span class="acc-area">'+escH(r.equipTag)+'</span></td>'
-      +'<td style="color:var(--text2);font-size:12.5px">'+escH(r.drawingName)+'</td>'
-      +'<td>'+itpLabel+'</td>'
+    var itpRef=r.itpRef||r.itpNo||'—';
+    return '<tr style="cursor:pointer" onclick="eqpOpenItp(\''+escH(r.pinId)+'\',\''+escH(r.drawingId)+'\',\''+escH(r.itpNo).replace(/\u0027/g,"\\'")+'\')" title="Open ITP form in a new tab">'
+      +'<td><span class="acc-num">'+escH(itpRef)+'</span></td>'
+      +'<td style="color:var(--text)">'+escH(r.itpType||'—')+'</td>'
+      +'<td><span class="acc-area" style="color:var(--accent);font-weight:600">'+escH(r.equipTag)+'</span></td>'
+      +'<td style="color:var(--text2);font-size:12.5px">'+escH(r.location||'—')+'</td>'
       +'<td>'+eqpStatusBadge(r.status)+'</td>'
-      +'<td style="color:var(--text2);font-size:12px">'+eqpFmtDate(r.lastUpdated)+'</td>'
-      +'<td style="text-align:right">'
-        +'<div class="act-btns-grid" style="display:inline-flex">'
-          +'<button class="bp bsm btn" onclick="eqpOpenItp(\''+escH(r.pinId)+'\',\''+escH(r.drawingId)+'\',\''+escH(r.itpNo).replace(/\u0027/g,"\\'")+'\')">Open in ITP</button>'
-        +'</div>'
-      +'</td>'
     +'</tr>';
   }).join('');
 }
@@ -543,7 +562,7 @@ function eqpOpenItp(pinId,drawingId,itpNo){
     +'&drawingId='+encodeURIComponent(drawingId)
     +'&p='+encodeURIComponent(pKey)
     +(itpNo?'&itpNo='+encodeURIComponent(itpNo):'');
-  window.location.href=url;
+  window.open(url,'_blank','noopener');
 }
 
 // Boot equipment register (parallel to area checklists boot)
