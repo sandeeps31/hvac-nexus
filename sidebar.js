@@ -107,8 +107,8 @@
         <span class="sb-group-name">Settings</span>
       </div>
       <div class="sb-group-items" id="gitems-settings">
-        <div class="sb-item" onclick="navTo('hvac-project-settings.html')"><span class="sb-item-icon">🏗️</span><span class="sb-item-label">Project settings</span></div>
-        <div class="sb-item" onclick="navTo('hvac-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
+        <div class="sb-item" onclick="navTo('project-settings.html')"><span class="sb-item-icon">🏗️</span><span class="sb-item-label">Project settings</span></div>
+        <div class="sb-item" onclick="navTo('company-settings.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Company settings</span></div>
       </div>
     </div>
   </nav>
@@ -190,7 +190,7 @@
     var main=document.getElementById('mainWrap')||document.querySelector('.main');
     var btn=document.getElementById('sbToggleBtn');
     if(sb) sb.classList.toggle('sm', c);
-    if(main) main.style.marginLeft=c?'52px':'';
+    if(main) main.style.left=c?'52px':'';
     if(btn) btn.textContent=c?'»':'«';
   };
   window.toggleGroup = function(id){
