@@ -182,12 +182,59 @@
 .cat-radio-sub{font-size:12px;color:var(--text2);line-height:1.5}
 
 /* Role popover */
-.role-popover, .sub-popover, .notes-popover{position:fixed;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;padding:14px 16px;width:280px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none}
-.role-popover.open, .sub-popover.open, .notes-popover.open{display:block}
-.role-popover h4, .sub-popover h4, .notes-popover h4{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin:0 0 10px}
+.role-popover, .sub-popover{position:fixed;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;padding:14px 16px;width:280px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none}
+.role-popover.open, .sub-popover.open{display:block}
+.role-popover h4, .sub-popover h4{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin:0 0 10px}
 .sub-popover{width:380px}
-.notes-popover{width:480px}
 .sub-popover-sub{font-size:11.5px;color:var(--muted);margin:0 0 10px;line-height:1.4}
+
+/* Notes drawer (right-side slide-in) */
+.notes-drawer-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2400;
+  opacity:0;pointer-events:none;transition:opacity .22s ease
+}
+.notes-drawer-overlay.open{opacity:1;pointer-events:all}
+.notes-drawer{
+  position:fixed;top:0;right:0;bottom:0;width:520px;max-width:96vw;
+  background:var(--surface);border-left:1px solid var(--border);
+  z-index:2500;display:flex;flex-direction:column;
+  box-shadow:-12px 0 40px rgba(0,0,0,.5);
+  transform:translateX(100%);transition:transform .22s ease;
+  visibility:hidden
+}
+.notes-drawer.open{transform:translateX(0);visibility:visible}
+.notes-drawer-hdr{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;gap:12px;flex-shrink:0
+}
+.notes-drawer-hdr-text{flex:1;min-width:0}
+.notes-drawer-hdr h4{
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:800;
+  color:var(--text);margin:0 0 4px;letter-spacing:0.5px
+}
+.notes-drawer-sub{
+  font-size:11.5px;color:var(--muted);margin:0;line-height:1.5
+}
+.notes-drawer-close{
+  background:none;border:1px solid var(--border);color:var(--muted);
+  cursor:pointer;width:28px;height:28px;border-radius:6px;
+  font-size:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  transition:all .13s
+}
+.notes-drawer-close:hover{color:var(--danger);border-color:var(--danger)}
+.notes-drawer-body{
+  flex:1;min-height:0;padding:16px 20px;display:flex;flex-direction:column
+}
+.notes-drawer-body .notes-textarea{
+  flex:1;min-height:0;height:100%;
+  resize:none;font-size:13.5px;line-height:1.6;
+  padding:14px 16px
+}
+.notes-drawer-ftr{
+  padding:12px 20px;border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+  flex-shrink:0;background:var(--surface2)
+}
 
 .role-opt{padding:7px 12px;cursor:pointer;font-size:12.5px;color:var(--text2);border-radius:6px;transition:all .13s}
 .role-opt:hover{background:var(--surface2);color:var(--text)}
@@ -409,15 +456,23 @@
   </div>
 </div>
 
-<!-- NOTES POPOVER -->
-<div class="notes-popover" id="notesPopover">
-  <h4 id="notesPopHeader">Notes</h4>
-  <p class="sub-popover-sub" id="notesPopSub">Lessons learned, things to check, pitfalls from past jobs. Markdown supported.</p>
-  <textarea id="notesTextarea" class="notes-textarea" placeholder="Things to check:
+<!-- NOTES DRAWER (right-side slide-in) -->
+<div class="notes-drawer-overlay" id="notesDrawerOverlay" onclick="closeNotesPopover()"></div>
+<div class="notes-drawer" id="notesPopover">
+  <div class="notes-drawer-hdr">
+    <div class="notes-drawer-hdr-text">
+      <h4 id="notesPopHeader">Notes</h4>
+      <p class="notes-drawer-sub" id="notesPopSub">Lessons learned, things to check, pitfalls from past jobs. Carries to every project this template is applied to.</p>
+    </div>
+    <button class="notes-drawer-close" onclick="closeNotesPopover()" title="Close (Esc)">✕</button>
+  </div>
+  <div class="notes-drawer-body">
+    <textarea id="notesTextarea" class="notes-textarea" placeholder="Things to check:
 - Confirm scope is locked before signing
 - Check liquidated damages clause
 - Lessons from project XYZ: ..."></textarea>
-  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+  </div>
+  <div class="notes-drawer-ftr">
     <span class="notes-char-count" id="notesCharCount">0 chars</span>
     <div style="display:flex;gap:8px">
       <button class="btn bsm" onclick="closeNotesPopover()">Cancel</button>
@@ -483,6 +538,20 @@ async function init() {
   showRegister();
 }
 window.addEventListener('DOMContentLoaded', init);
+
+// Drawer keyboard shortcuts: Esc to close, Ctrl/Cmd+S to save
+window.addEventListener('keydown', function(e) {
+  const drawerOpen = document.getElementById('notesPopover') &&
+                     document.getElementById('notesPopover').classList.contains('open');
+  if (!drawerOpen) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeNotesPopover();
+  } else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+    e.preventDefault();
+    saveNotesPopover();
+  }
+});
 
 // ─── View switching ────────────────────────────────────────
 function showRegister() {
@@ -1242,7 +1311,7 @@ function closeSubPopover() {
   if (wasOpen) renderEditorBody();   // refresh chip counts only if we actually had it open
 }
 
-// ─── NOTES POPOVER ─────────────────────────────────────────
+// ─── NOTES DRAWER ──────────────────────────────────────────
 function openNotesPopover(itemId, ev) {
   if (ev) ev.stopPropagation();
   closeAnyPopover();
@@ -1255,17 +1324,14 @@ function openNotesPopover(itemId, ev) {
   ta.value = target.item.notes || '';
   updateNotesCharCount();
   ta.oninput = updateNotesCharCount;
-  const pop = document.getElementById('notesPopover');
-  pop.classList.add('open');
-  positionPopover(pop, ev);
-  setTimeout(() => ta.focus(), 80);
+  showNotesDrawer();
+  setTimeout(() => ta.focus(), 220);
 }
 
 function openSubNotesPopover(itemId, subId, ev) {
   if (ev) ev.stopPropagation();
-  // Don't fully close — we want to keep the sub-popover state intact and just layer notes over it
+  // Hide other popovers (but keep sub-popover state so we can return to it on close)
   document.getElementById('rolePopover').classList.remove('open');
-  document.getElementById('notesPopover').classList.remove('open');
   notesPopContext = { kind: 'sub', itemId: itemId, subId: subId };
   const t = activeTpl();
   let sub = null;
@@ -1280,10 +1346,13 @@ function openSubNotesPopover(itemId, subId, ev) {
   ta.value = sub.notes || '';
   updateNotesCharCount();
   ta.oninput = updateNotesCharCount;
-  const pop = document.getElementById('notesPopover');
-  pop.classList.add('open');
-  positionPopover(pop, ev);
-  setTimeout(() => ta.focus(), 80);
+  showNotesDrawer();
+  setTimeout(() => ta.focus(), 220);
+}
+
+function showNotesDrawer() {
+  document.getElementById('notesDrawerOverlay').classList.add('open');
+  document.getElementById('notesPopover').classList.add('open');
 }
 
 function updateNotesCharCount() {
@@ -1324,6 +1393,7 @@ function saveNotesPopover() {
 
 function closeNotesPopover() {
   document.getElementById('notesPopover').classList.remove('open');
+  document.getElementById('notesDrawerOverlay').classList.remove('open');
   notesPopContext = null;
 }
 
@@ -1361,8 +1431,13 @@ function positionPopover(pop, ev) {
   setTimeout(() => document.addEventListener('click', outsideClickHandler, { once: true }), 0);
 }
 function outsideClickHandler(e) {
+  // If notes drawer is open, ignore — it has its own overlay-click-to-close
+  if (document.getElementById('notesPopover').classList.contains('open')) {
+    setTimeout(() => document.addEventListener('click', outsideClickHandler, { once: true }), 0);
+    return;
+  }
   // Only close if click is outside popovers and any popmenu
-  const inside = e.target.closest('.role-popover, .sub-popover, .notes-popover');
+  const inside = e.target.closest('.role-popover, .sub-popover, .notes-drawer, .notes-drawer-overlay');
   if (!inside) closeAnyPopover();
   else setTimeout(() => document.addEventListener('click', outsideClickHandler, { once: true }), 0);
 }
