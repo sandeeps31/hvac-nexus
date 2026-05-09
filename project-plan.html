@@ -851,13 +851,13 @@ select.pp-input {
       <div class="pp-topbar-actions">
         <!-- Register-view actions -->
         <span id="pp-reg-actions" style="display:flex;gap:8px;align-items:center">
-          <button class="btn" onclick="ppApplyTemplatePicker(event)">Apply template</button>
-          <button class="btn" onclick="ppImportExcel()">Import .xlsx</button>
           <button class="btn primary" onclick="ppNewPlan()">+ New plan</button>
         </span>
         <!-- Editor-view actions -->
         <span id="pp-edit-actions" style="display:none;gap:8px;align-items:center">
           <button class="btn" onclick="ppShowRegister()">← Back to Plans</button>
+          <button class="btn" onclick="ppApplyTemplatePicker(event)">Apply template</button>
+          <button class="btn" onclick="ppImportExcel()">Import .xlsx</button>
           <button class="btn" onclick="ppExportExcel()">Export .xlsx</button>
           <button class="btn pp-btn-danger" id="pp-archive-btn" onclick="ppArchivePlan()">Archive</button>
           <button class="btn" id="pp-restore-btn" style="display:none" onclick="ppRestorePlan()">Restore from archive</button>
@@ -1091,11 +1091,9 @@ function ppRenderRegister() {
         <div class="pp-reg-empty">
           <div class="pp-reg-empty-icon">📅</div>
           <div class="pp-reg-empty-title">No plans yet for this project</div>
-          <div class="pp-reg-empty-sub">Create one from scratch, apply a company template, or import an Excel sheet.</div>
+          <div class="pp-reg-empty-sub">Create your first plan to get started. You can apply a company template or import from Excel once the plan is open.</div>
           <div class="pp-reg-empty-actions">
             <button class="btn primary" onclick="ppNewPlan()">+ New plan</button>
-            ${PP_TEMPLATES.length ? '<button class="btn" onclick="ppApplyTemplatePicker(event)">Apply template</button>' : ''}
-            <button class="btn" onclick="ppImportExcel()">Import .xlsx</button>
           </div>
         </div>
       </td></tr>`;
@@ -1468,17 +1466,25 @@ function ppApplyTemplate(tplId) {
   ppCloseAnyMenu();
   const tpl = PP_TEMPLATES.find(t => t.id === tplId);
   if (!tpl) return;
+  const plan = ppCurrentPlan();
+  if (!plan) { alert('No plan is open. Apply a template from inside an open plan.'); return; }
 
-  const plan = JSON.parse(JSON.stringify(tpl));
-  plan.id = ppUid('pp');
-  plan.name = tpl.name;
-  plan.templateId = tpl.id;
-  plan.createdAt = ppToday();
-  plan.archived = false;
-  delete plan.updatedAt;
-  delete plan.description;
+  // Warn about overwrite
+  const stats = ppPlanStats(plan);
+  const hasContent = stats.total > 0;
+  if (hasContent) {
+    const msg = `Replace this plan's contents with template "${tpl.name}"?\n\n`
+              + `This will delete all ${stats.total} item${stats.total===1?'':'s'} `
+              + `(including ${stats.done} marked done) in "${plan.name}" and replace them with the template's structure.\n\n`
+              + `The plan name and creation date stay the same.`;
+    if (!confirm(msg)) return;
+  } else {
+    if (!confirm(`Apply template "${tpl.name}" to this plan?`)) return;
+  }
 
-  plan.phases.forEach(ph => {
+  // Deep-clone template phases/stages/items, regenerate IDs, reset live-mode fields
+  const fresh = JSON.parse(JSON.stringify(tpl.phases));
+  fresh.forEach(ph => {
     ph.id = ppUid('ph');
     ph.stages.forEach(st => {
       st.id = ppUid('st');
@@ -1500,9 +1506,15 @@ function ppApplyTemplate(tplId) {
     });
   });
 
-  PP_PLANS.push(plan);
+  // Replace contents in place — keep plan id, name, createdAt, archived
+  plan.phases = fresh;
+  plan.templateId = tpl.id;
+  plan.updatedAt = ppToday();
+  // Reset current phase to first phase of the new structure
+  PP_CURRENT_PHASE_ID = plan.phases[0] ? plan.phases[0].id : null;
+
   ppSave();
-  ppOpenPlan(plan.id);
+  ppRender();
 }
 
 function ppDuplicatePlan() {
@@ -1965,6 +1977,19 @@ function ppExportExcel() {
 
 // ─── Excel import ──────────────────────────────────────────
 function ppImportExcel() {
+  const plan = ppCurrentPlan();
+  if (!plan) { alert('No plan is open. Import from inside an open plan.'); return; }
+
+  // Pre-confirm if there's content to overwrite
+  const stats = ppPlanStats(plan);
+  if (stats.total > 0) {
+    const msg = `Importing will REPLACE this plan's contents.\n\n`
+              + `All ${stats.total} item${stats.total===1?'':'s'} `
+              + `(including ${stats.done} marked done) in "${plan.name}" will be deleted and replaced with rows from the Excel file.\n\n`
+              + `The plan name and creation date stay the same. Continue?`;
+    if (!confirm(msg)) return;
+  }
+
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.xlsx,.xls,.xlsm';
@@ -1975,14 +2000,14 @@ function ppImportExcel() {
     reader.onload = ev => {
       try {
         const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-        const defaultName = f.name.replace(/\.[^.]+$/, '');
-        const name = prompt('Plan name:', defaultName);
-        if (!name || !name.trim()) return;
-        const plan = ppPlanFromWorkbook(wb, name.trim());
-        PP_PLANS.push(plan);
+        const tmp = ppPlanFromWorkbook(wb, plan.name);  // parse only; we'll merge phases
+        // Replace current plan's phases in place
+        plan.phases = tmp.phases;
+        plan.updatedAt = ppToday();
+        PP_CURRENT_PHASE_ID = plan.phases[0] ? plan.phases[0].id : null;
         ppSave();
-        alert(`Imported ${ppPlanStats(plan).total} items into "${plan.name}".`);
-        ppOpenPlan(plan.id);
+        ppRender();
+        alert(`Replaced contents of "${plan.name}" — ${ppPlanStats(plan).total} items imported.`);
       } catch(err) {
         console.error(err);
         alert('Import failed: ' + err.message);
