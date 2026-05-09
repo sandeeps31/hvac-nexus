@@ -28,8 +28,8 @@
 .bdanger:hover{background:var(--danger-dim)}
 
 /* VIEWS */
-.view{display:none}
-.view.active{display:block}
+.view{display:none;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}
+.view.active{display:block;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}
 
 /* ─── REGISTER VIEW ─── */
 .reg-toolbar{padding:12px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
@@ -182,10 +182,11 @@
 .cat-radio-sub{font-size:12px;color:var(--text2);line-height:1.5}
 
 /* Role popover */
-.role-popover, .sub-popover{position:fixed;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;padding:14px 16px;width:280px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none}
-.role-popover.open, .sub-popover.open{display:block}
-.role-popover h4, .sub-popover h4{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin:0 0 10px}
-.sub-popover{width:340px}
+.role-popover, .sub-popover, .notes-popover{position:fixed;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;padding:14px 16px;width:280px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none}
+.role-popover.open, .sub-popover.open, .notes-popover.open{display:block}
+.role-popover h4, .sub-popover h4, .notes-popover h4{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin:0 0 10px}
+.sub-popover{width:380px}
+.notes-popover{width:480px}
 .sub-popover-sub{font-size:11.5px;color:var(--muted);margin:0 0 10px;line-height:1.4}
 
 .role-opt{padding:7px 12px;cursor:pointer;font-size:12.5px;color:var(--text2);border-radius:6px;transition:all .13s}
@@ -196,8 +197,20 @@
 .sub-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
 .sub-row-inp{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-size:12.5px;padding:6px 10px;outline:none;font-family:'DM Sans',sans-serif}
 .sub-row-inp:focus{border-color:var(--accent)}
+.sub-row-note-btn{background:none;border:1.5px solid var(--border);color:var(--muted);cursor:pointer;font-size:12px;padding:4px 7px;border-radius:5px;line-height:1;transition:all .13s}
+.sub-row-note-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sub-row-note-btn.has-notes{border-color:rgba(0,229,160,.3);color:var(--green);background:var(--green-dim)}
 .sub-row-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;line-height:1}
 .sub-row-del:hover{color:var(--danger)}
+
+/* Notes textarea */
+.notes-textarea{width:100%;min-height:200px;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;line-height:1.55;padding:10px 12px;outline:none;resize:vertical;box-sizing:border-box}
+.notes-textarea:focus{border-color:var(--accent)}
+.notes-textarea::placeholder{color:var(--muted);font-size:12.5px;line-height:1.5}
+.notes-char-count{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--muted)}
+
+/* Notes icon "has-notes" state — green to differentiate from cyan link icon */
+.link-icon.has-notes{color:var(--green);background:var(--green-dim);border-radius:4px}
 .sub-add-btn{font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;padding:4px 0;font-family:'DM Sans',sans-serif;font-weight:500}
 .sub-add-btn:hover{text-decoration:underline}
 
@@ -372,11 +385,28 @@
 <!-- SUB-ITEMS POPOVER -->
 <div class="sub-popover" id="subPopover">
   <h4>Sub-items</h4>
-  <p class="sub-popover-sub">One-level sub-tasks under this item. Live projects get a checkbox per sub-item.</p>
+  <p class="sub-popover-sub">One-level sub-tasks under this item. Live projects get a checkbox per sub-item. Click 📝 to add a note to a sub.</p>
   <div id="subList"></div>
   <button class="sub-add-btn" onclick="subAddNew()">＋ Add sub-item</button>
   <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
     <button class="btn bsm" onclick="closeSubPopover()">Done</button>
+  </div>
+</div>
+
+<!-- NOTES POPOVER -->
+<div class="notes-popover" id="notesPopover">
+  <h4 id="notesPopHeader">Notes</h4>
+  <p class="sub-popover-sub" id="notesPopSub">Lessons learned, things to check, pitfalls from past jobs. Markdown supported.</p>
+  <textarea id="notesTextarea" class="notes-textarea" placeholder="Things to check:
+- Confirm scope is locked before signing
+- Check liquidated damages clause
+- Lessons from project XYZ: ..."></textarea>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+    <span class="notes-char-count" id="notesCharCount">0 chars</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn bsm" onclick="closeNotesPopover()">Cancel</button>
+      <button class="btn bp bsm" onclick="saveNotesPopover()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -403,6 +433,9 @@ let saveDebounceT = null;
 
 // Sub-popover state
 let subPopForItemId = null;
+
+// Notes-popover state — { kind: 'item'|'sub', itemId, subId? }
+let notesPopContext = null;
 
 // ─── Utils ─────────────────────────────────────────────────
 function uid(prefix) { return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
@@ -864,6 +897,7 @@ function renderEditorBody() {
         <th>Description</th>
         <th style="width:160px">Default Role</th>
         <th style="width:90px">Sub-items</th>
+        <th style="width:36px">Notes</th>
         <th style="width:36px">Link</th>
         <th style="width:30px"></th>
       </tr>`;
@@ -979,6 +1013,17 @@ function buildItemRow(stage, item, num) {
   subChip.onclick = function(e) { openSubPopover(item.id, e); };
   tdSub.appendChild(subChip);
   tr.appendChild(tdSub);
+
+  // Notes icon
+  const tdNotes = document.createElement('td');
+  const hasNotes = !!(item.notes && item.notes.trim());
+  const notesIcon = document.createElement('span');
+  notesIcon.className = 'link-icon' + (hasNotes ? ' has-notes' : '');
+  notesIcon.innerHTML = '📝';
+  notesIcon.title = hasNotes ? 'Edit notes' : 'Add notes';
+  notesIcon.onclick = function(e) { openNotesPopover(item.id, e); };
+  tdNotes.appendChild(notesIcon);
+  tr.appendChild(tdNotes);
 
   // Link icon
   const tdLink = document.createElement('td');
@@ -1121,8 +1166,10 @@ function renderSubList() {
 
   let html = '';
   item.subs.forEach((s, i) => {
+    const hasNotes = !!(s.notes && s.notes.trim());
     html += `<div class="sub-row">
       <input class="sub-row-inp" data-sub-idx="${i}" value="${escH(s.description || '')}" placeholder="Sub-item description…" onchange="subUpdate(${i},this.value)" />
+      <button class="sub-row-note-btn ${hasNotes?'has-notes':''}" onclick="openSubNotesPopover('${item.id}','${s.id}',event)" title="${hasNotes?'Edit notes':'Add notes'}">📝</button>
       <button class="sub-row-del" onclick="subDelete(${i})" title="Remove">&#10005;</button>
     </div>`;
   });
@@ -1179,6 +1226,102 @@ function closeSubPopover() {
   if (wasOpen) renderEditorBody();   // refresh chip counts only if we actually had it open
 }
 
+// ─── NOTES POPOVER ─────────────────────────────────────────
+function openNotesPopover(itemId, ev) {
+  if (ev) ev.stopPropagation();
+  closeAnyPopover();
+  notesPopContext = { kind: 'item', itemId: itemId };
+  const target = findItemById(itemId);
+  if (!target) return;
+  document.getElementById('notesPopHeader').textContent = 'Notes';
+  document.getElementById('notesPopSub').textContent = 'Lessons learned, things to check, pitfalls from past jobs. Carries to every project this template is applied to.';
+  const ta = document.getElementById('notesTextarea');
+  ta.value = target.item.notes || '';
+  updateNotesCharCount();
+  ta.oninput = updateNotesCharCount;
+  const pop = document.getElementById('notesPopover');
+  pop.classList.add('open');
+  positionPopover(pop, ev);
+  setTimeout(() => ta.focus(), 80);
+}
+
+function openSubNotesPopover(itemId, subId, ev) {
+  if (ev) ev.stopPropagation();
+  // Don't fully close — we want to keep the sub-popover state intact and just layer notes over it
+  document.getElementById('rolePopover').classList.remove('open');
+  document.getElementById('notesPopover').classList.remove('open');
+  notesPopContext = { kind: 'sub', itemId: itemId, subId: subId };
+  const t = activeTpl();
+  let sub = null;
+  for (const ph of t.phases) for (const st of ph.stages) {
+    const it = st.items.find(i => i.id === itemId);
+    if (it && it.subs) { sub = it.subs.find(s => s.id === subId); if (sub) break; }
+  }
+  if (!sub) return;
+  document.getElementById('notesPopHeader').textContent = 'Sub-item Notes';
+  document.getElementById('notesPopSub').textContent = 'Notes specific to this sub-item.';
+  const ta = document.getElementById('notesTextarea');
+  ta.value = sub.notes || '';
+  updateNotesCharCount();
+  ta.oninput = updateNotesCharCount;
+  const pop = document.getElementById('notesPopover');
+  pop.classList.add('open');
+  positionPopover(pop, ev);
+  setTimeout(() => ta.focus(), 80);
+}
+
+function updateNotesCharCount() {
+  const ta = document.getElementById('notesTextarea');
+  const cc = document.getElementById('notesCharCount');
+  if (ta && cc) cc.textContent = (ta.value || '').length + ' chars';
+}
+
+function saveNotesPopover() {
+  const ctx = notesPopContext;
+  if (!ctx) return;
+  const val = (document.getElementById('notesTextarea').value || '').trim();
+  const t = activeTpl();
+  let didChange = false;
+  for (const ph of t.phases) for (const st of ph.stages) {
+    const it = st.items.find(i => i.id === ctx.itemId);
+    if (!it) continue;
+    if (ctx.kind === 'item') {
+      it.notes = val || null;
+      didChange = true;
+    } else if (ctx.kind === 'sub' && it.subs) {
+      const sub = it.subs.find(s => s.id === ctx.subId);
+      if (sub) {
+        sub.notes = val || null;
+        didChange = true;
+      }
+    }
+    break;
+  }
+  if (didChange) markDirty();
+  closeNotesPopover();
+  // Refresh whichever surface needs updating
+  if (ctx.kind === 'sub' && subPopForItemId) {
+    renderSubList();
+  }
+  renderEditorBody();
+}
+
+function closeNotesPopover() {
+  document.getElementById('notesPopover').classList.remove('open');
+  notesPopContext = null;
+}
+
+// Helper used by openNotesPopover to find an item by id
+function findItemById(itemId) {
+  const t = activeTpl();
+  if (!t) return null;
+  for (const ph of t.phases) for (const st of ph.stages) {
+    const it = st.items.find(i => i.id === itemId);
+    if (it) return { item: it, stage: st, phase: ph };
+  }
+  return null;
+}
+
 // ─── POPOVER POSITIONING ───────────────────────────────────
 function positionPopover(pop, ev) {
   // Capture rect BEFORE any re-render — find the trigger element by walking up if needed
@@ -1203,16 +1346,17 @@ function positionPopover(pop, ev) {
 }
 function outsideClickHandler(e) {
   // Only close if click is outside popovers and any popmenu
-  const inside = e.target.closest('.role-popover, .sub-popover');
+  const inside = e.target.closest('.role-popover, .sub-popover, .notes-popover');
   if (!inside) closeAnyPopover();
   else setTimeout(() => document.addEventListener('click', outsideClickHandler, { once: true }), 0);
 }
 function closeAnyPopover() {
   closeRolePopover();
   closeSubPopover();
+  closeNotesPopover();
   // Close any ad-hoc menus we created
   document.querySelectorAll('.role-popover.open').forEach(el => {
-    if (el.id !== 'rolePopover' && el.id !== 'subPopover') el.remove();
+    if (el.id !== 'rolePopover' && el.id !== 'subPopover' && el.id !== 'notesPopover') el.remove();
   });
 }
 
@@ -1258,22 +1402,27 @@ function exportTemplate() {
 
   const wb = XLSX.utils.book_new();
   for (const phase of t.phases) {
-    const headers = ['Stage', 'Description', 'Default Role', 'Link', 'Sub-items'];
+    const headers = ['Stage', 'Description', 'Default Role', 'Link', 'Sub-items', 'Notes'];
     const rows = [headers];
     for (const stage of phase.stages) {
       for (const item of stage.items) {
-        const subList = (item.subs || []).map(s => '↳ ' + (s.description || '')).join('\n');
+        const subList = (item.subs || []).map(s => {
+          let line = '↳ ' + (s.description || '');
+          if (s.notes && s.notes.trim()) line += '  [note: ' + s.notes.replace(/\n/g, ' / ') + ']';
+          return line;
+        }).join('\n');
         rows.push([
           stage.name,
           item.description || '',
           item.defaultRole || '',
           item.link || '',
-          subList
+          subList,
+          item.notes || ''
         ]);
       }
     }
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{wch:24},{wch:60},{wch:18},{wch:30},{wch:40}];
+    ws['!cols'] = [{wch:24},{wch:60},{wch:18},{wch:30},{wch:40},{wch:60}];
     const sname = (phase.name || 'Phase').replace(/[\\\/\?\*\[\]:]/g, '').slice(0, 31);
     XLSX.utils.book_append_sheet(wb, ws, sname);
   }
@@ -1342,6 +1491,7 @@ function templateFromWorkbook(wb, name) {
     const colRole   = hdr.findIndex(c => c.includes('default role') || c.includes('person responsible') || c === 'role' || c.includes('responsible'));
     const colLink   = hdr.findIndex(c => c.includes('link') || c.includes('url'));
     const colSubs   = hdr.findIndex(c => c.includes('sub-item') || c.includes('subitem') || c.includes('subs'));
+    const colNotes  = hdr.findIndex(c => c === 'notes' || c === 'note' || c.includes('comment'));
 
     const phase = { id: uid('ph'), name: sheetName, stages: [] };
     const stageMap = {};
@@ -1362,11 +1512,19 @@ function templateFromWorkbook(wb, name) {
       const linkVal = colLink >= 0 ? String(r[colLink] || '').trim() : '';
       const roleVal = colRole >= 0 ? String(r[colRole] || '').trim() : '';
       const subsVal = colSubs >= 0 ? String(r[colSubs] || '').trim() : '';
+      const notesVal = colNotes >= 0 ? String(r[colNotes] || '').trim() : '';
       const subs = [];
       if (subsVal) {
         subsVal.split(/\r?\n/).forEach(line => {
-          const t = line.replace(/^[\s↳→\-•*]+/, '').trim();
-          if (t) subs.push({ id: uid('sub'), description: t });
+          // Match optional [note: ...] suffix from our own export format
+          const m = line.match(/^(.*?)(?:\s*\[note:\s*(.+?)\])?\s*$/);
+          const desc = (m ? m[1] : line).replace(/^[\s↳→\-•*]+/, '').trim();
+          const noteText = m && m[2] ? m[2].replace(/ \/ /g, '\n').trim() : null;
+          if (desc) {
+            const sub = { id: uid('sub'), description: desc };
+            if (noteText) sub.notes = noteText;
+            subs.push(sub);
+          }
         });
       }
 
@@ -1375,6 +1533,7 @@ function templateFromWorkbook(wb, name) {
         description: desc,
         defaultRole: roleVal,
         link: /^https?:\/\//i.test(linkVal) ? linkVal : null,
+        notes: notesVal || null,
         subs: subs
       });
     }
