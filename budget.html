@@ -240,7 +240,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
   var DEV_BYPASS=false;
   if(DEV_BYPASS)return;
   var stored=localStorage.getItem('hvacnexus_session');
-  if(!stored){window.location.href='hvac-login.html';return;}
+  if(!stored){window.location.href='login.html';return;}
   try{
     var sess=JSON.parse(stored);
     if(Date.now()/1000<(sess.expires_at||0)-60){
@@ -252,8 +252,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
     var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
     var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
     if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
-    else{localStorage.removeItem('hvacnexus_session');window.location.href='hvac-login.html';}
-  }catch(e){window.location.href='hvac-login.html';}
+    else{localStorage.removeItem('hvacnexus_session');window.location.href='login.html';}
+  }catch(e){window.location.href='login.html';}
 })();
 </script>
 </head>
@@ -603,7 +603,7 @@ function renderVarSection(){
   var tbl='';
   if(!filtered.length){
     tbl='<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted);font-size:13px">'
-      +(showApprovedOnly?'No approved variations yet.':'No variations yet. Go to the <a href="hvac-variations.html" style="color:var(--accent)">Variations</a> module to create one.')
+      +(showApprovedOnly?'No approved variations yet.':'No variations yet. Go to the <a href="variations.html" style="color:var(--accent)">Variations</a> module to create one.')
       +'</td></tr>';
   }else{
     for(var i=0;i<filtered.length;i++){
@@ -613,7 +613,7 @@ function renderVarSection(){
       var approvedIncl=approvedEx*1.1;
       var st=v.status||'Pending';
       var stStyle=statusStyles[st]||statusStyles['Pending'];
-      tbl+='<tr onclick="localStorage.setItem(\'hvacnexus_openvar\',\''+v.id+'\');navTo(\'hvac-variations.html\')" style="cursor:pointer">'
+      tbl+='<tr onclick="localStorage.setItem(\'hvacnexus_openvar\',\''+v.id+'\');navTo(\'variations.html\')" style="cursor:pointer">'
         +'<td style="padding:11px 18px;font-family:\'DM Mono\',monospace;font-size:12px;color:var(--accent);font-weight:600;width:110px;white-space:nowrap">'+v.num+'</td>'
         +'<td style="padding:11px 18px;color:var(--text);font-size:13px">'+(v.shortDesc||v.desc||'--')+'</td>'
         +'<td style="padding:11px 18px;text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;color:var(--accent);width:160px;white-space:nowrap">'+fmt(submittedIncl)+'</td>'
@@ -684,10 +684,10 @@ function updateSummary(){
 
 // -- PO PANEL --
 function renderPOPanel(g,secId){
-  var procUrl = 'hvac-procurement-pos.html';
+  var procUrl = 'procurement-pos.html';
   if(!g.pos.length) return '<div class="po-empty">No POs -- <button onclick="navTo(\''+procUrl+'\')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-family:DM Sans,sans-serif">+ Create PO in Procurement</button></div>';
   return '<table class="po-tbl"><thead><tr><th style="width:130px">PO No.</th><th>Supplier</th><th class="r" style="min-width:90px">Amount</th><th class="r" style="min-width:90px">Actual</th></tr></thead><tbody>'
-    +g.pos.map(function(po){return '<tr><td class="po-num" onclick="navTo(\'hvac-procurement-pos.html?viewpo='+encodeURIComponent(po.id)+'\')">'+po.id+'</td><td style="font-weight:500;color:var(--text)">'+(po.supplier||'--')+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">'+fmt(liSub(po.lineItems||[]))+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(po.actual)+'</td></tr>';}).join('')
+    +g.pos.map(function(po){return '<tr><td class="po-num" onclick="navTo(\'procurement-pos.html?viewpo='+encodeURIComponent(po.id)+'\')">'+po.id+'</td><td style="font-weight:500;color:var(--text)">'+(po.supplier||'--')+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--accent)">'+fmt(liSub(po.lineItems||[]))+'</td><td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(po.actual)+'</td></tr>';}).join('')
     +'</tbody></table><button class="add-po-btn" onclick="navTo(\''+procUrl+'\')">+ Create PO in Procurement</button>';
 }
 
@@ -860,7 +860,7 @@ function renderAll(){
     +   '<span id="varRegCount" style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted);background:var(--surface3);border:1px solid var(--border);padding:2px 9px;border-radius:20px"></span>'
     + '</div>'
     + '<div style="display:flex;align-items:center;gap:12px">'
-    +   '<a href="hvac-variations.html" onclick="event.stopPropagation()" style="font-size:12px;color:var(--accent);text-decoration:none;padding:4px 12px;border:1px solid rgba(0,200,255,.3);border-radius:6px;background:var(--accent-dim)">Open Variations &#8594;</a>'
+    +   '<a href="variations.html" onclick="event.stopPropagation()" style="font-size:12px;color:var(--accent);text-decoration:none;padding:4px 12px;border:1px solid rgba(0,200,255,.3);border-radius:6px;background:var(--accent-dim)">Open Variations &#8594;</a>'
     + '</div>'
     + '</div>'
     + '<div id="varRegBody" style="display:block">'

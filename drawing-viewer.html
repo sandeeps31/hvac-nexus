@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<!-- build: 2026-04-06 12:45 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drawing Viewer — HVAC NEXUS</title>
+<link rel="stylesheet" href="theme.css">
+<script src="head-common.js"></script>
+<script src="db.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── TOPBAR ── */
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:8px;flex-shrink:0;z-index:100}
+.drw-info{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;overflow:hidden}
+.drw-num{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drw-name{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
+.tb-btn{height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:all .13s}
+.tb-btn:hover{color:var(--text);border-color:var(--text2)}
+.tb-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex-shrink:0}
+/* Add pin button states */
+.tb-btn.itp-active{background:rgba(167,139,250,.2);color:var(--purple);border-color:var(--purple)}
+.tb-btn.def-active{background:rgba(255,77,109,.2);color:var(--danger);border-color:var(--danger)}
+.tb-btn.fs-active{background:rgba(255,77,109,.15);color:#ff6b6b;border-color:#ff6b6b}
+.tb-btn.fd-active{background:rgba(255,184,48,.2);color:var(--warn);border-color:var(--warn)}
+
+/* ── FILTER BAR ── */
+.filter-bar{height:36px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:6px;flex-shrink:0;overflow-x:auto}
+.filter-bar::-webkit-scrollbar{height:0}
+.filter-sep{width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 4px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .13s;white-space:nowrap;user-select:none}
+/* Layer chips - off by default, on when active */
+.chip-all{color:var(--muted);border-color:var(--border)}.chip-all.on{background:var(--surface3);color:var(--text);border-color:var(--text2)}
+.chip-itp{color:var(--muted);border-color:var(--border)}.chip-itp.on{background:rgba(167,139,250,.15);color:var(--purple);border-color:var(--purple)}
+.chip-def{color:var(--muted);border-color:var(--border)}.chip-def.on{background:rgba(255,77,109,.15);color:var(--danger);border-color:var(--danger)}
+.chip-fs{color:var(--muted);border-color:var(--border)}.chip-fs.on{background:rgba(255,100,100,.12);color:#ff6b6b;border-color:#ff6b6b}
+.chip-fd{color:var(--muted);border-color:var(--border)}.chip-fd.on{background:rgba(255,184,48,.15);color:var(--warn);border-color:var(--warn)}
+/* Status chips */
+.chip-sall{background:var(--surface3);color:var(--text2);border-color:var(--border)}.chip-sall.on{color:var(--text);border-color:var(--text2)}
+.chip-sns{color:var(--muted);border-color:var(--border)}.chip-sns.on{background:var(--surface3);color:var(--text2);border-color:var(--muted)}
+.chip-sip{color:var(--warn);border-color:rgba(255,184,48,.3)}.chip-sip.on{background:var(--warn-dim);border-color:var(--warn)}
+.chip-sact{color:var(--danger);border-color:rgba(255,77,109,.3)}.chip-sact.on{background:var(--danger-dim);border-color:var(--danger)}
+.chip-scl{color:var(--green);border-color:rgba(0,229,160,.3)}.chip-scl.on{background:var(--green-dim);border-color:var(--green)}
+
+/* ── VIEWER AREA ── */
+.viewer-wrap{display:flex;flex:1;overflow:hidden;position:relative}
+.viewer{flex:1;overflow:hidden;position:relative;cursor:grab;background:#111420}
+.viewer.crosshair{cursor:crosshair}
+.viewer.grabbing{cursor:grabbing}
+#pdfStage{position:absolute;transform-origin:top left;will-change:transform}
+#pdfCanvas{display:block}
+#pinLayer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:30}
+.loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted)}
+.spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-state,.no-pdf{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:13px}
+
+/* ── PIN DOTS ── */
+.drw-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:30;transition:transform .1s;pointer-events:all}
+.drw-pin:hover{transform:translate(-50%,-50%) scale(1.2);z-index:40}
+.drw-pin.hidden{display:none}
+/* ITP - pill */
+.pin-itp{height:22px;min-width:22px;padding:0 7px;border-radius:11px;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);background:#6d4aff;color:#fff;white-space:nowrap}
+.pin-itp.ns{background:#3d5a7a}.pin-itp.ip{background:#cc8800}.pin-itp.act{background:#cc2244}.pin-itp.cl{background:#00aa70}
+.pin-cluster-badge{position:absolute;top:-6px;right:-6px;background:var(--accent);color:#080c12;border-radius:10px;font-size:9px;font-weight:800;font-family:DM Mono,monospace;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:1.5px solid #080c12;z-index:2}
+.itp-cluster-popup{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:9999;min-width:220px;max-width:300px;overflow:hidden}
+.icp-hdr{padding:8px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-family:DM Mono,monospace;font-size:10px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.icp-item{padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s}
+.icp-item:last-child{border-bottom:none}
+.icp-item:hover{background:var(--surface2)}
+.icp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.icp-dot.ns{background:#3d5a7a}.icp-dot.ip{background:#cc8800}.icp-dot.act{background:#cc2244}.icp-dot.cl{background:#00aa70}
+/* Defect - circle */
+.pin-def{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);background:var(--danger);color:#fff}
+.pin-def.cl{background:#00aa70}
+/* Fire Seal - diamond */
+.pin-fs-wrap{width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.pin-fs{width:18px;height:18px;background:#ff4444;border:2px solid rgba(255,255,255,.7);transform:rotate(45deg);box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.pin-fs.cl{background:#00aa70}
+/* Fire Damper - pentagon via clip-path */
+.pin-fd{width:22px;height:22px;background:#ff9500;border:2px solid rgba(255,255,255,.7);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.5);color:#fff;clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%)}
+.pin-fd.cl{background:#00aa70}
+/* Pin label on hover */
+.pin-lbl{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);background:rgba(8,12,18,.92);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);white-space:nowrap;pointer-events:none;display:none;z-index:50}
+.drw-pin:hover .pin-lbl{display:block}
+
+/* ── PLACE HINT ── */
+.place-hint{position:fixed;top:96px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:7px 18px;font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);z-index:200;display:none;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+
+/* ── ZOOM FAB ── */
+.zoom-fab{position:absolute;bottom:20px;left:20px;z-index:100;display:flex;flex-direction:column;gap:6px;pointer-events:all}
+.z-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .13s;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.z-btn:hover{color:var(--accent);border-color:var(--accent);background:var(--surface2)}
+
+/* ── PINS PANEL ── */
+.pins-panel{width:300px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .2s;flex-shrink:0;position:relative}
+.pins-panel.collapsed{width:16px}
+.pins-panel.collapsed .pp-hide{display:none!important}
+.pp-tab{position:absolute;top:50%;left:-1px;transform:translateY(-50%);width:16px;height:48px;background:var(--surface2);border:1px solid var(--border);border-right:none;border-radius:6px 0 0 6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px;z-index:5;transition:all .13s}
+.pp-tab:hover{color:var(--accent);background:var(--surface3)}
+.pp-hdr{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.pp-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);flex:1}
+.pp-list{flex:1;overflow-y:auto;padding:6px}
+.pin-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:pointer;transition:border-color .13s;overflow:hidden}
+.pin-item:hover{border-color:var(--muted)}
+.pin-item.itp{border-left:3px solid var(--purple)}
+.pin-item.defect{border-left:3px solid var(--danger)}
+.pin-item.fireseal{border-left:3px solid #ff4444}
+.pin-item.firedamper{border-left:3px solid #ff9500}
+.pi-hdr{display:flex;align-items:center;gap:7px;padding:8px 11px}
+.pi-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.pin-item.itp .pi-dot{background:var(--purple)}.pin-item.defect .pi-dot{background:var(--danger)}.pin-item.fireseal .pi-dot{background:#ff4444}.pin-item.firedamper .pi-dot{background:#ff9500}
+.pi-ref{font-family:'DM Mono',monospace;font-size:11px;font-weight:700;flex-shrink:0}
+.pin-item.itp .pi-ref{color:var(--purple)}.pin-item.defect .pi-ref{color:var(--danger)}.pin-item.fireseal .pi-ref{color:#ff4444}.pin-item.firedamper .pi-ref{color:#ff9500}
+.pi-desc{flex:1;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pi-st{font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:20px;flex-shrink:0}
+.pi-st.ns{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.pi-st.ip{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
+.pi-st.act{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.2)}
+.pi-st.cl{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+
+/* ── MODALS ── */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(2px)}
+.mo.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.modal-hdr h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;flex:1}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
+.searchable-wrap{position:relative;width:100%}
+.searchable-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 12px;outline:none;box-sizing:border-box}
+.searchable-input:focus{border-color:var(--accent)}
+.searchable-dropdown{position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:8px;z-index:9999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.6);display:none}
+.searchable-dropdown.open{display:block}
+.sd-option{padding:9px 14px;cursor:pointer;font-size:13px;color:var(--text)}
+.sd-option:hover{background:var(--surface3)}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+.mi{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%}
+.mi:focus{border-color:var(--accent)}
+.mbtn{padding:7px 16px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:600;transition:all .13s}
+.mbtn:hover{color:var(--text);border-color:var(--text2)}
+.mbtn.primary{background:var(--accent);color:#000;border-color:var(--accent)}
+.mbtn.primary:hover{opacity:.9}
+.mbtn.danger{color:var(--danger);border-color:rgba(255,77,109,.4)}
+/* Service type buttons for Fire Seal */
+.svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.svc-btn{padding:12px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;text-align:center;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px}
+.svc-btn:hover{border-color:var(--accent);color:var(--text)}
+.svc-btn.sel{background:rgba(255,68,68,.15);border-color:#ff4444;color:#ff4444}
+.svc-btn .svc-icon{font-size:20px}
+/* Context menu */
+.ctx-menu{position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:400;display:none;min-width:140px;overflow:hidden}
+.ctx-item{padding:10px 14px;font-size:13px;cursor:pointer;color:var(--text2);transition:background .1s}
+.ctx-item:hover{background:var(--surface3);color:var(--text)}
+</style>
+<script>
+// ── HVAC Nexus Auth Guard ──
+(function(){
+  if(!localStorage.getItem('hvacnexus_session')){window.location.href='login.html';}
+})();
+</script>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="drw-info">
+    <div class="drw-num" id="topNum">Loading…</div>
+    <div class="drw-name" id="topName"></div>
+  </div>
+  <div class="tb-sep"></div>
+  <span class="tb-lbl">Add Pin</span>
+  <button class="tb-btn" id="btnItp" onclick="startPlace('itp')" style="color:var(--purple);border-color:rgba(167,139,250,.4)">🔵 ITP</button>
+  <button class="tb-btn" id="btnDef" onclick="startPlace('defect')" style="color:var(--danger);border-color:rgba(255,77,109,.4)">🔴 Defect</button>
+  <button class="tb-btn" id="btnFs" onclick="startPlace('fireseal')" style="color:#ff4444;border-color:rgba(255,68,68,.4)">🔶 Fire Seal</button>
+  <button class="tb-btn" id="btnFd" onclick="startPlace('firedamper')" style="color:#ff9500;border-color:rgba(255,149,0,.4)">🟠 Fire Damper</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="flashPins()" title="Spotlight">⚡</button>
+  <button class="tb-btn" onclick="togglePanel()" title="Toggle pin panel">📍</button>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <span class="tb-lbl">Layers</span>
+  <div class="chip chip-all on" id="lay-all" onclick="toggleLayer('all')">👁 All</div>
+  <div class="chip chip-itp on" id="lay-itp" onclick="toggleLayer('itp')">🔵 ITP</div>
+  <div class="chip chip-def on" id="lay-def" onclick="toggleLayer('defect')">🔴 Defect</div>
+  <div class="chip chip-fs on" id="lay-fs" onclick="toggleLayer('fireseal')">🔶 Fire Seal</div>
+  <div class="chip chip-fd on" id="lay-fd" onclick="toggleLayer('firedamper')">🟠 Fire Damper</div>
+  <div class="filter-sep"></div>
+  <span class="tb-lbl">Status</span>
+  <div class="chip chip-sall on" id="st-all" onclick="toggleStatus('all')">All</div>
+  <div class="chip chip-sns" id="st-ns" onclick="toggleStatus('not-started')">● Not Started</div>
+  <div class="chip chip-sip" id="st-ip" onclick="toggleStatus('in-progress')">● In Progress</div>
+  <div class="chip chip-sact" id="st-act" onclick="toggleStatus('action')">● Action</div>
+  <div class="chip chip-scl" id="st-cl" onclick="toggleStatus('closed')">● Closed</div>
+  <div id="placeHintBar" style="display:none;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);margin-left:auto;flex-shrink:0">📍 Click to place — Esc to cancel</div>
+</div>
+
+<!-- VIEWER + PANEL -->
+<div class="viewer-wrap">
+  <div class="viewer" id="viewer">
+    <div id="pdfStage"><canvas id="pdfCanvas"></canvas><div id="pinLayer"></div></div>
+    <div class="loading" id="loading"><div class="spin"></div><span style="font-size:13px;color:var(--muted)">Loading drawing…</span></div>
+    <div class="error-state" id="errorState"><div style="font-size:36px">⚠️</div><div id="errorMsg">Could not load PDF</div></div>
+    <div class="no-pdf" id="noPdf"><div style="font-size:40px">📄</div><div>No PDF uploaded for this drawing</div></div>
+    <div class="zoom-fab">
+      <button class="z-btn" onclick="zoom(1.25)" title="Zoom in">+</button>
+      <button class="z-btn" onclick="zoom(0.8)" title="Zoom out">−</button>
+      <button class="z-btn" onclick="fitToScreen()" title="Fit">⊡</button>
+    </div>
+  </div>
+
+  <!-- PINS PANEL -->
+  <div class="pins-panel" id="pinsPanel">
+    <div class="pp-tab" id="ppTab" onclick="togglePanel()">◀</div>
+    <div class="pp-hdr pp-hide">
+      <span class="pp-title">Pins</span>
+      <select id="ppFilter" onchange="renderPanel()" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-size:11px;padding:2px 6px;outline:none;cursor:pointer">
+        <option value="">All</option>
+        <option value="itp">ITP</option>
+        <option value="defect">Defect</option>
+        <option value="fireseal">Fire Seal</option>
+        <option value="firedamper">Fire Damper</option>
+      </select>
+    </div>
+    <div class="pp-list pp-hide" id="ppList"></div>
+  </div>
+</div>
+
+<!-- PLACE HINT OVERLAY -->
+<div class="place-hint" id="placeHint"></div>
+
+<!-- CONTEXT MENU -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" onclick="ctxMove()">📍 Move Pin</div>
+  <div class="ctx-item" onclick="ctxDelete()" style="color:var(--danger)">🗑 Delete Pin</div>
+</div>
+
+<!-- ITP PIN MODAL (reuses pdf-viewer modal) -->
+<div class="mo" id="itpMo">
+  <div class="modal" style="width:460px">
+    <div class="modal-hdr"><h3 id="itpMoTitle">New ITP Pin</h3></div>
+    <div class="modal-body" style="padding:14px 18px;display:flex;flex-direction:column;gap:12px">
+      <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:7px;padding:7px 12px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px">
+        <span style="color:var(--accent)">ℹ</span>ITP templates can be added from project settings only
+      </div>
+      <div>
+        <label class="ml">Equipment ID</label>
+        <input class="mi" id="itpEquip" placeholder="e.g. FCU-L02-001" autocomplete="off">
+      </div>
+      <div>
+        <label class="ml">Filter by Equipment Type</label>
+        <div class="searchable-wrap">
+          <input class="searchable-input" id="itpEquipTypeFilter" placeholder="Search equipment type…" autocomplete="off"
+            oninput="onItpEquipSearch()" onfocus="openItpEquipDd()" onblur="setTimeout(closeItpEquipDd,150)"/>
+          <div class="searchable-dropdown" id="itpEquipDd"></div>
+        </div>
+      </div>
+      <div>
+        <label class="ml">Select ITP Templates <span id="itpSelCount" style="font-family:DM Mono,monospace;font-size:10px;color:var(--accent);margin-left:6px"></span></label>
+        <div id="itpCheckList" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;margin-top:4px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn" onclick="closeItpMo()">Cancel</button>
+      <button class="mbtn danger" id="itpDelBtn" onclick="deleteCurrentPin()" style="display:none;margin-right:auto">Delete</button>
+      <button class="mbtn primary" onclick="saveItpPin()">Save Pin</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIRE SEAL MODAL -->
+<div class="mo" id="fsMo">
+  <div class="modal" style="width:380px">
+    <div class="modal-hdr"><h3>🔶 Fire Seal Pin</h3><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="fsRef"></span></div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">Service Type *</label>
+        <div class="svc-grid">
+          <button class="svc-btn" id="svc-pipe" onclick="selectSvc('pipe')"><span class="svc-icon">🔧</span>Pipe</button>
+          <button class="svc-btn" id="svc-cable" onclick="selectSvc('cable')"><span class="svc-icon">🔌</span>Cable</button>
+          <button class="svc-btn" id="svc-conduit" onclick="selectSvc('conduit')"><span class="svc-icon">⬛</span>Conduit</button>
+          <button class="svc-btn" id="svc-refrigerant" onclick="selectSvc('refrigerant')"><span class="svc-icon">❄️</span>Refrigerant</button>
+          <button class="svc-btn" id="svc-bms" onclick="selectSvc('bms')"><span class="svc-icon">📡</span>BMS</button>
+          <button class="svc-btn" id="svc-electrical" onclick="selectSvc('electrical')"><span class="svc-icon">⚡</span>Electrical</button>
+        </div>
+      </div>
+      <div>
+        <label class="ml">Photo (optional)</label>
+        <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;background:var(--surface2);border:1.5px dashed var(--border);border-radius:7px;padding:10px 14px;font-size:12px;color:var(--muted);width:100%">
+          <span style="font-size:20px">📷</span><span id="fsPhotoLbl">Tap to add photo</span>
+          <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleFsPhoto(this)">
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn" onclick="closeFsMo()">Cancel</button>
+      <button class="mbtn danger" id="fsDelBtn" onclick="deleteCurrentPin()" style="display:none;margin-right:auto">Delete</button>
+      <button class="mbtn primary" onclick="saveFsPin()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIRE DAMPER MODAL -->
+<div class="mo" id="fdMo">
+  <div class="modal" style="width:440px">
+    <div class="modal-hdr"><h3>🟠 Fire Damper Pin</h3><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="fdRef"></span></div>
+    <div class="modal-body">
+      <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:7px;padding:8px 12px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="color:var(--accent);font-size:13px">ℹ</span>
+        ITP templates can be added from project settings only
+      </div>
+      <div>
+        <label class="ml">Equipment ID (Tag)</label>
+        <input class="mi" id="fdTag" placeholder="e.g. FD-L02-001">
+      </div>
+      <div>
+        <label class="ml">ITP Template</label>
+        <select class="mi" id="fdItpType" style="height:38px;appearance:auto;cursor:pointer">
+          <option value="">— Select ITP Template —</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Assignee — Duct Installer</label>
+        <select class="mi" id="fdAssignee" style="cursor:pointer">
+          <option value="">— Select installer —</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Status</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="mbtn" id="fdst-ns" onclick="selectFdStatus('not-started')" style="flex:1;font-size:11px">Not Started</button>
+          <button class="mbtn" id="fdst-ip" onclick="selectFdStatus('in-progress')" style="flex:1;font-size:11px">In Progress</button>
+          <button class="mbtn" id="fdst-cl" onclick="selectFdStatus('closed')" style="flex:1;font-size:11px">Closed</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-wrap:wrap;gap:6px">
+      <button class="mbtn danger" id="fdDelBtn" onclick="deleteCurrentPin()" style="display:none;margin-right:auto">Delete</button>
+      <button class="mbtn" onclick="closeFdMo()">Cancel</button>
+      <button class="mbtn" id="fdSaveAnotherBtn" onclick="saveFdPin('another')" style="display:none">Save &amp; Add Another</button>
+      <button class="mbtn" id="fdSaveOpenBtn" onclick="saveFdPin('open')" style="display:none">Save &amp; Open ITP</button>
+      <button class="mbtn primary" onclick="saveFdPin('close')">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- DEFECT PIN MODAL -->
+<div class="mo" id="defMo">
+  <div class="modal" style="width:420px">
+    <div class="modal-hdr"><h3>🔴 Defect Pin</h3><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="defRef"></span></div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">Description *</label>
+        <textarea class="mi" id="defDesc" rows="3" placeholder="Describe the defect…" style="resize:vertical"></textarea>
+      </div>
+      <div>
+        <label class="ml">Priority</label>
+        <select class="mi" id="defPriority" style="height:38px;appearance:auto">
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn" onclick="closeDefMo()">Cancel</button>
+      <button class="mbtn danger" id="defDelBtn" onclick="deleteCurrentPin()" style="display:none;margin-right:auto">Delete</button>
+      <button class="mbtn primary" onclick="saveDefPin()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── PARAMS & STATE ──
+var params=new URLSearchParams(window.location.search);
+var drawingId=params.get('id')||params.get('drawingId')||'';
+var pKey=(dbGetCurrentProject()||{}).num||'GCT001';
+
+var _scale=1,_offsetX=0,_offsetY=0;
+var _dragging=false,_lastX=0,_lastY=0;
+var _canvasW=0,_canvasH=0;
+var _renderTask=null;
+var _placing=false; // true = click places pin
+var _placeType=''; // 'itp','defect','fireseal','firedamper'
+var _movingPinId=null;
+var _ctxPinId=null;
+var _editPinId=null;
+var _pendingX=0,_pendingY=0;
+var _fsService='';
+var _fsPhoto=null;
+var _fdStatus='not-started';
+var _itpStatus='not-started';
+var _showDeleted=false;
+
+// Layer/status visibility
+var _layers={itp:true,defect:true,fireseal:true,firedamper:true};
+var _statusFilter=''; // '' = all
+
+// DATA
+var drawings=[];
+var responses={};
+var defects=[];
+var templates=[];
+var curDrawing=null;
+
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function nid(){return'pin_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);}
+function today(){return new Date().toISOString().split('T')[0];}
+function toast(msg,col){var t=document.createElement('div');t.textContent=msg;t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(col||'var(--surface)')+(col?';color:#000':';color:var(--text)')+';border:1px solid var(--border);padding:8px 20px;border-radius:8px;font-size:12px;z-index:9999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.4)';document.body.appendChild(t);setTimeout(function(){t.remove();},2500);}
+
+// ── LOAD DATA ──
+async function loadData(){
+  try{var d=await dbGetDrawings(pKey);drawings=Array.isArray(d)?d:[];}catch(e){}
+  try{var r=await dbGetItpResponses(pKey);responses=r||{};}catch(e){}
+  try{var df=await dbGetProject('defects',pKey);defects=Array.isArray(df)?df:[];}catch(e){}
+  try{var pt=await dbGetItpProjectTemplates(pKey);templates=Array.isArray(pt)?pt:[];}catch(e){}
+  curDrawing=drawings.find(function(d){return d.id===drawingId;})||null;
+}
+function saveAll(){
+  var toStore=drawings.map(function(d){var c=Object.assign({},d);c.history=(d.history||[]).map(function(h){return Object.assign({},h);});c.pins=(d.pins||[]).map(function(p){return Object.assign({},p);});delete c.pdfData;return c;});
+  dbSetDrawings(pKey,toStore).catch(function(e){console.error(e);});
+  dbSetItpResponses(pKey,responses).catch(function(e){console.error(e);});
+}
+function saveDefects(){
+  dbSetProject('defects',pKey,defects).catch(function(e){console.error(e);});
+}
+
+// ── INIT ──
+(async function(){
+  if(typeof dbReady!=='undefined')await dbReady;
+  await loadData();
+  if(!drawingId){showError('No drawing ID');return;}
+  if(!curDrawing){showError('Drawing not found (id='+drawingId+')');return;}
+  document.title=(curDrawing.num||'Drawing')+' — HVAC NEXUS';
+  document.getElementById('topNum').textContent=curDrawing.num||'—';
+  document.getElementById('topName').textContent=curDrawing.name||'';
+  populateItpTypes();
+  if(curDrawing.pdfUrl){loadFromUrl(curDrawing.pdfUrl);}
+  else if(curDrawing.pdfData){loadFromData(curDrawing.pdfData);}
+  else{showNoPdf();}
+  var hd=params.get('highlightDefect');
+  if(hd){setTimeout(function(){highlightPin(hd);},1000);}
+})();
+
+// ── PDF RENDER ──
+function loadFromUrl(url){
+  var headers={'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA'};
+  try{var s=JSON.parse(localStorage.getItem('hvacnexus_session')||'{}');if(s.access_token)headers['Authorization']='Bearer '+s.access_token;}catch(e){}
+  fetch(url,{headers:headers})
+    .then(function(r){
+          if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.arrayBuffer();
+    })
+    .then(function(buf){
+          pdfjsLib.getDocument({data:buf}).promise.then(renderPdf).catch(function(e){showError('PDF render error: '+e.message);});
+    })
+    .catch(function(e){
+      console.error('[DV] fetch failed:',e);
+      showError('Could not load PDF: '+e.message);
+    });
+}
+function loadFromData(dataUrl){
+  var bin=atob(dataUrl.split(',')[1]||dataUrl);
+  var arr=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  pdfjsLib.getDocument({data:arr}).promise.then(renderPdf).catch(function(e){showError('PDF error: '+e.message);});
+}
+var _pdfPage=null;
+var _hiRenderTask=null;
+
+function renderPdf(pdf){
+  pdf.getPage(1).then(function(page){
+    _pdfPage=page;
+    var vp=page.getViewport({scale:0.75});
+    var canvas=document.getElementById('pdfCanvas');
+    canvas.width=vp.width;
+    canvas.height=vp.height;
+    canvas.style.width='';canvas.style.height='';
+    _canvasW=vp.width;_canvasH=vp.height;
+    var ctx=canvas.getContext('2d');
+    // Pass 1: quick render at 0.75x
+    page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
+      document.getElementById('loading').style.display='none';
+      requestAnimationFrame(function(){
+        fitToScreen();
+        renderPins();
+        renderPanel();
+        // Pass 2: hi-res upgrade in background
+        var dpr=window.devicePixelRatio||1;
+        var hiScale=Math.min(dpr*2,4);
+        var vpHi=page.getViewport({scale:hiScale});
+        var vp1=page.getViewport({scale:1});
+        canvas.width=vpHi.width;
+        canvas.height=vpHi.height;
+        canvas.style.width=vp1.width+'px';
+        canvas.style.height=vp1.height+'px';
+        _canvasW=vp1.width;_canvasH=vp1.height;
+        var ctx2=canvas.getContext('2d');
+        page.render({canvasContext:ctx2,viewport:vpHi}).promise.then(function(){
+          fitToScreen();renderPins();
+        }).catch(function(){});
+      });
+    }).catch(function(e){console.error('render error',e);});
+  });
+}
+
+function renderAtScale(page,scale,cb){
+  var vp=page.getViewport({scale:scale});
+  _canvasW=vp.width;_canvasH=vp.height;
+  var canvas=document.getElementById('pdfCanvas');
+  canvas.width=_canvasW;canvas.height=_canvasH;
+  var ctx=canvas.getContext('2d');
+  page.render({canvasContext:ctx,viewport:vp}).promise.then(cb).catch(function(){});
+}
+
+function renderHighRes(page){
+  // No-op — rendering is now done in single high-res pass in renderPdf
+}
+function applyTransform(){
+  document.getElementById('pdfStage').style.transform='translate('+_offsetX+'px,'+_offsetY+'px) scale('+_scale+')';
+}
+function fitToScreen(){
+  var v=document.getElementById('viewer');
+  var vw=v.clientWidth,vh=v.clientHeight;
+  var sx=vw/_canvasW,sy=vh/_canvasH;
+  _scale=Math.min(sx,sy)*0.92;
+  _offsetX=(vw-_canvasW*_scale)/2;
+  _offsetY=(vh-_canvasH*_scale)/2;
+  applyTransform();
+}
+function zoom(f){
+  var v=document.getElementById('viewer');
+  var cx=v.clientWidth/2,cy=v.clientHeight/2;
+  var ns=Math.max(0.05,Math.min(10,_scale*f));
+  _offsetX=cx-(cx-_offsetX)*ns/_scale;
+  _offsetY=cy-(cy-_offsetY)*ns/_scale;
+  _scale=ns;
+  applyTransform();
+}
+
+// ── RENDER PINS ──
+var PIN_STATUS_CLS={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};
+var PIN_STATUS_LBL={'not-started':'Not Started','in-progress':'In Progress','action':'Action','closed':'Closed'};
+
+function pinVisible(p){
+  if(!_layers[p.type])return false;
+  var resp=responses[p.id]||{};
+  if(resp.deleted&&!_showDeleted)return false;
+  if(_statusFilter&&resp.status!==_statusFilter)return false;
+  return true;
+}
+
+function renderPins(){
+  var layer=document.getElementById('pinLayer');
+  layer.innerHTML='';
+  if(!curDrawing||!_canvasW)return;
+  (curDrawing.pins||[]).forEach(function(p){
+    if(!pinVisible(p))return;
+    var resp=responses[p.id]||{};
+    var st=resp.status||'not-started';
+    var stCls=PIN_STATUS_CLS[st]||'ns';
+    var el=document.createElement('div');
+    el.className='drw-pin';
+    el.dataset.pinId=p.id;
+    el.dataset.pinType=p.type;
+    el.style.left=(p.x/100*_canvasW)+'px';
+    el.style.top=(p.y/100*_canvasH)+'px';
+    var inner='';
+    if(p.type==='itp'){
+      var txt=(p.ref||'').replace('ITP-','');
+      var itpCount=(p.itps&&p.itps.length)||1;
+      inner='<div class="pin-itp '+stCls+'" style="position:relative">'+escH(txt)
+        +(itpCount>1?'<span class="pin-cluster-badge">'+itpCount+'</span>':'')
+        +'</div>';
+    } else if(p.type==='defect'){
+      var dtxt=(p.ref||'').replace('DEF-','');
+      inner='<div class="pin-def '+stCls+'">'+escH(dtxt.slice(-3))+'</div>';
+    } else if(p.type==='fireseal'){
+      inner='<div class="pin-fs-wrap"><div class="pin-fs '+stCls+'"></div></div>';
+    } else if(p.type==='firedamper'){
+      inner='<div class="pin-fd '+stCls+'">FD</div>';
+    }
+    var lbl=p.ref||(p.itpTypeLabel||p.type);
+    var desc=p.equip||(p.service||p.tag||'');
+    inner+='<div class="pin-lbl">'+escH(lbl)+(desc?' · '+escH(desc):'')+'</div>';
+    el.innerHTML=inner;
+    (function(pin){
+      el.addEventListener('click',function(e){e.stopPropagation();if(_movingPinId){commitMove(pin.x,pin.y);return;}openPinModal(pin);});
+      el.addEventListener('contextmenu',function(e){e.preventDefault();e.stopPropagation();showCtx(e,pin.id);});
+    })(p);
+    layer.appendChild(el);
+  });
+}
+
+// Update pin positions after zoom (pins are in canvas %, stage handles transform)
+function updatePinPositions(){renderPins();}
+
+// ── LAYER / STATUS FILTER ──
+function toggleLayer(type){
+  if(type==='all'){
+    var allOn=Object.values(_layers).every(function(v){return v;});
+    ['itp','defect','fireseal','firedamper'].forEach(function(t){_layers[t]=!allOn;});
+    document.getElementById('lay-all').classList.toggle('on',!allOn);
+    document.getElementById('lay-itp').classList.toggle('on',!allOn);
+    document.getElementById('lay-def').classList.toggle('on',!allOn);
+    document.getElementById('lay-fs').classList.toggle('on',!allOn);
+    document.getElementById('lay-fd').classList.toggle('on',!allOn);
+  } else {
+    _layers[type]=!_layers[type];
+    var chipId={'itp':'lay-itp','defect':'lay-def','fireseal':'lay-fs','firedamper':'lay-fd'}[type];
+    if(chipId)document.getElementById(chipId).classList.toggle('on',_layers[type]);
+    var allOn2=Object.values(_layers).every(function(v){return v;});
+    document.getElementById('lay-all').classList.toggle('on',allOn2);
+  }
+  renderPins();renderPanel();
+}
+function toggleStatus(st){
+  _statusFilter=(st==='all'||_statusFilter===st)?'':st;
+  ['all','ns','ip','act','cl'].forEach(function(s){document.getElementById('st-'+s).classList.remove('on');});
+  if(!_statusFilter)document.getElementById('st-all').classList.add('on');
+  else{var m={'not-started':'ns','in-progress':'ip','action':'act','closed':'cl'};if(m[_statusFilter])document.getElementById('st-'+m[_statusFilter]).classList.add('on');}
+  renderPins();renderPanel();
+}
+
+// ── PLACE MODE ──
+function startPlace(type){
+  if(_placeType===type){cancelPlace();return;}
+  _placing=true;_placeType=type;
+  document.getElementById('viewer').classList.add('crosshair');
+  var labels={itp:'ITP',defect:'Defect',fireseal:'Fire Seal',firedamper:'Fire Damper'};
+  document.getElementById('placeHint').style.display='block';
+  document.getElementById('placeHint').textContent='📍 Click drawing to place '+labels[type]+' pin — Esc to cancel';
+  document.getElementById('placeHintBar').style.display='block';
+  // Update button active state
+  ['btnItp','btnDef','btnFs','btnFd'].forEach(function(id){document.getElementById(id).className='tb-btn';});
+  var map={itp:'btnItp',defect:'btnDef',fireseal:'btnFs',firedamper:'btnFd'};
+  var cls={itp:'itp-active',defect:'def-active',fireseal:'fs-active',firedamper:'fd-active'};
+  if(map[type]){document.getElementById(map[type]).className='tb-btn '+cls[type];}
+}
+function cancelPlace(){
+  _placing=false;_placeType='';_movingPinId=null;
+  document.getElementById('viewer').classList.remove('crosshair');
+  document.getElementById('placeHint').style.display='none';
+  document.getElementById('placeHintBar').style.display='none';
+  ['btnItp','btnDef','btnFs','btnFd'].forEach(function(id){document.getElementById(id).className='tb-btn';});
+  var btnStyles={btnItp:'color:var(--purple);border-color:rgba(167,139,250,.4)',btnDef:'color:var(--danger);border-color:rgba(255,77,109,.4)',btnFs:'color:#ff4444;border-color:rgba(255,68,68,.4)',btnFd:'color:#ff9500;border-color:rgba(255,149,0,.4)'};
+  Object.keys(btnStyles).forEach(function(id){document.getElementById(id).style.cssText=btnStyles[id];});
+}
+function onPlace(xPct,yPct){
+  _pendingX=xPct;_pendingY=yPct;
+  var type=_placeType;
+  cancelPlace();
+  if(type==='itp')openItpMo(null);
+  else if(type==='defect')openDefMo(null);
+  else if(type==='fireseal')openFsMo(null);
+  else if(type==='firedamper')openFdMo(null);
+}
+
+// ── NEXT REF ──
+function nextRef(prefix){
+  // Scan ALL drawings for highest existing ref
+  var max=0;
+  drawings.forEach(function(d){
+    (d.pins||[]).forEach(function(p){
+      var m=(p.ref||'').match(new RegExp('^'+prefix+'-(\\d+)$'));
+      if(m){var n=parseInt(m[1]);if(n>max)max=n;}
+      // Also check itps array on each pin for individual refs
+      (p.itps||[]).forEach(function(itp){
+        var mi=(itp.ref||'').match(new RegExp('^'+prefix+'-(\\d+)$'));
+        if(mi){var ni=parseInt(mi[1]);if(ni>max)max=ni;}
+      });
+    });
+  });
+  if(prefix==='DEF'){
+    defects.forEach(function(d){var m=(d.ref||'').match(/^DEF-(\d+)$/);if(m){var n=parseInt(m[1]);if(n>max)max=n;}});
+  }
+  return prefix+'-'+String(max+1).padStart(4,'0');
+}
+
+// ── ITP PIN MODAL ──
+var _itpPinCache=null;
+var _itpSelectedTemplates=[];
+
+function getItpEquipTypes(){
+  return [...new Set((templates||[]).map(function(t){return t.equipType||'';}).filter(Boolean))].sort();
+}
+function populateItpTypes(){
+  renderItpEquipDd('');
+}
+function renderItpEquipDd(q){
+  var types=getItpEquipTypes();
+  var filtered=q?types.filter(function(t){return t.toLowerCase().includes(q.toLowerCase());}):types;
+  var dd=document.getElementById('itpEquipDd');if(!dd)return;
+  var html='';
+  if(!q)html='<div class="sd-option" onmousedown="selectItpEquipType(\'\')">— All Types —</div>';
+  filtered.forEach(function(t){
+    html+='<div class="sd-option" onmousedown="selectItpEquipType(\''+escH(t)+'\')">'+escH(t)+'</div>';
+  });
+  if(!filtered.length&&q)html='<div style="padding:10px 14px;color:var(--muted);font-size:12px">No types found</div>';
+  dd.innerHTML=html;
+  // Use fixed positioning to escape modal overflow clipping
+  var inp=document.getElementById('itpEquipTypeFilter');
+  if(inp){
+    var r=inp.getBoundingClientRect();
+    dd.style.cssText='position:fixed;left:'+r.left+'px;top:'+(r.bottom+4)+'px;width:'+r.width+'px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;z-index:9999;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+  }
+}
+function onItpEquipSearch(){
+  var q=document.getElementById('itpEquipTypeFilter').value||'';
+  renderItpEquipDd(q);
+  openItpEquipDd();
+  filterItpList();
+}
+function openItpEquipDd(){
+  renderItpEquipDd(document.getElementById('itpEquipTypeFilter').value||'');
+  var dd=document.getElementById('itpEquipDd');if(dd)dd.style.display='block';
+}
+function closeItpEquipDd(){
+  var dd=document.getElementById('itpEquipDd');if(dd)dd.style.display='none';
+}
+function selectItpEquipType(val){
+  document.getElementById('itpEquipTypeFilter').value=val;
+  closeItpEquipDd();
+  filterItpList();
+}
+function filterItpList(){
+  var eq=(document.getElementById('itpEquipTypeFilter').value||'').trim();
+  var filtered=(templates||[]).filter(function(t){
+    if(!eq)return true;
+    return (t.equipType||'').toLowerCase().includes(eq.toLowerCase())
+      ||(t.itpType||'').toLowerCase().includes(eq.toLowerCase());
+  });
+  renderItpCheckList(filtered);
+}
+function renderItpCheckList(list){
+  var el=document.getElementById('itpCheckList');if(!el)return;
+  if(!list||!list.length){
+    el.innerHTML='<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px">No templates — add from project settings</div>';
+    return;
+  }
+  var catOrder=['Installation','Pre-Commissioning','Commissioning'];
+  var groups={};
+  list.forEach(function(t){var cat=t.itpCategory||'Other';if(!groups[cat])groups[cat]=[];groups[cat].push(t);});
+  var catCols={'Installation':'#00e5a0','Pre-Commissioning':'#ffb830','Commissioning':'#c4b5fd','Other':'var(--muted)'};
+  var html='';
+  var allCats=catOrder.concat(Object.keys(groups).filter(function(k){return catOrder.indexOf(k)<0;}));
+  allCats.forEach(function(cat){
+    var items=groups[cat];if(!items||!items.length)return;
+    html+='<div style="padding:5px 12px 3px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:'+(catCols[cat]||'var(--muted)')+';background:var(--surface3);border-bottom:1px solid var(--border)">'+escH(cat)+'</div>';
+    items.forEach(function(t){
+      var checked=_itpSelectedTemplates.some(function(s){return s.itpNo===t.itpNo;});
+      html+='<label style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border)">'
+        +'<input type="checkbox" data-itpno="'+escH(t.itpNo||'')+'" data-itptype="'+escH(t.itpType||'')+'" '+(checked?'checked':'')+' onchange="toggleItpSel(this)" style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0">'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH(t.itpType||t.itpNo||'')+'</div>'
+        +'<div style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">'+escH(t.itpNo||'')+'</div>'
+        +'</div></label>';
+    });
+  });
+  el.innerHTML=html;
+  updateItpSelCount();
+}
+function toggleItpSel(cb){
+  var no=cb.dataset.itpno,type=cb.dataset.itptype;
+  if(cb.checked){if(!_itpSelectedTemplates.some(function(s){return s.itpNo===no;}))_itpSelectedTemplates.push({itpNo:no,itpType:type});}
+  else{_itpSelectedTemplates=_itpSelectedTemplates.filter(function(s){return s.itpNo!==no;});}
+  updateItpSelCount();
+}
+function updateItpSelCount(){
+  var el=document.getElementById('itpSelCount');
+  if(el)el.textContent=_itpSelectedTemplates.length?_itpSelectedTemplates.length+' selected':'';
+}
+function onItpTypeChange(){}
+function selectStatus(st){_itpStatus=st;}
+function openItpMo(pin){
+  _itpPinCache=pin;
+  _itpSelectedTemplates=[];
+  if(pin&&pin.itps&&pin.itps.length)_itpSelectedTemplates=pin.itps.slice();
+  else if(pin&&pin.itpTypeLabel)_itpSelectedTemplates=[{itpNo:'',itpType:pin.itpTypeLabel}];
+  document.getElementById('itpMoTitle').textContent=pin?'Edit ITP Pin':'New ITP Pin';
+  document.getElementById('itpEquip').value=pin?(pin.equip||''):'';
+  document.getElementById('itpDelBtn').style.display=pin?'':'none';
+  var ef=document.getElementById('itpEquipTypeFilter');if(ef)ef.value='';
+  closeItpEquipDd();
+  populateItpTypes();filterItpList();
+  document.getElementById('itpMo').classList.add('open');
+}
+function closeItpMo(){document.getElementById('itpMo').classList.remove('open');_itpPinCache=null;}
+function saveItpPin(){
+  if(!_itpSelectedTemplates.length){toast('Select at least one ITP template');return;}
+  if(!curDrawing.pins)curDrawing.pins=[];
+  var u=dbGetCurrentUser();var equip=document.getElementById('itpEquip').value.trim();
+
+  // Calculate starting ref number once, then increment for each ITP
+  function nextItpRefNum(){
+    var max=0;
+    drawings.forEach(function(d){
+      (d.pins||[]).forEach(function(p){
+        var m=(p.ref||'').match(/^ITP-(\d+)$/);
+        if(m){var n=parseInt(m[1]);if(n>max)max=n;}
+        (p.itps||[]).forEach(function(itp){
+          var mi=(itp.ref||'').match(/^ITP-(\d+)$/);
+          if(mi){var ni=parseInt(mi[1]);if(ni>max)max=ni;}
+        });
+      });
+    });
+    return max+1;
+  }
+
+  if(_itpPinCache){
+    var existingRefs={};
+    (_itpPinCache.itps||[]).forEach(function(itp){if(itp.ref&&itp.itpNo)existingRefs[itp.itpNo]=itp.ref;});
+    var startNum=nextItpRefNum();
+    _itpPinCache.itps=_itpSelectedTemplates.map(function(t,i){
+      var ref=existingRefs[t.itpNo]||('ITP-'+String(startNum+i).padStart(4,'0'));
+      return {itpNo:t.itpNo,itpType:t.itpType,ref:ref};
+    });
+    _itpPinCache.itpTypeLabel=_itpPinCache.itps[0].itpType||'';
+    _itpPinCache.ref=_itpPinCache.itps[0].ref||_itpPinCache.ref;
+    _itpPinCache.equip=equip;
+    responses[_itpPinCache.id]=responses[_itpPinCache.id]||{};
+  } else {
+    var startNum=nextItpRefNum();
+    var itpsWithRefs=_itpSelectedTemplates.map(function(t,i){
+      return {itpNo:t.itpNo,itpType:t.itpType,ref:'ITP-'+String(startNum+i).padStart(4,'0')};
+    });
+    var firstRef=itpsWithRefs[0].ref;
+    var pin={id:nid(),type:'itp',ref:firstRef,itps:itpsWithRefs,itpTypeLabel:itpsWithRefs[0].itpType||'',equip:equip,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    curDrawing.pins.push(pin);responses[pin.id]={status:'not-started'};
+  }
+  saveAll();renderPins();renderPanel();closeItpMo();
+  toast(_itpSelectedTemplates.length>1?_itpSelectedTemplates.length+' ITP templates pinned':'ITP pin saved');
+}
+
+// ── FIRE SEAL MODAL ──
+var _fsPinCache=null;
+function selectSvc(svc){
+  _fsService=svc;
+  document.querySelectorAll('.svc-btn').forEach(function(b){b.classList.remove('sel');});
+  var el=document.getElementById('svc-'+svc);if(el)el.classList.add('sel');
+}
+function handleFsPhoto(inp){
+  if(!inp.files[0])return;
+  _fsPhoto=inp.files[0];
+  document.getElementById('fsPhotoLbl').textContent=inp.files[0].name+' ✓';
+}
+function openFsMo(pin){
+  _fsPinCache=pin;
+  _fsService='';_fsPhoto=null;
+  document.querySelectorAll('.svc-btn').forEach(function(b){b.classList.remove('sel');});
+  document.getElementById('fsPhotoLbl').textContent='Tap to add photo';
+  document.getElementById('fsRef').textContent=pin?pin.ref:'';
+  document.getElementById('fsDelBtn').style.display=pin?'':'none';
+  if(pin&&pin.service)selectSvc(pin.service);
+  document.getElementById('fsMo').classList.add('open');
+}
+function closeFsMo(){document.getElementById('fsMo').classList.remove('open');_fsPinCache=null;}
+async function saveFsPin(){
+  if(!_fsService&&!_fsPinCache){toast('Select a service type');return;}
+  if(!curDrawing.pins)curDrawing.pins=[];
+  var u=dbGetCurrentUser();
+  var photoUrl=null;
+  if(_fsPhoto){try{photoUrl=await uploadPhoto(_fsPhoto,'fireseal');}catch(e){console.error(e);}}
+  if(_fsPinCache){
+    if(_fsService)_fsPinCache.service=_fsService;
+    if(photoUrl){responses[_fsPinCache.id]=responses[_fsPinCache.id]||{};responses[_fsPinCache.id].photos=[{url:photoUrl,date:today()}];}
+  } else {
+    var ref=nextRef('FS');
+    var pin={id:nid(),type:'fireseal',ref:ref,service:_fsService,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    curDrawing.pins.push(pin);
+    var resp={status:'not-started'};
+    if(photoUrl)resp.photos=[{url:photoUrl,date:today()}];
+    responses[pin.id]=resp;
+  }
+  saveAll();renderPins();renderPanel();closeFsMo();toast('Fire seal pin saved');
+}
+
+// ── FIRE DAMPER MODAL ──
+var _fdPinCache=null;
+function selectFdStatus(st){
+  _fdStatus=st;
+  ['ns','ip','cl'].forEach(function(s){document.getElementById('fdst-'+s).classList.remove('primary');});
+  var m={'not-started':'ns','in-progress':'ip','closed':'cl'};
+  if(m[st])document.getElementById('fdst-'+m[st]).classList.add('primary');
+}
+async function loadFdAssignees(){
+  var sel=document.getElementById('fdAssignee');if(!sel)return;
+  var current=sel.value;
+  sel.innerHTML='<option value="">— Select installer —</option>';
+  var contacts=[];
+  try{var cs=await dbGetCompanySettings();if(cs&&cs.contacts)contacts=cs.contacts;}catch(e){}
+  var subs=contacts.filter(function(c){return c.type==='Subcontractor';});
+  var ductTrades=subs.filter(function(c){return (c.trade||'').toLowerCase().includes('duct')||(c.trade||'').toLowerCase().includes('fire')||(c.trade||'').toLowerCase().includes('mechanical');});
+  var other=subs.filter(function(c){return !ductTrades.includes(c);});
+  if(ductTrades.length){
+    var grp1=document.createElement('optgroup');grp1.label='Duct / Mechanical';
+    ductTrades.forEach(function(c){
+      var o=document.createElement('option');o.value=c.company+(c.contact?' — '+c.contact:'');
+      o.textContent=c.company+(c.contact?' ('+c.contact+')':'')+(c.trade?' · '+c.trade:'');
+      grp1.appendChild(o);
+    });
+    sel.appendChild(grp1);
+  }
+  if(other.length){
+    var grp2=document.createElement('optgroup');grp2.label='Other Subcontractors';
+    other.forEach(function(c){
+      var o=document.createElement('option');o.value=c.company+(c.contact?' — '+c.contact:'');
+      o.textContent=c.company+(c.contact?' ('+c.contact+')':'');
+      grp2.appendChild(o);
+    });
+    sel.appendChild(grp2);
+  }
+  if(!subs.length){
+    var o=document.createElement('option');o.disabled=true;o.textContent='No subcontractors in company settings';
+    sel.appendChild(o);
+  }
+  if(current)sel.value=current;
+}
+function openFdMo(pin){
+  _fdPinCache=pin;
+  _fdStatus=pin?(responses[pin.id]||{}).status||'not-started':'not-started';
+  document.getElementById('fdTag').value=pin?(pin.tag||''):'';
+  document.getElementById('fdRef').textContent=pin?pin.ref:'';
+  document.getElementById('fdDelBtn').style.display=pin?'':'none';
+  // Save & Add Another / Save & Open ITP only for new pins
+  var isNew=!pin;
+  document.getElementById('fdSaveAnotherBtn').style.display=isNew?'':'none';
+  document.getElementById('fdSaveOpenBtn').style.display=isNew?'':'none';
+  loadFdAssignees();
+  document.getElementById('fdAssignee').value=pin?(pin.assignee||''):'';
+  // Populate ITP template select from project templates
+  var fdItpSel=document.getElementById('fdItpType');
+  if(fdItpSel){
+    fdItpSel.innerHTML='<option value="">— Select ITP Template —</option>'+(templates||[]).map(function(t){
+      return '<option value="'+escH(t.itpType)+'">'+escH(t.itpType)+'</option>';
+    }).join('');
+    fdItpSel.value=pin?(pin.linkedItpType||''):'';
+  }
+  selectFdStatus(_fdStatus);
+  document.getElementById('fdMo').classList.add('open');
+}
+function closeFdMo(){document.getElementById('fdMo').classList.remove('open');_fdPinCache=null;}
+function saveFdPin(action){
+  if(!curDrawing.pins)curDrawing.pins=[];
+  var u=dbGetCurrentUser();
+  var tag=document.getElementById('fdTag').value.trim();
+  var assignee=document.getElementById('fdAssignee').value;
+  var linkedItpType=(document.getElementById('fdItpType')||{}).value||'';
+  var savedPin=null;
+  if(_fdPinCache){
+    _fdPinCache.tag=tag;
+    _fdPinCache.assignee=assignee;
+    _fdPinCache.linkedItpType=linkedItpType;
+    responses[_fdPinCache.id]=responses[_fdPinCache.id]||{};
+    responses[_fdPinCache.id].status=_fdStatus;
+    savedPin=_fdPinCache;
+  } else {
+    var ref=nextRef('FD');
+    savedPin={id:nid(),type:'firedamper',ref:ref,tag:tag,assignee:assignee,linkedItpType:linkedItpType,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    curDrawing.pins.push(savedPin);
+    responses[savedPin.id]={status:'not-started'};
+  }
+  saveAll();renderPins();renderPanel();
+  if(action==='another'){
+    // Close modal and immediately re-enter placement mode for another FD pin
+    closeFdMo();
+    toast('Fire damper saved — click to place next pin');
+    startPlace('firedamper');
+  } else if(action==='open'){
+    // Create a linked ITP pin at the same location, then open ITP form
+    closeFdMo();
+    var u2=dbGetCurrentUser();
+    var itpRef=nextRef('ITP');
+    var itpPin={
+      id:nid(),type:'itp',
+      ref:itpRef,
+      itpTypeLabel:savedPin.linkedItpType||'Fire Damper',
+      equip:savedPin.tag||'',
+      x:savedPin.x,y:savedPin.y,
+      createdBy:(u2&&(u2.name||u2.username))||'',
+      createdDate:today()
+    };
+    if(!curDrawing.pins)curDrawing.pins=[];
+    curDrawing.pins.push(itpPin);
+    responses[itpPin.id]={status:'not-started'};
+    saveAll();renderPins();
+    var pNum2=pKey||'';
+    var dwgId3=(curDrawing&&curDrawing.id)||'';
+    window.open('itp-form.html?pinId='+encodeURIComponent(itpPin.id)+'&drawingId='+encodeURIComponent(dwgId3)+(pNum2?'&p='+encodeURIComponent(pNum2):''),'_blank');
+  } else {
+    closeFdMo();
+    toast('Fire damper pin saved');
+  }
+}
+
+// ── DEFECT PIN MODAL (syncs with defects table) ──
+var _defPinCache=null;
+function openDefMo(pin){
+  _defPinCache=pin;
+  var defRecord=pin?defects.find(function(d){return d.pinId===pin.id;}):null;
+  document.getElementById('defDesc').value=defRecord?(defRecord.desc||''):'';
+  document.getElementById('defPriority').value=defRecord?(defRecord.priority||'medium'):'medium';
+  document.getElementById('defRef').textContent=pin?pin.ref:'';
+  document.getElementById('defDelBtn').style.display=pin?'':'none';
+  document.getElementById('defMo').classList.add('open');
+}
+function closeDefMo(){document.getElementById('defMo').classList.remove('open');_defPinCache=null;}
+function saveDefPin(){
+  var desc=document.getElementById('defDesc').value.trim();
+  if(!desc){toast('Description required');return;}
+  if(!curDrawing.pins)curDrawing.pins=[];
+  var u=dbGetCurrentUser();
+  var pin,defRecord;
+  if(_defPinCache){
+    pin=_defPinCache;
+    defRecord=defects.find(function(d){return d.pinId===pin.id;});
+    if(defRecord){defRecord.desc=desc;defRecord.priority=document.getElementById('defPriority').value;}
+  } else {
+    // Generate DEF ref globally
+    var maxDef=0;
+    defects.forEach(function(d){var m=(d.ref||'').match(/^DEF-(\d+)$/);if(m&&parseInt(m[1])>maxDef)maxDef=parseInt(m[1]);});
+    var defRef='DEF-'+String(maxDef+1).padStart(4,'0');
+    var ref=nextRef('DEF');
+    pin={id:nid(),type:'defect',ref:defRef,x:_pendingX,y:_pendingY,createdBy:(u&&(u.name||u.username))||'',createdDate:today()};
+    curDrawing.pins.push(pin);
+    responses[pin.id]={status:'not-started'};
+    defRecord={id:'def_'+Date.now(),ref:defRef,pinId:pin.id,drawingId:drawingId,desc:desc,priority:document.getElementById('defPriority').value,status:'open',issueDate:today(),raisedBy:(u&&(u.name||u.username))||'',createdAt:new Date().toISOString()};
+    defects.push(defRecord);
+  }
+  saveAll();saveDefects();renderPins();renderPanel();closeDefMo();toast('Defect pin saved');
+}
+
+// ── OPEN PIN MODAL (click existing pin) ──
+function openPinModal(pin){
+  var pNum=(dbGetCurrentProject()||{}).num||pKey||'';
+  if(pin.type==='itp'){
+    var itpCount=(pin.itps&&pin.itps.length)||0;
+    if(itpCount>1){
+      // Show cluster popup
+      showItpClusterPopup(pin);
+    } else {
+      // Single ITP — open directly
+      var dwgId=(curDrawing&&curDrawing.id)||'';
+      var itpNo=(pin.itps&&pin.itps[0]&&pin.itps[0].itpNo)||'';
+      var url='itp-form.html?pinId='+encodeURIComponent(pin.id)+'&drawingId='+encodeURIComponent(dwgId)+(pNum?'&p='+encodeURIComponent(pNum):'')+(itpNo?'&itpNo='+encodeURIComponent(itpNo):'');
+      window.open(url,'_blank');
+    }
+  } else if(pin.type==='defect'){
+    var dwgId2=(curDrawing&&curDrawing.id)||'';
+    var defUrl='defect-form.html?pinId='+encodeURIComponent(pin.id)+'&drawingId='+encodeURIComponent(dwgId2)+(pNum?'&p='+encodeURIComponent(pNum):'');
+    window.open(defUrl,'_blank');
+  } else if(pin.type==='fireseal'){
+    openFsMo(pin);
+  } else if(pin.type==='firedamper'){
+    openFdMo(pin);
+  }
+}
+
+var _clusterPopup=null;
+function showItpClusterPopup(pin){
+  closeItpClusterPopup();
+  var pNum=(dbGetCurrentProject()||{}).num||pKey||'';
+  var dwgId=(curDrawing&&curDrawing.id)||'';
+  var stCls=PIN_STATUS_CLS[(responses[pin.id]||{}).status||'not-started']||'ns';
+  // Header: equipment ID only
+  var html='<div class="icp-hdr"><span>'+escH(pin.equip||pin.ref||'')+'</span>'
+    +'<button onclick="closeItpClusterPopup()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px">✕</button></div>';
+  (pin.itps||[]).forEach(function(itp){
+    var url='itp-form.html?pinId='+encodeURIComponent(pin.id)+'&drawingId='+encodeURIComponent(dwgId)+(pNum?'&p='+encodeURIComponent(pNum):'')+(itp.itpNo?'&itpNo='+encodeURIComponent(itp.itpNo):'');
+    // Format: ITP-XXXX  FCU — Water Cooled
+    var label=(itp.ref?itp.ref+' ':'')+escH(itp.itpType||itp.itpNo||'');
+    html+='<div class="icp-item" onclick="window.open(\''+url+'\',\'_blank\')">'
+      +'<div class="icp-dot '+stCls+'"></div>'
+      +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:DM Sans,sans-serif">'+label+'</div>'
+      +'</div>';
+  });
+  html+='<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px">'
+    +'<button class="mbtn" style="flex:1;font-size:11px" onclick="closeItpClusterPopup();openItpMo(_getCurrentPin(\''+escH(pin.id)+'\'))">✏ Edit Pin</button>'
+    +'</div>';
+  var pop=document.createElement('div');
+  pop.className='itp-cluster-popup';
+  pop.innerHTML=html;
+  // Position near the pin element
+  var pinEl=document.querySelector('[data-pin-id="'+pin.id+'"]');
+  if(pinEl){
+    var r=pinEl.getBoundingClientRect();
+    pop.style.left=Math.min(r.right+8,window.innerWidth-310)+'px';
+    pop.style.top=Math.max(r.top-20,8)+'px';
+  } else {
+    pop.style.left='50%';pop.style.top='50%';pop.style.transform='translate(-50%,-50%)';
+  }
+  document.body.appendChild(pop);
+  _clusterPopup=pop;
+  setTimeout(function(){document.addEventListener('click',closeItpClusterPopup,{once:true});},10);
+}
+function closeItpClusterPopup(){
+  if(_clusterPopup){_clusterPopup.remove();_clusterPopup=null;}
+}
+function _getCurrentPin(id){
+  return (curDrawing&&curDrawing.pins||[]).find(function(p){return p.id===id;})||null;
+}
+
+// ── DELETE PIN ──
+function deleteCurrentPin(){
+  var pin=_itpPinCache||_fsPinCache||_fdPinCache||_defPinCache;
+  if(!pin||!confirm('Delete this pin?'))return;
+  if(pin.type==='defect'){
+    defects=defects.filter(function(d){return d.pinId!==pin.id;});
+    saveDefects();
+  }
+  curDrawing.pins=(curDrawing.pins||[]).filter(function(p){return p.id!==pin.id;});
+  delete responses[pin.id];
+  saveAll();renderPins();renderPanel();
+  closeItpMo();closeFsMo();closeFdMo();closeDefMo();
+  toast('Pin deleted');
+}
+
+// ── CONTEXT MENU ──
+function showCtx(e,pinId){
+  _ctxPinId=pinId;
+  var menu=document.getElementById('ctxMenu');
+  menu.style.display='block';
+  menu.style.left=Math.min(e.clientX,window.innerWidth-160)+'px';
+  menu.style.top=Math.min(e.clientY,window.innerHeight-80)+'px';
+}
+function hideCtx(){document.getElementById('ctxMenu').style.display='none';}
+function ctxMove(){
+  hideCtx();
+  _movingPinId=_ctxPinId;
+  _placing=true;
+  document.getElementById('viewer').classList.add('crosshair');
+  document.getElementById('placeHint').style.display='block';
+  document.getElementById('placeHint').textContent='📍 Click new position — Esc to cancel';
+}
+function ctxDelete(){
+  hideCtx();
+  if(!confirm('Delete this pin?'))return;
+  var pin=(curDrawing.pins||[]).find(function(p){return p.id===_ctxPinId;});
+  if(!pin)return;
+  if(pin.type==='defect'){defects=defects.filter(function(d){return d.pinId!==pin.id;});saveDefects();}
+  curDrawing.pins=(curDrawing.pins||[]).filter(function(p){return p.id!==_ctxPinId;});
+  delete responses[_ctxPinId];
+  saveAll();renderPins();renderPanel();toast('Pin deleted');
+}
+function commitMove(xPct,yPct){
+  var pin=(curDrawing.pins||[]).find(function(p){return p.id===_movingPinId;});
+  if(pin){pin.x=xPct;pin.y=yPct;saveAll();renderPins();}
+  cancelPlace();
+}
+
+// ── PINS PANEL ──
+function togglePanel(){
+  var panel=document.getElementById('pinsPanel');
+  var tab=document.getElementById('ppTab');
+  panel.classList.toggle('collapsed');
+  tab.textContent=panel.classList.contains('collapsed')?'▶':'◀';
+  if(!panel.classList.contains('collapsed'))renderPanel();
+}
+function renderPanel(){
+  var list=document.getElementById('ppList');
+  if(!list||!curDrawing)return;
+  var panel=document.getElementById('pinsPanel');
+  if(panel.classList.contains('collapsed'))return;
+  var tf=(document.getElementById('ppFilter')||{}).value||'';
+  var pins=(curDrawing.pins||[]).filter(function(p){
+    var resp=responses[p.id]||{};
+    if(resp.deleted&&!_showDeleted)return false;
+    if(tf&&p.type!==tf)return false;
+    if(!_layers[p.type])return false;
+    return true;
+  });
+  if(!pins.length){
+    list.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">No pins on this drawing</div>';
+    return;
+  }
+  list.innerHTML='';
+  pins.forEach(function(p){
+    var resp=responses[p.id]||{};
+    var st=resp.status||'not-started';
+    var stCls=PIN_STATUS_CLS[st]||'ns';
+    var stLbl=PIN_STATUS_LBL[st]||st;
+
+    if(p.type==='itp'&&p.itps&&p.itps.length>1){
+      // Cluster pin — render one row per ITP
+      p.itps.forEach(function(itp){
+        var item=document.createElement('div');
+        item.className='pin-item itp';
+        item.dataset.pid=p.id;
+        item.addEventListener('click',function(){highlightPin(this.dataset.pid);});
+        var hdr=document.createElement('div');hdr.className='pi-hdr';
+        hdr.innerHTML='<div class="pi-dot"></div>'
+          +'<span class="pi-ref">'+escH(itp.ref||p.ref||'')+'</span>'
+          +'<span class="pi-desc" title="'+escH(itp.itpType||'')+'">'+escH(itp.itpType||'')+(p.equip?' · '+escH(p.equip):'')+'</span>'
+          +'<span class="pi-st '+stCls+'">'+escH(stLbl)+'</span>';
+        item.appendChild(hdr);
+        list.appendChild(item);
+      });
+      return;
+    }
+
+    var desc='';
+    if(p.type==='itp')desc=p.itpTypeLabel||(p.equip||'');
+    else if(p.type==='defect'){var dr=defects.find(function(d){return d.pinId===p.id;});desc=dr?dr.desc:'';}
+    else if(p.type==='fireseal')desc=p.service||'';
+    else if(p.type==='firedamper')desc=p.tag||(p.size||'');
+    var item=document.createElement('div');
+    item.className='pin-item '+p.type;
+    item.dataset.pid=p.id;
+    item.addEventListener('click',function(){highlightPin(this.dataset.pid);});
+    var hdr=document.createElement('div');
+    hdr.className='pi-hdr';
+    hdr.innerHTML='<div class="pi-dot"></div>'
+      +'<span class="pi-ref">'+escH(p.ref||'')+'</span>'
+      +'<span class="pi-desc" title="'+escH(desc)+'">'+escH(desc)+'</span>'
+      +'<span class="pi-st '+stCls+'">'+escH(stLbl)+'</span>';
+    item.appendChild(hdr);
+    list.appendChild(item);
+  });
+}
+
+function highlightPin(pinId){
+  document.querySelectorAll('.drw-pin').forEach(function(el){el.style.transform='translate(-50%,-50%)';el.style.zIndex='30';});
+  var el=document.querySelector('[data-pin-id="'+pinId+'"]');
+  if(el){el.style.transform='translate(-50%,-50%) scale(2)';el.style.zIndex='99';setTimeout(function(){el.style.transform='';el.style.zIndex='30';},1500);}
+}
+function flashPins(){
+  document.querySelectorAll('.drw-pin').forEach(function(el){el.style.transform='translate(-50%,-50%) scale(1.8)';});
+  setTimeout(function(){document.querySelectorAll('.drw-pin').forEach(function(el){el.style.transform='';});},1500);
+}
+
+// ── MOUSE / TOUCH EVENTS ──
+(function(){
+  var viewer=document.getElementById('viewer');
+  viewer.addEventListener('mousedown',function(e){
+    if(e.button!==0)return;
+    hideCtx();
+    if(_placing){return;} // don't start drag in place mode
+    _dragging=true;_lastX=e.clientX;_lastY=e.clientY;
+    viewer.classList.add('grabbing');
+  });
+  viewer.addEventListener('mousemove',function(e){
+    if(!_dragging)return;
+    _offsetX+=e.clientX-_lastX;_offsetY+=e.clientY-_lastY;
+    _lastX=e.clientX;_lastY=e.clientY;
+    applyTransform();
+  });
+  viewer.addEventListener('mouseup',function(e){
+    if(_dragging){_dragging=false;viewer.classList.remove('grabbing');return;}
+    // click to place
+    if(!_placing)return;
+    var rect=document.getElementById('pdfStage').getBoundingClientRect();
+    var xPct=(e.clientX-rect.left)/rect.width*100;
+    var yPct=(e.clientY-rect.top)/rect.height*100;
+    if(_movingPinId){commitMove(xPct,yPct);}
+    else{onPlace(xPct,yPct);}
+  });
+  viewer.addEventListener('wheel',function(e){e.preventDefault();zoom(e.deltaY<0?1.1:0.9);},{passive:false});
+  document.addEventListener('click',function(e){if(!e.target.closest('#ctxMenu'))hideCtx();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')cancelPlace();});
+})();
+
+function showError(msg){document.getElementById('loading').style.display='none';var el=document.getElementById('errorState');el.style.display='flex';el.querySelector('#errorMsg').textContent=msg;}
+function showNoPdf(){document.getElementById('loading').style.display='none';document.getElementById('noPdf').style.display='flex';}
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+</script>
+</body>
+</html>

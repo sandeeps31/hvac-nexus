@@ -1,0 +1,2082 @@
+<!DOCTYPE html>
+<!-- build: 2026-04-14-v2 -->
+<html lang="en">
+<head>
+<link rel="stylesheet" href="theme.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress Claims — HVAC NEXUS</title>
+<style>
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type=number]{-moz-appearance:textfield}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+/* SIDEBAR */
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px}.sb-icon{font-size:20px}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;position:relative;white-space:nowrap;overflow:hidden}
+.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis}
+.sb-tooltip{position:absolute;left:100%;top:50%;transform:translateY(-50%);background:var(--surface2);color:var(--text);font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:400;margin-left:8px}
+.sb-group{}.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}
+.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}
+.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.sb-group-items .sb-item{padding-left:28px}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}
+.sb-user-name{font-size:12.5px;color:var(--text2);white-space:nowrap}
+/* TOPBAR */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px}.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted);background:var(--surface2)}
+.bsm{padding:5px 12px;font-size:12px}
+.bdanger{background:transparent;color:var(--danger);border:1px solid rgba(255,77,109,.3)}.bdanger:hover{background:var(--danger-dim)}
+.bgreen{background:var(--green);color:#080c12}.bgreen:hover{filter:brightness(1.1)}
+/* VIEWS */
+.view{display:none}.view.active{display:block}
+/* CLAIM LIST VIEW */
+.sum-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:stretch;overflow-x:auto}
+.sc{padding:11px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:3px;flex-shrink:0}
+.sc-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.sc-val{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;line-height:1}
+.sc-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.cb .sc-val{color:var(--accent)}.cg .sc-val{color:var(--green)}.cw .sc-val{color:var(--warn)}
+.page{padding:16px 24px 60px}
+/* CLAIM CARDS */
+.claim-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;transition:border-color .13s;cursor:pointer}
+.claim-card:hover{border-color:var(--accent)}
+.claim-card-hdr{display:flex;align-items:center;gap:12px;padding:14px 18px}
+.claim-num{font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);font-weight:700;flex-shrink:0}
+.claim-month{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);flex:1}
+.claim-status-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px}
+.cs-draft{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.cs-submitted{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
+.cs-certified{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.claim-amounts{display:flex;gap:20px;padding:0 18px 14px;flex-wrap:wrap}
+.ca-item{display:flex;flex-direction:column;gap:2px}
+.ca-lbl{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.ca-val{font-family:'DM Mono',monospace;font-size:13px;color:var(--text)}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;gap:16px;color:var(--muted);text-align:center}
+.empty-icon{font-size:48px;opacity:.35}
+/* CLAIM DETAIL VIEW */
+.detail-topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.detail-sum{background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;gap:24px;flex-wrap:wrap;align-items:center}
+.ds-item{display:flex;flex-direction:column;gap:2px}
+.ds-lbl{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.ds-val{font-family:'Syne',sans-serif;font-size:16px;font-weight:700}
+/* LINE ITEMS TABLE */
+.claim-section{margin:16px 24px 0}
+.section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
+.sec-hdr{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;background:var(--surface2);border-bottom:1px solid var(--border);user-select:none;transition:background .13s}
+.sec-hdr:hover{background:var(--surface3)}
+.sec-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1}
+.sec-chev{font-size:11px;color:var(--muted);transition:transform .2s}
+.section-card.collapsed .sec-chev{transform:rotate(-90deg)}
+.section-card.collapsed .sec-body{display:none}
+.section-card.collapsed .sec-hdr{border-bottom:none}
+.claim-tbl{width:100%;border-collapse:collapse}
+.claim-tbl th{padding:8px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)}
+.claim-tbl th.r{text-align:right}
+.claim-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.claim-tbl td.r{text-align:right}
+.claim-tbl tr:last-child td{border-bottom:none}
+.claim-tbl tr.subtot-row td{background:var(--surface2);font-weight:600;font-family:'DM Mono',monospace;font-size:12px}
+/* EDITABLE INPUTS */
+.claim-input{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:4px 8px;outline:none;width:90px;text-align:right;transition:border-color .15s}
+.claim-input:focus{border-color:var(--accent);background:var(--surface2)}
+.pct-toggle{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px;gap:1px}
+.pct-btn{padding:2px 7px;border-radius:3px;border:none;font-size:10px;font-family:'DM Mono',monospace;cursor:pointer;background:transparent;color:var(--muted);transition:all .12s}
+.pct-btn.on{background:var(--accent-dim);color:var(--accent);font-weight:600}
+/* VARIATIONS SECTION */
+.var-toggle-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.toggle-track{position:relative;display:inline-block;width:34px;height:18px;cursor:pointer}
+.toggle-track input{opacity:0;width:0;height:0;position:absolute}
+.toggle-knob{position:absolute;inset:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:18px;transition:all .2s}
+.toggle-knob::after{content:'';position:absolute;left:2px;top:2px;width:12px;height:12px;background:var(--muted);border-radius:50%;transition:all .2s}
+.toggle-track input:checked ~ .toggle-knob{background:var(--green-dim);border-color:var(--green)}
+.toggle-track input:checked ~ .toggle-knob::after{background:var(--green);transform:translateX(16px)}
+/* COST INDICATOR */
+.cost-indicator{margin:12px 24px 0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.ci-hdr{padding:11px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.ci-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.ci-note{font-size:11px;color:var(--muted);font-style:italic}
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.mo.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:560px;max-width:96vw;transform:translateY(10px);transition:transform .2s;max-height:92vh;overflow-y:auto}
+.mo.open .modal{transform:translateY(0)}
+.modal h3{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:4px;color:var(--text)}
+.msub{color:var(--text2);font-size:12.5px;margin-bottom:16px}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;margin-top:12px}
+.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;transition:border-color .2s}
+.mi:focus{border-color:var(--accent);background:var(--surface2)}.mi::placeholder{color:var(--muted)}
+.ms{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;cursor:pointer}
+.ms:focus{border-color:var(--accent)}.ms option{background:var(--surface2)}
+.mac{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+/* SETUP WIZARD */
+.setup-opt{border:2px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s;margin-bottom:10px}
+.setup-opt:hover{border-color:var(--accent);background:var(--accent-dim)}
+.setup-opt.selected{border-color:var(--accent);background:var(--accent-dim)}
+.setup-opt-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
+.setup-opt-desc{font-size:12.5px;color:var(--text2)}
+/* BUDGET IMPORT TREE */
+.bud-section{margin-bottom:6px}
+.bud-sec-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface2);border-radius:6px;cursor:pointer;user-select:none}
+.bud-sec-name{font-size:13px;font-weight:600;color:var(--text);flex:1}
+.bud-sec-chev{font-size:10px;color:var(--muted);transition:transform .2s}
+.bud-section.col .bud-sec-chev{transform:rotate(-90deg)}
+.bud-section.col .bud-items{display:none}
+.bud-item{border-bottom:1px solid var(--border)}
+.bud-item:last-child{border-bottom:none}
+.bud-item-hdr{display:flex;align-items:center;gap:10px;padding:8px 12px 8px 28px;transition:background .12s}
+.bud-item-hdr:hover{background:var(--surface2)}
+.bud-item-name{flex:1;font-size:13px;color:var(--text2)}
+.bud-item-cb{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.bud-item-areas{padding:0 12px 8px 44px;display:flex;flex-direction:column;gap:5px}
+.bud-area-row{display:flex;align-items:center;gap:8px}
+.bud-item-area{background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:4px 8px;outline:none;flex:1;min-width:0}
+.bud-item-area:focus{border-color:var(--accent)}
+.bud-item-price{background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:4px 8px;outline:none;width:110px;text-align:right}
+.bud-item-price:focus{border-color:var(--accent)}
+.bud-area-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;transition:color .12s}
+.bud-area-del:hover{color:var(--danger)}
+.bud-add-area{background:none;border:none;color:var(--accent);cursor:pointer;font-size:11.5px;font-family:'DM Sans',sans-serif;padding:2px 0;text-align:left}
+/* PO SIDE PANEL */
+.po-panel{position:fixed;top:0;right:-440px;width:420px;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:800;transition:right .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.4)}
+.po-panel.open{right:0}
+.po-panel-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.po-panel-body{flex:1;overflow-y:auto;padding:20px}
+.po-panel-close{background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;font-size:14px;padding:4px 10px;transition:all .15s}
+.po-panel-close:hover{color:var(--text);border-color:var(--text)}
+
+/* COST TAB */
+.ct-hidden{display:none!important}
+
+/* DETAIL TABS */
+.detail-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 24px;background:var(--surface)}
+.dtab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;padding:10px 16px;margin-bottom:-1px;transition:all .15s}
+.dtab:hover{color:var(--text)}
+.dtab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+/* COST BANNER */
+.cost-banner{margin:14px 24px 0;padding:12px 16px;border-radius:8px;border:1px solid;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cost-banner-dismiss{background:none;border:none;cursor:pointer;color:inherit;font-size:16px;opacity:.7;padding:0;line-height:1;flex-shrink:0}
+.cost-banner-dismiss:hover{opacity:1}
+/* CLAIM INPUT - dual % and $ */
+.claim-dual{display:flex;align-items:center;gap:5px;justify-content:flex-end}
+.claim-pct-inp{width:58px;text-align:right;background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:4px 5px;outline:none}
+.claim-pct-inp:focus{border-color:var(--accent)}
+.claim-amt-inp{width:90px;text-align:right;background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;padding:4px 5px;outline:none}
+.claim-amt-inp:focus{border-color:var(--accent)}
+.claim-inp-sep{color:var(--muted);font-size:11px;font-family:'DM Mono',monospace}
+.sg-section-hdr td{border-bottom:2px solid var(--border)!important}
+.sg-section-hdr:hover td{background:var(--surface3)!important}
+.sg-subheader td{border-bottom:1px solid var(--border)!important}
+.sg-subheader:hover td{background:var(--surface2)!important}
+.sg-item:hover td{background:var(--surface2)}
+.sp-grid{width:100%;border-collapse:collapse;min-width:400px}
+.sp-grid th{padding:8px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
+.sp-grid th:first-child{text-align:left;min-width:160px}
+.sp-grid th:last-child{border-right:none}
+.sp-grid td{padding:6px 8px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:middle}
+.sp-grid td:first-child{font-size:13px;color:var(--text2);border-right:2px solid var(--border)}
+.sp-grid td:last-child{border-right:none}
+.sp-grid tr:last-child td{border-bottom:none}
+.sp-grid tr:hover td{background:var(--surface2)}
+.sp-price-inp{background:transparent;border:1px solid transparent;border-radius:5px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:4px 6px;outline:none;width:100%;text-align:right;transition:border-color .15s,background .15s}
+.sp-price-inp:hover{border-color:var(--border)}
+.sp-price-inp:focus{border-color:var(--accent);background:var(--surface2)}
+.sp-price-inp::placeholder{color:var(--muted)}
+.area-col-tag{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:12px}
+.area-col-input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:90px}
+.area-col-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;line-height:1;transition:color .12s}
+.area-col-del:hover{color:var(--danger)}
+/* SCRATCH LINE ITEMS */
+.scratch-item{border-bottom:1px solid var(--border)}
+.scratch-item:last-child{border-bottom:none}
+.scratch-item-hdr{display:flex;align-items:center;gap:8px;padding:10px 12px}
+.scratch-name{flex:1;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 9px;outline:none}
+.scratch-name:focus{border-color:var(--accent)}
+/* PRINT */
+@media print{
+  /* Hide navigation and UI chrome */
+  .sb,.topbar,.no-print,.detail-topbar,.detail-tabs,.cost-banner,
+  #view-list,#view-setup,#sidebar,#app-sidebar,#poPanelCosts{display:none!important}
+  /* Show detail view only */
+  .view{display:none!important}
+  #view-detail{display:block!important}
+  .main{margin-left:0!important;padding:0!important}
+  body{margin:0;padding:0}
+  /* Hide edit inputs, show formatted text */
+  .claim-dual{display:none!important}
+  /* White theme */
+  body,#view-detail,#detailContent,#detailSum,.detail-sum,
+  .section-card,.claim-tbl,.claim-tbl th,.claim-tbl td,
+  .sec-hdr,.sec-body,.subtot-row td{
+    background:#fff!important;color:#111!important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* Summary bar — show it */
+  .detail-sum{display:flex!important;background:#f5f5f5!important;border-bottom:1px solid #ccc!important;padding:10px 20px!important;gap:20px!important;flex-wrap:wrap!important}
+  .ds-lbl{color:#555!important;font-size:10px!important}
+  .ds-val{color:#111!important;font-size:14px!important;font-weight:700!important}
+  /* Table styling */
+  .section-card{border:1px solid #ccc!important;margin-bottom:8px!important;page-break-inside:avoid}
+  .sec-hdr{background:#f0f0f0!important;border-bottom:1px solid #ccc!important}
+  .sec-title{color:#111!important;font-weight:700!important}
+  .claim-tbl{width:100%!important;border-collapse:collapse!important}
+  .claim-tbl th{background:#f0f0f0!important;color:#555!important;border-bottom:2px solid #ccc!important;padding:6px 8px!important;font-size:10px!important}
+  .claim-tbl td{color:#111!important;border-bottom:1px solid #eee!important;padding:6px 8px!important}
+  .subtot-row td{background:#e8e8e8!important;font-weight:700!important;color:#111!important}
+  /* Letterhead */
+  .letterhead{display:flex!important;border-bottom:2px solid #1a3a6a!important}
+  .lh-co{color:#1a3a6a!important}
+}
+.letterhead{display:none;align-items:flex-start;justify-content:space-between;padding:24px 24px 16px;border-bottom:2px solid #1a3a6a;margin-bottom:16px}
+.lh-co{font-size:20px;font-weight:700;color:#1a3a6a}
+.lh-sub{font-size:11px;color:#666;margin-top:2px}
+.lh-right{text-align:right;font-size:12px;color:#333}
+
+
+/* ── SIDEBAR STANDARD ── */
+.sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden;overflow-x:hidden}
+.sb.sm{width:52px}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px;overflow:hidden}.sb-icon{font-size:20px;flex-shrink:0}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0;scrollbar-width:thin}
+.sb-nav::-webkit-scrollbar{width:4px}.sb-nav::-webkit-scrollbar-track{background:transparent}.sb-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;position:relative;overflow:hidden;text-decoration:none}.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.sb-tooltip{position:fixed;background:var(--surface2);color:var(--text);font-size:12px;font-weight:500;padding:5px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.sb-group{}.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-group-hdr,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb.sm .sb-group-items{display:block !important}.sb.sm .sb-item{padding:9px 14px;justify-content:center;border-left:none;overflow:visible}
+.sb.sm .sb-top{padding:14px 12px 10px;justify-content:center}.sb.sm .sb-footer{justify-content:center}.sb.sm .sb-item-icon{width:auto}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
+.main{margin-left:230px;transition:margin-left .25s}
+</style>
+<script>
+// ── HVAC Nexus Auth Guard ──
+(async function(){
+  if(typeof dbReady !== 'undefined') await dbReady;
+  var DEV_BYPASS=false;
+  if(DEV_BYPASS)return;
+  var stored=localStorage.getItem('hvacnexus_session');
+  if(!stored){window.location.href='login.html';return;}
+  try{
+    var sess=JSON.parse(stored);
+    if(Date.now()/1000<(sess.expires_at||0)-60){
+      // Set _authSession if db.js loaded
+      if(typeof _authSession!=='undefined')_authSession=sess;
+      return;
+    }
+    var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
+    var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+    var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
+    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
+    else{localStorage.removeItem('hvacnexus_session');window.location.href='login.html';}
+  }catch(e){window.location.href='login.html';}
+})();
+</script>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="app-sidebar"></div>
+<script src="sidebar.js"></script>
+
+<span class="sb-user-name" id="sb-user">—</span></div>
+</div>
+
+
+<!-- MAIN -->
+<div class="main" id="mainWrap">
+<div class="topbar">
+  <div class="bc">
+    <span class="bcl" onclick="window.location.href='index.html'">My Projects</span><span class="bcs">›</span>
+    <span class="bcl" onclick="navTo('login.html')" style="cursor:pointer" onclick="window.location.href='project-dashboard.html'">Greenfield Commercial Tower</span class would be here><span class="bcs">›</span>
+    <span class="bcc" id="bcCurr">Progress Claims</span>
+  </div>
+  <div style="display:flex;gap:8px" id="topBtns">
+    <button class="bp bsm btn" onclick="openNewClaimWizard()">📋 Setup Claim Sheet</button>
+  </div>
+</div>
+
+<!-- LIST VIEW -->
+<div class="view active" id="view-list">
+  <div class="sum-bar">
+    <div class="sc cb"><div class="sc-lbl">Contract value</div><div class="sc-val" id="sumContract">—</div><div class="sc-sub">ex GST</div></div>
+    <div class="sc cg"><div class="sc-lbl">Total claimed</div><div class="sc-val" id="sumClaimed">—</div><div class="sc-sub">cumulative ex GST</div></div>
+    <div class="sc cw"><div class="sc-lbl">Remaining</div><div class="sc-val" id="sumRemaining">—</div><div class="sc-sub">yet to claim</div></div>
+    <div class="sc"><div class="sc-lbl">Claims submitted</div><div class="sc-val" id="sumCount">0</div><div class="sc-sub">this project</div></div>
+    <div class="sc"><div class="sc-lbl">Retention held</div><div class="sc-val" id="sumRetention" style="color:var(--warn)">—</div><div class="sc-sub" id="sumRetPct"></div></div>
+  </div>
+  <div class="page" id="claimList">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">📈</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text2)">No claims yet</div>
+      <div>Click <strong>＋ New Claim</strong> to set up your first progress claim.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SETUP VIEW (full page grid) -->
+<div class="view" id="view-setup">
+  <div class="detail-topbar no-print" style="position:sticky;top:0;z-index:200">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="bg bsm btn" onclick="closeSetupView()">← Back</button>
+      <span style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text)" id="setupViewTitle">Set Up Claim Sheet</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center" id="setupViewBtns">
+      <div id="setupAreaColsBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
+      <button onclick="addSetupArea()" class="btn bg bsm" id="setupAddAreaBtn" style="color:var(--accent);border-color:rgba(0,200,255,.3);white-space:nowrap">＋ Area</button>
+      <button class="bp bsm btn" id="setupFinishBtn" onclick="wizFinish()">Finalise Claim Sheet →</button>
+    </div>
+  </div>
+  <!-- Total bar -->
+  <div style="background:var(--surface2);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+    <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Contract Value <strong id="sv-contract" style="color:var(--accent);font-size:13px">—</strong></div>
+    <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Total Allocated <strong id="sv-allocated" style="color:var(--text);font-size:13px">$0.00</strong></div>
+    <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Remaining to Allocate <strong id="sv-remaining" style="font-size:13px">—</strong></div>
+  </div>
+  <div style="padding:16px 24px 60px;overflow-x:auto">
+    <div id="setupGridWrap"></div>
+  </div>
+</div>
+<div class="view" id="view-detail">
+  <!-- Letterhead (print only) -->
+  <div class="letterhead" id="letterhead">
+    <div>
+      <div class="lh-co" id="lhCoName">Company Name</div>
+      <div class="lh-sub" id="lhCoSub"></div>
+    </div>
+    <div class="lh-right" id="lhRight"></div>
+  </div>
+
+  <div class="detail-topbar no-print">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="bg bsm btn" onclick="goList()">← Back</button>
+      <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent)" id="detailClaimNum"></span>
+      <span style="font-size:14px;font-weight:600;color:var(--text)" id="detailClaimTitle"></span>
+    </div>
+    <div style="display:flex;gap:7px" id="detailBtns">
+      <button class="bg bsm btn" id="editClaimBtn" onclick="toggleEditMode(true)">✎ Edit</button>
+      <button class="bg bsm btn" id="saveClaimBtn" style="display:none;color:var(--green);border-color:var(--green)" onclick="saveClaim()">✓ Save</button>
+      <button class="bg bsm btn" id="cancelEditBtn" style="display:none" onclick="toggleEditMode(false)">Cancel</button>
+      <button class="btn bdanger bsm" id="deleteClaimBtn" style="display:none" onclick="deleteDraftClaim(currentClaimId)">🗑 Delete</button>
+      <select class="fsel" id="claimStatusSel" onchange="updateClaimStatus()" style="font-size:12px;padding:4px 8px">
+        <option value="Draft">Draft</option>
+        <option value="Submitted">Submitted</option>
+        <option value="Certified">Certified</option>
+      </select>
+      <button class="bg bsm btn no-print" onclick="if(editMode){saveClaim();}window.print()">🖨 Print / PDF</button>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="detail-tabs no-print">
+    <button class="dtab active" id="dtab-claim" onclick="switchDetailTab('claim')">📋 Claim</button>
+    <button class="dtab" id="dtab-costs" onclick="switchDetailTab('costs')">💰 Costs</button>
+  </div>
+
+  <div class="detail-sum" id="detailSum">
+    <div class="ds-item"><div class="ds-lbl">This claim (ex GST)</div><div class="ds-val" id="ds-current" style="color:var(--accent)">—</div></div>
+    <div class="ds-item"><div class="ds-lbl">GST</div><div class="ds-val" id="ds-gst" style="color:var(--text2);font-size:13px">—</div></div>
+    <div class="ds-item"><div class="ds-lbl">This claim (incl GST)</div><div class="ds-val" id="ds-incl" style="color:var(--accent)">—</div></div>
+    <div class="ds-item" style="border-left:1px solid var(--border);padding-left:24px"><div class="ds-lbl">Retention (held)</div><div class="ds-val" id="ds-ret" style="color:var(--warn)">—</div></div>
+    <div class="ds-item"><div class="ds-lbl">Net payable</div><div class="ds-val" id="ds-net" style="color:var(--green)">—</div></div>
+    <div class="ds-item" style="border-left:1px solid var(--border);padding-left:24px"><div class="ds-lbl">Cumul. claimed</div><div class="ds-val" id="ds-cumul" style="font-size:13px;color:var(--text2)">—</div></div>
+    <div class="ds-item"><div class="ds-lbl">Remaining</div><div class="ds-val" id="ds-remain" style="font-size:13px;color:var(--text2)">—</div></div>
+  </div>
+
+  <div id="detailContent" style="padding-bottom:60px"></div>
+  <div id="costsContent" style="padding-bottom:60px;display:none"></div>
+</div>
+
+<!-- PO SIDE PANEL -->
+<div class="po-panel" id="poPanelCosts">
+  <div class="po-panel-hdr">
+    <div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Purchase Order</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text)" id="poPanelTitle">—</div>
+    </div>
+    <button class="po-panel-close" onclick="closePOPanel()">✕ Close</button>
+  </div>
+  <div class="po-panel-body" id="poPanelBody">
+    <div style="color:var(--muted);text-align:center;padding:40px 0">Loading…</div>
+  </div>
+</div>
+
+<!-- SETUP WIZARD MODAL -->
+<div class="mo" id="sellPricesModal" onclick="if(event.target===this)closeM('sellPricesModal')">
+  <div class="modal" style="width:640px">
+    <h3>Edit Sell Prices</h3>
+    <p class="msub">Adjust area sell prices for any line item. Changes apply to all future claims.</p>
+    <div id="sellPricesBody" style="max-height:60vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px"></div>
+    <div class="mac">
+      <button class="bg bsm btn" onclick="closeM('sellPricesModal')">Cancel</button>
+      <button class="bp bsm btn" onclick="saveSellPrices()">✓ Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="mo" id="wizardModal" onclick="if(event.target===this&&wizStep===0)closeWizard()">
+  <div class="modal" id="wizardInner" style="width:620px">
+    <div id="wizStep0">
+      <h3>New Progress Claim</h3>
+      <p class="msub">Set up this claim's details.</p>
+      <div class="mgrid">
+        <div><label class="ml">Claim Number</label><input class="mi" id="w-claimnum" readonly style="font-family:'DM Mono',monospace;color:var(--accent)"/></div>
+        <div><label class="ml">Claim Month</label><input class="mi" id="w-month" type="month"/></div>
+      </div>
+      <div class="mgrid">
+        <div><label class="ml">Contract Value (ex GST) *</label><input class="mi" id="w-contract" type="number" placeholder="0.00" oninput="updateContractPreview()"/></div>
+        <div><label class="ml">Retention %</label><input class="mi" id="w-retention" type="number" placeholder="e.g. 5" value="5"/></div>
+      </div>
+      <div id="w-contract-preview" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);margin-top:6px;min-height:16px"></div>
+
+      <div id="firstClaimSetup" style="margin-top:16px">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Line item setup (first claim only)</div>
+        <div class="setup-opt" id="opt1" onclick="selectOpt(1)">
+          <div class="setup-opt-title">Option 1 — Import from Budget</div>
+          <div class="setup-opt-desc">Pull in budget line items. Assign areas (e.g. Level 1, Level 2) and set selling prices per item.</div>
+        </div>
+        <div class="setup-opt" id="opt2" onclick="selectOpt(2)">
+          <div class="setup-opt-title">Option 2 — Build from scratch</div>
+          <div class="setup-opt-desc">Type in your own line items and set the selling price for each.</div>
+        </div>
+      </div>
+
+      <div class="mac">
+        <button class="bg bsm btn" onclick="closeWizard()">Cancel</button>
+        <button class="bp bsm btn" onclick="wizNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 1a/1b handled as full page view -->
+  </div>
+</div>
+
+<script src="head-common.js"></script>
+<script src="db.js"></script>
+<script>
+var _pcProj=dbGetCurrentProject();var _pcPNum=_pcProj.num||_pcProj.number||'GCT001';
+
+
+var claimsData={contractValue:0,retentionPct:5,lineItems:[],claims:[]};
+var currentClaimId=null;
+var editMode=false;
+var wizOpt=0,wizStep=0;
+var scratchItems=[];
+var _uid=200;
+function nid(){return ++_uid;}
+function num(v){return parseFloat(v)||0;}
+function numRaw(v){return parseFloat(String(v||'').replace(/[$,]/g,''))||0;}
+function fmtClaimNum(n){return 'PC-'+String(n).padStart(2,'0');}
+function fmt(n){var v=num(n);return '$'+v.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtR(n){var v=num(n);return v===0?'—':'$'+Math.round(v).toLocaleString('en-AU');}
+// Attach $ formatting on blur to a number input
+function attachPriceFmt(inp){
+  inp.addEventListener('focus',function(){
+    var raw=numRaw(this.value);
+    this.type='number';
+    this.value=raw||'';
+  });
+  inp.addEventListener('blur',function(){
+    var raw=numRaw(this.value);
+    this.type='text';
+    this.value=raw>0?fmt(raw):'';
+  });
+}
+function fmtM(m){if(!m)return '—';try{var p=m.split('-');var d=new Date(parseInt(p[0]),parseInt(p[1])-1,1);return d.toLocaleDateString('en-AU',{month:'long',year:'numeric'});}catch(e){return m;}}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function today(){return new Date().toISOString().split('T')[0];}
+function currentMonth(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+
+// SIDEBAR
+
+
+// applySB called in sidebar init below
+
+
+// DATA
+function save(){dbSetProgressClaims(_pcPNum,claimsData).catch(e=>console.error(e));}
+async function load(){
+  try{
+    if(typeof dbReady!=='undefined')await dbReady;
+    var s=await dbGetProgressClaims(_pcPNum);
+    if(s&&s.claims){claimsData=s;}
+    prefetchVendorInvoices(); // non-blocking prefetch
+  }catch(e){console.warn('load error',e);}
+  renderList();
+  updateListSummary();
+  if(!claimsData.claims.length&&(!claimsData.lineItems||!claimsData.lineItems.length)){
+    setTimeout(openNewClaimWizard,300);
+  }
+}
+
+// COMPANY SETTINGS
+async function loadCoSettings(){try{return await dbGetCompanySettings()||{};}catch(e){return {};}}
+function applyLetterhead(){
+  var co=loadCoSettings();
+  document.getElementById('lhCoName').textContent=co.coName||'Company Name';
+  document.getElementById('lhCoSub').textContent=[co.coABN?'ABN: '+co.coABN:'',co.coAddress||''].filter(Boolean).join(' · ');
+  var claim=claimsData.claims.find(function(c){return c.id===currentClaimId;});
+  if(claim){
+    document.getElementById('lhRight').innerHTML='<strong>Progress Claim '+claim.num+'</strong><br>'+fmtM(claim.month)+'<br>Greenfield Commercial Tower<br>Date: '+(new Date().toLocaleDateString('en-AU'));
+  }
+  if(co.userName) document.getElementById('sbUser').textContent=co.userName;
+}
+applyLetterhead();
+
+// LOAD BUDGET LINE ITEMS — async, reads from Supabase via db.js
+async function loadBudgetItems(){
+  try{
+    var data=await dbGetBudget(_pcPNum);
+    if(!data||!data.sections)return[];
+    var margin=num(data.margin)||0;
+    var items=[];
+    (data.sections||[]).forEach(function(sec){
+      var secName=sec.name||'';
+      (sec.groups||[]).forEach(function(g){
+        if(g.isL2Header){
+          // Sub-section header row — no price, just label
+          items.push({type:'subheader',sectionName:secName,name:g.parent||'',budgetVal:0});
+          return;
+        }
+        var budgetCost=num(g.budget);
+        if(budgetCost<=0)return;
+        var sellPrice=Math.round(budgetCost*(1+margin/100)*100)/100;
+        items.push({type:'item',sectionName:secName,name:g.parent||'Unnamed',budgetVal:sellPrice});
+      });
+    });
+    return items;
+  }catch(e){console.warn('loadBudgetItems error',e);return[];}
+}
+
+// Calculate total base contract sell price from budget
+async function getBudgetContractValue(){
+  try{
+    var data=await dbGetBudget(_pcPNum);
+    if(!data||!data.sections)return 0;
+    var margin=num(data.margin)||0;
+    var total=0;
+    (data.sections||[]).forEach(function(sec){
+      (sec.groups||[]).forEach(function(g){
+        if(!g.isL2Header)total+=num(g.budget)*(1+margin/100);
+      });
+    });
+    return Math.round(total*100)/100;
+  }catch(e){return 0;}
+}
+
+// LOAD VARIATIONS (approved only option)
+async function loadVariations(approvedOnly){
+  try{
+    var data=await dbGetVariations(_pcPNum);
+    var vars=Array.isArray(data)?data:(data&&data.variations?data.variations:[]);
+    if(approvedOnly)vars=vars.filter(function(v){return v.status==='Approved';});
+    return vars;
+  }catch(e){return[];}
+}
+
+// LOAD VENDOR INVOICES for a month
+function loadInvoicesForMonth(month){
+  try{
+    if(window._cachedVendorInvoices){
+      var invs=Array.isArray(window._cachedVendorInvoices)?window._cachedVendorInvoices:[];
+      // Return ALL records for the month — no status filter
+      return month?invs.filter(function(i){return i.period===month;}):invs;
+    }
+    return [];
+  }catch(e){return[];}
+}
+async function prefetchVendorInvoices(){
+  try{
+    var data=await dbGetVendorInvoices(_pcPNum);
+    // Data is {claims:[...]} JSONB blob
+    var raw=data&&data.claims?data.claims:(Array.isArray(data)?data:[]);
+    window._cachedVendorInvoices=raw;
+  }catch(e){window._cachedVendorInvoices=[];}
+}
+
+// CALC previous claimed for a line item area up to (but not including) claimId
+function prevClaimed(entryKey, claimId){
+  var total=0;
+  var thisNum=(claimsData.claims.find(function(x){return x.id===claimId;})||{}).num||0;
+  claimsData.claims.forEach(function(c){
+    if(c.id===claimId||c.num>=thisNum)return;
+    (c.entries||[]).forEach(function(e){
+      if(e.lineItemId===entryKey)total+=num(e.currentAmt);
+    });
+  });
+  return total;
+}
+
+// SUMMARY BAR (list view)
+function updateListSummary(){
+  var cv=claimsData.contractValue;
+  var totalClaimed=0;
+  claimsData.claims.forEach(function(c){
+    (c.entries||[]).forEach(function(e){totalClaimed+=num(e.currentAmt);});
+    // add variation entries
+    (c.varEntries||[]).forEach(function(e){totalClaimed+=num(e.currentAmt);});
+  });
+  var remaining=Math.max(0,cv-totalClaimed);
+  var retPct=claimsData.retentionPct||5;
+  var retHeld=claimsData.claims.reduce(function(a,c){
+    var claimAmt=(c.entries||[]).reduce(function(s,e){return s+num(e.currentAmt);},0)
+      +(c.varEntries||[]).reduce(function(s,e){return s+num(e.currentAmt);},0);
+    return a+claimAmt*(retPct/100);
+  },0);
+  document.getElementById('sumContract').textContent=fmtR(cv)||'—';
+  document.getElementById('sumClaimed').textContent=fmtR(totalClaimed)||'—';
+  document.getElementById('sumRemaining').textContent=fmtR(remaining)||'—';
+  document.getElementById('sumCount').textContent=claimsData.claims.length;
+  document.getElementById('sumRetention').textContent=fmtR(retHeld)||'—';
+  document.getElementById('sumRetPct').textContent=retPct+'% retention';
+}
+
+function updateTopBtns(){
+  var el=document.getElementById('topBtns');if(!el)return;
+  var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
+  if(!hasLineItems){
+    el.innerHTML='<button class="bp bsm btn" onclick="openNewClaimWizard()">📋 Setup Claim Sheet</button>';
+  } else {
+    el.innerHTML='<button class="btn bg bsm" onclick="openSetupViewEdit()">📋 View Claim Sheet</button>'
+      +'<button class="bp bsm btn" onclick="openLogClaimView()">＋ Log Claim</button>';
+  }
+}
+
+// ── VIEW SWITCHER ──
+function showView(name){
+  // name = 'list' | 'detail' | 'setup'
+  ['list','detail','setup'].forEach(function(v){
+    var el=document.getElementById('view-'+v);
+    if(el)el.classList.toggle('active',v===name);
+  });
+}
+
+// RENDER LIST
+function renderList(){
+  updateListSummary();
+  showView('list');
+  updateTopBtns();
+  document.getElementById('bcCurr').textContent='Progress Claims';
+  var el=document.getElementById('claimList');
+  var emp=document.getElementById('emptyState');
+  if(!el)return;
+  var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
+  if(!claimsData.claims.length){
+    if(emp){
+      emp.style.display='flex';
+      emp.innerHTML='<div class="empty-icon">📈</div>'
+        +'<div style="font-size:15px;font-weight:600;color:var(--text2)">'+(hasLineItems?'Claim sheet ready':'No claim sheet yet')+'</div>'
+        +'<div>'+(hasLineItems?'Click <strong>＋ Log Claim</strong> to record your first claim.':'Click <strong>Setup Claim Sheet</strong> to get started.')+'</div>';
+      el.innerHTML='';el.appendChild(emp);
+    }
+    return;
+  }
+  if(emp)emp.style.display='none';
+  var html='';
+  var sorted=[].concat(claimsData.claims).sort(function(a,b){return b.num-a.num;});
+  sorted.forEach(function(c){
+    var claimAmt=(c.entries||[]).reduce(function(s,e){return s+num(e.currentAmt);},0)
+      +(c.varEntries||[]).reduce(function(s,e){return s+num(e.currentAmt);},0);
+    var net=claimAmt*(1-((claimsData.retentionPct||5)/100));
+    var stMap={Draft:'cs-draft',Submitted:'cs-submitted',Certified:'cs-certified'};
+    var isDraft=(c.status||'').trim().toLowerCase()==='draft';
+    html+='<div class="claim-card" onclick="openClaim(\''+c.id+'\')">'+
+      '<div class="claim-card-hdr">'+
+      '<span class="claim-num">'+fmtClaimNum(c.num)+'</span>'+
+      '<span class="claim-month">'+fmtM(c.month)+'</span>'+
+      '<div style="margin-left:auto;display:flex;align-items:center;gap:8px">'+
+      '<span class="claim-status-badge '+(stMap[c.status]||'cs-draft')+'">'+escH(c.status||'Draft')+'</span>'+
+      (isDraft?'<button class="btn bdanger bsm" style="font-size:11px" onclick="event.stopPropagation();deleteDraftClaim(\''+c.id+'\')">🗑 Delete</button>':'')+      '</div>'+
+      '</div>'+
+      '<div class="claim-amounts">'+
+      '<div class="ca-item"><div class="ca-lbl">This claim ex GST</div><div class="ca-val" style="color:var(--accent)">'+fmt(claimAmt)+'</div></div>'+
+      '<div class="ca-item"><div class="ca-lbl">GST</div><div class="ca-val">'+fmt(claimAmt*0.1)+'</div></div>'+
+      '<div class="ca-item"><div class="ca-lbl">Incl GST</div><div class="ca-val">'+fmt(claimAmt*1.1)+'</div></div>'+
+      '<div class="ca-item"><div class="ca-lbl">Net payable (after retention)</div><div class="ca-val" style="color:var(--green)">'+fmt(net*1.1)+'</div></div>'+
+      '</div></div>';
+  });
+  el.innerHTML=html;
+}
+
+// OPEN CLAIM DETAIL
+function openClaim(id){
+  currentClaimId=id;
+  editMode=false;
+  _activeDetailTab='claim';
+  applyLetterhead();
+  renderDetail();
+  showView('detail');
+  document.getElementById('detailContent').style.display='';
+  document.getElementById('costsContent').style.display='none';
+  document.getElementById('dtab-claim').classList.add('active');
+  document.getElementById('dtab-costs').classList.remove('active');
+  document.getElementById('detailSum').style.display='';
+  var c=claimsData.claims.find(function(x){return x.id===id;});
+  document.getElementById('bcCurr').textContent=c?fmtClaimNum(c.num):'Claim';
+  document.getElementById('topBtns').innerHTML='';
+}
+
+function closeM(id){document.getElementById(id).classList.remove('open');}
+
+function deleteDraftClaim(id){
+  var c=claimsData.claims.find(function(x){return x.id===id;});
+  if(!c||(c.status||'').trim().toLowerCase()!=='draft'){alert('Only Draft claims can be deleted.');return;}
+  if(!confirm('Delete '+fmtClaimNum(c.num)+'? This cannot be undone.'))return;
+  claimsData.claims=claimsData.claims.filter(function(x){return x.id!==id;});
+  if(currentClaimId===id)currentClaimId=null;
+  editMode=false;
+  save();
+  // Explicitly switch all views before re-rendering
+  ['list','detail','setup'].forEach(function(v){
+    var el=document.getElementById('view-'+v);
+    if(el)el.classList.toggle('active',v==='list');
+  });
+  document.getElementById('claimList').innerHTML='';
+  document.getElementById('bcCurr').textContent='Progress Claims';
+  renderList();
+}
+
+function goList(){
+  currentClaimId=null;editMode=false;
+  renderList();
+}
+
+function toggleEditMode(on){
+  editMode=on;
+  document.getElementById('editClaimBtn').style.display=on?'none':'';
+  document.getElementById('saveClaimBtn').style.display=on?'':'none';
+  document.getElementById('cancelEditBtn').style.display=on?'':'none';
+  renderDetail();
+}
+
+function updateClaimStatus(){
+  var c=claimsData.claims.find(function(x){return x.id===currentClaimId;});
+  if(c){c.status=document.getElementById('claimStatusSel').value;save();}
+}
+
+// RENDER DETAIL
+function renderDetail(){
+  var claim=claimsData.claims.find(function(c){return c.id===currentClaimId;});
+  if(!claim)return;
+  document.getElementById('detailClaimNum').textContent=fmtClaimNum(claim.num);
+  document.getElementById('detailClaimTitle').textContent=fmtM(claim.month);
+  document.getElementById('claimStatusSel').value=claim.status||'Draft';
+  document.getElementById('editClaimBtn').style.display=editMode?'none':'';
+  document.getElementById('saveClaimBtn').style.display=editMode?'':'none';
+  document.getElementById('cancelEditBtn').style.display=editMode?'':'none';
+  var delBtn=document.getElementById('deleteClaimBtn');
+  if(delBtn)delBtn.style.display=(claim.status==='Draft'&&!editMode)?'':'none';
+
+  var content=document.getElementById('detailContent');
+  content.innerHTML='';
+
+  // ── Build area map: areaName → [{li, area, entryKey}]
+  // Support both old model (li.area + li.sellingPrice) and new (li.areas[])
+  var areaMap={};
+  claimsData.lineItems.forEach(function(li){
+    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+    areas.forEach(function(ar){
+      if(num(ar.sellingPrice)<=0)return; // skip zero-value areas
+      var aName=ar.areaName||'General';
+      if(!areaMap[aName])areaMap[aName]=[];
+      var entryKey=li.id+'__'+ar.areaId;
+      areaMap[aName].push({li:li,area:ar,entryKey:entryKey});
+    });
+  });
+
+  // ── Render each area as collapsible section
+  var totalCurrentAmt=0,totalPrevAmt=0,totalContractVal=0;
+
+  Object.keys(areaMap).forEach(function(areaName){
+    var items=areaMap[areaName];
+    var secCard=document.createElement('div');secCard.className='section-card claim-section';
+    var areaCurrentTotal=0,areaPrevTotal=0,areaContractTotal=0;
+    // Pre-calc for header
+    items.forEach(function(row){
+      var e=(claim.entries||[]).find(function(x){return x.lineItemId===row.entryKey;});
+      var curr=e?num(e.currentAmt):0;
+      var prev=prevClaimed(row.entryKey,claim.id);
+      areaCurrentTotal+=curr;areaPrevTotal+=prev;areaContractTotal+=num(row.area.sellingPrice);
+      totalCurrentAmt+=curr;totalPrevAmt+=prev;totalContractVal+=num(row.area.sellingPrice);
+    });
+
+    var areaSlug=areaName.replace(/[^a-zA-Z0-9]/g,'_');
+    var secHdr=document.createElement('div');secHdr.className='sec-hdr';
+    secHdr.innerHTML='<span class="sec-title">'+escH(areaName)+'</span>'
+      +'<span id="sechdr-curr-'+areaSlug+'" style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text2);margin-left:auto;margin-right:12px">'+fmt(areaCurrentTotal)+' this claim</span>'
+      +'<span class="sec-chev">▾</span>';
+    secHdr.addEventListener('click',function(){secCard.classList.toggle('collapsed');});
+
+    var secBody=document.createElement('div');secBody.className='sec-body';
+    var tbl=document.createElement('table');tbl.className='claim-tbl';
+    tbl.innerHTML='<thead><tr>'
+      +'<th style="width:38%">Description</th>'
+      +'<th class="r">Sell Price</th>'
+      +'<th class="r">Prev Claimed</th>'
+      +'<th class="r" style="min-width:170px">This Claim</th>'
+      +'<th class="r">Remaining</th>'
+      +'</tr></thead>';
+    var tbody=document.createElement('tbody');
+
+    items.forEach(function(row){
+      var li=row.li,ar=row.area,ek=row.entryKey;
+      var entry=(claim.entries||[]).find(function(e){return e.lineItemId===ek;});
+      if(!entry){entry={lineItemId:ek,currentAmt:0,mode:'pct'};if(!claim.entries)claim.entries=[];claim.entries.push(entry);}
+      var prevAmt=prevClaimed(ek,claim.id);
+      var currentAmt=num(entry.currentAmt);
+      var sellPrice=num(ar.sellingPrice);
+      var remaining=Math.max(0,sellPrice-prevAmt-currentAmt);
+      var pctDone=sellPrice>0?Math.round((prevAmt+currentAmt)/sellPrice*100):0;
+
+      var claimCell='';
+      if(editMode){
+        var pctVal=sellPrice>0?Math.round(currentAmt/sellPrice*1000)/10:0;
+        var claimId=claim.id;
+        claimCell='<div class="claim-dual">'
+          +'<input class="claim-pct-inp" type="number" min="0" max="100" step="0.1" placeholder="%" value="'+(pctVal||'')+'" '
+          +'oninput="syncClaimPct(this,\''+ek+'\',\''+claimId+'\','+sellPrice+','+prevAmt+')" />'
+          +'<span class="claim-inp-sep">%&thinsp;/</span>'
+          +'<input class="claim-amt-inp" type="number" min="0" placeholder="$" value="'+(currentAmt||'')+'" '
+          +'oninput="syncClaimAmt(this,\''+ek+'\',\''+claimId+'\','+sellPrice+','+prevAmt+')" />'
+          +'</div>';
+      }else{
+        var pctDone=sellPrice>0?Math.round((prevAmt+currentAmt)/sellPrice*100):0;
+        claimCell=fmt(currentAmt)+'<div style="font-size:10px;color:var(--muted);font-family:DM Mono,monospace">'+pctDone+'% complete</div>';
+      }
+
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+escH(li.name)+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(sellPrice)+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmt(prevAmt)+'</td>'
+        +'<td class="r">'+claimCell+'</td>'
+        +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:'+(remaining<=0?'var(--muted)':'var(--text)')+'">'+fmt(remaining)+'</td>';
+      tbody.appendChild(tr);
+    });
+
+    // Area subtotal row — live ID for dynamic updates
+    var areaSlug=areaName.replace(/[^a-zA-Z0-9]/g,'_');
+    var subTr=document.createElement('tr');subTr.className='subtot-row';subTr.id='subtot-'+areaSlug;
+    subTr.innerHTML='<td>'+escH(areaName)+' subtotal</td>'
+      +'<td class="r">'+fmt(areaContractTotal)+'</td>'
+      +'<td class="r">'+fmt(areaPrevTotal)+'</td>'
+      +'<td class="r" id="subtot-curr-'+areaSlug+'" style="color:var(--accent)">'+fmt(areaCurrentTotal)+'</td>'
+      +'<td class="r" id="subtot-rem-'+areaSlug+'">'+fmt(Math.max(0,areaContractTotal-areaPrevTotal-areaCurrentTotal))+'</td>';
+    tbody.appendChild(subTr);
+
+    tbl.appendChild(tbody);secBody.appendChild(tbl);secCard.appendChild(secHdr);secCard.appendChild(secBody);
+    content.appendChild(secCard);
+  });
+
+
+  // VARIATIONS SECTION
+  var varSection=document.createElement('div');varSection.className='claim-section';
+  var varCard=document.createElement('div');varCard.className='section-card';
+  var varHdr=document.createElement('div');varHdr.className='sec-hdr';
+  var isSubmitted=claim.status!=='Draft';
+
+  varHdr.innerHTML='<span class="sec-title">Variations</span>'
+    +(isSubmitted?'<span class="no-print" style="font-size:11px;color:var(--muted);margin-left:auto;font-family:DM Mono,monospace">LOCKED — submitted</span>':'')
+    +'<span class="sec-chev" style="margin-left:10px">▾</span>';
+  varHdr.addEventListener('click',function(){varCard.classList.toggle('collapsed');});
+
+  var varBody=document.createElement('div');varBody.className='sec-body';
+  var varTbl=document.createElement('table');varTbl.className='claim-tbl';
+  varTbl.innerHTML='<thead><tr><th>Variation</th><th>Description</th><th class="r">Approved Value (ex GST)</th><th class="r">Previous Claims</th><th class="r" style="min-width:160px">This Claim</th><th class="r">Remaining</th></tr></thead>';
+  var varTbody=document.createElement('tbody');
+  var totalVarCurrentAmt=0;
+
+  // Load approved variations async then render
+  loadVariations(true).then(function(vars){
+    // Merge any new approved variations into this claim's varEntries
+    if(!isSubmitted){
+      vars.forEach(function(v){
+        if(!claim.varEntries)claim.varEntries=[];
+        if(!claim.varEntries.find(function(e){return e.varId===v.id;})){
+          claim.varEntries.push({varId:v.id,currentAmt:0,mode:'pct'});
+        }
+      });
+    }
+
+    if(!vars.length){
+      var noVarTr=document.createElement('tr');
+      noVarTr.innerHTML='<td colspan="6" style="text-align:center;padding:20px;color:var(--muted);font-size:12px">No approved variations found.</td>';
+      varTbody.appendChild(noVarTr);
+    } else {
+      vars.forEach(function(v){
+        // Always use approved value
+        var varVal=num(v.approvedValue)||0;
+        if(!varVal){
+          var sub=(v.lineItems||[]).reduce(function(a,li){
+            if(li.type==='vendor'){return a+(li.vcMode==='link'?num(li.svValue)/1.1:num(li.vendorAmt));}
+            return a+num(li.qty)*num(li.rate);
+          },0);
+          varVal=sub*(1+num(v.margin)/100);
+        }
+
+        var varEntry=(claim.varEntries||[]).find(function(e){return e.varId===v.id;});
+        if(!varEntry){varEntry={varId:v.id,currentAmt:0,mode:'pct'};if(!claim.varEntries)claim.varEntries=[];claim.varEntries.push(varEntry);}
+
+        // Sum all PREVIOUS (earlier) submitted claims for this variation
+        var prevVarAmt=0;
+        var thisClaim=claimsData.claims.find(function(x){return x.id===currentClaimId;});
+        claimsData.claims.forEach(function(c){
+          if(c.id===claim.id)return;
+          if(c.num>=thisClaim.num)return;
+          (c.varEntries||[]).forEach(function(e){if(e.varId===v.id)prevVarAmt+=num(e.currentAmt);});
+        });
+
+        var currentVarAmt=num(varEntry.currentAmt);
+        var remainingVar=varVal-prevVarAmt-currentVarAmt;
+        totalVarCurrentAmt+=currentVarAmt;
+
+        // This claim cell — locked if submitted
+        var claimCellV='';
+        if(editMode&&!isSubmitted){
+          var pctValV=varVal>0?Math.round(currentVarAmt/varVal*1000)/10:0;
+          claimCellV='<div class="claim-dual">'
+            +'<input class="claim-pct-inp" type="number" min="0" max="100" step="0.1" placeholder="%" value="'+(pctValV||'')+'" '
+            +'oninput="syncVarPct(this,\''+v.id+'\',\''+claim.id+'\','+varVal+','+prevVarAmt+')" />'
+            +'<span class="claim-inp-sep">%&thinsp;/</span>'
+            +'<input class="claim-amt-inp" type="number" min="0" placeholder="$" value="'+(currentVarAmt||'')+'" '
+            +'oninput="syncVarAmt(this,\''+v.id+'\',\''+claim.id+'\','+varVal+','+prevVarAmt+')" />'
+            +'</div>';
+        } else {
+          var displayAmt=currentVarAmt>0?fmt(currentVarAmt):'<span style="color:var(--muted)">$—</span>';
+          claimCellV=displayAmt+(isSubmitted?' <span style="font-size:10px;color:var(--muted)">🔒</span>':'');
+        }
+
+        // Remaining colour
+        var remStyle='font-family:DM Mono,monospace;font-size:12px;'
+          +(remainingVar<0?'color:#ff4d6d':remainingVar===0?'color:var(--green)':'');
+
+        var varTr=document.createElement('tr');
+        varTr.innerHTML='<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--purple)">'+escH(v.num)+'</td>'
+          +'<td>'+escH(v.shortDesc||v.desc||'—')+'</td>'
+          +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px">'+fmt(varVal)+'</td>'
+          +'<td class="r" style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmt(prevVarAmt)+'</td>'
+          +'<td class="r">'+claimCellV+'</td>'
+          +'<td class="r" style="'+remStyle+'">'+(remainingVar<0?'⚠ '+fmt(Math.abs(remainingVar))+' over':remainingVar===0?'✓ Fully claimed':fmt(remainingVar))+'</td>';
+        varTbody.appendChild(varTr);
+      });
+    }
+    varTbl.appendChild(varTbody);
+  });
+
+  varBody.appendChild(varTbl);varCard.appendChild(varHdr);varCard.appendChild(varBody);varSection.appendChild(varCard);
+  content.appendChild(varSection);
+
+  // GRAND TOTALS — use saved varEntries for immediate sync calculation
+  var totalVarCurrentAmt=(claim.varEntries||[]).reduce(function(s,e){return s+num(e.currentAmt);},0);
+  var grandCurrent=totalCurrentAmt+totalVarCurrentAmt;
+  var retPct=claimsData.retentionPct||5;
+  var retAmt=grandCurrent*(retPct/100);
+  var netPayable=grandCurrent-retAmt;
+  var gst=grandCurrent*0.1;
+  var netPayableInclGST=netPayable*1.1;
+
+  // Detail summary bar
+  document.getElementById('ds-current').textContent=fmt(grandCurrent);
+  document.getElementById('ds-gst').textContent=fmt(gst);
+  document.getElementById('ds-incl').textContent=fmt(grandCurrent*1.1);
+  document.getElementById('ds-ret').textContent=fmt(retAmt)+' ('+retPct+'%)';
+  document.getElementById('ds-net').textContent=fmt(netPayableInclGST);
+
+  // Cumulative and remaining
+  var prevClaimedTotal=0;
+  claimsData.claims.forEach(function(c){
+    if(c.id===claim.id) return;
+    var thisClaim=claimsData.claims.find(function(x){return x.id===currentClaimId;});
+    if(c.num>=thisClaim.num) return;
+    (c.entries||[]).forEach(function(e){prevClaimedTotal+=num(e.currentAmt);});
+    (c.varEntries||[]).forEach(function(e){prevClaimedTotal+=num(e.currentAmt);});
+  });
+  var cumulClaimed=prevClaimedTotal+grandCurrent;
+  document.getElementById('ds-cumul').textContent=fmt(cumulClaimed);
+  document.getElementById('ds-remain').textContent=fmt(Math.max(0,claimsData.contractValue-cumulClaimed));
+
+  // Cost banner — placed at top of content
+  var invoicesBanner=loadInvoicesForMonth(claim.month);
+  var totalCostsBanner=0;
+  // Use totalAmount (claim amount) preferring over invoiceAmount to avoid double-counting
+  invoicesBanner.forEach(function(inv){totalCostsBanner+=num(inv.totalAmount||inv.invoiceAmount||inv.amount||0);});
+  if(totalCostsBanner>0&&!_dismissedCostBanner[claim.id]){
+    var marginForBanner=totalCostsBanner>0?((netPayable-totalCostsBanner)/totalCostsBanner*100):0;
+    var bType=grandCurrent<totalCostsBanner?'danger':marginForBanner<10?'warn':'green';
+    var bColors={danger:['rgba(255,77,109,.12)','#ff4d6d'],warn:['rgba(255,184,48,.12)','#ffb830'],green:['rgba(0,229,160,.1)','#00e5a0']};
+    var bc=bColors[bType];
+    var bIcon=bType==='danger'?'🔴':bType==='warn'?'🟡':'🟢';
+    var bMsg=bType==='danger'
+      ?'Claim ('+fmt(grandCurrent)+') is below costs ('+fmt(totalCostsBanner)+') — potential loss of '+fmt(totalCostsBanner-grandCurrent)
+      :bType==='warn'
+      ?'Costs covered but margin is '+marginForBanner.toFixed(1)+'% — below 10% target'
+      :'Margin on costs is '+marginForBanner.toFixed(1)+'% — looking healthy';
+    var costBannerEl=document.createElement('div');
+    costBannerEl.className='cost-banner no-print';
+    costBannerEl.style.cssText='margin:0 0 14px;padding:10px 14px;border-radius:8px;border:1px solid '+bc[1]+';background:'+bc[0]+';display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap';
+    costBannerEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap">'
+      +'<span>'+bIcon+'</span>'
+      +'<span style="font-size:13px;color:var(--text);font-weight:500">'+bMsg+'</span>'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Vendor costs: <strong style="color:'+bc[1]+'">'+fmt(totalCostsBanner)+'</strong> ex GST · Switch to <strong>Costs tab</strong> for full breakdown</span>'
+      +'</div>'
+      +'<button class="cost-banner-dismiss" onclick="dismissCostBanner(\''+claim.id+'\')" title="Dismiss">✕</button>';
+    content.insertBefore(costBannerEl,content.firstChild);
+  }
+}
+
+var _dismissedCostBanner={};
+function dismissCostBanner(claimId){
+  _dismissedCostBanner[claimId]=true;
+  renderDetail();
+}
+
+function openPOPanel(poId){
+  var panel=document.getElementById('poPanelCosts');
+  var title=document.getElementById('poPanelTitle');
+  var body=document.getElementById('poPanelBody');
+  if(!panel)return;
+  title.textContent=poId||'—';
+  body.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px 0">Loading PO data…</div>';
+  panel.classList.add('open');
+  // Load PO data from procurement
+  dbGetPurchaseOrders(_pcPNum).then(function(data){
+    if(!data||!data.sections){body.innerHTML='<div style="color:var(--muted);padding:20px">No PO data found.</div>';return;}
+    var po=null,poGrp=null,poSec=null;
+    (data.sections||[]).forEach(function(sec){
+      (sec.groups||[]).forEach(function(grp){
+        (grp.pos||[]).forEach(function(p){if(p.id===poId){po=p;poGrp=grp;poSec=sec;}});
+      });
+    });
+    if(!po){body.innerHTML='<div style="color:var(--muted);padding:20px">PO not found: '+escH(poId)+'</div>';return;}
+    var poValue=(po.lineItems||[]).reduce(function(s,li){return s+num(li.qty||1)*num(li.price||0);},0);
+    var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">';
+    [
+      {l:'PO Number',v:po.id||'—'},
+      {l:'Supplier',v:po.supplier||'—'},
+      {l:'Category',v:(poGrp&&poGrp.parent)||'—'},
+      {l:'Section',v:(poSec&&poSec.name)||'—'},
+      {l:'Status',v:po.status||'—'},
+      {l:'Order Date',v:po.orderDate||'—'},
+      {l:'Delivery',v:po.delivery||'—'},
+      {l:'PO Value',v:fmt(poValue)},
+    ].forEach(function(f){
+      html+='<div style="background:var(--surface2);border-radius:8px;padding:10px 14px">'
+        +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px">'+f.l+'</div>'
+        +'<div style="font-family:\'DM Mono\',monospace;font-size:13px;color:var(--text)">'+escH(String(f.v))+'</div>'
+        +'</div>';
+    });
+    html+='</div>';
+    if(po.notes){html+='<div style="background:var(--surface2);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--text2)">'+escH(po.notes)+'</div>';}
+    // Line items
+    if(po.lineItems&&po.lineItems.length){
+      html+='<div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Line Items</div>';
+      html+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+      html+='<thead><tr style="border-bottom:1px solid var(--border)">'
+        +'<th style="padding:6px 8px;text-align:left;color:var(--muted);font-size:10px;font-weight:500">Description</th>'
+        +'<th style="padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:500">Qty</th>'
+        +'<th style="padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:500">Price</th>'
+        +'<th style="padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:500">Total</th>'
+        +'</tr></thead><tbody>';
+      po.lineItems.forEach(function(li){
+        var t=num(li.qty||1)*num(li.price||0);
+        html+='<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:7px 8px;color:var(--text2)">'+escH(li.desc||'—')+'</td>'
+          +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace">'+escH(String(li.qty||'—'))+'</td>'
+          +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace">'+fmt(num(li.price||0))+'</td>'
+          +'<td style="padding:7px 8px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--accent)">'+fmt(t)+'</td>'
+          +'</tr>';
+      });
+      html+='<tr style="background:var(--surface2)">'
+        +'<td colspan="3" style="padding:7px 8px;font-weight:600;color:var(--text)">Total</td>'
+        +'<td style="padding:7px 8px;text-align:right;font-weight:700;font-family:\'DM Mono\',monospace;color:var(--accent)">'+fmt(poValue)+'</td>'
+        +'</tr></tbody></table>';
+    }
+    body.innerHTML=html;
+  }).catch(function(){body.innerHTML='<div style="color:var(--muted);padding:20px">Failed to load PO data.</div>';});
+}
+
+function closePOPanel(){
+  var panel=document.getElementById('poPanelCosts');
+  if(panel)panel.classList.remove('open');
+}
+
+// ── TAB SWITCHING ──
+var _activeDetailTab='claim';
+function switchDetailTab(tab){
+  _activeDetailTab=tab;
+  document.getElementById('dtab-claim').classList.toggle('active',tab==='claim');
+  document.getElementById('dtab-costs').classList.toggle('active',tab==='costs');
+  document.getElementById('detailContent').style.display=tab==='claim'?'':'none';
+  document.getElementById('costsContent').style.display=tab==='costs'?'':'none';
+  document.getElementById('detailSum').style.display=tab==='claim'?'':'none';
+  if(tab==='costs')renderCostsTab();
+}
+
+async function renderCostsTab(){
+  var claim=claimsData.claims.find(function(c){return c.id===currentClaimId;});
+  if(!claim)return;
+  var cont=document.getElementById('costsContent');
+  cont.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">Loading costs…</div>';
+
+  if(!window._cachedVendorInvoices){await prefetchVendorInvoices();}
+  var allRecords=loadInvoicesForMonth(claim.month);
+
+  if(!allRecords.length){
+    cont.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">💰</div>'
+      +'<div style="font-weight:600;color:var(--text2)">No invoices or claims found for '+fmtM(claim.month)+'</div>'
+      +'<div style="font-size:12px;margin-top:6px">Vendor invoices for this period will appear here.</div></div>';
+    return;
+  }
+
+  var getAmt=function(r){return num(r.invoiceAmount||r.totalAmount||r.amount||0);};
+  var getRef=function(r){return r.invoiceNo||r.claimNo||r.ref||'—';};
+  var statusColor=function(s){
+    var sl=(s||'').toLowerCase();
+    if(sl.includes('approved'))return 'var(--green)';
+    if(sl.includes('pending'))return 'var(--warn)';
+    return 'var(--muted)';
+  };
+
+  var retPct=claimsData.retentionPct||5;
+  var grandCurrent=0;
+  (claim.entries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
+  (claim.varEntries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
+  var netAfterRet=grandCurrent*(1-retPct/100);
+
+  // ── Split lines into Contract vs SV ──
+  // Each record may have multiple lines; split and tag with parent record info
+  var contractLines=[]; // type === 'base' or isDirect (no lines)
+  var svLines=[];       // type !== 'base', has varNum
+
+  allRecords.forEach(function(r){
+    var lines=r.lines||[];
+    if(r.isDirect||!lines.length){
+      contractLines.push({vendor:r.vendor||'Other',ref:getRef(r),poId:r.poId||r.poRef||'',
+        status:r.status||'',amt:getAmt(r),varNum:''});
+    } else {
+      lines.forEach(function(l){
+        var amt=num(l.amount||0);
+        if(!amt)return;
+        var row={vendor:r.vendor||'Other',ref:getRef(r),poId:l.poId||l.poRef||r.poId||'',
+          desc:l.description||'',status:r.status||'',amt:amt,varNum:l.varNum||''};
+        if(l.type==='base'||!l.varNum){contractLines.push(row);}
+        else{svLines.push(row);}
+      });
+    }
+  });
+
+  // Group by vendor, sort vendors alphabetically
+  var groupByVendor=function(rows){
+    var map={};
+    rows.forEach(function(r){
+      var v=r.vendor||'Other';
+      if(!map[v])map[v]=[];
+      map[v].push(r);
+    });
+    return Object.keys(map).sort().map(function(v){return {vendor:v,rows:map[v]};});
+  };
+
+  var contractGroups=groupByVendor(contractLines);
+  var svGroups=groupByVendor(svLines);
+  var contractTotal=contractLines.reduce(function(s,r){return s+r.amt;},0);
+  var svTotal=svLines.reduce(function(s,r){return s+r.amt;},0);
+  var grandTotal=contractTotal+svTotal;
+  var marginPct=grandTotal>0?((netAfterRet-grandTotal)/grandTotal*100):0;
+  var marginColor=marginPct>=10?'var(--green)':marginPct>=0?'var(--warn)':'var(--danger)';
+
+  // ── Top summary bar ──
+  var html='<div style="background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;gap:28px;flex-wrap:wrap;align-items:center">'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">This Claim <strong style="color:var(--accent);font-size:13px">'+fmt(grandCurrent)+'</strong></div>'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Net After Retention <strong style="color:var(--text);font-size:13px">'+fmt(netAfterRet)+'</strong></div>'
+    +'<div style="border-left:1px solid var(--border);padding-left:24px;font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Total Costs <strong style="color:var(--danger);font-size:13px">'+fmt(grandTotal)+'</strong></div>'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Contract <strong style="color:var(--text2);font-size:13px">'+fmt(contractTotal)+'</strong></div>'
+    +'<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">SV <strong style="color:var(--text2);font-size:13px">'+fmt(svTotal)+'</strong></div>'
+    +'<div style="border-left:1px solid var(--border);padding-left:24px;font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">Margin <strong style="color:'+marginColor+';font-size:13px">'+marginPct.toFixed(1)+'%</strong></div>'
+    +'</div>';
+
+  html+='<div style="padding:16px 24px;display:flex;flex-direction:column;gap:16px">';
+
+  // ── Helper: render a card (flat rows, single total) ──
+  var isSub=function(title){return title.includes('Sub');};
+  var renderCard=function(title,groups,cardTotal){
+    if(!groups.length)return'';
+    // Flatten all rows from all vendor groups, sort by vendor then ref
+    var allRows=[];
+    groups.forEach(function(grp){grp.rows.forEach(function(r){allRows.push(r);});});
+    allRows.sort(function(a,b){
+      var v=(a.vendor||'').localeCompare(b.vendor||'');
+      return v!==0?v:(a.ref||'').localeCompare(b.ref||'');
+    });
+    var colSpan=isSub(title)?6:5;
+    var c='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+    // Card header — collapsible
+    c+='<div style="background:var(--surface2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none" onclick="this.nextElementSibling.classList.toggle(\'ct-hidden\')">'
+      +'<span style="font-family:\'Syne\',sans-serif;font-size:14px;font-weight:700;color:var(--text)">'+title+'</span>'
+      +'<div style="display:flex;gap:20px;align-items:center">'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--accent);font-weight:600">'+fmt(cardTotal)+' ex GST</span>'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted)">'+fmt(cardTotal*1.1)+' incl GST</span>'
+      +'<span style="color:var(--muted);font-size:12px">▾</span>'
+      +'</div></div>';
+    // Table — flat, no vendor grouping
+    c+='<div><table style="width:100%;border-collapse:collapse;font-size:12px">';
+    c+='<thead><tr style="background:var(--surface)">'
+      +'<th style="padding:5px 16px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Trade / Vendor</th>'
+      +'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Ref</th>'
+      +(isSub(title)?'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Variation</th>':'')
+      +'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">PO No</th>'
+      +'<th style="padding:5px 8px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Status</th>'
+      +'<th style="padding:5px 16px;text-align:right;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Ex GST</th>'
+      +'<th style="padding:5px 16px;text-align:right;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:500;border-bottom:1px solid var(--border)">Incl GST</th>'
+      +'</tr></thead><tbody>';
+    allRows.forEach(function(r){
+      var poLink=r.poId
+        ?'<a href="#" onclick="event.preventDefault();openPOPanel(\''+escH(r.poId)+'\')" style="color:var(--accent);font-family:\'DM Mono\',monospace;font-size:11px;text-decoration:underline;cursor:pointer">'+escH(r.poId)+'</a>'
+        :'<span style="color:var(--muted);font-size:11px">—</span>';
+      c+='<tr style="border-bottom:1px solid var(--border)">'
+        +'<td style="padding:7px 16px;color:var(--text2);font-size:12px">'+escH(r.vendor)+'</td>'
+        +'<td style="padding:7px 8px;color:var(--accent);font-family:\'DM Mono\',monospace;white-space:nowrap">'+escH(r.ref)+'</td>'
+        +(isSub(title)?'<td style="padding:7px 8px;color:var(--purple);font-family:\'DM Mono\',monospace;font-size:11px">'+escH(r.varNum)+'</td>':'')
+        +'<td style="padding:7px 8px">'+poLink+'</td>'
+        +'<td style="padding:7px 8px;text-align:center"><span style="font-size:10px;font-family:\'DM Mono\',monospace;padding:2px 7px;border-radius:4px;background:rgba(0,0,0,.2);color:'+statusColor(r.status)+'">'+escH(r.status||'—')+'</span></td>'
+        +'<td style="padding:7px 16px;text-align:right;font-family:\'DM Mono\',monospace;font-weight:500">'+fmt(r.amt)+'</td>'
+        +'<td style="padding:7px 16px;text-align:right;font-family:\'DM Mono\',monospace;color:var(--text2)">'+fmt(r.amt*1.1)+'</td>'
+        +'</tr>';
+    });
+    // Single total row
+    c+='<tr style="background:var(--surface2)">'
+      +'<td colspan="'+(isSub(title)?5:4)+'" style="padding:8px 16px;font-weight:700;color:var(--text)">'+title+' Total</td>'
+      +'<td style="padding:8px 16px;text-align:right;font-weight:700;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(cardTotal)+'</td>'
+      +'<td style="padding:8px 16px;text-align:right;font-weight:600;font-family:\'DM Mono\',monospace;color:var(--danger)">'+fmt(cardTotal*1.1)+'</td>'
+      +'</tr>';
+    c+='</tbody></table></div></div>';
+    return c;
+  };
+
+  html+=renderCard('Base Contract',contractGroups,contractTotal);
+  html+=renderCard('Subcontractor Variations',svGroups,svTotal);
+
+  // Grand total row
+  html+='<div style="padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">'
+    +'<span style="font-weight:700;font-size:14px;color:var(--text)">Grand Total</span>'
+    +'<div style="display:flex;gap:24px;flex-wrap:wrap">'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Ex GST <strong style="color:var(--danger)">'+fmt(grandTotal)+'</strong></span>'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Incl GST <strong style="color:var(--danger)">'+fmt(grandTotal*1.1)+'</strong></span>'
+    +'<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--muted)">Margin <strong style="color:'+marginColor+'">'+marginPct.toFixed(1)+'%</strong></span>'
+    +'</div></div>';
+
+  html+='</div>';
+  cont.innerHTML=html;
+}
+
+// ── ENTRY SETTERS — synced % and $ ──
+function getClaimEntry(lineItemId, claimId){
+  var c=claimsData.claims.find(function(x){return x.id===claimId;});
+  if(!c)return null;
+  if(!c.entries)c.entries=[];
+  var e=c.entries.find(function(x){return x.lineItemId===lineItemId;});
+  if(!e){e={lineItemId:lineItemId,currentAmt:0};c.entries.push(e);}
+  return e;
+}
+function syncClaimPct(inp,ek,claimId,sellPrice,prevAmt){
+  var pct=num(inp.value);
+  var amt=Math.round(sellPrice*(pct/100)*100)/100;
+  amt=Math.max(0,Math.min(sellPrice-prevAmt,amt));
+  var e=getClaimEntry(ek,claimId);if(e){e.currentAmt=amt;}
+  var dual=inp.closest?inp.closest('.claim-dual'):inp.parentElement;
+  if(dual){var amtInp=dual.querySelector('.claim-amt-inp');if(amtInp)amtInp.value=amt||'';}
+  save();updateDetailSummary();updateAreaSubtotal(ek,claimId);
+}
+function syncClaimAmt(inp,ek,claimId,sellPrice,prevAmt){
+  var amt=Math.max(0,Math.min(sellPrice-prevAmt,num(inp.value)));
+  var e=getClaimEntry(ek,claimId);if(e){e.currentAmt=amt;}
+  var dual=inp.closest?inp.closest('.claim-dual'):inp.parentElement;
+  if(dual){var pctInp=dual.querySelector('.claim-pct-inp');if(pctInp)pctInp.value=sellPrice>0?Math.round(amt/sellPrice*1000)/10:'';}
+  save();updateDetailSummary();updateAreaSubtotal(ek,claimId);
+}
+
+// Update area subtotal row live when an entry changes
+function updateAreaSubtotal(changedEk,claimId){
+  var claim=claimsData.claims.find(function(c){return c.id===claimId;});
+  if(!claim)return;
+  // Find which area this ek belongs to
+  claimsData.lineItems.forEach(function(li){
+    var areas=li.areas||[{areaId:li.id,areaName:li.area||'General',sellingPrice:num(li.sellingPrice||0)}];
+    areas.forEach(function(ar){
+      var ek=li.id+'__'+ar.areaId;
+      if(ek!==changedEk)return;
+      var areaName=ar.areaName||'General';
+      var areaSlug=areaName.replace(/[^a-zA-Z0-9]/g,'_');
+      // Sum all entries in this area
+      var areaTotal=0;var areaContract=0;var areaPrev=0;
+      claimsData.lineItems.forEach(function(li2){
+        var a2=li2.areas||[{areaId:li2.id,areaName:li2.area||'General',sellingPrice:num(li2.sellingPrice||0)}];
+        a2.forEach(function(ar2){
+          if((ar2.areaName||'General')!==areaName)return;
+          var ek2=li2.id+'__'+ar2.areaId;
+          var entry=(claim.entries||[]).find(function(e){return e.lineItemId===ek2;});
+          areaTotal+=entry?num(entry.currentAmt):0;
+          areaContract+=num(ar2.sellingPrice);
+          areaPrev+=prevClaimed(ek2,claimId);
+        });
+      });
+      var currEl=document.getElementById('subtot-curr-'+areaSlug);
+      var remEl=document.getElementById('subtot-rem-'+areaSlug);
+      var hdrEl=document.getElementById('sechdr-curr-'+areaSlug);
+      if(currEl)currEl.textContent=fmt(areaTotal);
+      if(remEl)remEl.textContent=fmt(Math.max(0,areaContract-areaPrev-areaTotal));
+      if(hdrEl)hdrEl.textContent=fmt(areaTotal)+' this claim';
+    });
+  });
+}
+function syncVarPct(inp,varId,claimId,varVal,prevAmt){
+  var pct=num(inp.value);
+  var amt=Math.round(varVal*(pct/100)*100)/100;
+  amt=Math.max(0,Math.min(varVal-prevAmt,amt));
+  var c=claimsData.claims.find(function(x){return x.id===claimId;});if(!c)return;
+  if(!c.varEntries)c.varEntries=[];
+  var e=c.varEntries.find(function(x){return x.varId===varId;});
+  if(!e){e={varId:varId,currentAmt:0};c.varEntries.push(e);}
+  e.currentAmt=amt;
+  var dual=inp.closest?inp.closest('.claim-dual'):inp.parentElement;
+  if(dual){var amtInp=dual.querySelector('.claim-amt-inp');if(amtInp)amtInp.value=amt||'';}
+  save();updateDetailSummary();
+}
+function syncVarAmt(inp,varId,claimId,varVal,prevAmt){
+  var amt=Math.max(0,Math.min(varVal-prevAmt,num(inp.value)));
+  var c=claimsData.claims.find(function(x){return x.id===claimId;});if(!c)return;
+  if(!c.varEntries)c.varEntries=[];
+  var e=c.varEntries.find(function(x){return x.varId===varId;});
+  if(!e){e={varId:varId,currentAmt:0};c.varEntries.push(e);}
+  e.currentAmt=amt;
+  var dual=inp.closest?inp.closest('.claim-dual'):inp.parentElement;
+  if(dual){var pctInp=dual.querySelector('.claim-pct-inp');if(pctInp)pctInp.value=varVal>0?Math.round(amt/varVal*1000)/10:'';}
+  save();updateDetailSummary();
+}
+// Live update summary bar without full re-render
+function updateDetailSummary(){
+  var claim=claimsData.claims.find(function(c){return c.id===currentClaimId;});
+  if(!claim)return;
+  var grandCurrent=0;
+  (claim.entries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
+  (claim.varEntries||[]).forEach(function(e){grandCurrent+=num(e.currentAmt);});
+  var retPct=claimsData.retentionPct||5;
+  var retAmt=grandCurrent*(retPct/100);
+  var netPayable=grandCurrent-retAmt;
+  var gst=grandCurrent*0.1;
+  var el=function(id){return document.getElementById(id);};
+  if(el('ds-current'))el('ds-current').textContent=fmt(grandCurrent);
+  if(el('ds-gst'))el('ds-gst').textContent=fmt(gst);
+  if(el('ds-incl'))el('ds-incl').textContent=fmt(grandCurrent*1.1);
+  if(el('ds-ret'))el('ds-ret').textContent=fmt(retAmt)+' ('+retPct+'%)';
+  if(el('ds-net'))el('ds-net').textContent=fmt((grandCurrent-retAmt)*1.1);
+  // Update cost banner live
+  var invoicesBanner=loadInvoicesForMonth(claim.month);
+  var totalCostsBanner=0;
+  invoicesBanner.forEach(function(inv){totalCostsBanner+=num(inv.totalAmount||inv.invoiceAmount||inv.amount||0);});
+  if(totalCostsBanner>0){
+    var marginForBanner=totalCostsBanner>0?((netPayable-totalCostsBanner)/totalCostsBanner*100):0;
+    var bType=grandCurrent<totalCostsBanner?'danger':marginForBanner<10?'warn':'green';
+    var bColors={danger:['rgba(255,77,109,.12)','#ff4d6d'],warn:['rgba(255,184,48,.12)','#ffb830'],green:['rgba(0,229,160,.1)','#00e5a0']};
+    var bc=bColors[bType];
+    var bIcon=bType==='danger'?'🔴':bType==='warn'?'🟡':'🟢';
+    var bMsg=bType==='danger'
+      ?'Claim ('+fmt(grandCurrent)+') is below costs ('+fmt(totalCostsBanner)+') — potential loss of '+fmt(totalCostsBanner-grandCurrent)
+      :bType==='warn'
+      ?'Costs covered but margin is '+marginForBanner.toFixed(1)+'% — below 10% target'
+      :'Margin on costs is '+marginForBanner.toFixed(1)+'% — looking healthy';
+    var bannerEl=document.querySelector('.cost-banner');
+    if(bannerEl){
+      bannerEl.style.borderColor=bc[1];
+      bannerEl.style.background=bc[0];
+      var msgEl=bannerEl.querySelector('span:nth-child(2)');
+      var iconEl=bannerEl.querySelector('span:first-child');
+      if(iconEl)iconEl.textContent=bIcon;
+      if(msgEl)msgEl.textContent=bMsg;
+    }
+  }
+}
+
+function saveClaim(){save();toggleEditMode(false);}
+
+// WIZARD
+var wizContractVal=0,wizRetPct=5;
+async function openNewClaimWizard(){
+  wizOpt=0;wizStep=0;
+  var nextNum=(claimsData.claims.length?Math.max.apply(null,claimsData.claims.map(function(c){return c.num;}))+1:1);
+  document.getElementById('w-claimnum').value=fmtClaimNum(nextNum);
+  document.getElementById('w-month').value=currentMonth();
+  // Auto-populate contract value from budget base contract sell price excl GST
+  if(claimsData.contractValue>0){
+    document.getElementById('w-contract').value=claimsData.contractValue;
+    document.getElementById('w-retention').value=claimsData.retentionPct||5;
+    updateContractPreview();
+  } else {
+    // Pull from budget
+    var budgetCV=await getBudgetContractValue();
+    if(budgetCV>0){
+      document.getElementById('w-contract').value=budgetCV.toFixed(2);
+      document.getElementById('w-retention').value=5;
+      updateContractPreview();
+      document.getElementById('w-contract-preview').textContent=fmt(budgetCV*1.1)+' incl GST  ·  Pulled from budget';
+    }
+  }
+  // Hide first claim setup if not first claim
+  // Show first-claim setup if no claims exist (even if stale lineItems data exists)
+  var isFirst=claimsData.claims.length===0;
+  document.getElementById('firstClaimSetup').style.display=isFirst?'block':'none';
+  document.getElementById('opt1').classList.remove('selected');
+  document.getElementById('opt2').classList.remove('selected');
+  document.getElementById('wizStep0').style.display='block';
+  document.getElementById('wizardModal').classList.add('open');
+}
+function closeWizard(){document.getElementById('wizardModal').classList.remove('open');}
+function selectOpt(n){
+  wizOpt=n;
+  document.getElementById('opt1').classList.toggle('selected',n===1);
+  document.getElementById('opt2').classList.toggle('selected',n===2);
+}
+function updateContractPreview(){
+  var v=num(document.getElementById('w-contract').value);
+  document.getElementById('w-contract-preview').textContent=v>0?'Incl GST: '+fmt(v*1.1):'';
+}
+async function wizNext(){
+  var contract=num(document.getElementById('w-contract').value);
+  if(!contract){alert('Contract value is required.');return;}
+  wizContractVal=contract;
+  wizRetPct=num(document.getElementById('w-retention').value)||5;
+  // If line items already set up, just create the claim — no setup needed
+  var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
+  if(hasLineItems){wizFinish();return;}
+  if(!wizOpt){alert('Please select a setup option.');return;}
+  closeWizard();
+  if(wizOpt===1){
+    await openSetupView('budget');
+  } else {
+    openSetupView('scratch');
+  }
+  wizStep=1;
+}
+function wizBack(){
+  closeSetupView();
+  wizStep=0;
+}
+
+
+// ── FULL PAGE SETUP VIEW ──
+var _setupMode='budget'; // 'budget' or 'scratch'
+var _logClaimMode=false; // true = Log Claim mode (Total Sell read-only, areas editable only)
+
+// Open setup view to VIEW/EDIT the claim sheet (all fields editable)
+function openSetupViewEdit(){
+  _logClaimMode=false;
+  _setupMode='budget';
+  // Rebuild _gridAreas and _gridItems from existing lineItems
+  var allAreaNames=[];var areaMap={};
+  claimsData.lineItems.forEach(function(li){
+    (li.areas||[]).forEach(function(ar){
+      if(ar.areaName&&!areaMap[ar.areaName]){areaMap[ar.areaName]=true;allAreaNames.push(ar.areaName);}
+    });
+  });
+  if(!allAreaNames.length)allAreaNames=['General'];
+  _gridAreas=allAreaNames.map(function(n){return {id:'ga_'+n.replace(/\W/g,'_'),name:n};});
+  _gridItems=claimsData.lineItems.map(function(li){
+    var prices={};
+    _gridAreas.forEach(function(ga){
+      var match=(li.areas||[]).find(function(a){return a.areaName===ga.name;});
+      prices[ga.id]=match?match.sellingPrice:0;
+    });
+    return {id:li.id,type:'item',sectionName:li.sectionName||'',name:li.name,
+            checked:true,totalSell:li.totalSell||0,prices:prices};
+  });
+  showView('setup');
+  document.getElementById('setupViewTitle').textContent='Claim Sheet';
+  document.getElementById('sv-contract').textContent=fmt(claimsData.contractValue||0);
+  document.getElementById('topBtns').innerHTML='';
+  document.getElementById('setupFinishBtn').textContent='Save Changes';
+  document.getElementById('setupFinishBtn').onclick=saveClaimSheetEdit;
+  document.getElementById('setupAddAreaBtn').style.display='';
+  renderSetupAreaCols();renderSetupGrid();
+}
+
+function openLogClaimView(){
+  // Open wizard in log-claim mode (line items already set — just need month + number)
+  var nextNum=(claimsData.claims.length?Math.max.apply(null,claimsData.claims.map(function(c){return c.num;}))+1:1);
+  document.getElementById('w-claimnum').value=fmtClaimNum(nextNum);
+  document.getElementById('w-month').value=currentMonth();
+  document.getElementById('w-contract').value=claimsData.contractValue||'';
+  document.getElementById('w-retention').value=claimsData.retentionPct||5;
+  document.getElementById('firstClaimSetup').style.display='none';
+  document.getElementById('w-contract-preview').textContent='';
+  document.getElementById('wizStep0').style.display='block';
+  wizContractVal=claimsData.contractValue||0;
+  wizRetPct=claimsData.retentionPct||5;
+  document.getElementById('wizardModal').classList.add('open');
+}
+
+function saveLogClaim(){
+  // Open a small modal to get claim number and month before saving
+  var nextNum=(claimsData.claims.length?Math.max.apply(null,claimsData.claims.map(function(c){return c.num;}))+1:1);
+  document.getElementById('w-claimnum').value=fmtClaimNum(nextNum);
+  document.getElementById('w-month').value=currentMonth();
+  document.getElementById('firstClaimSetup').style.display='none';
+  document.getElementById('w-contract-preview').textContent='';
+  document.getElementById('wizStep0').style.display='block';
+  // Temporarily swap the wizard Next button to finalise
+  var nextBtn=document.querySelector('#wizStep0 .bp');
+  if(nextBtn){nextBtn.textContent='Create Claim →';nextBtn.onclick=function(){
+    var month=document.getElementById('w-month').value;
+    var claimNum=parseInt(String(document.getElementById('w-claimnum').value).replace('PC-',''))||1;
+    var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[]};
+    claimsData.claims.push(newClaim);
+    save();closeWizard();
+    renderList();openClaim(newClaim.id);
+    // Restore button
+    nextBtn.textContent='Next →';nextBtn.onclick=wizNext;
+  };}
+  document.getElementById('wizardModal').classList.add('open');
+}
+
+function saveClaimSheetEdit(){
+  _gridItems.forEach(function(item){
+    var li=claimsData.lineItems.find(function(x){return x.id===item.id;});
+    if(!li)return;
+    li.totalSell=numRaw(item.totalSell||0);
+    var updatedAreas=[];
+    _gridAreas.forEach(function(ga){
+      var price=numRaw((item.prices||{})[ga.id]||0);
+      updatedAreas.push({areaId:ga.id,areaName:ga.name,sellingPrice:price});
+    });
+    li.areas=updatedAreas;
+  });
+  save();
+  // Reset finish button back to default
+  document.getElementById('setupFinishBtn').textContent='Finalise Claim Sheet →';
+  document.getElementById('setupFinishBtn').onclick=wizFinish;
+  renderList();
+}
+
+async function openSetupView(mode){
+  _setupMode=mode;
+  showView('setup');
+  document.getElementById('setupViewTitle').textContent=mode==='budget'?'Select Line Items from Budget':'Build Line Items from Scratch';
+  document.getElementById('sv-contract').textContent=fmt(wizContractVal);
+  document.getElementById('topBtns').innerHTML='';
+  if(mode==='budget'){
+    _gridAreas=[{id:'ga'+nid(),name:''}];
+    var budItems=await loadBudgetItems();
+    _gridItems=budItems.map(function(item){
+      if(item.type==='subheader'){
+        return {id:'gh'+nid(),type:'subheader',sectionName:item.sectionName,name:item.name};
+      }
+      return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,
+              checked:true,totalSell:item.budgetVal,prices:{},budgetVal:item.budgetVal};
+    });
+  } else {
+    _scratchAreas=[{id:'sa'+nid(),name:''}];
+    _scratchRows=[{id:'sr'+nid(),name:'',prices:{}}];
+  }
+  renderSetupAreaCols();
+  renderSetupGrid();
+}
+
+function closeSetupView(){
+  renderList();
+  wizStep=0;
+}
+
+function renderSetupAreaCols(){
+  var bar=document.getElementById('setupAreaColsBar');if(!bar)return;
+  bar.innerHTML='';
+  var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
+  areas.forEach(function(ar,i){
+    var tag=document.createElement('div');tag.className='area-col-tag';
+    var inp=document.createElement('input');inp.className='area-col-input';inp.placeholder='Area name';inp.value=ar.name||'';
+    (function(idx){inp.addEventListener('input',function(){
+      if(_setupMode==='budget')_gridAreas[idx].name=this.value;
+      else _scratchAreas[idx].name=this.value;
+      renderSetupGrid();
+    });})(i);
+    var del=document.createElement('button');del.className='area-col-del';del.textContent='×';
+    (function(idx){del.addEventListener('click',function(){
+      if(_setupMode==='budget'){if(_gridAreas.length>1){_gridAreas.splice(idx,1);}}
+      else{if(_scratchAreas.length>1){_scratchAreas.splice(idx,1);}}
+      renderSetupAreaCols();renderSetupGrid();
+    });})(i);
+    tag.appendChild(inp);tag.appendChild(del);bar.appendChild(tag);
+  });
+}
+
+function addSetupArea(){
+  if(_setupMode==='budget')_gridAreas.push({id:'ga'+nid(),name:''});
+  else _scratchAreas.push({id:'sa'+nid(),name:''});
+  renderSetupAreaCols();renderSetupGrid();
+  var inputs=document.getElementById('setupAreaColsBar').querySelectorAll('.area-col-input');
+  if(inputs.length)inputs[inputs.length-1].focus();
+}
+
+function renderSetupGrid(){
+  var wrap=document.getElementById('setupGridWrap');if(!wrap)return;
+  var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
+  var rows=_setupMode==='budget'?_gridItems:_scratchRows;
+  var colSpan=areas.length+((_setupMode==='budget')?4:3); // name + [cb] + total + areas + remaining
+
+  var tbl=document.createElement('table');tbl.className='sp-grid';tbl.style.width='100%';
+
+  // ── HEADER ROW ──
+  var thead=document.createElement('thead');var htr=document.createElement('tr');
+  var th0=document.createElement('th');th0.style.cssText='text-align:left;min-width:220px';th0.textContent='Line Item';htr.appendChild(th0);
+  if(_setupMode==='budget'){var thCb=document.createElement('th');thCb.style.cssText='width:36px;text-align:center';thCb.textContent='✓';htr.appendChild(thCb);}
+  // Total Sell comes BEFORE area columns
+  var thTot=document.createElement('th');thTot.textContent='Total Sell Price';thTot.style.cssText='text-align:right;min-width:130px;color:var(--accent)';htr.appendChild(thTot);
+  areas.forEach(function(ar){var th=document.createElement('th');th.textContent=ar.name||'Area';th.style.minWidth='120px';htr.appendChild(th);});
+  var thRem=document.createElement('th');thRem.textContent='Remaining';thRem.style.cssText='text-align:right;min-width:120px;color:var(--warn)';htr.appendChild(thRem);
+  thead.appendChild(htr);tbl.appendChild(thead);
+
+  var tbody=document.createElement('tbody');
+
+  if(_setupMode==='budget'){
+    // Group by section then render section header → subheaders → items
+    var currentSection=null;
+    var currentSubheader=null;
+    var _collapsedSections={};
+    var _collapsedSubheaders={};
+
+    rows.forEach(function(row,ri){
+      // ── SECTION HEADER ──
+      if(row.sectionName!==currentSection){
+        currentSection=row.sectionName;
+        currentSubheader=null;
+        var secId='sec-'+currentSection.replace(/\s/g,'-');
+        var secTr=document.createElement('tr');secTr.className='sg-section-hdr';secTr.id=secId+'-hdr';
+        secTr.style.cssText='background:var(--surface2);cursor:pointer;user-select:none';
+        secTr.onclick=(function(sid){return function(){toggleSetupSection(sid);};})(secId);
+        var secTd=document.createElement('td');secTd.colSpan=colSpan;
+        secTd.style.cssText='padding:8px 12px;font-family:\'Syne\',sans-serif;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border)';
+        secTd.innerHTML='<span id="'+secId+'-chev" style="font-size:10px;color:var(--muted);margin-right:8px;display:inline-block;transition:transform .2s">▼</span>'+escH(currentSection);
+        secTr.appendChild(secTd);tbody.appendChild(secTr);
+      }
+
+      // ── SUBHEADER ROW ──
+      if(row.type==='subheader'){
+        currentSubheader=row.name;
+        var subId='sub-'+currentSection.replace(/\s/g,'-')+'-'+currentSubheader.replace(/\s/g,'-');
+        var subTr=document.createElement('tr');subTr.className='sg-subheader sg-sec-'+currentSection.replace(/\s/g,'-');
+        subTr.id=subId+'-hdr';subTr.style.cssText='background:var(--surface3);cursor:pointer;user-select:none';
+        subTr.onclick=(function(sid,subid){return function(){toggleSetupSubheader(subid);};})(currentSection,subId);
+        var subTd=document.createElement('td');subTd.colSpan=colSpan;
+        subTd.style.cssText='padding:6px 12px 6px 28px;font-size:12px;font-weight:600;color:var(--text2);border-bottom:1px solid var(--border)';
+        subTd.innerHTML='<span id="'+subId+'-chev" style="font-size:9px;color:var(--muted);margin-right:7px;display:inline-block;transition:transform .2s">▼</span>'+escH(currentSubheader);
+        subTr.appendChild(subTd);tbody.appendChild(subTr);
+        return;
+      }
+
+      // ── LINE ITEM ROW ──
+      var secClass='sg-sec-'+currentSection.replace(/\W/g,'-');
+      var subClass=currentSubheader?'sg-sub-'+currentSection.replace(/\W/g,'-')+'-'+currentSubheader.replace(/\W/g,'-'):'';
+      var tr=document.createElement('tr');tr.id='sgrow-'+ri;
+      tr.className='sg-item '+secClass+(subClass?' '+subClass:'');
+      tr.style.cssText='border-bottom:1px solid var(--border)';
+
+      // Name cell
+      var tdName=document.createElement('td');
+      var indent=currentSubheader?44:28;
+      tdName.style.cssText='font-size:13px;color:var(--text2);padding-left:'+indent+'px';
+      tdName.textContent=row.name;
+      tr.appendChild(tdName);
+
+      // Checkbox
+      var tdCb=document.createElement('td');tdCb.style.textAlign='center';
+      var cb=document.createElement('input');cb.type='checkbox';cb.checked=row.checked!==false;
+      cb.style.cssText='width:14px;height:14px;accent-color:var(--accent);cursor:pointer';
+      (function(idx){cb.addEventListener('change',function(){_gridItems[idx].checked=this.checked;updateSetupRowTotal(idx);});})(ri);
+      tdCb.appendChild(cb);tr.appendChild(tdCb);
+
+      // Total Sell — editable in setup mode, read-only in log claim mode
+      var tdTot=document.createElement('td');
+      if(_logClaimMode){
+        tdTot.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:13px;font-weight:600;color:var(--accent);padding:6px 10px';
+        tdTot.textContent=fmt(num(row.totalSell||0));
+      } else {
+        var totInp=document.createElement('input');totInp.type='text';totInp.className='sp-price-inp';
+        totInp.style.cssText='font-weight:600;color:var(--accent);text-align:right;width:100%';
+        totInp.placeholder='$0.00';
+        var totVal=num(row.totalSell||0);if(totVal>0){totInp.value=fmt(totVal);}
+        attachPriceFmt(totInp);
+        (function(idx){totInp.addEventListener('input',function(){_gridItems[idx].totalSell=numRaw(this.value);updateSetupRowTotal(idx);});})(ri);
+        tdTot.appendChild(totInp);
+      }
+      tr.appendChild(tdTot);
+
+      // Area price cells — start blank
+      areas.forEach(function(ar){
+        var td=document.createElement('td');
+        if(!row.prices)row.prices={};
+        var inp=document.createElement('input');inp.type='text';inp.className='sp-price-inp';
+        inp.placeholder='$0.00';
+        var aVal=num((row.prices||{})[ar.id]||0);if(aVal>0){inp.value=fmt(aVal);}
+        attachPriceFmt(inp);
+        (function(rIdx,aId){inp.addEventListener('input',function(){
+          if(!_gridItems[rIdx].prices)_gridItems[rIdx].prices={};
+          _gridItems[rIdx].prices[aId]=numRaw(this.value);
+          updateSetupRowTotal(rIdx);
+        });})(ri,ar.id);
+        td.appendChild(inp);tr.appendChild(td);
+      });
+
+      // Remaining cell
+      var tdRem=document.createElement('td');tdRem.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;white-space:nowrap';
+      tdRem.id='sg-rem-'+ri;tdRem.textContent='—';tr.appendChild(tdRem);
+      tbody.appendChild(tr);
+    });
+
+  } else {
+    // SCRATCH MODE — simple rows
+    rows.forEach(function(row,ri){
+      var tr=document.createElement('tr');tr.id='sgrow-'+ri;tr.style.cssText='border-bottom:1px solid var(--border)';
+      var tdName=document.createElement('td');
+      var nameInp=document.createElement('input');
+      nameInp.style.cssText='background:transparent;border:none;outline:none;color:var(--text);font-family:\'DM Sans\',sans-serif;font-size:13px;width:100%;padding:2px';
+      nameInp.placeholder='Line item name';nameInp.value=row.name||'';
+      (function(idx){nameInp.addEventListener('input',function(){_scratchRows[idx].name=this.value;});})(ri);
+      tdName.appendChild(nameInp);tr.appendChild(tdName);
+      // Total Sell — editable
+      var tdTot=document.createElement('td');
+      var totInp=document.createElement('input');totInp.type='text';totInp.className='sp-price-inp';
+      totInp.style.cssText='font-weight:600;color:var(--accent);text-align:right;width:100%';
+      totInp.placeholder='$0.00';
+      var sTotVal=num(row.totalSell||0);if(sTotVal>0)totInp.value=fmt(sTotVal);
+      attachPriceFmt(totInp);
+      (function(idx){totInp.addEventListener('input',function(){_scratchRows[idx].totalSell=numRaw(this.value);updateSetupRowTotal(idx);});})(ri);
+      tdTot.appendChild(totInp);tr.appendChild(tdTot);
+      // Area price cells
+      areas.forEach(function(ar){
+        var td=document.createElement('td');if(!row.prices)row.prices={};
+        var inp=document.createElement('input');inp.type='text';inp.className='sp-price-inp';
+        inp.placeholder='$0.00';
+        var sAVal=num(row.prices[ar.id]||0);if(sAVal>0)inp.value=fmt(sAVal);
+        attachPriceFmt(inp);
+        (function(rIdx,aId){inp.addEventListener('input',function(){
+          if(!_scratchRows[rIdx].prices)_scratchRows[rIdx].prices={};
+          _scratchRows[rIdx].prices[aId]=numRaw(this.value);
+          updateSetupRowTotal(rIdx);
+        });})(ri,ar.id);
+        td.appendChild(inp);tr.appendChild(td);
+      });
+      var tdRem=document.createElement('td');tdRem.style.cssText='text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;white-space:nowrap';
+      tdRem.id='sg-rem-'+ri;tdRem.textContent='—';tr.appendChild(tdRem);
+      tbody.appendChild(tr);
+    });
+    // Add row button
+    var addTr=document.createElement('tr');var addTd=document.createElement('td');addTd.colSpan=colSpan;
+    addTd.style.cssText='padding:8px 12px;border-top:1px solid var(--border)';
+    var addBtn=document.createElement('button');
+    addBtn.style.cssText='background:none;border:none;color:var(--accent);cursor:pointer;font-size:12.5px;font-family:\'DM Sans\',sans-serif';
+    addBtn.textContent='＋ Add Line Item';
+    addBtn.addEventListener('click',function(){_scratchRows.push({id:'sr'+nid(),name:'',prices:{}});renderSetupGrid();});
+    addTd.appendChild(addBtn);addTr.appendChild(addTd);tbody.appendChild(addTr);
+  }
+
+  tbl.appendChild(tbody);wrap.innerHTML='';wrap.appendChild(tbl);
+  rows.forEach(function(_,ri){updateSetupRowTotal(ri);});
+  updateSetupTotals();
+}
+
+function toggleSetupSection(secId){
+  var chev=document.getElementById(secId+'-chev');
+  var items=document.querySelectorAll('.'+secId.replace('sec-','sg-sec-'));
+  var isVisible=items.length&&items[0].style.display!=='none';
+  items.forEach(function(el){el.style.display=isVisible?'none':'';});
+  if(chev)chev.style.transform=isVisible?'rotate(-90deg)':'';
+}
+
+function toggleSetupSubheader(subId){
+  var chev=document.getElementById(subId+'-chev');
+  var items=document.querySelectorAll('.'+subId.replace('sub-','sg-sub-'));
+  var isVisible=items.length&&items[0].style.display!=='none';
+  items.forEach(function(el){el.style.display=isVisible?'none':'';});
+  if(chev)chev.style.transform=isVisible?'rotate(-90deg)':'';
+}
+
+function updateSetupRowTotal(ri){
+  var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
+  var rows=_setupMode==='budget'?_gridItems:_scratchRows;
+  var row=rows[ri];if(!row||row.type==='subheader')return;
+  var rawSum=0;
+  areas.forEach(function(ar){rawSum+=num((row.prices||{})[ar.id]||0);});
+  var areaSum=Math.round(rawSum*100)/100;
+  var totalSell=Math.round(num(row.totalSell||0)*100)/100;
+  var remaining=Math.round((totalSell-areaSum)*100)/100;
+  var remEl=document.getElementById('sg-rem-'+ri);
+  if(remEl){
+    if(totalSell===0){remEl.textContent='—';remEl.style.color='var(--muted)';}
+    else if(remaining<0){remEl.textContent='⚠ '+fmt(Math.abs(remaining))+' over';remEl.style.color='var(--danger)';}
+    else if(remaining===0){remEl.textContent='✓ Fully allocated';remEl.style.color='var(--green)';}
+    else{remEl.textContent=fmt(remaining);remEl.style.color='var(--warn)';}
+  }
+  updateSetupTotals();
+}
+
+function updateSetupTotals(){
+  var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
+  var rows=_setupMode==='budget'?_gridItems:_scratchRows;
+  var totalSellAll=0,totalAllocated=0;
+  rows.forEach(function(row){
+    if(row.type==='subheader')return;
+    if(_setupMode==='budget'&&row.checked===false)return;
+    totalSellAll+=num(row.totalSell||0);
+    areas.forEach(function(ar){totalAllocated+=num((row.prices||{})[ar.id]||0);});
+  });
+  var remaining=totalSellAll-totalAllocated;
+  var allocEl=document.getElementById('sv-allocated');
+  var remEl=document.getElementById('sv-remaining');
+  if(allocEl)allocEl.textContent=fmt(totalAllocated);
+  if(remEl){
+    remEl.textContent=fmt(Math.abs(remaining))+(remaining<0?' over':remaining===0?' ✓ fully allocated':' to go');
+    remEl.style.color=remaining<0?'#ff4d6d':remaining===0?'var(--green)':'var(--warn)';
+  }
+}
+var _gridAreas=[]; // [{id, name}] — shared column definitions
+var _gridItems=[]; // [{id, name, checked, prices:{areaId:price}}]
+var _scratchAreas=[];
+var _scratchRows=[]; // [{id, name, prices:{areaId:price}}]
+
+// ── BUDGET GRID ──
+async function buildBudgetTree(){
+  _gridAreas=[{id:'ga'+nid(),name:''}];
+  var budItems=await loadBudgetItems();
+  _gridItems=budItems.map(function(item){
+    if(item.type==='subheader'){
+      return {id:'gh'+nid(),type:'subheader',sectionName:item.sectionName,name:item.name};
+    }
+    return {id:'gi'+nid(),type:'item',sectionName:item.sectionName,name:item.name,
+            checked:true,totalSell:item.budgetVal,prices:{},budgetVal:item.budgetVal};
+  });
+  if(!_gridItems.length){
+    document.getElementById('budgetGrid').innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">No budget data found. Use Option 2 instead.</div>';
+    renderGridAreaCols();return;
+  }
+  renderGridAreaCols();
+  renderBudgetGrid();
+}
+
+function renderGridAreaCols(){
+  var cont=document.getElementById('gridAreaCols');if(!cont)return;
+  cont.innerHTML='';
+  _gridAreas.forEach(function(ar,i){
+    var tag=document.createElement('div');tag.className='area-col-tag';
+    var inp=document.createElement('input');inp.className='area-col-input';inp.placeholder='Area name';inp.value=ar.name||'';
+    (function(idx){inp.addEventListener('input',function(){_gridAreas[idx].name=this.value;renderBudgetGrid();});})(i);
+    var del=document.createElement('button');del.className='area-col-del';del.textContent='×';del.title='Remove';
+    (function(idx){del.addEventListener('click',function(){if(_gridAreas.length>1){_gridAreas.splice(idx,1);renderGridAreaCols();renderBudgetGrid();}});})(i);
+    tag.appendChild(inp);tag.appendChild(del);cont.appendChild(tag);
+  });
+}
+
+function addGridArea(){
+  _gridAreas.push({id:'ga'+nid(),name:''});
+  renderGridAreaCols();renderBudgetGrid();
+  var inputs=document.getElementById('gridAreaCols').querySelectorAll('.area-col-input');
+  if(inputs.length)inputs[inputs.length-1].focus();
+}
+
+function renderBudgetGrid(){
+  var cont=document.getElementById('budgetGrid');if(!cont)return;
+  var tbl=document.createElement('table');tbl.className='sp-grid';
+  var thead=document.createElement('thead');var htr=document.createElement('tr');
+  var th0=document.createElement('th');th0.textContent='Line Item';htr.appendChild(th0);
+  var thCb=document.createElement('th');thCb.style.cssText='width:32px;text-align:center';thCb.textContent='✓';htr.appendChild(thCb);
+  _gridAreas.forEach(function(ar){var th=document.createElement('th');th.textContent=ar.name||'(Area)';htr.appendChild(th);});
+  thead.appendChild(htr);tbl.appendChild(thead);
+  var tbody=document.createElement('tbody');
+  _gridItems.forEach(function(item,ri){
+    var tr=document.createElement('tr');
+    var tdName=document.createElement('td');tdName.textContent=item.name;tr.appendChild(tdName);
+    var tdCb=document.createElement('td');tdCb.style.textAlign='center';
+    var cb=document.createElement('input');cb.type='checkbox';cb.checked=item.checked!==false;
+    cb.style.cssText='width:14px;height:14px;accent-color:var(--accent);cursor:pointer';
+    (function(idx){cb.addEventListener('change',function(){_gridItems[idx].checked=this.checked;});})(ri);
+    tdCb.appendChild(cb);tr.appendChild(tdCb);
+    _gridAreas.forEach(function(ar){
+      var td=document.createElement('td');if(!item.prices)item.prices={};
+      var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
+      inp.placeholder='0.00';inp.value=item.prices[ar.id]||'';
+      (function(rIdx,aId){inp.addEventListener('input',function(){if(!_gridItems[rIdx].prices)_gridItems[rIdx].prices={};_gridItems[rIdx].prices[aId]=numRaw(this.value);});})(ri,ar.id);
+      td.appendChild(inp);tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);cont.innerHTML='';cont.appendChild(tbl);
+}
+
+// ── SCRATCH GRID ──
+function initScratchGrid(){
+  _scratchAreas=[{id:'sa'+nid(),name:'General'}];
+  _scratchRows=[{id:'sr'+nid(),name:'',prices:{}}];
+  renderScratchAreaCols();renderScratchGrid();
+}
+
+function renderScratchAreaCols(){
+  var cont=document.getElementById('scratchAreaCols');if(!cont)return;cont.innerHTML='';
+  _scratchAreas.forEach(function(ar,i){
+    var tag=document.createElement('div');tag.className='area-col-tag';
+    var inp=document.createElement('input');inp.className='area-col-input';inp.placeholder='Area name';inp.value=ar.name||'';
+    (function(idx){inp.addEventListener('input',function(){_scratchAreas[idx].name=this.value;renderScratchGrid();});})(i);
+    var del=document.createElement('button');del.className='area-col-del';del.textContent='×';
+    (function(idx){del.addEventListener('click',function(){if(_scratchAreas.length>1){_scratchAreas.splice(idx,1);renderScratchAreaCols();renderScratchGrid();}});})(i);
+    tag.appendChild(inp);tag.appendChild(del);cont.appendChild(tag);
+  });
+}
+
+function addScratchArea(){
+  _scratchAreas.push({id:'sa'+nid(),name:''});
+  renderScratchAreaCols();renderScratchGrid();
+  var inputs=document.getElementById('scratchAreaCols').querySelectorAll('.area-col-input');
+  if(inputs.length)inputs[inputs.length-1].focus();
+}
+
+function addScratchRow(){
+  _scratchRows.push({id:'sr'+nid(),name:'',prices:{}});
+  renderScratchGrid();
+}
+
+function renderScratchGrid(){
+  var cont=document.getElementById('scratchGrid');if(!cont)return;
+  var tbl=document.createElement('table');tbl.className='sp-grid';
+  var thead=document.createElement('thead');var htr=document.createElement('tr');
+  var th0=document.createElement('th');th0.textContent='Line Item';htr.appendChild(th0);
+  _scratchAreas.forEach(function(ar){var th=document.createElement('th');th.textContent=ar.name||'(Area)';htr.appendChild(th);});
+  var thDel=document.createElement('th');thDel.style.width='28px';htr.appendChild(thDel);
+  thead.appendChild(htr);tbl.appendChild(thead);
+  var tbody=document.createElement('tbody');
+  _scratchRows.forEach(function(row,ri){
+    var tr=document.createElement('tr');
+    var tdName=document.createElement('td');
+    var nameInp=document.createElement('input');
+    nameInp.style.cssText='background:transparent;border:none;outline:none;color:var(--text);font-family:\'DM Sans\',sans-serif;font-size:13px;width:100%;padding:2px';
+    nameInp.placeholder='Line item name';nameInp.value=row.name||'';
+    (function(idx){nameInp.addEventListener('input',function(){_scratchRows[idx].name=this.value;});})(ri);
+    tdName.appendChild(nameInp);tr.appendChild(tdName);
+    _scratchAreas.forEach(function(ar){
+      var td=document.createElement('td');if(!row.prices)row.prices={};
+      var inp=document.createElement('input');inp.type='number';inp.className='sp-price-inp';
+      inp.placeholder='0.00';inp.value=row.prices[ar.id]||'';
+      (function(rIdx,aId){inp.addEventListener('input',function(){if(!_scratchRows[rIdx].prices)_scratchRows[rIdx].prices={};_scratchRows[rIdx].prices[aId]=numRaw(this.value);});})(ri,ar.id);
+      td.appendChild(inp);tr.appendChild(td);
+    });
+    var tdDel=document.createElement('td');tdDel.style.textAlign='center';
+    var del=document.createElement('button');del.style.cssText='background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px';del.textContent='×';
+    (function(idx){del.addEventListener('click',function(){if(_scratchRows.length>1){_scratchRows.splice(idx,1);renderScratchGrid();}});})(ri);
+    tdDel.appendChild(del);tr.appendChild(tdDel);tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);cont.innerHTML='';cont.appendChild(tbl);
+}
+
+
+function wizFinish(){
+  var hasLineItems=claimsData.lineItems&&claimsData.lineItems.length>0;
+  claimsData.contractValue=wizContractVal;
+  claimsData.retentionPct=wizRetPct;
+
+  if(!hasLineItems){
+    claimsData.lineItems=[];
+    var newItems=[];
+    var areas=_setupMode==='budget'?_gridAreas:_scratchAreas;
+    var rows=_setupMode==='budget'?_gridItems:_scratchRows;
+    rows.forEach(function(row){
+      if(row.type==='subheader')return;
+      if(_setupMode==='budget'&&row.checked===false)return;
+      var name=row.name;if(!name||!name.trim())return;
+      var totalSell=numRaw(row.totalSell||0);
+      var itemAreas=[];
+      areas.forEach(function(ar){
+        var price=numRaw((row.prices||{})[ar.id]||0);
+        var aName=(ar.name||'').trim()||'Area';
+        if(price>0)itemAreas.push({areaId:ar.id,areaName:aName,sellingPrice:price});
+      });
+      if(!itemAreas.length){
+        var aName=(areas[0]&&areas[0].name)||'General';
+        itemAreas=[{areaId:(areas[0]&&areas[0].id)||'a'+nid(),areaName:aName,sellingPrice:totalSell}];
+      }
+      newItems.push({id:'li'+nid(),name:name.trim(),totalSell:totalSell,areas:itemAreas,sectionName:row.sectionName||''});
+    });
+    if(!newItems.length){alert('Please add at least one line item with a sell price.');return;}
+    claimsData.lineItems=newItems;
+    save();
+    // Close setup view and return to list — user will Log Claim separately
+    renderList();
+    return;
+  }
+
+  // Log Claim mode — create a new claim record
+  var month=document.getElementById('w-month').value;
+  var claimNum=parseInt(String(document.getElementById('w-claimnum').value).replace('PC-',''))||1;
+  var newClaim={id:'claim'+nid(),num:claimNum,month:month,status:'Draft',entries:[],varEntries:[]};
+  claimsData.claims.push(newClaim);
+  save();
+  closeWizard();
+  openClaim(newClaim.id);
+  renderList();openClaim(newClaim.id);
+}
+
+// Init — wait for session then load data
+(async function(){
+  if(typeof dbReady!=='undefined')await dbReady;
+  await load();
+})();
+</script>
+<script>
+(function(){try{var cp=localStorage.getItem('hvacnexus_current_project');if(cp){var p=JSON.parse(cp);document.querySelectorAll('.bc-proj-name').forEach(function(el){el.textContent=p.name||el.textContent;});}}catch(e){}})();
+
+// ── SIDEBAR ──
+var SBK='hvacnexus_sb_collapsed';
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
+(function(){
+  applySB(localStorage.getItem(SBK)==='1');
+  localStorage.removeItem('hvacnexus_sb_groups');
+  try{var p=dbGetCurrentProject();if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
+  if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
+    handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});
+    document.addEventListener('mousemove',function(e){if(!dragging)return;var w=Math.min(MAX_W,Math.max(MIN_W,startW+(e.clientX-startX)));sb.style.width=w+'px';});
+    document.addEventListener('mouseup',function(){if(!dragging)return;dragging=false;document.body.style.userSelect='';document.body.style.cursor='';});
+  }
+  var tip=document.createElement('div');tip.className='sb-tooltip';document.body.appendChild(tip);
+  document.querySelectorAll('.sb-item').forEach(function(item){
+    var lbl=item.querySelector('.sb-item-label');
+    var label=lbl?lbl.textContent:'';
+    item.addEventListener('mouseenter',function(){
+      if(!label)return;
+      var r=item.getBoundingClientRect();var sbEl=document.getElementById('sidebar');var sbW=sbEl?sbEl.offsetWidth:230;
+      tip.textContent=label;tip.style.left=(sbW+8)+'px';tip.style.top=(r.top+r.height/2)+'px';tip.style.transform='translateY(-50%)';tip.style.opacity='1';
+    });
+    item.addEventListener('mouseleave',function(){tip.style.opacity='0';});
+  });
+})();
+
+</script>
+</body>
+</html>

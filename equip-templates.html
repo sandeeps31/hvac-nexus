@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="theme.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗂️</text></svg>">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equipment Schedule Templates — HVAC NEXUS</title>
+<script src="head-common.js"></script>
+<script src="db.js"></script>
+<style>
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted);background:var(--surface2)}
+.bsm{padding:5px 12px;font-size:12px}
+.bdanger{background:transparent;color:var(--danger);border:1px solid rgba(255,77,109,.3)}.bdanger:hover{background:var(--danger-dim)}
+.view{display:none}.view.active{display:block}
+.reg-toolbar{padding:12px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px;width:300px}
+.search-box:focus-within{border-color:var(--accent)}
+.search-box input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%}
+.search-box input::placeholder{color:var(--muted)}
+.fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;cursor:pointer}
+.fsel:focus{border-color:var(--accent);color:var(--text)}
+.reg-page{padding:16px 24px 60px}
+.reg-tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.reg-tbl thead tr{background:var(--surface2)}
+.reg-tbl th{padding:9px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.reg-tbl td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.reg-tbl tbody tr:last-child td{border-bottom:none}
+.reg-tbl tbody tr:hover td{background:var(--surface2)}
+.tpl-name{font-weight:600;color:var(--text)}
+.tpl-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent)}
+.tpl-ver{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--muted)}
+.tpl-ver.current{background:var(--green-dim);border-color:rgba(0,229,160,.2);color:var(--green)}
+.tpl-ver.draft{background:var(--warn-dim);border-color:rgba(255,184,48,.2);color:var(--warn)}
+.status-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.sb-current{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.sb-draft{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2)}
+.sb-superseded{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.act-btns{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.act-btn{width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .13s;position:relative}
+.act-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.act-btn.danger:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-dim)}
+.act-btn .tip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface2);color:var(--text);font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:500}
+.act-btn:hover .tip{opacity:1}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;gap:16px;color:var(--muted)}
+.empty-icon{font-size:48px;opacity:.3}
+.empty-title{font-family:'Syne',sans-serif;font-size:16px;color:var(--text2)}
+.empty-sub{font-size:13px;color:var(--muted);text-align:center;max-width:360px;line-height:1.6}
+.editor-topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.editor-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text);flex:1}
+.editor-meta-bar{padding:14px 24px;background:var(--surface2);border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.draft-edit-bar{display:none;padding:8px 24px;background:var(--surface2);border-bottom:1px solid var(--border);align-items:center;gap:10px}
+.draft-edit-bar.visible{display:flex}
+.draft-save-indicator{font-family:'DM Mono',monospace;font-size:11px;color:var(--green);opacity:0;transition:opacity .5s}
+.draft-save-indicator.show{opacity:1}
+.emf{display:flex;flex-direction:column;gap:4px}
+.emf-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.emf-val{font-size:13px;color:var(--text)}
+.emf-val.mono{font-family:'DM Mono',monospace;color:var(--accent)}
+.emf-input{background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 10px;outline:none;transition:border-color .2s;width:100%}
+.emf-input:focus{border-color:var(--accent)}.emf-input::placeholder{color:var(--muted)}
+.editor-body{padding:20px 24px 80px;overflow-x:auto}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.mo.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;max-width:96vw;transform:translateY(10px);transition:transform .2s;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.mo.open .modal{transform:translateY(0)}
+.modal-hdr{padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-hdr h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text)}
+.modal-hdr p{color:var(--text2);font-size:12.5px;margin-top:3px}
+.modal-body{padding:18px 22px;overflow-y:auto;flex:1}
+.modal-footer{padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;margin-top:12px;display:block}
+.ml:first-child{margin-top:0}
+.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none}
+.mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
+.mi.mono{font-family:'DM Mono',monospace;color:var(--accent)}
+.rev-tbl{width:100%;border-collapse:collapse}
+.rev-tbl th{padding:8px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)}
+.rev-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:12.5px}
+.rev-tbl tr:last-child td{border-bottom:none}
+.rev-tbl tbody tr:hover td{background:var(--surface2)}
+/* SIDEBAR */
+.sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden}
+.sb.sm{width:52px}
+.sb-top{display:flex;align-items:center;justify-content:space-between;padding:0 14px;height:52px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px;overflow:hidden}.sb-icon{font-size:20px;flex-shrink:0}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:4px;border-radius:5px;flex-shrink:0}.sb-toggle:hover{color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0}
+.sb-item{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:pointer;border-radius:0;transition:background .13s;font-size:13px;color:var(--text2);white-space:nowrap}
+.sb-item:hover,.sb-item.active{background:var(--surface2);color:var(--text)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}
+.sb-item-label{overflow:hidden;text-overflow:ellipsis}
+.sb-group-hdr{display:flex;align-items:center;gap:6px;padding:6px 16px;cursor:pointer;user-select:none}
+.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-group-name,.sb.sm .sb-group-chev,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb-footer{padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}
+.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px}.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.main{margin-left:230px;transition:margin-left .25s;min-width:0;overflow-x:auto}
+/* FIELD BUILDER */
+.eq-section{border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow-x:auto;overflow-y:hidden}
+.eq-section-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:2px solid var(--border)}
+.eq-section-hdr.no-header-style{background:var(--surface2);border-bottom:1px solid var(--border)}
+.eq-section-hdr.has-header-style{background:var(--surface3)}
+.eq-field-cols{display:grid;grid-template-columns:22px 200px 110px 60px 220px 150px 44px 24px;gap:6px;padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.eq-field-row{display:grid;grid-template-columns:22px 200px 110px 60px 220px 150px 44px 24px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center;background:var(--surface);transition:background .12s}
+.dd-popover{position:fixed;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;padding:14px 16px;width:280px;z-index:2000;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none}
+.dd-popover.open{display:block}
+.dd-popover h4{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin:0 0 10px}
+.dd-opt-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.dd-opt-inp{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;font-family:'DM Sans',sans-serif}
+.dd-opt-inp:focus{border-color:var(--accent)}
+.dd-opt-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;line-height:1}
+.dd-opt-del:hover{color:var(--danger)}
+.dd-add-btn{font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 0;font-family:'DM Sans',sans-serif}
+.dd-add-btn:hover{text-decoration:underline}
+.eq-field-row.dragging{opacity:.4;background:var(--surface3)}
+.eq-field-row.drag-over{border-top:2px solid var(--accent)}
+.drag-handle{color:var(--muted);cursor:grab;font-size:14px;display:flex;align-items:center;justify-content:center;user-select:none}
+.drag-handle:active{cursor:grabbing}
+.opt-tag{display:inline-flex;align-items:center;gap:4px;background:var(--surface3);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:11px;color:var(--text2);cursor:default}
+.opt-tag .opt-x{cursor:pointer;color:var(--muted);font-size:12px;line-height:1}
+.opt-tag .opt-x:hover{color:var(--danger)}
+.opt-wrap{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:text;min-height:32px}
+.opt-wrap input{border:none;background:transparent;outline:none;color:var(--text);font-size:11px;font-family:DM Sans,sans-serif;min-width:60px;flex:1}
+.si{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;width:100%}
+.si:focus{border-color:var(--accent)}
+</style>
+<script>
+// ── HVAC Nexus Auth Guard ──
+(async function(){
+  if(typeof dbReady !== 'undefined') await dbReady;
+  var DEV_BYPASS=false;
+  if(DEV_BYPASS)return;
+  var stored=localStorage.getItem('hvacnexus_session');
+  if(!stored){window.location.href='login.html';return;}
+  try{
+    var sess=JSON.parse(stored);
+    if(Date.now()/1000<(sess.expires_at||0)-60){
+      // Set _authSession if db.js loaded
+      if(typeof _authSession!=='undefined')_authSession=sess;
+      return;
+    }
+    var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
+    var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+    var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
+    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
+    else{localStorage.removeItem('hvacnexus_session');window.location.href='login.html';}
+  }catch(e){window.location.href='login.html';}
+})();
+</script>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="app-sidebar"></div>
+<script src="sidebar.js"></script>
+
+<span class="sb-user-name" id="sb-user">—</span></div>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="mainWrap">
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl" onclick="navTo('hvac-settings.html')">Company Settings</span><span class="bcs">›</span>
+      <span class="bcc" id="bcCurr">Equipment Schedule Templates</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn bg bsm" id="backToRegBtn" style="display:none" onclick="showRegister()">← Back to Templates</button>
+      <button class="btn bg bsm" id="publishBtn" style="display:none" onclick="publishTemplate()">↑ Publish Revision</button>
+      <button class="btn bg bsm" id="inboxBtn" onclick="showInbox()" style="color:var(--purple);border-color:rgba(167,139,250,.3)">📥 Inbox <span id="inboxBadge" style="display:none;background:var(--purple);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:4px"></span></button>
+      <button class="btn bp bsm" id="newTplBtn" onclick="openNewTplModal()">＋ New Template</button>
+    </div>
+  </div>
+
+  <!-- REGISTER VIEW -->
+  <div class="view active" id="view-register">
+    <div class="reg-toolbar">
+      <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search equipment templates…" oninput="renderRegister()"></div>
+      <select class="fsel" id="groupFilter" onchange="renderRegister()">
+        <option value="">All Groups</option>
+        <option>Air Handling</option>
+        <option>Air Conditioning</option>
+        <option>Airflow Equipment</option>
+        <option>Fans &amp; Extraction</option>
+        <option>Air Quality</option>
+        <option>Heating</option>
+        <option>Hydronic &amp; Refrigerant</option>
+        <option>Actuators &amp; Controls</option>
+        <option>Electrical</option>
+      </select>
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="tplCount"></span>
+    </div>
+    <div class="reg-page">
+      <table class="reg-tbl">
+        <thead>
+          <tr>
+            <th style="width:100px">Form No.</th>
+            <th>Equipment Type</th>
+            <th style="width:140px">Group</th>
+            <th style="width:80px">Layout</th>
+            <th style="width:60px">Version</th>
+            <th style="width:90px">Status</th>
+            <th style="width:110px">Last Modified</th>
+            <th style="width:120px;text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="regBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- INBOX VIEW -->
+  <div class="view" id="view-inbox">
+    <div class="reg-toolbar">
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">Schedules submitted from projects for review</span>
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="inboxCount"></span>
+    </div>
+    <div class="reg-page">
+      <table class="reg-tbl">
+        <thead>
+          <tr>
+            <th>Equipment Type</th>
+            <th style="width:120px">Project</th>
+            <th style="width:80px">Layout</th>
+            <th style="width:90px">Submitted</th>
+            <th style="width:90px">Status</th>
+            <th style="width:140px;text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="inboxBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- EDITOR VIEW -->
+  <div class="view" id="view-editor">
+    <div class="editor-topbar">
+      <div class="editor-title" id="editorTitle">Equipment Schedule Template</div>
+      <div id="editorStatusBadge"></div>
+    </div>
+    <div class="draft-edit-bar" id="draftEditBar">
+      <span style="font-size:12px;color:var(--warn);font-family:'DM Mono',monospace">⚠ DRAFT v<span id="draftVerNum">—</span></span>
+      <span style="font-size:12px;color:var(--text2)" id="draftEditToggleLabel">View only</span>
+      <button class="btn bg bsm" id="draftEditToggleBtn" onclick="toggleDraftEdit()">✏️ Edit Draft</button>
+      <button class="btn bg bsm" id="draftCancelBtn" style="display:none" onclick="cancelDraft()">✕ Discard Draft</button>
+      <button class="btn bp bsm" id="draftSaveBtn" style="display:none" onclick="saveDraft()">💾 Save Draft</button>
+      <span class="draft-save-indicator" id="draftSaveIndicator">Saved</span>
+    </div>
+    <div class="editor-meta-bar" id="editorMetaBar"></div>
+    <div id="layoutPreview" style="display:none;margin:0 24px 0;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;border-top:none"></div>
+    <div class="editor-body" id="editorBody"></div>
+  </div>
+</div>
+
+<!-- NEW TEMPLATE MODAL -->
+<div class="mo" id="newTplModal" onclick="if(event.target===this)closeNewTplModal()">
+  <div class="modal" style="width:440px">
+    <div class="modal-hdr"><h3>New Equipment Schedule Template</h3><p>Create a new template for an equipment type</p></div>
+    <div class="modal-body">
+      <label class="ml">Form No.</label>
+      <input class="mi mono" id="new-tplno" placeholder="e.g. EQS-001"/>
+      <label class="ml">Equipment Type Name</label>
+      <input class="mi" id="new-tplname" placeholder="e.g. FCU - Water Cooled"/>
+      <label class="ml">Group</label>
+      <select class="mi" id="new-tplgroup">
+        <option value="">— Select group —</option>
+        <option>Air Handling</option>
+        <option>Air Conditioning</option>
+        <option>Airflow Equipment</option>
+        <option>Fans &amp; Extraction</option>
+        <option>Air Quality</option>
+        <option>Heating</option>
+        <option>Hydronic &amp; Refrigerant</option>
+        <option>Actuators &amp; Controls</option>
+        <option>Electrical</option>
+        <option>Custom</option>
+      </select>
+      <label class="ml">Layout</label>
+      <select class="mi" id="new-tpllayout">
+        <option value="vertical">↕ Vertical — fields are rows (FCU, AHU style)</option>
+        <option value="horizontal">↔ Horizontal — fields are columns (Damper, VAV style)</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bg bsm" onclick="closeNewTplModal()">Cancel</button>
+      <button class="btn bp bsm" onclick="confirmNewTpl()">Create Template</button>
+    </div>
+  </div>
+</div>
+
+<!-- PUBLISH MODAL -->
+<div class="mo" id="publishModal" onclick="if(event.target===this)closePublishModal()">
+  <div class="modal" style="width:440px">
+    <div class="modal-hdr"><h3>Publish Revision</h3><p>This will publish the current draft as an official version</p></div>
+    <div class="modal-body">
+      <label class="ml">Version Notes (optional)</label>
+      <textarea class="mi" id="publishNotes" rows="3" placeholder="What changed in this revision…" style="resize:vertical"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bg bsm" onclick="closePublishModal()">Cancel</button>
+      <button class="btn bp bsm" onclick="confirmPublish()">↑ Publish</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVISION HISTORY MODAL -->
+<div class="mo" id="revHistModal" onclick="if(event.target===this)closeRevHist()">
+  <div class="modal" style="width:580px">
+    <div class="modal-hdr"><h3>Revision History</h3></div>
+    <div class="modal-body" id="revHistBody"></div>
+    <div class="modal-footer"><button class="btn bg bsm" onclick="closeRevHist()">Close</button></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// EQUIPMENT SCHEDULE TEMPLATE BUILDER
+// ═══════════════════════════════════════════════════
+var _uid=0;
+function nid(){return 'eqs'+(++_uid)+Date.now();}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escHs(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+
+var templates=[];
+var activeTplId=null;
+var _isDirty=false;
+var _draftEditMode=false;
+var _inEditor=false;
+
+var FIELD_TYPES=[
+  {key:'text',label:'Text'},
+  {key:'number',label:'Number'},
+  {key:'dropdown',label:'Dropdown'},
+  {key:'date',label:'Date'},
+];
+
+// ── Storage ──
+function save(){dbSet('eqs_templates',templates).catch(function(e){console.error(e);});}
+async function load(){
+  try{var d=await dbGet('eqs_templates');if(d&&Array.isArray(d))templates=d;}catch(e){templates=[];}
+}
+
+// ── Version helpers (identical to ITP) ──
+function genTplNum(){
+  var max=0;
+  templates.forEach(function(t){var m=(t.tplNo||'').match(/EQS-(\d+)/);if(m){var n=parseInt(m[1]);if(n>max)max=n;}});
+  return 'EQS-'+String(max+1).padStart(3,'0');
+}
+function currentRev(tpl){return tpl.revisions&&tpl.revisions.length?tpl.revisions[tpl.revisions.length-1]:null;}
+function publishedRev(tpl){
+  if(!tpl.revisions)return null;
+  for(var i=tpl.revisions.length-1;i>=0;i--){if(tpl.revisions[i].status==='published')return tpl.revisions[i];}
+  return null;
+}
+function hasDraftRev(tpl){var r=currentRev(tpl);return r&&r.status==='draft';}
+function nextVersion(tpl){
+  var pub=publishedRev(tpl);
+  if(!pub)return '1.0';
+  var parts=pub.version.split('.');
+  return parts[0]+'.'+(parseInt(parts[1]||0)+1);
+}
+
+// ── Navigation ──
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function showView(id){document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});document.getElementById('view-'+id).classList.add('active');}
+
+function showRegister(){
+  if(_isDirty&&_inEditor){if(!confirm('You have unsaved changes. Leave without saving?'))return;}
+  _isDirty=false;_draftEditMode=false;_inEditor=false;
+  document.getElementById('backToRegBtn').style.display='none';
+  document.getElementById('publishBtn').style.display='none';
+  document.getElementById('newTplBtn').style.display='';
+  document.getElementById('inboxBtn').style.display='';
+  document.getElementById('bcCurr').textContent='Equipment Schedule Templates';
+  activeTplId=null;
+  renderRegister();showView('register');
+}
+
+function openEditor(tplId){
+  _inEditor=true;activeTplId=tplId;
+  document.getElementById('backToRegBtn').style.display='';
+  document.getElementById('newTplBtn').style.display='none';
+  showView('editor');renderEditor();
+}
+
+// ── REGISTER ──
+function renderRegister(){
+  var q=(document.getElementById('srch')||{}).value||'';q=q.toLowerCase();
+  var gf=(document.getElementById('groupFilter')||{}).value||'';
+  var list=templates.filter(function(t){
+    var matchQ=!q||(t.tplNo||'').toLowerCase().includes(q)||(t.name||'').toLowerCase().includes(q)||(t.group||'').toLowerCase().includes(q);
+    var matchG=!gf||(t.group||'')=== gf;
+    return matchQ&&matchG;
+  });
+  var cnt=document.getElementById('tplCount');
+  if(cnt)cnt.textContent=list.length+' template'+(list.length!==1?'s':'');
+  var rows='';
+  if(!list.length){
+    rows='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🗂️</div><div class="empty-title">No templates yet</div><div class="empty-sub">Create your first equipment schedule template to define fields for FCUs, AHUs, dampers and other equipment types.</div></div></td></tr>';
+  } else {
+    list.forEach(function(tpl){
+      var pubRev=publishedRev(tpl);
+      var hasDraft=hasDraftRev(tpl);
+      var verLabel=pubRev?('v'+pubRev.version):'—';
+      var verClass=pubRev?'current':'';
+      var statusLabel=hasDraft?'Draft':(pubRev?'Published':'No versions');
+      var statusClass=hasDraft?'sb-draft':(pubRev?'sb-current':'sb-superseded');
+      rows+='<tr onclick="openEditor(\''+escH(tpl.id)+'\')" style="cursor:pointer">'
+        +'<td><span class="tpl-num">'+escH(tpl.tplNo||'—')+'</span></td>'
+        +'<td><span class="tpl-name">'+escH(tpl.name||'—')+'</span></td>'
+        +'<td style="color:var(--text2);font-size:12px">'+escH(tpl.group||'—')+'</td>'
+        +'<td><span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">'+(tpl.layout==='vertical'?'↕ Vertical':'↔ Horizontal')+'</span></td>'
+        +'<td><span class="tpl-ver '+verClass+'">'+verLabel+'</span></td>'
+        +'<td><span class="status-badge '+statusClass+'">'+statusLabel+'</span></td>'
+        +'<td style="color:var(--muted);font-size:12px">'+fmtDate(tpl.updatedAt||tpl.createdAt||'')+'</td>'
+        +'<td onclick="event.stopPropagation()"><div class="act-btns">'
+        +'<button class="act-btn" onclick="openEditor(\''+escH(tpl.id)+'\')"><span class="tip">Edit</span>✏️</button>'
+        +'<button class="act-btn" onclick="openRevHist(\''+escH(tpl.id)+'\')"><span class="tip">History</span>🕐</button>'
+        +'<button class="act-btn" onclick="duplicateTpl(\''+escH(tpl.id)+'\')"><span class="tip">Duplicate</span>📋</button>'
+        +'<button class="act-btn danger" onclick="deleteTpl(\''+escH(tpl.id)+'\')"><span class="tip">Delete</span>🗑</button>'
+        +'</div></td>'
+        +'</tr>';
+    });
+  }
+  document.getElementById('regBody').innerHTML=rows;
+}
+
+// ── EDITOR ──
+function renderEditor(){
+  var tpl=templates.find(function(t){return t.id===activeTplId;});
+  if(!tpl)return;
+  var rev=currentRev(tpl);
+  var pubRev=publishedRev(tpl);
+  var isDraft=rev&&rev.status==='draft';
+  var canEdit=isDraft&&_draftEditMode;
+
+  document.getElementById('editorTitle').textContent=(tpl.tplNo||'')+(tpl.name?' — '+tpl.name:'');
+  document.getElementById('bcCurr').textContent=tpl.name||'Template';
+
+  // Status badge
+  var sb=document.getElementById('editorStatusBadge');
+  if(isDraft)sb.innerHTML='<span class="status-badge sb-draft">Draft v'+rev.version+'</span>';
+  else if(pubRev)sb.innerHTML='<span class="status-badge sb-current">Published v'+pubRev.version+'</span>';
+  else sb.innerHTML='<span class="status-badge sb-superseded">No versions</span>';
+
+  // Draft bar
+  var deb=document.getElementById('draftEditBar');
+  var pub=document.getElementById('publishBtn');
+  if(isDraft){
+    deb.classList.add('visible');
+    document.getElementById('draftVerNum').textContent=rev.version;
+    document.getElementById('draftEditToggleLabel').textContent=canEdit?'Editing':'View only';
+    document.getElementById('draftEditToggleBtn').textContent=canEdit?'👁 View':'✏️ Edit Draft';
+    document.getElementById('draftCancelBtn').style.display=canEdit?'':'none';
+    document.getElementById('draftSaveBtn').style.display=canEdit?'':'none';
+    pub.style.display='';
+    pub.textContent='↑ Publish v'+rev.version;
+  } else {
+    deb.classList.remove('visible');
+    pub.style.display='none';
+  }
+
+  // Meta bar
+  var mb=document.getElementById('editorMetaBar');
+  var si='background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;padding:6px 10px;outline:none;width:100%';
+  if(canEdit){
+    mb.innerHTML='<div class="emf"><span class="emf-lbl">Form No.</span><input class="emf-input mono" value="'+escH(tpl.tplNo||'')+'" oninput="tplMeta(\'tplNo\',this.value)" placeholder="EQS-001"/></div>'
+      +'<div class="emf"><span class="emf-lbl">Equipment Type</span><input class="emf-input" value="'+escH(tpl.name||'')+'" oninput="tplMeta(\'name\',this.value)"/></div>'
+      +'<div class="emf"><span class="emf-lbl">Group</span><select class="emf-input" onchange="tplMeta(\'group\',this.value)">'
+      +'<option value="">— Select —</option>'
+      +['Air Handling','Air Conditioning','Airflow Equipment','Fans & Extraction','Air Quality','Heating','Hydronic & Refrigerant','Actuators & Controls','Electrical','Custom'].map(function(g){return'<option'+(g===tpl.group?' selected':'')+'>'+g+'</option>';}).join('')
+      +'</select></div>'
+      +'<div class="emf"><span class="emf-lbl">Layout</span><div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;margin-top:2px">'
+      +'<button onclick="tplLayout(\'vertical\')" style="flex:1;padding:6px;font-size:11px;border:none;cursor:pointer;background:'+(tpl.layout==='vertical'?'var(--accent)':'var(--surface3)')+';color:'+(tpl.layout==='vertical'?'#000':'var(--text2)')+'">↕ Vertical</button>'
+      +'<button onclick="tplLayout(\'horizontal\')" style="flex:1;padding:6px;font-size:11px;border:none;cursor:pointer;background:'+(tpl.layout==='horizontal'?'var(--accent)':'var(--surface3)')+';color:'+(tpl.layout==='horizontal'?'#000':'var(--text2)')+'">↔ Horizontal</button>'
+      +'</div></div>';
+  } else {
+    mb.innerHTML='<div class="emf"><span class="emf-lbl">Form No.</span><span class="emf-val mono">'+escH(tpl.tplNo||'—')+'</span></div>'
+      +'<div class="emf"><span class="emf-lbl">Equipment Type</span><span class="emf-val">'+escH(tpl.name||'—')+'</span></div>'
+      +'<div class="emf"><span class="emf-lbl">Group</span><span class="emf-val">'+escH(tpl.group||'—')+'</span></div>'
+      +'<div class="emf"><span class="emf-lbl">Layout</span><span class="emf-val">'+(tpl.layout==='vertical'?'↕ Vertical':'↔ Horizontal')+'</span></div>'
+      +'<div class="emf"><span class="emf-lbl">Created</span><span class="emf-val">'+fmtDate(tpl.createdAt)+'</span></div>';
+    if(!isDraft){
+      mb.innerHTML+='<div class="emf"><span class="emf-lbl">Action</span><button class="btn bg bsm" onclick="doStartDraft()" style="margin-top:2px">✏️ Start New Draft</button></div>';
+    }
+  }
+
+  // Body — field builder
+  renderLayoutPreview(tpl,rev);
+  renderEditorBody(tpl,rev,canEdit);
+}
+
+function renderLayoutPreview(tpl,rev){
+  var el=document.getElementById('layoutPreview');
+  if(!el)return;
+  var sections=(rev&&rev.sections)||[];
+  // Get first 4 fields for preview
+  var fields=[];
+  sections.forEach(function(s){(s.fields||[]).forEach(function(f){if(fields.length<5)fields.push({label:f.label,section:s.name==='__none__'?'':s.name});});});
+  if(!fields.length){el.style.display='none';return;}
+  el.style.display='block';
+  var isVert=tpl.layout==='vertical';
+  var previewHtml='<div style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Layout Preview — '+(isVert?'↕ Vertical (fields as rows, equipment as columns)':'↔ Horizontal (fields as columns, equipment as rows)')+'</div>';
+  if(isVert){
+    // Vertical: field labels in left col, 2 example equipment cols
+    previewHtml+='<div style="display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:11px;max-width:500px">';
+    previewHtml+='<div style="flex:none;width:160px;background:var(--surface3);border-right:1px solid var(--border)">';
+    previewHtml+='<div style="padding:5px 10px;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)">FIELD</div>';
+    fields.forEach(function(f){
+      if(f.section)previewHtml+='<div style="padding:3px 10px;font-size:9px;font-weight:700;color:var(--accent);background:var(--surface3)">'+escH(f.section)+'</div>';
+      previewHtml+='<div style="padding:5px 10px;border-bottom:1px solid var(--border);color:var(--text2)">'+escH(f.label)+'</div>';
+    });
+    previewHtml+='</div>';
+    ['EQ-001','EQ-002'].forEach(function(eq){
+      previewHtml+='<div style="flex:1;border-right:1px solid var(--border)">';
+      previewHtml+='<div style="padding:5px 10px;font-family:DM Mono,monospace;font-size:9px;color:var(--accent);background:var(--surface2);border-bottom:1px solid var(--border);text-align:center">'+eq+'</div>';
+      fields.forEach(function(){previewHtml+='<div style="padding:5px 10px;border-bottom:1px solid var(--border);color:var(--muted);font-size:10px">—</div>';});
+      previewHtml+='</div>';
+    });
+    previewHtml+='</div>';
+  } else {
+    // Horizontal: fields as columns, equipment as rows
+    previewHtml+='<div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:11px;max-width:600px">';
+    previewHtml+='<div style="display:flex;background:var(--surface3);border-bottom:1px solid var(--border)">';
+    fields.forEach(function(f){previewHtml+='<div style="flex:1;padding:5px 8px;font-family:DM Mono,monospace;font-size:9px;color:var(--muted);border-right:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH(f.label)+'</div>';});
+    previewHtml+='</div>';
+    ['EQ-001','EQ-002'].forEach(function(eq){
+      previewHtml+='<div style="display:flex;border-bottom:1px solid var(--border)">';
+      previewHtml+='<div style="flex:1;padding:5px 8px;color:var(--accent);font-family:DM Mono,monospace;font-size:10px;border-right:1px solid var(--border)">'+eq+'</div>';
+      fields.slice(1).forEach(function(){previewHtml+='<div style="flex:1;padding:5px 8px;color:var(--muted);font-size:10px;border-right:1px solid var(--border)">—</div>';});
+      previewHtml+='</div>';
+    });
+    previewHtml+='</div>';
+  }
+  el.innerHTML=previewHtml;
+}
+
+function renderEditorBody(tpl,rev,canEdit){
+  var body=document.getElementById('editorBody');
+  var sections=rev?rev.sections:(tpl.sections||[]);
+  if(!sections||!sections.length){
+    if(canEdit){
+      body.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:28px;margin-bottom:12px">📋</div><div style="margin-bottom:16px">No fields yet — add a section to get started</div>'
+        +'<button class="btn bg bsm" onclick="addSection()" style="color:var(--accent);border-color:rgba(0,200,255,.3)">+ Add Fields (no header)</button>'
+        +'<button class="btn bg bsm" onclick="addSectionHeader()" style="color:var(--accent);border-color:rgba(0,200,255,.3);margin-left:8px">+ Add Section Header</button>'
+        +'</div>';
+    } else {
+      body.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted)">No fields defined yet.<br>'+(isDraftMode(tpl)?'Edit the draft to add fields.':'Start a draft to add fields.')+'</div>';
+    }
+    return;
+  }
+  var html='';
+  sections.forEach(function(sec,si){
+    var noHdr=!sec.name||sec.name==='__none__';
+    html+='<div class="eq-section" draggable="true" data-si="'+si+'" ondragstart="secDragStart(event,'+si+')" ondragover="secDragOver(event)" ondrop="secDrop(event,'+si+')" ondragleave="secDragLeave(event)" ondragend="secDragEnd(event)">';
+    // Section header
+    html+='<div class="eq-section-hdr '+(noHdr?'no-header-style':'has-header-style')+'">';
+    if(canEdit){
+      html+='<div class="drag-handle" style="cursor:grab;color:var(--muted);padding:0 6px 0 0">⠿</div>';
+      html+=(noHdr
+        ?'<span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;color:var(--muted)">NO HEADER</span>'
+        +'<span style="flex:1;font-style:italic;font-size:11px;color:var(--muted)">Fields shown without a section header</span>'
+        :'<span style="font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;color:var(--muted);flex-shrink:0">SECTION</span>'
+        +'<input value="'+escHs(sec.name)+'" oninput="secRename('+si+',this.value)" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Mono,monospace;font-weight:700;font-size:12px;flex:1;letter-spacing:1px;text-transform:uppercase;padding:4px 8px;outline:none"/>'
+      );
+      html+='<span style="font-size:10px;color:var(--muted)">'+sec.fields.length+' field'+(sec.fields.length!==1?'s':'')+'</span>';
+      html+='<button onclick="secToggleHeader('+si+')" style="background:none;border:1px solid var(--border);border-radius:5px;color:'+(noHdr?'var(--muted)':'var(--accent)')+';cursor:pointer;font-size:10px;padding:2px 7px">'+(noHdr?'+ Header':'× No header')+'</button>';
+      if(sections.length>1)html+='<button onclick="secDelete('+si+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">×</button>';
+    } else {
+      html+=(noHdr?'':'<span style="font-family:DM Mono,monospace;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text)">'+escH(sec.name)+'</span>');
+    }
+    html+='</div>';
+    // Fields
+    if(sec.fields.length&&canEdit){
+      html+='<div class="eq-field-cols">'
+        +'<span></span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Field Label</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Type</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Unit</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Options</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Example Value</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:center">Req.</span>'
+        +'<span></span>'
+        +'</div>';
+    }
+    sec.fields.forEach(function(f,fi){
+      if(canEdit){
+        html+='<div class="eq-field-row" draggable="true" data-si="'+si+'" data-fi="'+fi+'" ondragstart="fldDragStart(event,'+si+','+fi+')" ondragover="fldDragOver(event)" ondrop="fldDrop(event,'+si+','+fi+')" ondragleave="fldDragLeave(event)" ondragend="fldDragEnd(event)">'
+          +'<div class="drag-handle">⠿</div>'
+          +(f.locked
+            ?'<input class="si" value="'+escHs(f.label)+'" disabled style="opacity:.7;cursor:not-allowed" title="This field name cannot be changed"/>'
+            +'<span style="font-family:DM Mono,monospace;font-size:8px;padding:1px 6px;background:var(--accent-dim);color:var(--accent);border-radius:10px;border:1px solid rgba(0,200,255,.25);white-space:nowrap;align-self:center">locked</span>'
+            :'<input class="si" value="'+escHs(f.label)+'" oninput="fieldUpdate('+si+','+fi+',\'label\',this.value)" placeholder="e.g. Air Flow"/>'
+            +'<span></span>'
+          )
+          +'<select class="si" onchange="fieldUpdate('+si+','+fi+',\'type\',this.value)"'+(f.locked?' disabled style="opacity:.7"':'')+' >'
+          +FIELD_TYPES.map(function(ft){return'<option value="'+ft.key+'"'+(ft.key===(f.type||'text')?' selected':'')+'>'+ft.label+'</option>';}).join('')
+          +'</select>'
+          +'<input class="si" value="'+escHs(f.unit||'')+'" oninput="fieldUpdate('+si+','+fi+',\'unit\',this.value)" placeholder="l/s"/>'
+          +(f.type==='dropdown'
+            ?'<div style="display:flex;flex-wrap:wrap;gap:3px;align-items:flex-start;line-height:1.7">'
+             +(f.options&&f.options.length?(f.options.map(function(o){return'<span style="display:inline-block;background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);border-radius:12px;padding:1px 8px;font-size:10px;color:var(--accent);white-space:nowrap">'+escH(o)+'</span>';}).join('')+'<button class="dd-add-btn" onclick="event.stopPropagation();openEqDdPopover('+si+','+fi+',this)" style="margin-top:2px">Edit ▼</button>'):'<button class="dd-add-btn" onclick="event.stopPropagation();openEqDdPopover('+si+','+fi+',this)">+ Add options</button>')
+             +'</div>'
+            :'<span></span>'
+          )
+          +'<input class="si" value="'+escHs(f.exampleVal||'')+'" oninput="fieldUpdate('+si+','+fi+',\'exampleVal\',this.value)" placeholder="e.g. TB1-ATT-01"/>'
+          +'<div style="text-align:center"><input type="checkbox" '+(f.required?'checked':'')+' onchange="fieldUpdate('+si+','+fi+',\'required\',this.checked)"'+(f.locked?' disabled':'')+'/></div>'
+          +(f.locked
+            ?'<span style="width:24px;display:inline-block"></span>'
+            :'<button onclick="fieldDelete('+si+','+fi+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1">×</button>'
+          )
+          +'</div>';
+      } else {
+        html+='<div style="display:grid;grid-template-columns:22px 200px 110px 60px 220px 150px 44px;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);align-items:center">'
+          +'<span></span>'
+          +'<span style="font-size:12px;color:var(--text)">'+escH(f.label)+(f.required?'<span style="color:var(--danger);margin-left:3px">*</span>':'')+'</span>'
+          +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted)">'+escH((FIELD_TYPES.find(function(x){return x.key===(f.type||'text');})||{label:'Text'}).label)+'</span>'
+          +'<span style="font-size:11px;color:var(--muted)">'+escH(f.unit||'—')+'</span>'
+          +(f.type==='dropdown'
+            ?'<div style="display:flex;flex-wrap:wrap;gap:3px;line-height:1.7">'+(f.options||[]).map(function(o){return'<span style="display:inline-block;background:var(--accent-dim);border:1px solid rgba(0,200,255,.2);border-radius:12px;padding:1px 8px;font-size:10px;color:var(--accent);white-space:nowrap">'+escH(o)+'</span>';}).join('')+'</div>'            :'<span style="font-size:11px;color:var(--muted)">—</span>')
+          +'<span style="font-size:11px;color:var(--accent)">'+escH(f.exampleVal||'—')+'</span>'
+          +'<span style="text-align:center;font-size:11px;color:var(--muted)">'+(f.required?'✓':'')+'</span>'
+          +'</div>';
+      }
+    });
+    if(!sec.fields.length&&canEdit){
+      html+='<div style="padding:10px 14px;font-size:12px;color:var(--muted);font-style:italic">No fields yet</div>';
+    }
+    if(canEdit){
+      html+='<div style="padding:8px 14px;background:var(--surface)">'
+        +'<button class="btn bg bsm" onclick="fieldAdd('+si+')" style="color:var(--accent);border-color:rgba(0,200,255,.3)">+ Add Field</button>'
+        +'</div>';
+    }
+    html+='</div>';
+  });
+  if(canEdit){
+    html+='<div style="display:flex;gap:8px;margin-top:8px">'
+      +'<button class="btn bg bsm" onclick="addSection()" style="color:var(--accent);border-color:rgba(0,200,255,.3)">+ Add Fields (no header)</button>'
+      +'<button class="btn bg bsm" onclick="addSectionHeader()" style="color:var(--accent);border-color:rgba(0,200,255,.3)">+ Add Section Header</button>'
+      +'</div>';
+  }
+  body.innerHTML=html;
+}
+
+// ── Draft helpers ──
+function isDraftMode(tpl){var r=currentRev(tpl);return r&&r.status==='draft';}
+function markDirty(){_isDirty=true;}
+function getDraftSections(){
+  var tpl=templates.find(function(t){return t.id===activeTplId;});
+  if(!tpl)return null;
+  var rev=currentRev(tpl);
+  if(!rev||rev.status!=='draft')return null;
+  return rev.sections;
+}
+
+function tplMeta(key,val){
+  var tpl=templates.find(function(t){return t.id===activeTplId;});
+  if(!tpl)return;
+  tpl[key]=val;tpl.updatedAt=todayStr();markDirty();
+}
+function tplLayout(val){
+  tplMeta('layout',val);renderEditor();
+}
+
+function secRename(si,val){
+  var s=getDraftSections();if(!s)return;
+  s[si].name=val;markDirty();
+}
+function secToggleHeader(si){
+  var s=getDraftSections();if(!s)return;
+  s[si].name=(s[si].name==='__none__'||!s[si].name)?'NEW SECTION':'__none__';
+  markDirty();renderEditor();
+}
+function secDelete(si){
+  var s=getDraftSections();if(!s||s.length<=1)return;
+  if(!confirm('Delete this section and all its fields?'))return;
+  s.splice(si,1);markDirty();renderEditor();
+}
+function addSection(){
+  var tpl=templates.find(function(t){return t.id===activeTplId;});if(!tpl)return;
+  var rev=currentRev(tpl);if(!rev||rev.status!=='draft')return;
+  rev.sections.push({name:'__none__',fields:[]});markDirty();renderEditor();
+}
+function addSectionHeader(){
+  var tpl=templates.find(function(t){return t.id===activeTplId;});if(!tpl)return;
+  var rev=currentRev(tpl);if(!rev||rev.status!=='draft')return;
+  rev.sections.push({name:'NEW SECTION',fields:[]});markDirty();renderEditor();
+}
+function fieldAdd(si){
+  var s=getDraftSections();if(!s)return;
+  s[si].fields.push({key:'',label:'',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'',options:[]});
+  markDirty();renderEditor();
+}
+function fieldDelete(si,fi){
+  var s=getDraftSections();if(!s)return;
+  if(s[si].fields[fi]&&s[si].fields[fi].locked){showToast('This field cannot be deleted.');return;}
+  s[si].fields.splice(fi,1);markDirty();renderEditor();
+}
+var DROPDOWN_PRESETS={
+  'airflow type':['Supply Air','Return Air','Exhaust Air','Transfer Air','Outside Air','Mixed Air'],
+  'service type':['Supply Air','Return Air','Exhaust Air','Transfer Air','Outside Air'],
+  'air type':['Supply Air','Return Air','Exhaust Air','Transfer Air','Outside Air'],
+  'status':['Not Started','Procurement','Installed','Commissioned','Complete'],
+  'yes no':['Yes','No'],
+  'yes/no':['Yes','No'],
+  'motor type':['Direct Drive','Belt Drive'],
+  'connection type':['CHWS/CHWR','HWS/HWR','CWS/CWR'],
+};
+
+function fieldUpdate(si,fi,prop,val){
+  var s=getDraftSections();if(!s)return;
+  if(prop==='label'&&s[si].fields[fi]&&s[si].fields[fi].locked)return; // cannot rename locked fields
+  s[si].fields[fi][prop]=val;
+  if(prop==='label')s[si].fields[fi].key=val.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+  // Auto-populate dropdown options based on label
+  if(prop==='type'&&val==='dropdown'){
+    var lbl=(s[si].fields[fi].label||'').toLowerCase().trim();
+    var preset=DROPDOWN_PRESETS[lbl];
+    if(preset&&(!s[si].fields[fi].options||!s[si].fields[fi].options.length)){
+      s[si].fields[fi].options=preset.slice();
+    }
+  }
+  markDirty();
+  if(prop==='type')renderEditor(); // re-render to show/hide options input
+}
+function fieldAddOpt(si,fi,val){
+  val=(val||'').trim();if(!val)return;
+  var s=getDraftSections();if(!s)return;
+  if(!s[si].fields[fi].options)s[si].fields[fi].options=[];
+  if(!s[si].fields[fi].options.includes(val))s[si].fields[fi].options.push(val);
+  markDirty();renderEditor();
+}
+function fieldRemoveOpt(si,fi,oi){
+  var s=getDraftSections();if(!s)return;
+  s[si].fields[fi].options.splice(oi,1);
+  markDirty();renderEditor();
+}
+
+// ── Dropdown options popover ──
+var _ddSi=null,_ddFi=null;
+
+function openEqDdPopover(si,fi,anchorEl){
+  _ddSi=si;_ddFi=fi;
+  var s=getDraftSections();
+  if(!s)return;
+  var f=s[si].fields[fi];
+  if(!f.options||!f.options.length)f.options=[''];
+  var pop=document.getElementById('ddPopover');
+  renderDdOpts();
+  pop.classList.add('open');
+  var rect=anchorEl.getBoundingClientRect();
+  var top=rect.bottom+6;
+  var left=rect.left;
+  if(left+290>window.innerWidth)left=window.innerWidth-295;
+  if(top+260>window.innerHeight)top=rect.top-270;
+  pop.style.top=top+'px';pop.style.left=left+'px';
+  setTimeout(function(){document.addEventListener('click',closeDdOnOutside);},10);
+}
+
+function closeDdOnOutside(e){
+  var pop=document.getElementById('ddPopover');
+  if(pop&&!pop.contains(e.target)){closeDdPopover();document.removeEventListener('click',closeDdOnOutside);}
+}
+
+function closeDdPopover(){
+  var pop=document.getElementById('ddPopover');
+  if(pop)pop.classList.remove('open');
+  document.removeEventListener('click',closeDdOnOutside);
+  // Remove empty options and re-render
+  if(_ddSi!==null&&_ddFi!==null){
+    var s=getDraftSections();
+    if(s){
+      var f=s[_ddSi].fields[_ddFi];
+      f.options=(f.options||[]).filter(function(o){return o.trim();});
+      markDirty();renderEditor();
+    }
+  }
+  _ddSi=null;_ddFi=null;
+}
+
+function renderDdOpts(){
+  if(_ddSi===null)return;
+  var s=getDraftSections();if(!s)return;
+  var f=s[_ddSi].fields[_ddFi];
+  var list=document.getElementById('ddOptList');if(!list)return;
+  list.innerHTML='';
+  (f.options||[]).forEach(function(opt,i){
+    var row=document.createElement('div');row.className='dd-opt-row';
+    var inp=document.createElement('input');inp.className='dd-opt-inp';inp.value=opt;inp.placeholder='Option text';
+    inp.oninput=(function(idx){return function(){s[_ddSi].fields[_ddFi].options[idx]=this.value;markDirty();};})(i);
+    inp.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();ddAddOption();}};
+    var del=document.createElement('button');del.className='dd-opt-del';del.innerHTML='&#10005;';
+    del.onclick=(function(idx){return function(){
+      s[_ddSi].fields[_ddFi].options.splice(idx,1);
+      renderDdOpts();markDirty();
+    };})(i);
+    row.appendChild(inp);row.appendChild(del);list.appendChild(row);
+  });
+}
+
+function ddAddOption(){
+  if(_ddSi===null)return;
+  var s=getDraftSections();if(!s)return;
+  var f=s[_ddSi].fields[_ddFi];
+  if(!f.options)f.options=[];
+  f.options.push('');
+  renderDdOpts();
+  markDirty();
+  var inputs=document.getElementById('ddOptList').querySelectorAll('input');
+  if(inputs.length)inputs[inputs.length-1].focus();
+}
+
+// ── Section drag-and-drop ──
+var _secDragSi=null;
+function secDragStart(e,si){_secDragSi=si;setTimeout(function(){e.target.style.opacity='.4';},0);}
+function secDragOver(e){e.preventDefault();e.currentTarget.style.borderTop='2px solid var(--accent)';}
+function secDragLeave(e){e.currentTarget.style.borderTop='';}
+function secDragEnd(e){e.target.style.opacity='';document.querySelectorAll('.eq-section').forEach(function(r){r.style.borderTop='';});}
+function secDrop(e,toSi){
+  e.preventDefault();e.currentTarget.style.borderTop='';
+  if(_secDragSi===null||_secDragSi===toSi)return;
+  var s=getDraftSections();if(!s)return;
+  var moved=s.splice(_secDragSi,1)[0];
+  s.splice(toSi,0,moved);
+  _secDragSi=null;markDirty();renderEditor();
+}
+
+// ── Field drag-and-drop ──
+var _fldDragSi=null,_fldDragFi=null;
+function fldDragStart(e,si,fi){
+  _fldDragSi=si;_fldDragFi=fi;
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(function(){e.target.classList.add('dragging');},0);
+}
+function fldDragOver(e){
+  e.preventDefault();e.dataTransfer.dropEffect='move';
+  var row=e.currentTarget;
+  row.classList.add('drag-over');
+}
+function fldDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function fldDragEnd(e){
+  e.target.classList.remove('dragging');
+  document.querySelectorAll('.eq-field-row').forEach(function(r){r.classList.remove('drag-over','dragging');});
+}
+function fldDrop(e,toSi,toFi){
+  e.preventDefault();e.currentTarget.classList.remove('drag-over');
+  if(_fldDragSi===null)return;
+  var s=getDraftSections();if(!s)return;
+  // Only support drag within same section for now
+  if(_fldDragSi!==toSi){_fldDragSi=null;return;}
+  var fields=s[toSi].fields;
+  var moved=fields.splice(_fldDragFi,1)[0];
+  var insertAt=toFi>_fldDragFi?toFi-1:toFi;
+  fields.splice(insertAt,0,moved);
+  _fldDragSi=null;_fldDragFi=null;
+  markDirty();renderEditor();
+}
+
+function doStartDraft(){
+  var tpl=templates.find(function(t){return t.id===activeTplId;});if(!tpl)return;
+  startDraft(tpl,true);
+}
+function startDraft(tpl,rerender){
+  var pubRev=publishedRev(tpl);
+  var existingDraft=tpl.revisions&&tpl.revisions.find(function(r){return r.status==='draft';});
+  // Preserve sections from existing draft or published rev — never wipe to empty
+  var DEFAULT_LOCKED_FIELDS=[
+    {key:'equipId',label:'Equipment ID',type:'text',unit:'',required:true,defaultVal:'',exampleVal:'FCU-L3-01',options:[],locked:true},
+    {key:'location',label:'Location',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'Level 3',options:[],locked:true},
+    {key:'manufacturer',label:'Manufacturer',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'Daikin',options:[],locked:true},
+    {key:'model',label:'Model',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'FWD-125',options:[],locked:true}
+  ];
+  var newSections=pubRev
+    ?JSON.parse(JSON.stringify(pubRev.sections))
+    :existingDraft&&existingDraft.sections&&existingDraft.sections.length
+      ?JSON.parse(JSON.stringify(existingDraft.sections))
+      :[{name:'__none__',fields:DEFAULT_LOCKED_FIELDS}];
+  // Re-enforce locked field order at front of first section for existing sections
+  if(newSections.length&&newSections[0].fields&&newSections[0].fields.length){
+    var sec0=newSections[0];
+    var orderedL=[];
+    DEFAULT_LOCKED_FIELDS.forEach(function(lf){
+      var ex=sec0.fields.find(function(f){return f.key===lf.key||f.label===lf.label;});
+      if(ex){ex.locked=true;orderedL.push(ex);}
+      else{orderedL.push(JSON.parse(JSON.stringify(lf)));}
+    });
+    var lockedK=DEFAULT_LOCKED_FIELDS.map(function(l){return l.key;});
+    sec0.fields.forEach(function(f){if(!lockedK.includes(f.key)&&!f.locked)orderedL.push(f);});
+    sec0.fields=orderedL;
+  }
+  var ver=nextVersion(tpl);
+  tpl.revisions=tpl.revisions||[];
+  // Remove any existing draft
+  tpl.revisions=tpl.revisions.filter(function(r){return r.status!=='draft';});
+  tpl.revisions.push({version:ver,status:'draft',sections:newSections,createdAt:todayStr(),notes:''});
+  tpl.updatedAt=todayStr();
+  save();
+  _draftEditMode=true;
+  if(rerender)renderEditor();
+}
+function cancelDraft(){
+  if(!confirm('Discard this draft?'))return;
+  var tpl=templates.find(function(t){return t.id===activeTplId;});if(!tpl)return;
+  tpl.revisions=tpl.revisions.filter(function(r){return r.status!=='draft';});
+  tpl.updatedAt=todayStr();
+  _isDirty=false;_draftEditMode=false;
+  save();renderEditor();
+}
+function toggleDraftEdit(){
+  _draftEditMode=!_draftEditMode;renderEditor();
+}
+function saveDraft(){
+  var tpl=templates.find(function(t){return t.id===activeTplId;});if(!tpl)return;
+  tpl.updatedAt=todayStr();
+  _isDirty=false;
+  save();
+  var ind=document.getElementById('draftSaveIndicator');
+  if(ind){ind.classList.add('show');setTimeout(function(){ind.classList.remove('show');},2000);}
+  renderEditor();
+}
+function publishTemplate(){document.getElementById('publishModal').classList.add('open');}
+function closePublishModal(){document.getElementById('publishModal').classList.remove('open');}
+function confirmPublish(){
+  var tpl=templates.find(function(t){return t.id===activeTplId;});if(!tpl)return;
+  var rev=currentRev(tpl);if(!rev||rev.status!=='draft')return;
+  var notes=document.getElementById('publishNotes').value||'';
+  // Supersede previous published revisions
+  tpl.revisions.forEach(function(r){if(r.status==='published')r.status='superseded';});
+  rev.status='published';rev.publishedAt=todayStr();rev.notes=notes;
+  tpl.updatedAt=todayStr();
+  _isDirty=false;_draftEditMode=false;
+  document.getElementById('publishNotes').value='';
+  closePublishModal();save();renderEditor();renderRegister();
+  showToast('✓ Published v'+rev.version);
+}
+
+function openRevHist(tplId){
+  var tpl=templates.find(function(t){return t.id===tplId;});if(!tpl)return;
+  var revs=(tpl.revisions||[]).slice().reverse();
+  var html='<table class="rev-tbl"><thead><tr><th>Version</th><th>Status</th><th>Published</th><th>Notes</th></tr></thead><tbody>';
+  if(!revs.length){html+='<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">No versions yet</td></tr>';}
+  revs.forEach(function(r){
+    var sc=r.status==='published'?'rev-status-curr':r.status==='draft'?'rev-status-draft':'rev-status-sup';
+    html+='<tr><td style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent)">v'+escH(r.version)+'</td>'
+      +'<td><span class="'+sc+'">'+r.status+'</span></td>'
+      +'<td style="font-size:12px;color:var(--muted)">'+fmtDate(r.publishedAt||r.createdAt)+'</td>'
+      +'<td style="font-size:12px;color:var(--text2)">'+escH(r.notes||'—')+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  document.getElementById('revHistBody').innerHTML=html;
+  document.getElementById('revHistModal').classList.add('open');
+}
+function closeRevHist(){document.getElementById('revHistModal').classList.remove('open');}
+
+function duplicateTpl(tplId){
+  var src=templates.find(function(t){return t.id===tplId;});if(!src)return;
+  var copy=JSON.parse(JSON.stringify(src));
+  copy.id=nid();copy.tplNo=genTplNum();copy.name=copy.name+' (copy)';copy.createdAt=todayStr();copy.updatedAt=todayStr();
+  // Get source sections from published or latest revision
+  var srcRev=publishedRev(src)||currentRev(src);
+  var srcSections=srcRev?JSON.parse(JSON.stringify(srcRev.sections)):[{name:'__none__',fields:[]}];
+  // Ensure the 4 locked fields exist in the first section — add any missing ones at the front
+  var LOCKED=[
+    {key:'equipId',label:'Equipment ID',type:'text',unit:'',required:true,defaultVal:'',exampleVal:'FCU-L3-01',options:[],locked:true},
+    {key:'location',label:'Location',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'Level 3',options:[],locked:true},
+    {key:'manufacturer',label:'Manufacturer',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'Daikin',options:[],locked:true},
+    {key:'model',label:'Model',type:'text',unit:'',required:false,defaultVal:'',exampleVal:'FWD-125',options:[],locked:true}
+  ];
+  var firstSec=srcSections[0]||(srcSections[0]={name:'__none__',fields:[]});
+  // Ensure locked fields are first in their defined order, mark existing ones as locked
+  var orderedFields=[];
+  LOCKED.forEach(function(lf){
+    var existing=firstSec.fields.find(function(f){return f.key===lf.key||f.label===lf.label;});
+    if(existing){existing.locked=true;orderedFields.push(existing);}
+    else{orderedFields.push(lf);}
+  });
+  // Append remaining non-locked fields that aren't one of the 4
+  var lockedKeys=LOCKED.map(function(l){return l.key;});
+  firstSec.fields.forEach(function(f){
+    if(!lockedKeys.includes(f.key)&&!(f.locked))orderedFields.push(f);
+  });
+  firstSec.fields=orderedFields;
+  // Create a new draft revision with the merged sections
+  var ver=1;
+  copy.revisions=[{version:ver,status:'draft',sections:srcSections,createdAt:todayStr(),notes:'Duplicated from '+src.name}];
+  templates.push(copy);save();renderRegister();showToast('Template duplicated');
+}
+function deleteTpl(tplId){
+  var tpl=templates.find(function(t){return t.id===tplId;});
+  if(!tpl||!confirm('Delete "'+tpl.name+'"? This cannot be undone.'))return;
+  templates=templates.filter(function(t){return t.id!==tplId;});
+  save();renderRegister();showToast('Template deleted');
+}
+
+// ── New template modal ──
+function openNewTplModal(){
+  document.getElementById('new-tplno').value=genTplNum();
+  document.getElementById('new-tplname').value='';
+  document.getElementById('new-tplgroup').value='';
+  document.getElementById('new-tpllayout').value='vertical';
+  document.getElementById('newTplModal').classList.add('open');
+  setTimeout(function(){document.getElementById('new-tplname').focus();},100);
+}
+function closeNewTplModal(){document.getElementById('newTplModal').classList.remove('open');}
+function confirmNewTpl(){
+  var no=document.getElementById('new-tplno').value.trim();
+  var name=document.getElementById('new-tplname').value.trim();
+  var group=document.getElementById('new-tplgroup').value;
+  var layout=document.getElementById('new-tpllayout').value;
+  if(!no){alert('Form number is required.');return;}
+  if(!name){alert('Equipment type name is required.');return;}
+  if(templates.find(function(t){return t.tplNo===no;})){alert('Form number already exists.');return;}
+  var tpl={id:nid(),tplNo:no,name:name,group:group,layout:layout,revisions:[],createdAt:todayStr(),updatedAt:todayStr()};
+  templates.push(tpl);
+  // Auto-start a draft
+  startDraft(tpl,false);
+  save();closeNewTplModal();
+  openEditor(tpl.id);
+}
+
+// ── Toast ──
+function showToast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);transition:opacity .3s';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},300);},2500);
+}
+
+// ── Inbox (project submissions) ──
+var _inboxItems=[];
+
+async function loadInbox(){
+  try{var d=await dbGetEqsSubmissions();_inboxItems=Array.isArray(d)?d:[];}catch(e){_inboxItems=[];}
+  // Update badge
+  var pending=_inboxItems.filter(function(s){return s.status==='pending';}).length;
+  var badge=document.getElementById('inboxBadge');
+  if(badge){badge.style.display=pending?'':'none';badge.textContent=pending;}
+}
+
+function showInbox(){
+  _inEditor=false;
+  document.getElementById('backToRegBtn').style.display='none';
+  document.getElementById('publishBtn').style.display='none';
+  document.getElementById('newTplBtn').style.display='none';
+  document.getElementById('inboxBtn').style.display='none';
+  // Add back button
+  var bb=document.getElementById('backToRegBtn');
+  bb.style.display='';bb.textContent='← Back to Templates';
+  document.getElementById('bcCurr').textContent='Project Submissions';
+  showView('inbox');renderInbox();
+}
+
+function renderInbox(){
+  var body=document.getElementById('inboxBody');
+  var cnt=document.getElementById('inboxCount');
+  var pending=_inboxItems.filter(function(s){return s.status==='pending';});
+  if(cnt)cnt.textContent=_inboxItems.length+' submission'+(_inboxItems.length!==1?'s':'')+' · '+pending.length+' pending';
+  if(!_inboxItems.length){
+    body.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📥</div><div class="empty-title">No submissions yet</div><div class="empty-sub">When project teams submit equipment schedules for review, they will appear here.</div></div></td></tr>';
+    return;
+  }
+  var rows='';
+  _inboxItems.slice().reverse().forEach(function(s,i){
+    var ri=_inboxItems.length-1-i;
+    var statusCls=s.status==='pending'?'sb-draft':s.status==='added'?'sb-current':'sb-superseded';
+    var statusLabel=s.status==='pending'?'Pending':s.status==='added'?'Added to Library':'Dismissed';
+    rows+='<tr>'
+      +'<td><span style="font-weight:600;color:var(--text)">'+escH(s.equipType||'—')+'</span>'
+      +(s.tplNo?'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted);margin-left:8px">'+escH(s.tplNo)+'</span>':'')
+      +(s.notes?'<div style="font-size:11px;color:var(--text2);margin-top:2px">'+escH(s.notes)+'</div>':'')+'</td>'
+      +'<td><span style="font-size:12px;font-family:DM Mono,monospace;color:var(--accent)">'+escH(s.fromProjectNum||'—')+'</span><div style="font-size:11px;color:var(--text2)">'+escH(s.fromProjectName||'')+'</div></td>'
+      +'<td style="font-size:12px;color:var(--muted)">'+(s.layout==='vertical'?'↕ Vertical':'↔ Horizontal')+'</td>'
+      +'<td style="font-size:12px;color:var(--muted)">'+fmtDate(s.submittedAt||'')+'</td>'
+      +'<td><span class="status-badge '+statusCls+'">'+statusLabel+'</span></td>'
+      +'<td><div class="act-btns">'
+      +(s.status==='pending'?'<button class="act-btn" onclick="inboxAddToLib('+ri+')" title="Add to Library"><span class="tip">Add to Library</span>＋</button>':'')
+      +(s.status==='pending'?'<button class="act-btn danger" onclick="inboxDismiss('+ri+')" title="Dismiss"><span class="tip">Dismiss</span>✕</button>':'')
+      +'<button class="act-btn danger" onclick="inboxDelete('+ri+')" title="Delete"><span class="tip">Delete</span>🗑</button>'
+      +'</div></td></tr>';
+  });
+  body.innerHTML=rows;
+}
+
+async function inboxAddToLib(idx){
+  var s=_inboxItems[idx];if(!s)return;
+  // Create a new template from this submission
+  var newTpl={
+    id:nid(),
+    tplNo:genTplNum(),
+    name:s.equipType,
+    group:'',
+    layout:s.layout||'horizontal',
+    revisions:[],
+    createdAt:todayStr(),
+    updatedAt:todayStr(),
+    sourceProject:s.fromProjectNum,
+    sourceProjectName:s.fromProjectName
+  };
+  // Start as published rev with the submitted sections
+  newTpl.revisions.push({
+    version:'1.0',status:'published',
+    sections:JSON.parse(JSON.stringify(s.sections||[])),
+    createdAt:todayStr(),publishedAt:todayStr(),
+    notes:'Imported from project '+s.fromProjectNum+' — '+s.fromProjectName
+  });
+  templates.push(newTpl);
+  _inboxItems[idx].status='added';
+  save();
+  await dbSetEqsSubmissions(_inboxItems);
+  await loadInbox();
+  renderInbox();
+  showToast('✓ Added "'+s.equipType+'" to template library as '+newTpl.tplNo);
+}
+
+async function inboxDismiss(idx){
+  if(!confirm('Dismiss this submission?'))return;
+  _inboxItems[idx].status='dismissed';
+  await dbSetEqsSubmissions(_inboxItems);
+  await loadInbox();renderInbox();
+}
+
+async function inboxDelete(idx){
+  if(!confirm('Delete this submission permanently?'))return;
+  _inboxItems.splice(idx,1);
+  await dbSetEqsSubmissions(_inboxItems);
+  await loadInbox();renderInbox();
+}
+
+// ── Sidebar ──
+var SBK='hvacnexus_sb_collapsed';
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var mw=document.getElementById('mainWrap');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(mw)mw.style.marginLeft=c?'52px':'230px';if(btn)btn.textContent=c?'»':'«';}
+function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'▸':'▾';}
+
+// ── Init ──
+(async function(){
+  applySB(localStorage.getItem(SBK)==='1');
+  try{var p=dbGetCurrentProject();if(p.name){var pn=document.getElementById('sb-proj-name');if(pn)pn.textContent=p.name;}if(p.num){var pu=document.getElementById('sb-proj-num');if(pu)pu.textContent=p.num;}}catch(e){}
+  try{var cu=dbGetCurrentUser();if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  await load();
+  await loadInbox();
+  renderRegister();
+})();
+</script>
+<!-- Dropdown options popover -->
+<div class="dd-popover" id="ddPopover">
+  <h4>▼ Dropdown Options</h4>
+  <div id="ddOptList"></div>
+  <button class="dd-add-btn" onclick="ddAddOption()">+ Add option</button>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+    <button class="btn bsm bp" onclick="closeDdPopover()">Done</button>
+  </div>
+</div>
+</body>
+</html>+(f.type==='dropdown'
