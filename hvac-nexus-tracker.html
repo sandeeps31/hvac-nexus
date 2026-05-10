@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="theme.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HVAC NEXUS — Project Tracker</title>
+<style>
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
+
+/* HEADER */
+.main-wrap{margin-left:230px;transition:margin-left .25s;min-height:100vh}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header-brand{display:flex;align-items:center;gap:10px}
+.header-icon{font-size:22px}
+.header-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text)}
+.header-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:1px}
+.header-actions{display:flex;gap:8px;align-items:center}
+
+/* TABS */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);padding:0 28px;position:sticky;top:58px;z-index:99}
+.tab{padding:11px 20px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;display:flex;align-items:center;gap:7px;user-select:none}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-badge{font-family:'DM Mono',monospace;font-size:10px;padding:1px 7px;border-radius:20px;background:var(--surface3);border:1px solid var(--border);color:var(--muted)}
+.tab.active .tab-badge{background:var(--accent-dim);border-color:rgba(0,200,255,.2);color:var(--accent)}
+
+/* PAGE */
+.page{padding:24px 28px 80px;max-width:1100px}
+
+/* STATS ROW */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px}
+.stat-num{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;line-height:1;margin-bottom:4px}
+.stat-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:7px 12px;width:260px}
+.search-box:focus-within{border-color:var(--accent)}
+.search-box input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%}
+.search-box input::placeholder{color:var(--muted)}
+.fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:7px 10px;outline:none;cursor:pointer}
+.fsel:focus{border-color:var(--accent);color:var(--text)}.fsel option{background:var(--surface2)}
+.btn{padding:7px 15px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#080c12}.btn-primary:hover{background:#33d4ff}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--muted);background:var(--surface2)}
+.ml-auto{margin-left:auto}
+
+/* CARDS */
+.item-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;transition:border-color .15s}
+.item-card:hover{border-color:var(--surface3)}
+.item-hdr{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;cursor:pointer}
+.item-id{font-family:'DM Mono',monospace;font-size:10px;font-weight:700;flex-shrink:0;padding:2px 8px;border-radius:4px;margin-top:1px}
+.item-title{font-size:13.5px;font-weight:600;color:var(--text);flex:1;line-height:1.4}
+.item-meta{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.4}
+.item-badges{display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;margin-top:2px}
+.badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px;white-space:nowrap;border:1px solid transparent}
+
+/* PRIORITY */
+.p-critical{background:rgba(255,77,109,.15);color:var(--danger);border-color:rgba(255,77,109,.25)}
+.p-high{background:rgba(255,184,48,.12);color:var(--warn);border-color:rgba(255,184,48,.25)}
+.p-medium{background:var(--accent-dim);color:var(--accent);border-color:rgba(0,200,255,.2)}
+.p-low{background:var(--surface3);color:var(--muted);border-color:var(--border)}
+
+/* STATUS */
+.s-open{background:var(--danger-dim);color:var(--danger);border-color:rgba(255,77,109,.2)}
+.s-in-progress{background:var(--warn-dim);color:var(--warn);border-color:rgba(255,184,48,.2)}
+.s-done{background:var(--green-dim);color:var(--green);border-color:rgba(0,229,160,.2)}
+.list-group-hdr{display:flex;align-items:center;gap:10px;padding:10px 0 6px;margin-top:12px;cursor:pointer;user-select:none}
+.list-group-hdr:first-child{margin-top:0}
+.list-group-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.list-group-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1px 7px}
+.list-group-line{flex:1;height:1px;background:var(--border)}
+.list-group-chev{font-size:10px;color:var(--muted);transition:transform .15s}
+.list-group-items.collapsed{display:none}
+.done-check{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex-shrink:0;margin-right:4px}
+.item-card.is-done .item-title{text-decoration:line-through;color:var(--muted)}
+.item-card.is-done .item-meta{color:var(--muted);opacity:.6}
+.s-wont-fix{background:var(--surface3);color:var(--muted);border-color:var(--border)}
+.s-planned{background:var(--purple-dim);color:var(--purple);border-color:rgba(167,139,250,.2)}
+.s-backlog{background:var(--surface3);color:var(--muted);border-color:var(--border)}
+
+/* MODULE CHIP */
+.mod-chip{font-family:'DM Mono',monospace;font-size:9.5px;padding:2px 8px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text2)}
+
+/* EXPAND BODY */
+.item-body{padding:0 16px 14px 16px;border-top:1px solid var(--border);margin-top:0;display:none}
+.item-body.open{display:block;padding-top:14px}
+.item-desc{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:12px}
+.item-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.item-field{display:flex;flex-direction:column;gap:4px}
+.item-field label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.item-field select,.item-field input,.item-field textarea{background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;transition:border-color .2s;width:100%}
+.item-field select:focus,.item-field input:focus,.item-field textarea:focus{border-color:var(--accent)}
+.item-field textarea{resize:vertical;min-height:60px}
+.item-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:10px}
+.btn-del{padding:5px 12px;border-radius:6px;border:1px solid rgba(255,77,109,.3);background:transparent;color:var(--danger);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer}
+.btn-del:hover{background:var(--danger-dim)}
+.btn-save{padding:5px 14px;border-radius:6px;border:none;background:var(--accent);color:#080c12;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer}
+.btn-save:hover{background:#33d4ff}
+
+/* EMPTY */
+.empty{display:flex;flex-direction:column;align-items:center;padding:60px;gap:12px;color:var(--muted)}
+.empty-icon{font-size:40px;opacity:.3}
+.empty-title{font-family:'Syne',sans-serif;font-size:15px;color:var(--text2)}
+
+/* MODULE LIST (Modules tab) */
+.mod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,340px));gap:12px}
+.mod-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:8px}
+.mod-card-hdr{display:flex;align-items:center;gap:10px}
+.mod-card-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);flex:1}
+.mod-edit-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;cursor:pointer;padding:3px 8px;font-family:'DM Sans',sans-serif;transition:all .13s}
+.mod-edit-btn:hover{border-color:var(--accent);color:var(--accent)}
+.mod-sub-toggle{background:none;border:none;cursor:pointer;font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;padding:4px 0;display:flex;align-items:center;gap:5px;transition:color .13s}
+.mod-sub-toggle:hover{color:var(--accent)}
+.mod-sub-list{border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:none;flex-direction:column;gap:6px}
+.mod-sub-list.open{display:flex}
+.mod-sub-item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--surface2);border-radius:6px;border-left:3px solid var(--border)}
+.mod-sub-item.built{border-left-color:var(--green)}
+.mod-sub-item.wip{border-left-color:var(--warn)}
+.mod-sub-item.todo{border-left-color:var(--muted)}
+.mod-sub-name{font-size:12px;font-weight:600;color:var(--text);flex:1}
+.mod-sub-status{font-size:10px;font-family:'DM Mono',monospace;padding:2px 7px;border-radius:4px}
+.mod-group-hdr{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:8px 0 10px;border-bottom:1px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.mod-status-built{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.2);font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px}
+.mod-status-wip{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.2);font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px}
+.mod-status-todo{background:var(--surface3);color:var(--muted);border:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:20px}
+.mod-card-desc{font-size:12px;color:var(--text2);line-height:1.5}
+.mod-priority-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.priority-chip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;font-family:'DM Mono',monospace;cursor:pointer;border:1.5px solid transparent;transition:all .13s;user-select:none;opacity:.45}
+.priority-chip:hover{opacity:.75}
+.priority-chip.active{opacity:1}
+.pc-none{background:var(--surface2);color:var(--text2);border-color:var(--border)}
+.pc-critical{background:rgba(255,77,109,.15);color:var(--danger);border-color:rgba(255,77,109,.25)}
+.pc-high{background:rgba(255,184,48,.12);color:var(--warn);border-color:rgba(255,184,48,.25)}
+.pc-medium{background:var(--accent-dim);color:var(--accent);border-color:rgba(0,200,255,.2)}
+.pc-low{background:var(--surface3);color:var(--muted);border-color:var(--border)}
+.mod-priority-filter{display:none;align-items:center;gap:8px;padding:14px 28px 0;flex-wrap:wrap}
+.mod-priority-filter.visible{display:flex}
+.mpf-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-right:4px}
+
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.mo.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:560px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;transform:translateY(10px);transition:transform .2s}
+.mo.open .modal{transform:translateY(0)}
+.modal-hdr{padding:20px 22px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-hdr h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text)}
+.modal-hdr p{font-size:12.5px;color:var(--text2);margin-top:3px}
+.modal-body{padding:18px 22px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px}
+.modal-footer{padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block}
+.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;transition:border-color .2s}
+.mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
+.ms{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;cursor:pointer}
+.ms:focus{border-color:var(--accent)}.ms option{background:var(--surface2)}
+
+
+/* ── SIDEBAR STANDARD ── */
+.sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden;overflow-x:hidden}
+.sb.sm{width:52px}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px;overflow:hidden}.sb-icon{font-size:20px;flex-shrink:0}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0;scrollbar-width:thin}
+.sb-nav::-webkit-scrollbar{width:4px}.sb-nav::-webkit-scrollbar-track{background:transparent}.sb-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;position:relative;overflow:hidden;text-decoration:none}.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.sb-tooltip{position:fixed;background:var(--surface2);color:var(--text);font-size:12px;font-weight:500;padding:5px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.sb-group{}.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-group-hdr,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb.sm .sb-group-items{display:block !important}.sb.sm .sb-item{padding:9px 14px;justify-content:center;border-left:none;overflow:visible}
+.sb.sm .sb-top{padding:14px 12px 10px;justify-content:center}.sb.sm .sb-footer{justify-content:center}.sb.sm .sb-item-icon{width:auto}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
+.main{margin-left:230px;transition:margin-left .25s}
+</style>
+<script src="head-common.js"></script>
+<script src="db.js"></script>
+<script>
+// ── HVAC Nexus Auth Guard ──
+(async function(){
+  if(typeof dbReady !== 'undefined') await dbReady;
+  var DEV_BYPASS=false;
+  if(DEV_BYPASS)return;
+  var stored=localStorage.getItem('hvacnexus_session');
+  if(!stored){window.location.href='hvac-login.html';return;}
+  try{
+    var sess=JSON.parse(stored);
+    if(Date.now()/1000<(sess.expires_at||0)-60){
+      // Set _authSession if db.js loaded
+      if(typeof _authSession!=='undefined')_authSession=sess;
+      return;
+    }
+    var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
+    var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+    var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
+    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
+    else{localStorage.removeItem('hvacnexus_session');window.location.href='hvac-login.html';}
+  }catch(e){window.location.href='hvac-login.html';}
+})();
+</script>
+</head>
+<body>
+<!-- SIDEBAR -->
+<div id="app-sidebar"></div>
+<script src="sidebar.js"></script>
+
+<span class="sb-user-name" id="sb-user">—</span></div>
+</div>
+
+<div class="main-wrap" id="mainWrap">
+<div class="header">
+  <div class="header-brand">
+    <span class="header-icon">❄️</span>
+    <div>
+      <div class="header-title">HVAC NEXUS — Project Tracker</div>
+      <div class="header-sub">Bugs · Features · Module Status</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="exportData()">&#8595; Export</button>
+    <button class="btn btn-primary" id="addModuleBtn" style="display:none" onclick="openAddModuleModal()">&#65291; Add Module</button>
+    <button class="btn btn-primary" id="addItemBtn" onclick="openAddModal()">&#65291; Add Item</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" id="tab-bugs" onclick="switchTab('bugs')">🐛 Bugs <span class="tab-badge" id="badge-bugs">0</span></div>
+  <div class="tab" id="tab-features" onclick="switchTab('features')">✨ Features <span class="tab-badge" id="badge-features">0</span></div>
+  <div class="tab" id="tab-modules" onclick="switchTab('modules')">📦 Modules <span class="tab-badge" id="badge-modules">0</span></div>
+</div>
+
+<div class="page">
+
+  <!-- STATS -->
+  <div class="stats" id="statsRow"></div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="searchInput" placeholder="Search…" oninput="render()"></div>
+    <select class="fsel" id="filterStatus" onchange="render()">
+      <option value="">All Statuses</option>
+      <option value="open">Open</option>
+      <option value="in-progress">In Progress</option>
+      <option value="done">Done</option>
+      <option value="wont-fix">Won't Fix</option>
+      <option value="planned">Planned</option>
+      <option value="backlog">Backlog</option>
+    </select>
+    <select class="fsel" id="filterPriority" onchange="render()">
+      <option value="">All Priorities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+    <select class="fsel" id="filterModule" onchange="render()">
+      <option value="">All Modules</option>
+    </select>
+    <button class="btn btn-ghost" id="hideCompBtn" onclick="toggleHideCompleted()">&#10003; Hide Completed</button>
+    <button class="btn btn-ghost ml-auto" onclick="clearFilters()">Clear filters</button>
+  </div>
+
+  <!-- MODULE PRIORITY FILTER -->
+  <div class="mod-priority-filter" id="modPriorityFilter">
+    <span class="mpf-label">Priority</span>
+    <span class="priority-chip pc-none active" id="mpf-all" onclick="setModPriority('')">All</span>
+    <span class="priority-chip pc-critical" id="mpf-critical" onclick="setModPriority('critical')">&#128308; Critical</span>
+    <span class="priority-chip pc-high" id="mpf-high" onclick="setModPriority('high')">&#128992; High</span>
+    <span class="priority-chip pc-medium" id="mpf-medium" onclick="setModPriority('medium')">&#128309; Medium</span>
+    <span class="priority-chip pc-low" id="mpf-low" onclick="setModPriority('low')">&#9898; Low</span>
+  </div>
+
+  <!-- LIST -->
+  <div id="itemList"></div>
+  <div id="moduleGrid" style="display:none"></div>
+
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="mo" id="addModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="modalTitle">Add Item</h3>
+      <p id="modalSub">Log a bug or feature request</p>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label class="ml">Type *</label>
+        <select class="ms" id="m-type" onchange="updateModalType()">
+          <option value="bug">&#128027; Bug</option>
+          <option value="feature">&#10024; Feature Request</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Title *</label>
+        <input class="mi" id="m-title" placeholder="Short description…"/>
+      </div>
+      <div>
+        <label class="ml">Module</label>
+        <select class="ms" id="m-module"><option value="">— Select Module —</option></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="ml">Priority</label>
+          <select class="ms" id="m-priority">
+            <option value="medium">Medium</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div>
+          <label class="ml">Status</label>
+          <select class="ms" id="m-status">
+            <option value="open">Open</option>
+            <option value="in-progress">In Progress</option>
+            <option value="planned">Planned</option>
+            <option value="backlog">Backlog</option>
+            <option value="done">Done</option>
+            <option value="wont-fix">Won't Fix</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="ml">Description / Steps to reproduce</label>
+        <textarea class="mi" id="m-desc" rows="3" placeholder="More detail…" style="resize:vertical"></textarea>
+      </div>
+      <div>
+        <label class="ml">Notes / Workaround</label>
+        <input class="mi" id="m-notes" placeholder="Any workaround or additional context…"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveItem()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _trkProj=dbGetCurrentProject();var _trkPNum=_trkProj.num||_trkProj.number||'GCT001';
+var SK='hvacnexus_tracker_v1';
+var activeTab='bugs';
+var editingId=null;
+var _hideCompleted=true;
+var _editModIdx=-1;
+var _modEditPriority='';
+var _modPriorityFilter='';
+var items=[];
+var _uid=0;function nid(){return 'i'+(++_uid)+Date.now();}
+
+// ── SEED DATA — known bugs and features from session ──
+var SEED=[
+  // BUGS
+  {id:'b001',type:'bug',title:'Drawing navigation — zoom/pan rough in some browsers',module:'Drawings',priority:'high',status:'in-progress',desc:'Pin positions can be off after zoom. Navigation needs end-to-end verification.',notes:'CSS transform approach implemented; needs real-device testing.',created:'2026-03-31'},
+  {id:'b002',type:'bug',title:'Drawings HTML has accumulated patching debt',module:'Drawings',priority:'medium',status:'open',desc:'Multiple rounds of patching have left stale code fragments. Consider clean rebuild when stable.',notes:'',created:'2026-03-31'},
+  {id:'b003',type:'bug',title:'Pin placement after zoom needs verification',module:'Drawings',priority:'high',status:'open',desc:'After zooming in/out, pin placement click coordinates may not map correctly to drawing position.',notes:'onCanvasClick uses getBoundingClientRect which should account for scale.',created:'2026-03-31'},
+  {id:'b004',type:'bug',title:'Commissioning tracker column settings persistence',module:'Commissioning Tracker',priority:'low',status:'open',desc:'Column visibility settings could persist more reliably across sessions.',notes:'Currently saved to localStorage under hvacnexus_cx_cols_GCT001.',created:'2026-03-31'},
+  {id:'b005',type:'bug',title:'ITP Pre-Cx section anchor scroll needs verification',module:'ITP Form',priority:'low',status:'open',desc:'When opening ITP form from commissioning tracker with ?section=precx param, auto-scroll to Pre-Cx section needs testing.',notes:'',created:'2026-03-31'},
+  {id:'b006',type:'bug',title:'MSSB auto-lookup needs testing with real data',module:'Commissioning Tracker',priority:'high',status:'open',desc:'MSSB lookup by equipment tag from equipment schedule MSSB tab — needs verification that energisation status flows through correctly.',notes:'Logic: equip schedule MSSB tab has equip field; lookup by that to get MSSB tag; then MSSB card has energised field.',created:'2026-03-31'},
+  {id:'b007',type:'bug',title:'ITP Templates publish workflow needs end-to-end testing',module:'ITP Templates',priority:'medium',status:'open',desc:'Draft → Publish → use in ITP form chain has not been fully tested with real template data.',notes:'',created:'2026-03-31'},
+
+  // FEATURES — not built
+  {id:'f001',type:'feature',title:'RFI Module',module:'RFI',priority:'high',status:'planned',desc:'Drawing pin integration + variation linkage are the core value adds. Register, status, due dates, response chain, auto-numbering, impact flags (cost/program).',notes:'Build only if drawing pin integration and variation linkage are included.',created:'2026-03-31'},
+  {id:'f002',type:'feature',title:'Installation Defects Module',module:'Defects',priority:'high',status:'planned',desc:'Separate from commissioning defects. Snag list during installation phase, linked to drawings/equipment, assignee, photo evidence, close-out sign-off.',notes:'',created:'2026-03-31'},
+  {id:'f003',type:'feature',title:'NCR Module',module:'NCR',priority:'high',status:'planned',desc:'Non-Conformance Report. Root cause, corrective action, verification sign-off. Required for ISO 9001 projects.',notes:'',created:'2026-03-31'},
+  {id:'f004',type:'feature',title:'Subcontractor ITPs Module',module:'Subcontractor ITPs',priority:'medium',status:'backlog',desc:'Same ITP templates as internal, tracked per subcontractor separately.',notes:'',created:'2026-03-31'},
+  {id:'f005',type:'feature',title:'Subcontractor Agreements Module',module:'General / Cross-module',priority:'medium',status:'backlog',desc:'Contract register, scope, value, insurance expiry, key dates. Sidebar link exists but no module.',notes:'',created:'2026-03-31'},
+  {id:'f006',type:'feature',title:'Pressure Test Register',module:'General / Cross-module',priority:'medium',status:'backlog',desc:'Hydronic system pressure testing. Test date, witnessed by, pressure, duration, result, certificate number.',notes:'Currently managed as a spreadsheet by most PMs.',created:'2026-03-31'},
+  {id:'f007',type:'feature',title:'Lookahead / 3-Week Commissioning View',module:'Lookahead',priority:'medium',status:'planned',desc:'Auto-pulls from commissioning tracker start dates. Week-by-week view of equipment being commissioned, ITPs due, witness requirements.',notes:'Should pull from commissioning tracker date fields automatically.',created:'2026-03-31'},
+  {id:'f008',type:'feature',title:'Handover Package Builder',module:'Handover Package',priority:'medium',status:'planned',desc:'Ties all modules together at end of job. Checklist pulling status from ITPs, commissioning tracker, defects, O&M register. Shows what is missing before handover.',notes:'Critical for hospital projects — documentation requirements are stringent.',created:'2026-03-31'},
+  {id:'f009',type:'feature',title:'Tech Submissions → Commissioning Tracker linkage',module:'Commissioning Tracker',priority:'high',status:'planned',desc:'Approved data sheet for each equipment item should be a visible prerequisite in the commissioning tracker before commissioning can start.',notes:'Currently tech submissions and commissioning tracker are disconnected.',created:'2026-03-31'},
+  {id:'f010',type:'feature',title:'O&M Document Register',module:'General / Cross-module',priority:'low',status:'backlog',desc:'Track which O&M manuals received, reviewed, submitted. Often a handover hold point.',notes:'',created:'2026-03-31'},
+  {id:'f011',type:'feature',title:'Specifications Module',module:'General / Cross-module',priority:'low',status:'backlog',desc:'Sidebar link exists but no module.',notes:'',created:'2026-03-31'},
+  {id:'f012',type:'feature',title:'Safety Module',module:'General / Cross-module',priority:'low',status:'backlog',desc:'SWMS register, permits, incident log. May duplicate existing safety system.',notes:'Only build if no existing system in use.',created:'2026-03-31'},
+  {id:'f013',type:'feature',title:'Documents Module',module:'General / Cross-module',priority:'low',status:'backlog',desc:'General document register.',notes:'',created:'2026-03-31'},
+  {id:'f014',type:'feature',title:'Photos Module',module:'General / Cross-module',priority:'low',status:'backlog',desc:'Centralised photo register linked to drawings/equipment. Currently photos only live inside ITP forms.',notes:'',created:'2026-03-31'},
+
+  // DRAWINGS MODULE — PINS
+  {id:'f015',type:'feature',title:'Move pins — drag to reposition',module:'Drawings',priority:'high',status:'planned',desc:'Click and drag existing pins to reposition without delete/re-add.',notes:'',created:'2026-04-01'},
+  {id:'f016',type:'feature',title:'Continuous pin drop — Save & Add Another',module:'Drawings',priority:'high',status:'planned',desc:"Two buttons on pin modal: 'Save & Close' and 'Save & Add Another'. Needed for admins bulk-adding QA pins for site team.",notes:'',created:'2026-04-01'},
+
+  // DRAWINGS MODULE — NAVIGATION
+  {id:'f017',type:'feature',title:'Pan freely past drawing extents in all 4 directions',module:'Drawings',priority:'high',status:'planned',desc:'Pan beyond drawing edges in all directions. Add padding around pdfStage.',notes:'',created:'2026-04-01'},
+  {id:'f018',type:'feature',title:'Remove scrollbars — pan hand navigation only',module:'Drawings',priority:'medium',status:'planned',desc:'Remove horizontal and vertical scrollbars. Navigation = zoom in/out, fit to page, pan hand only.',notes:'',created:'2026-04-01'},
+
+  // DRAWINGS MODULE — ADD/EDIT
+  {id:'f019',type:'feature',title:'Bulk upload drawings with full metadata',module:'Drawings',priority:'high',status:'planned',desc:'Bulk upload with fields: Drawing no, Title, Submission date, Revision no, Status (IFR/IFA/IFC/AB), Approval status, Approval date, Discipline, PDF.',notes:'',created:'2026-04-01'},
+  {id:'f020',type:'feature',title:'Supersede drawing button per row',module:'Drawings',priority:'high',status:'planned',desc:'Mark drawing as superseded. Removed from drawing view, shown with strikethrough in register.',notes:'Status hierarchy: IFR < IFA < IFC < AB',created:'2026-04-01'},
+  {id:'f021',type:'feature',title:'Edit drawing button per row',module:'Drawings',priority:'high',status:'planned',desc:'Edit all drawing fields inline. Obsolete drawings removed from view, strikethrough in register.',notes:'',created:'2026-04-01'},
+  {id:'f022',type:'feature',title:'Revision history per drawing row',module:'Drawings',priority:'medium',status:'planned',desc:'Full revision history per drawing showing all previous revisions with status, approval, submission dates.',notes:'',created:'2026-04-01'},
+
+  // DRAWINGS MODULE — LIST
+  {id:'f023',type:'feature',title:'Categorise drawings by Area',module:'Drawings',priority:'medium',status:'planned',desc:'Area grouping in addition to Discipline in the drawings list.',notes:'',created:'2026-04-01'},
+  {id:'f024',type:'feature',title:'Expanded disciplines and subcategories',module:'Drawings',priority:'medium',status:'planned',desc:'Mechanical (General, Schematics, Schedules, Layout, Piping, Sections, Builders works, Board, Seismics), Architectural (Partitions, RCP, Fire compartment, GA, Doors, Finishes, Room layout), Electrical, Hydraulic, Base build. Add new category types.',notes:'',created:'2026-04-01'},
+  {id:'f025',type:'feature',title:'Transmittal generation and email to subcontractors',module:'Drawings',priority:'high',status:'planned',desc:'On drawing upload, generate transmittal with optional change description. Email to all subcontractors. Maintain transmittal register.',notes:'Use mailto: initially, SMTP via Supabase Edge Function when backend is live.',created:'2026-04-01'},
+
+  // DRAWINGS MODULE — REGISTER
+  {id:'f026',type:'feature',title:'Drawing register — detailed version (Type 1)',module:'Drawings',priority:'high',status:'planned',desc:'All revisions: Drawing no, Title, Submission date, Revision no, Status, Approval status, Approval date. Mechanical only. Export PDF/Excel.',notes:'',created:'2026-04-01'},
+  {id:'f027',type:'feature',title:'Drawing register — simplified version (Type 2)',module:'Drawings',priority:'high',status:'planned',desc:'Current state only: Drawing no, Title, Current Revision, Current Status, Approval status, Approval date. Export PDF/Excel.',notes:'',created:'2026-04-01'},
+  {id:'f028',type:'feature',title:'Status hierarchy enforcement: IFR < IFA < IFC < AB',module:'Drawings',priority:'medium',status:'planned',desc:'Warn if trying to move drawing backwards in hierarchy. AB = As Built.',notes:'',created:'2026-04-01'},
+
+  // USER MANAGEMENT
+  {id:'f029',type:'feature',title:'User session persistence across all modules',module:'User Management',priority:'high',status:'backlog',desc:'Currently requires manual Switch User in Settings each session. Session should persist across all modules automatically on page load — each module reads hvacnexus_current_user and applies role-based UI.',notes:'hvac-itp.html has this working. Needs rolling out to drawings, commissioning, budget etc.',created:'2026-04-03'},
+  {id:'f030',type:'feature',title:'Per-module permission enforcement',module:'User Management',priority:'high',status:'backlog',desc:'Role-based UI enforcement on every module — not just ITP. Drawings (add/edit pins), Commissioning (edit tracker), Budget (view only for site), Variations etc.',notes:'Pattern established in hvac-itp.html with can() function and role map.',created:'2026-04-03'},
+  {id:'f031',type:'feature',title:'Subcontractor view — limit to assigned ITPs only',module:'User Management',priority:'medium',status:'backlog',desc:'Subcontractor role should only see ITP types and instances assigned to their company. Filter ITP register by subbyName matching their company.',notes:'Subcontractor field already stored on ITP instances.',created:'2026-04-03'},
+  {id:'f032',type:'feature',title:'User PIN reset flow',module:'User Management',priority:'low',status:'backlog',desc:'Admin can reset another user\'s PIN from Settings → Permissions tab. User receives new PIN. Currently no reset mechanism — must delete and re-add user.',notes:'',created:'2026-04-03'},
+  {id:'f033',type:'feature',title:'Auto-detect logged-in user on module load',module:'User Management',priority:'high',status:'backlog',desc:'Each module should auto-resolve current user from hvacnexus_current_user → fall back to first admin in users list → never show Unknown. Already fixed in ITP register, needs applying everywhere.',notes:'loadCurrentUser() pattern from hvac-itp.html to be shared across all modules.',created:'2026-04-03'},
+  {id:'f038',type:'feature',title:'Budget — permission-restricted budget column',module:'Budget',priority:'high',status:'planned',desc:'Budget column should be editable only by Admin, Director, and Estimator roles. PM and all other roles see it as read-only with a lock icon. Implementation: (1) resolve _canEditBudget from dbGetCurrentUser() role on init, (2) render budget cell as inline input (onblur saves) for permitted roles, or read-only span with lock icon for PM, (3) add lock indicator on Budget column header when user is read-only. Permitted roles: Admin, Director, Estimator. Read-only roles: PM, Engineer, Subcontractor, Witness.',notes:'_pNum is not explicitly declared in hvac-budget.html — resolve via dbGetCurrentProject() in async init before applying role check. Budget input should match existing .margin-input CSS style.',created:'2026-04-07'},
+  {id:'f039',type:'feature',title:'PM personal template library',module:'User Management',priority:'medium',status:'backlog',desc:'A PM can maintain their own private library of reusable templates (budget structures, ITP checklists, email templates, etc.) stored against their user account on the server. Templates are portable across projects and companies. PM can deploy any personal template into the current project with one click. Library is private — not visible to other users.',notes:'Requires Supabase auth to be working first — needs a real user_id to scope templates to a specific person. Do not build against localStorage as templates must be cross-device. Build immediately after auth is complete. Table: pm_templates (user_id, type, name, data). Types: budget, itp, email, procurement.',created:'2026-04-07'},
+  {id:'b008',type:'bug',title:'Modal backdrop dismiss — block accidental close on all modals',module:'General / Cross-module',priority:'medium',status:'in-progress',desc:'All modals across the project should NOT close when clicking the backdrop. User must click Save or Cancel explicitly to prevent accidental data loss. Currently many modals dismiss on backdrop click.',notes:'Fixed in hvac-pdf-viewer.html pin modal. Needs rolling out to all other modules.',created:'2026-04-03'},
+  {id:'f041',type:'feature',title:'Equipment Schedule — Security Grilles tab',module:'Equipment Schedule',priority:'medium',status:'planned',desc:'Add a Security Grilles tab to the equipment schedule. Columns: Tag, Location, Size (mm x mm), Material, Finish, Frame Type, Mesh Type, Fixing Method, Drawing Ref, Status (Design/Procurement/Installed), Notes. Same revision/draft/publish workflow as other tabs. Supports inline editing, CSV export, and PDF export matching the existing equipment schedule format.',notes:'Add alongside existing tabs (FCU, AHU, Chiller, MSSB etc). Security grilles are typically installed over supply/return air openings in secure areas — hospitals, prisons, data centres.',created:'2026-04-08'},
+  {id:'f040',type:'feature',title:'Module priority filter — include sub-modules',module:'General / Cross-module',priority:'low',status:'backlog',desc:'When filtering modules by priority on the Modules tab, sub-modules that match the priority should also cause their parent to appear, with only matching sub-modules visible in the expanded list. Or optionally show sub-modules as standalone rows when filtered. Currently filter only checks parent module priority.',notes:'Three options: (A) show parents with matching sub-modules, (B) show matching sub-modules standalone, (C) both. Deferred — decide on UX before building.',created:'2026-04-07'},
+  {id:'b009',type:'bug',title:'Sidebar horizontal scrollbar — remove, drag resize, fixed tooltips',module:'General / Cross-module',priority:'medium',status:'backlog',desc:'Sidebar shows horizontal scrollbar when item labels are long. Standard fix for all modules: (1) overflow-x:hidden on .sb and .sb-nav, (2) text-overflow:ellipsis on .sb-item-label, (3) drag-to-resize handle on right edge capped at 276px (230+20%), (4) tooltips use position:fixed + JS mouseenter to escape overflow:hidden — CSS hover tooltips do not work inside overflow:hidden containers.',notes:'Fixed in hvac-variations.html. Needs rolling out to all other modules. Tooltip JS pattern: getBoundingClientRect on mouseenter, set fixed left=(sbWidth+8)px, top=midpoint of item.',created:'2026-04-03'},
+];
+
+// Module group definitions — used in renderModules and modal
+var MODULE_GROUPS=[
+  {key:'financials',  label:'Financials',   icon:'💰'},
+  {key:'procurement', label:'Procurement',  icon:'📦'},
+  {key:'technical',   label:'Technical',    icon:'📐'},
+  {key:'commissioning',label:'Commissioning',icon:'⚙️'},
+  {key:'quality',     label:'Quality',      icon:'📋'},
+  {key:'settings',    label:'Settings & Platform', icon:'🔧'},
+  {key:'other',       label:'Other',        icon:'📁'}
+];
+
+var MODULES=[
+  // Financials
+  {name:'Budget',group:'financials',status:'built',desc:'Cost tracking, budget vs actual, variations sync.'},
+  {name:'Progress Claims',group:'financials',status:'built',desc:'Custom selling price, retention, claim history.'},
+  {name:'Vendor Invoices',group:'financials',status:'built',desc:'Draft + final invoice tracking, AI extraction, match check, monthly grouping.'},
+  {name:'Variations',group:'financials',status:'built',desc:'Client-facing variations with vendor cost line items and subcontractor sync.'},
+  {name:'Subcontractor Variations',group:'financials',status:'built',desc:'Auto-syncs value to parent variation vendor line item.'},
+  // Procurement
+  {name:'Procurement Schedule',group:'procurement',status:'built',desc:'Inline editing, status tracking.'},
+  {name:'Purchase Orders',group:'procurement',status:'built',desc:'PO register linked to procurement schedule, vendor email/contact fields.'},
+  {name:'Subcontractor Agreements',group:'procurement',status:'todo',priority:'medium',desc:'Not built. Contract register, scope, value, insurance expiry, key dates.'},
+  // Technical
+  {name:'Drawings',group:'technical',status:'wip',desc:'PDF upload, ITP/Defect/Fire pins, CSS-transform zoom/pan, revision history.'},
+  {name:'Drawing Viewer',group:'technical',status:'wip',parent:'Drawings',desc:'Clean rewrite. 2-pass hi-res render, 96px pins, layer toggles, pins panel, fire/ITP/defect pins.'},
+  {name:'Tech Submissions',group:'technical',status:'built',desc:'Register with data sheets, spec sign-off, MSDS, photos, PDF bundle.'},
+  {name:'Equipment Schedule',group:'technical',status:'built',desc:'Revision system, change tracking, draft/publish, PDF/Excel export.'},
+  {name:'RFI',group:'technical',status:'todo',priority:'high',desc:'Not built. Drawing pin integration + variation linkage are the core value adds.'},
+  {name:'Specifications',group:'technical',status:'todo',priority:'low',desc:'Not built. Sidebar link exists.'},
+  {name:'Transmittals',group:'technical',status:'todo',priority:'medium',desc:'Not built. Auto-generate on drawing upload, email to subbies, maintain register.'},
+  // Commissioning
+  {name:'Pre-Commissioning Checklist',group:'commissioning',status:'built',desc:'Area-based checklist.'},
+  {name:'Commissioning Tracker',group:'commissioning',status:'wip',desc:'MSSB auto-lookup, auto-status formula, column settings, dep badges.'},
+  {name:'Commissioning Plan',group:'commissioning',status:'wip',desc:'Commissioning plan module.'},
+  {name:'Lookahead / 3-Week View',group:'commissioning',status:'todo',priority:'medium',desc:'Not built. Auto-pulls from commissioning tracker dates.'},
+  // Quality
+  {name:'ITP',group:'quality',status:'built',desc:'ITP instances per building/area, linked to templates and drawing pins.'},
+  {name:'ITP Register',group:'quality',status:'built',parent:'ITP',desc:'Cross-project ITP register view with status tracking.'},
+  {name:'ITP Templates',group:'quality',status:'built',desc:'Company-level templates, drag-to-reorder, auto-numbering, revision system.'},
+  {name:'ITP Form',group:'quality',status:'wip',parent:'ITP',desc:'On-site fillable form, signature capture, Pre-Cx/Cx tracking.'},
+  {name:'Passive Fire Register',group:'quality',status:'built',desc:'Fire seal and fire damper register across all drawings, syncs with drawing pins.'},
+  {name:'Defects',group:'quality',status:'built',desc:'Installation defects snag list, linked to drawings, photo evidence, close-out.'},
+  {name:'NCR',group:'quality',status:'todo',priority:'high',desc:'Not built. Non-Conformance Report with corrective action workflow.'},
+  {name:'Installation Defects',group:'quality',status:'todo',priority:'high',desc:'Not built. Separate from Cx defects, linked to drawings/equipment.'},
+  // Settings & Platform
+  {name:'Company Settings',group:'settings',status:'built',desc:'Logo, users, PIN management, ITP templates link.'},
+  {name:'Project Settings',group:'settings',status:'built',desc:'Project details, team, subbies, areas, claims settings, email template.'},
+  {name:'User Management',group:'settings',status:'wip',desc:'PIN-based users, Switch User flow. Session persistence and role enforcement in progress.'},
+  {name:'Auth',group:'settings',status:'todo',priority:'high',desc:'Not built. Biggest pre-launch blocker. Supabase auth, multi-tenant OAuth.'},
+  // Other
+  {name:'Dashboard',group:'other',status:'built',desc:'Project overview, summary cards, invoice deadline banner.'},
+  {name:'Handover Package Builder',group:'other',status:'todo',priority:'medium',desc:'Not built. Ties all modules together at end of job.'},
+  {name:'O&M Document Register',group:'other',status:'todo',priority:'low',desc:'Not built.'},
+  {name:'Safety',group:'other',status:'todo',priority:'low',desc:'Not built. May duplicate existing system.'},
+  {name:'Documents',group:'other',status:'todo',priority:'low',desc:'Not built.'},
+  {name:'Photos',group:'other',status:'todo',priority:'low',desc:'Not built. Currently photos only inside ITP forms.'},
+  {name:'Pressure Test Register',group:'other',status:'todo',priority:'medium',desc:'Not built. Hydronic system specific.'},
+];
+
+// ── STORAGE ──
+function save(){
+  dbSetCommissioning(_trkPNum+'_tracker',items).catch(e=>console.error(e));
+}
+function saveModules(){
+  var data={modules:MODULES,moduleGroups:MODULE_GROUPS};
+  dbSetCommissioning(_trkPNum+'_tracker_modules',data).catch(e=>console.error(e));
+}
+function saveAll(){
+  save();saveModules();
+}
+async function load(){
+  try{
+    var s=await dbGetCommissioning(_trkPNum+'_tracker');
+    if(s&&Array.isArray(s)&&s.length){
+      items=s;
+    } else if(s&&typeof s==='string'){
+      try{items=JSON.parse(s);}catch(e2){items=JSON.parse(JSON.stringify(SEED));save();}
+    } else {
+      items=JSON.parse(JSON.stringify(SEED));save();
+    }
+  }catch(e){
+    console.warn('Tracker load failed:',e);
+    items=JSON.parse(JSON.stringify(SEED));save();
+  }
+  // Load saved modules and groups
+  try{
+    var md=await dbGetCommissioning(_trkPNum+'_tracker_modules');
+    if(md&&md.modules&&Array.isArray(md.modules)&&md.modules.length){
+      MODULES.length=0;
+      md.modules.forEach(function(m){MODULES.push(m);});
+    }
+    if(md&&md.moduleGroups&&Array.isArray(md.moduleGroups)&&md.moduleGroups.length){
+      MODULE_GROUPS.length=0;
+      md.moduleGroups.forEach(function(g){MODULE_GROUPS.push(g);});
+    }
+  }catch(e){console.warn('Module load failed:',e);}
+  render();updateBadges();updateStats();
+  document.getElementById('badge-modules').textContent=MODULES.length;
+}
+
+// ── TABS ──
+function switchTab(tab){
+  activeTab=tab;
+  ['bugs','features','modules'].forEach(function(t){
+    document.getElementById('tab-'+t).classList.toggle('active',t===tab);
+  });
+  document.getElementById('itemList').style.display=tab==='modules'?'none':'block';
+  document.getElementById('moduleGrid').style.display=tab==='modules'?'block':'none';
+  document.getElementById('filterStatus').style.display=tab==='modules'?'none':'';
+  document.getElementById('filterPriority').style.display=tab==='modules'?'none':'';
+  document.getElementById('filterModule').style.display=tab==='modules'?'none':'';
+  document.getElementById('addModuleBtn').style.display=tab==='modules'?'':'none';
+  var mpf=document.getElementById('modPriorityFilter');
+  if(mpf)mpf.classList.toggle('visible',tab==='modules');
+  document.getElementById('addItemBtn').style.display=tab==='modules'?'none':'';
+  document.getElementById('hideCompBtn').style.display=tab==='modules'?'none':'';
+  if(tab==='modules')renderModules();else render();
+}
+
+// ── RENDER ──
+function render(){
+  updateBadges();updateStats();updateModuleFilter();
+  var q=(document.getElementById('searchInput').value||'').toLowerCase();
+  var sf=document.getElementById('filterStatus').value;
+  var pf=document.getElementById('filterPriority').value;
+  var mf=document.getElementById('filterModule').value;
+  var filtered=items.filter(function(it){
+    if(it.type!==activeTab.replace('s',''))return false;
+    if(_hideCompleted&&(it.status==='done'||it.status==='wont-fix'))return false;
+    if(sf&&it.status!==sf)return false;
+    if(pf&&it.priority!==pf)return false;
+    if(mf&&it.module!==mf)return false;
+    if(q&&!(it.title||'').toLowerCase().includes(q)&&!(it.desc||'').toLowerCase().includes(q)&&!(it.module||'').toLowerCase().includes(q))return false;
+    return true;
+  });
+  var list=document.getElementById('itemList');
+  if(!filtered.length){
+    list.innerHTML='<div class="empty"><div class="empty-icon">'+(activeTab==='bugs'?'&#128027;':'&#10024;')+'</div><div class="empty-title">No items match</div></div>';
+    return;
+  }
+  // Group by module
+  var moduleOrder=[
+    'Vendor Invoices','Budget','Progress Claims','Variations','Subcontractor Variations',
+    'Procurement Schedule','Purchase Orders','Drawings','Drawing Viewer',
+    'Tech Submissions','Equipment Schedule',
+    'ITP','ITP Templates','Passive Fire Register','Defects',
+    'Commissioning','Pre-Commissioning',
+    'User Management','General / Cross-module',
+    'RFI','NCR','Handover Package','Auth'
+  ];
+  var moduleMap={};
+  filtered.forEach(function(it){
+    var m=it.module||'General / Cross-module';
+    if(!moduleMap[m])moduleMap[m]=[];
+    moduleMap[m].push(it);
+  });
+  var moduleKeys=Object.keys(moduleMap).sort(function(a,b){
+    var ai=moduleOrder.indexOf(a);var bi=moduleOrder.indexOf(b);
+    if(ai>=0&&bi>=0)return ai-bi;
+    if(ai>=0)return -1;if(bi>=0)return 1;
+    return a.localeCompare(b);
+  });
+  var pOrd={critical:0,high:1,medium:2,low:3};
+  var sOrd={open:0,'in-progress':1,planned:2,backlog:3,done:4,'wont-fix':5};
+  var html='';
+  moduleKeys.forEach(function(mod){
+    var modItems=moduleMap[mod].slice().sort(function(a,b){
+      var sd=(sOrd[a.status]||0)-(sOrd[b.status]||0);
+      if(sd!==0)return sd;
+      return (pOrd[a.priority]||2)-(pOrd[b.priority]||2);
+    });
+    var doneCount=modItems.filter(function(it){return it.status==='done';}).length;
+    var openCount=modItems.length-doneCount;
+    var gid='lg-'+mod.replace(/[^a-z0-9]/gi,'_');
+    var doneChip=doneCount?('<span class="list-group-count" style="color:var(--green);border-color:rgba(0,229,160,.2);background:var(--green-dim)">'+doneCount+' done</span>'):'';
+    html+='<div class="list-group-hdr" onclick="toggleListGroup(\'+gid+\')">'
+      +'<span class="list-group-chev" id="chev-'+gid+'">&#9662;</span>'
+      +'<span class="list-group-label">'+mod+'</span>'
+      +'<span class="list-group-count">'+openCount+' open</span>'
+      +doneChip
+      +'<span class="list-group-line"></span>'
+      +'</div>'
+      +'<div class="list-group-items" id="'+gid+'">'
+      +modItems.map(function(it){return renderCard(it);}).join('')
+      +'</div>';
+  });
+  list.innerHTML=html;
+}
+
+function toggleListGroup(gid){
+  var el=document.getElementById(gid);
+  var chev=document.getElementById('chev-'+gid);
+  if(!el)return;
+  var collapsed=el.classList.toggle('collapsed');
+  if(chev)chev.style.transform=collapsed?'rotate(-90deg)':'';
+}
+
+
+function renderCard(it){
+  var pCls={critical:'p-critical',high:'p-high',medium:'p-medium',low:'p-low'}[it.priority]||'p-low';
+  var sCls={'open':'s-open','in-progress':'s-in-progress','done':'s-done','wont-fix':'s-wont-fix','planned':'s-planned','backlog':'s-backlog'}[it.status]||'s-open';
+  var pLbl={critical:'🔴 Critical',high:'🟠 High',medium:'🔵 Medium',low:'⚪ Low'}[it.priority]||'Medium';
+  var sLbl={'open':'Open','in-progress':'In Progress','done':'Done','wont-fix':"Won't Fix",'planned':'Planned','backlog':'Backlog'}[it.status]||it.status;
+  var isDone=it.status==='done';
+  return '<div class="item-card'+(isDone?' is-done':'')+'" id="card-'+it.id+'">'
+    +'<div class="item-hdr">'
+    +'<input type="checkbox" class="done-check"'+(isDone?' checked':'')+' onclick="event.stopPropagation();toggleDone(\''+it.id+'\')" title="Mark as done">'
+    +'<div style="flex:1" onclick="toggleCard(\''+it.id+'\')">'
+      +'<div class="item-badges" style="margin-bottom:5px">'
+        +'<span class="badge '+pCls+'">'+pLbl+'</span>'
+        +'<span class="badge '+sCls+'">'+sLbl+'</span>'
+        +(it.module?'<span class="mod-chip">'+escH(it.module)+'</span>':'')
+      +'</div>'
+      +'<div class="item-title">'+escH(it.title)+'</div>'
+      +(it.desc?'<div class="item-meta">'+escH(it.desc.substring(0,100))+(it.desc.length>100?'…':'')+'</div>':'')
+    +'</div>'
+    +'<div style="margin-left:auto;flex-shrink:0;color:var(--muted);font-size:11px;padding-left:12px">'+escH(it.created||'')+'</div>'
+    +'</div>'
+    +'</div>'
+    +'<div class="item-body" id="body-'+it.id+'">'
+      +'<div class="item-desc">'+escH(it.desc||'—')+'</div>'
+      +(it.notes?'<div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:6px;padding:8px 11px;margin-bottom:10px">📝 '+escH(it.notes)+'</div>':'')
+      +'<div class="item-fields">'
+        +'<div class="item-field"><label>Status</label><select onchange="quickUpdate(\''+it.id+'\',\'status\',this.value)">'
+          +['open','in-progress','planned','backlog','done','wont-fix'].map(function(s){return'<option value="'+s+'"'+(it.status===s?' selected':'')+'>'+({'open':'Open','in-progress':'In Progress','planned':'Planned','backlog':'Backlog','done':'Done','wont-fix':"Won't Fix"}[s]||s)+'</option>';}).join('')
+        +'</select></div>'
+        +'<div class="item-field"><label>Priority</label><select onchange="quickUpdate(\''+it.id+'\',\'priority\',this.value)">'
+          +['critical','high','medium','low'].map(function(p){return'<option value="'+p+'"'+(it.priority===p?' selected':'')+'>'+({critical:'Critical',high:'High',medium:'Medium',low:'Low'}[p])+'</option>';}).join('')
+        +'</select></div>'
+      +'</div>'
+      +'<div class="item-actions">'
+        +'<button class="btn-del" onclick="deleteItem(\''+it.id+'\')">🗑 Delete</button>'
+        +'<button class="btn btn-ghost" style="font-size:12px;padding:5px 12px" onclick="openEditModal(\''+it.id+'\')">✏ Edit</button>'
+      +'</div>'
+    +'</div>'
+  +'</div>';
+}
+
+function toggleCard(id){
+  var body=document.getElementById('body-'+id);
+  if(body)body.classList.toggle('open');
+}
+
+function toggleSubList(sid){
+  var el=document.getElementById(sid);
+  var chev=document.getElementById('chev-'+sid);
+  if(!el)return;
+  var open=el.classList.toggle('open');
+  if(chev)chev.style.transform=open?'rotate(-90deg)':'';
+}
+
+function quickUpdate(id,field,val){
+  var it=items.find(function(x){return x.id===id;});
+  if(it){it[field]=val;save();updateBadges();updateStats();}
+}
+function toggleDone(id){
+  var it=items.find(function(x){return x.id===id;});
+  if(!it)return;
+  it.status=it.status==='done'?'open':'done';
+  save();render();updateStats();
+}
+
+function deleteItem(id){
+  if(!confirm('Delete this item?'))return;
+  items=items.filter(function(x){return x.id!==id;});
+  save();render();
+}
+
+function renderModules(){
+  var grid=document.getElementById('moduleGrid');
+  var bugCount={};var featCount={};
+  items.forEach(function(it){
+    var m=it.module||'';
+    if(it.type==='bug'&&it.status!=='done'&&it.status!=='wont-fix'){bugCount[m]=(bugCount[m]||0)+1;}
+    if(it.type==='feature'&&it.status!=='done'){featCount[m]=(featCount[m]||0)+1;}
+  });
+  var html='';
+  MODULE_GROUPS.forEach(function(grp){
+    var grpModules=MODULES.filter(function(m){return m.group===grp.key&&(!_modPriorityFilter||(m.priority||'')=== _modPriorityFilter);});
+    if(!grpModules.length)return;
+    html+='<div style="margin-bottom:28px">';
+    html+='<div class="mod-group-hdr">'+grp.icon+' '+escH(grp.label)
+      +'<span style="margin-left:6px;color:var(--muted);font-weight:400">('+grpModules.filter(function(m){return !m.parent;}).length+')</span></div>';
+    html+='<div class="mod-grid">';
+    grpModules.filter(function(m){return !m.parent;}).forEach(function(m){
+      var midx=MODULES.indexOf(m);
+      var sCls=m.status==='built'?'mod-status-built':m.status==='wip'?'mod-status-wip':'mod-status-todo';
+      var sLbl=m.status==='built'?'&#10003; Built':m.status==='wip'?'&#9888; In Progress':'&#9675; Not Built';
+      var bugs=bugCount[m.name]||0;
+      var feats=featCount[m.name]||0;
+      var pLbl='';
+      if(m.priority){
+        var pMap={critical:['pc-critical','&#128308; Critical'],high:['pc-high','&#128992; High'],medium:['pc-medium','&#128309; Medium'],low:['pc-low','&#9898; Low']};
+        var pInfo=pMap[m.priority];
+        if(pInfo)pLbl='<span class="priority-chip '+pInfo[0]+' active" style="cursor:default;font-size:10px;padding:2px 8px">'+pInfo[1]+'</span>';
+      };
+      var subs=MODULES.filter(function(s){return s.parent===m.name;});
+      var subHtml='';
+      if(subs.length){
+        var sid='subs-'+midx;
+        var subItems=subs.map(function(s){
+          var si=MODULES.indexOf(s);
+          var sc=s.status==='built'?'built':s.status==='wip'?'wip':'todo';
+          var sl=s.status==='built'?'&#10003; Built':s.status==='wip'?'&#9888; WIP':'&#9675; Not Built';
+          var sbgs=bugCount[s.name]||0;
+          var sfts=featCount[s.name]||0;
+          return '<div class="mod-sub-item '+sc+'">'
+            +'<span class="mod-sub-name">'+escH(s.name)+'</span>'
+            +'<div style="display:flex;align-items:center;gap:6px">'
+            +(sbgs?'<span style="font-size:10px;color:var(--danger)">&#128027; '+sbgs+'</span>':'')
+            +(sfts?'<span style="font-size:10px;color:var(--purple)">&#10024; '+sfts+'</span>':'')
+            +(s.priority?'<span style="width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;background:'+({'critical':'var(--danger)','high':'var(--warn)','medium':'var(--accent)','low':'var(--muted)'}[s.priority]||'var(--muted)')+'"></span>':'')
+            +'<span class="mod-sub-status '+sc+'">'+sl+'</span>'
+            +'<button class="mod-edit-btn" style="padding:2px 6px;font-size:10px" onclick="event.stopPropagation();openModuleEdit('+si+')">Edit</button>'
+            +'</div>'
+          +'</div>';
+        }).join('');
+        subHtml='<button class="mod-sub-toggle" onclick="event.stopPropagation();toggleSubList(\'subs-'+midx+'\')">'  
+          +'<span id="chev-'+sid+'" style="transform:rotate(-90deg);display:inline-block">&#9662;</span> '+subs.length+' sub-module'+(subs.length!==1?'s':'')
+          +'</button>'
+          +'<div class="mod-sub-list open" id="'+sid+'">'+subItems+'</div>';
+      }
+      html+='<div class="mod-card">'
+        +'<div class="mod-card-hdr"><div class="mod-card-name">'+escH(m.name)+'</div>'
+        +'<button class="mod-edit-btn" onclick="event.stopPropagation();openModuleEdit('+midx+')">Edit</button>'
+        +'<span class="'+sCls+'" style="margin-left:6px">'+sLbl+'</span></div>'
+        +'<div class="mod-card-desc">'+escH(m.desc)+'</div>'
+        +'<div class="mod-priority-row">'
+          +(pLbl?'<span>'+pLbl+'</span>':'')
+          +(bugs?'<span style="color:var(--danger)">&#128027; '+bugs+' bug'+(bugs!==1?'s':'')+'</span>':'')
+          +(feats?'<span style="color:var(--purple)">&#10024; '+feats+' feature'+(feats!==1?'s':'')+'</span>':'')
+        +'</div>'
+        +subHtml
+      +'</div>';
+    });
+    html+='</div></div>';
+  });
+  grid.innerHTML=html;
+  document.getElementById('badge-modules').textContent=MODULES.length;
+}
+
+function openModuleEdit(idx){
+  var m=MODULES[idx];if(!m)return;
+  _editModIdx=idx;
+  document.getElementById('me-name').value=m.name;
+  document.getElementById('me-status').value=m.status||'todo';
+  _modEditPriority=m.priority||'';
+  setModEditPriority(_modEditPriority);
+  document.getElementById('me-desc').value=m.desc||'';
+  refreshGroupDropdowns();
+  document.getElementById('me-group').value=m.group||'other';
+  populateParentDropdown('me-parent',m.name);
+  document.getElementById('me-parent').value=m.parent||'';
+  document.getElementById('modEditModal').classList.add('open');
+}
+function saveModuleEdit(){
+  var m=MODULES[_editModIdx];if(!m)return;
+  var oldName=m.name;
+  var newName=document.getElementById('me-name').value.trim();
+  if(!newName){document.getElementById('me-name').focus();return;}
+  m.name=newName;
+  m.status=document.getElementById('me-status').value;
+  m.group=document.getElementById('me-group').value;
+  m.desc=document.getElementById('me-desc').value.trim();
+  m.priority=_modEditPriority||undefined;
+  var newParent=document.getElementById('me-parent').value;
+  m.parent=newParent||'';
+  // Update any sub-modules that referenced the old name
+  if(oldName!==newName){
+    MODULES.forEach(function(s){if(s.parent===oldName)s.parent=newName;});
+  }
+  document.getElementById('modEditModal').classList.remove('open');
+  saveModules();
+  renderModules();
+}
+function closeModuleEdit(){document.getElementById('modEditModal').classList.remove('open');}
+
+function deleteModule(){
+  var m=MODULES[_editModIdx];if(!m)return;
+  if(!confirm('Delete module "'+m.name+'"? This cannot be undone.'))return;
+  MODULES.splice(_editModIdx,1);
+  document.getElementById('modEditModal').classList.remove('open');
+  saveModules();
+  renderModules();
+}
+
+function openAddModuleModal(){
+  document.getElementById('am-title').value='';
+  document.getElementById('am-status').value='todo';
+  document.getElementById('am-desc').value='';
+  refreshGroupDropdowns();
+  document.getElementById('am-group').value='other';
+  populateParentDropdown('am-parent','');
+  document.getElementById('addModuleModal').classList.add('open');
+  setTimeout(function(){document.getElementById('am-title').focus();},80);
+}
+function saveAddModule(){
+  var title=document.getElementById('am-title').value.trim();
+  if(!title){document.getElementById('am-title').focus();return;}
+  var amParent=document.getElementById('am-parent').value;
+  var newMod={
+    name:title,
+    group:document.getElementById('am-group').value||'other',
+    status:document.getElementById('am-status').value||'todo',
+    desc:document.getElementById('am-desc').value.trim()
+  };
+  if(amParent)newMod.parent=amParent;
+  MODULES.push(newMod);
+  document.getElementById('addModuleModal').classList.remove('open');
+  saveModules();
+  renderModules();
+}
+function closeAddModuleModal(){document.getElementById('addModuleModal').classList.remove('open');}
+
+function addCustomGroup(){
+  var name=(document.getElementById('customGroupName').value||'').trim();
+  if(!name)return;
+  var key=name.toLowerCase().replace(/[^a-z0-9]/g,'_');
+  if(MODULE_GROUPS.find(function(g){return g.key===key;})){
+    alert('A group with this name already exists.');return;
+  }
+  MODULE_GROUPS.push({key:key,label:name,icon:'&#128193;'});
+  document.getElementById('customGroupName').value='';
+  saveModules();
+  // Refresh group dropdowns
+  refreshGroupDropdowns();
+  renderModules();
+}
+
+function refreshGroupDropdowns(){
+  // Rebuild group options in all group selects
+  var grpOpts=MODULE_GROUPS.map(function(g){
+    return '<option value="'+g.key+'">'+g.icon+' '+g.label+'</option>';
+  }).join('');
+  ['am-group','me-group'].forEach(function(id){
+    var sel=document.getElementById(id);
+    if(!sel)return;
+    var cur=sel.value;
+    sel.innerHTML=grpOpts;
+    if(cur)sel.value=cur;
+  });
+}
+
+function setModEditPriority(p){
+  _modEditPriority=p;
+  ['none','critical','high','medium','low'].forEach(function(k){
+    var el=document.getElementById('mep-'+k);
+    if(el)el.classList.toggle('active',(p===''&&k==='none')||(p===k));
+  });
+}
+
+function setModPriority(p){
+  _modPriorityFilter=p;
+  ['all','critical','high','medium','low'].forEach(function(k){
+    var el=document.getElementById('mpf-'+k);
+    if(el)el.classList.toggle('active',(p===''&&k==='all')||(p===k));
+  });
+  renderModules();
+}
+
+function populateParentDropdown(selId, excludeName){
+  var sel=document.getElementById(selId);if(!sel)return;
+  var cur=sel.value;
+  sel.innerHTML='<option value="">— None (top-level) —</option>';
+  // Only top-level modules can be parents (no parent themselves)
+  MODULES.filter(function(m){return !m.parent&&m.name!==excludeName;}).forEach(function(m){
+    var o=document.createElement('option');
+    o.value=m.name;o.textContent=m.name;
+    if(m.name===cur)o.selected=true;
+    sel.appendChild(o);
+  });
+}
+
+function populateModuleDropdown(){
+  var sel=document.getElementById('m-module');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">— Select Module —</option>';
+  MODULE_GROUPS.forEach(function(grp){
+    var grpMods=MODULES.filter(function(m){return m.group===grp.key;});
+    if(!grpMods.length)return;
+    var og=document.createElement('optgroup');
+    og.label=grp.icon+' '+grp.label;
+    grpMods.forEach(function(m){
+      var o=document.createElement('option');
+      o.value=m.name;o.textContent=m.name;
+      if(m.name===cur)o.selected=true;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+  // Add General cross-module option
+  var og2=document.createElement('optgroup');
+  og2.label='General';
+  var o2=document.createElement('option');
+  o2.value='General / Cross-module';o2.textContent='General / Cross-module';
+  if(cur==='General / Cross-module')o2.selected=true;
+  og2.appendChild(o2);
+  sel.appendChild(og2);
+}
+
+function updateBadges(){
+  var bugs=items.filter(function(it){return it.type==='bug'&&it.status!=='done'&&it.status!=='wont-fix';}).length;
+  var feats=items.filter(function(it){return it.type==='feature'&&it.status!=='done';}).length;
+  document.getElementById('badge-bugs').textContent=bugs;
+  document.getElementById('badge-features').textContent=feats;
+}
+
+function updateStats(){
+  var row=document.getElementById('statsRow');
+  var type=activeTab==='bugs'?'bug':'feature';
+  var all=items.filter(function(it){return it.type===type;});
+  var open=all.filter(function(it){return it.status==='open';}).length;
+  var inProg=all.filter(function(it){return it.status==='in-progress';}).length;
+  var done=all.filter(function(it){return it.status==='done';}).length;
+  var critical=all.filter(function(it){return it.priority==='critical'||it.priority==='high';}).length;
+  if(activeTab==='bugs'){
+    row.innerHTML=
+      '<div class="stat-card"><div class="stat-num" style="color:var(--danger)">'+open+'</div><div class="stat-lbl">Open Bugs</div></div>'+
+      '<div class="stat-card"><div class="stat-num" style="color:var(--warn)">'+inProg+'</div><div class="stat-lbl">In Progress</div></div>'+
+      '<div class="stat-card"><div class="stat-num" style="color:var(--danger)">'+critical+'</div><div class="stat-lbl">High / Critical</div></div>'+
+      '<div class="stat-card"><div class="stat-num" style="color:var(--green)">'+done+'</div><div class="stat-lbl">Fixed</div></div>';
+  } else if(activeTab==='features'){
+    var planned=all.filter(function(it){return it.status==='planned';}).length;
+    var backlog=all.filter(function(it){return it.status==='backlog';}).length;
+    row.innerHTML=
+      '<div class="stat-card"><div class="stat-num" style="color:var(--purple)">'+planned+'</div><div class="stat-lbl">Planned</div></div>'+
+      '<div class="stat-card"><div class="stat-num" style="color:var(--muted)">'+backlog+'</div><div class="stat-lbl">Backlog</div></div>'+
+      '<div class="stat-card"><div class="stat-num" style="color:var(--warn)">'+inProg+'</div><div class="stat-lbl">In Progress</div></div>'+
+      '<div class="stat-card"><div class="stat-num" style="color:var(--green)">'+done+'</div><div class="stat-lbl">Done</div></div>';
+  }
+}
+
+function updateModuleFilter(){
+  var sel=document.getElementById('filterModule');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">All Modules</option>';
+  var mods=[...new Set(items.filter(function(it){return it.type===(activeTab==='bugs'?'bug':'feature');}).map(function(it){return it.module||'';}))].filter(Boolean).sort();
+  mods.forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=m;if(m===cur)o.selected=true;sel.appendChild(o);});
+}
+
+// ── MODAL ──
+function openAddModal(){
+  editingId=null;
+  document.getElementById('modalTitle').textContent='Add Item';
+  document.getElementById('modalSub').textContent='Log a bug or feature request';
+  document.getElementById('m-type').value=activeTab==='features'?'feature':'bug';
+  document.getElementById('m-title').value='';
+  document.getElementById('m-module').value='';
+  document.getElementById('m-priority').value='medium';
+  document.getElementById('m-status').value=activeTab==='features'?'planned':'open';
+  document.getElementById('m-desc').value='';
+  document.getElementById('m-notes').value='';
+  populateModuleDropdown();
+  document.getElementById('addModal').classList.add('open');
+  setTimeout(function(){document.getElementById('m-title').focus();},80);
+}
+function openEditModal(id){
+  var it=items.find(function(x){return x.id===id;});if(!it)return;
+  editingId=id;
+  document.getElementById('modalTitle').textContent='Edit Item';
+  document.getElementById('modalSub').textContent=it.id;
+  document.getElementById('m-type').value=it.type;
+  document.getElementById('m-title').value=it.title||'';
+  document.getElementById('m-module').value=it.module||'';
+  document.getElementById('m-priority').value=it.priority||'medium';
+  document.getElementById('m-status').value=it.status||'open';
+  document.getElementById('m-desc').value=it.desc||'';
+  document.getElementById('m-notes').value=it.notes||'';
+  populateModuleDropdown();
+  document.getElementById('m-module').value=it.module||'';
+  document.getElementById('addModal').classList.add('open');
+}
+function closeModal(){document.getElementById('addModal').classList.remove('open');editingId=null;}
+function updateModalType(){}
+function saveItem(){
+  var title=document.getElementById('m-title').value.trim();
+  if(!title){document.getElementById('m-title').focus();return;}
+  var today=new Date().toISOString().split('T')[0];
+  if(editingId){
+    var it=items.find(function(x){return x.id===editingId;});
+    if(it){
+      it.type=document.getElementById('m-type').value;
+      it.title=title;
+      it.module=document.getElementById('m-module').value;
+      it.priority=document.getElementById('m-priority').value;
+      it.status=document.getElementById('m-status').value;
+      it.desc=document.getElementById('m-desc').value.trim();
+      it.notes=document.getElementById('m-notes').value.trim();
+    }
+  } else {
+    var itype=document.getElementById('m-type').value;
+    items.push({
+      id:nid(),
+      type:itype,
+      title:title,
+      module:document.getElementById('m-module').value,
+      priority:document.getElementById('m-priority').value,
+      status:document.getElementById('m-status').value,
+      desc:document.getElementById('m-desc').value.trim(),
+      notes:document.getElementById('m-notes').value.trim(),
+      created:today
+    });
+  }
+  var newType=editingId?null:document.getElementById('m-type').value;
+  save();closeModal();
+  if(newType&&newType==='feature'&&activeTab!=='features')switchTab('features');
+  else if(newType&&newType==='bug'&&activeTab!=='bugs')switchTab('bugs');
+  else render();
+}
+
+function toggleHideCompleted(){
+  _hideCompleted=!_hideCompleted;
+  var btn=document.getElementById('hideCompBtn');
+  if(btn){
+    btn.style.color=_hideCompleted?'var(--accent)':'';
+    btn.style.borderColor=_hideCompleted?'var(--accent)':'';
+    btn.textContent=_hideCompleted?'\u25cf Show Completed':'\u2713 Hide Completed';
+  }
+  render();
+}
+
+function clearFilters(){
+  document.getElementById('searchInput').value='';
+  document.getElementById('filterStatus').value='';
+  document.getElementById('filterPriority').value='';
+  document.getElementById('filterModule').value='';
+  _hideCompleted=false;
+  var btn=document.getElementById('hideCompBtn');
+  if(btn){btn.style.color='';btn.style.borderColor='';btn.textContent='\u2713 Hide Completed';}
+  render();
+}
+
+function exportData(){
+  var blob=new Blob([JSON.stringify(items,null,2)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='hvac-nexus-tracker-'+new Date().toISOString().split('T')[0]+'.json';
+  a.click();
+}
+
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// INIT
+(async function(){if(typeof dbReady!=="undefined")await dbReady;await load();})();
+// Apply initial hide-completed button state
+(function(){
+  var btn=document.getElementById('hideCompBtn');
+  if(btn){btn.style.color='var(--accent)';btn.style.borderColor='var(--accent)';btn.textContent='● Show Completed';}
+})();
+
+// ── SIDEBAR ──
+var SBK='hvacnexus_sb_collapsed';
+function navTo(url){var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);window.location.href=b+url;}
+function toggleSB(){var c=!document.getElementById('sidebar').classList.contains('sm');localStorage.setItem(SBK,c?'1':'0');applySB(c);}
+function applySB(c){var sb=document.getElementById('sidebar');var main=document.getElementById('mainWrap')||document.querySelector('.main');var btn=document.getElementById('sbToggleBtn');if(sb)sb.classList.toggle('sm',c);if(main)main.style.marginLeft=c?'52px':'230px';if(btn)btn.textContent=c?'\u00BB':'\u00AB';}
+function toggleGroup(id){var items=document.getElementById('gitems-'+id);var chev=document.getElementById('gchev-'+id);if(!items||!chev)return;var open=items.style.display!=='none';items.style.display=open?'none':'block';chev.textContent=open?'\u25B8':'\u25BE';}
+(function(){
+  applySB(localStorage.getItem(SBK)==='1');
+  localStorage.removeItem('hvacnexus_sb_groups');
+  try{var p=JSON.parse(localStorage.getItem('hvacnexus_current_project')||'{}');if(p.name){var en=document.getElementById('sb-proj-name');if(en)en.textContent=p.name;}if(p.num){var en2=document.getElementById('sb-proj-num');if(en2)en2.textContent=p.num;}}catch(e){}
+  try{var cu=JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null');if(cu){var ua=document.getElementById('sb-av');var un=document.getElementById('sb-user');if(ua)ua.textContent=(cu.name||'?').charAt(0).toUpperCase();if(un)un.textContent=cu.name||'';}}catch(e){}
+  var handle=document.getElementById('sbResize');var sb=document.getElementById('sidebar');
+  if(handle&&sb){var MIN_W=230,MAX_W=276,dragging=false,startX=0,startW=0;
+    handle.addEventListener('mousedown',function(e){dragging=true;startX=e.clientX;startW=sb.offsetWidth;document.body.style.userSelect='none';document.body.style.cursor='col-resize';e.preventDefault();});
+    document.addEventListener('mousemove',function(e){if(!dragging)return;var w=Math.min(MAX_W,Math.max(MIN_W,startW+(e.clientX-startX)));sb.style.width=w+'px';});
+    document.addEventListener('mouseup',function(){if(!dragging)return;dragging=false;document.body.style.userSelect='';document.body.style.cursor='';});
+  }
+  var tip=document.createElement('div');tip.className='sb-tooltip';document.body.appendChild(tip);
+  document.querySelectorAll('.sb-item').forEach(function(item){
+    var lbl=item.querySelector('.sb-item-label');
+    var label=lbl?lbl.textContent:'';
+    item.addEventListener('mouseenter',function(){
+      if(!label)return;
+      var r=item.getBoundingClientRect();var sbEl=document.getElementById('sidebar');var sbW=sbEl?sbEl.offsetWidth:230;
+      tip.textContent=label;tip.style.left=(sbW+8)+'px';tip.style.top=(r.top+r.height/2)+'px';tip.style.transform='translateY(-50%)';tip.style.opacity='1';
+    });
+    item.addEventListener('mouseleave',function(){tip.style.opacity='0';});
+  });
+})();
+
+</script>
+</div>
+<!-- MODULE EDIT MODAL -->
+<div class="mo" id="modEditModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <input id="me-name" class="mi" style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;background:transparent;border:none;border-bottom:1.5px solid var(--border);border-radius:0;padding:4px 0;color:var(--text);outline:none;width:100%;" placeholder="Module name">
+      <p style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:4px">Edit module name, status and group</p>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;padding:18px 20px">
+      <div>
+        <label class="ml">Status</label>
+        <select class="ms" id="me-status">
+          <option value="built">&#10003; Built</option>
+          <option value="wip">&#9888; In Progress</option>
+          <option value="todo">&#9675; Not Built</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Group</label>
+        <select class="ms" id="me-group"></select>
+      </div>
+      <div>
+        <label class="ml">Parent Module <span style="color:var(--muted);font-size:10px">(optional)</span></label>
+        <select class="ms" id="me-parent">
+          <option value="">— None (top-level) —</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Priority</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <span class="priority-chip pc-none active" id="mep-none" onclick="setModEditPriority('')">None</span>
+          <span class="priority-chip pc-critical" id="mep-critical" onclick="setModEditPriority('critical')">&#128308; Critical</span>
+          <span class="priority-chip pc-high" id="mep-high" onclick="setModEditPriority('high')">&#128992; High</span>
+          <span class="priority-chip pc-medium" id="mep-medium" onclick="setModEditPriority('medium')">&#128309; Medium</span>
+          <span class="priority-chip pc-low" id="mep-low" onclick="setModEditPriority('low')">&#9898; Low</span>
+        </div>
+      </div>
+      <div>
+        <label class="ml">Description</label>
+        <textarea class="ms" id="me-desc" rows="3" style="resize:vertical;font-family:'DM Sans',sans-serif;font-size:13px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn" style="color:var(--danger);border-color:var(--danger)" onclick="deleteModule()">&#128465; Delete</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="closeModuleEdit()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveModuleEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MODULE MODAL -->
+<div class="mo" id="addModuleModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <h3>&#128230; Add Module</h3>
+      <p style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:3px">Add a new module to the tracker</p>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;padding:18px 20px">
+      <div>
+        <label class="ml">Module Name *</label>
+        <input class="mi" id="am-title" placeholder="e.g. Transmittals" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%;box-sizing:border-box"/>
+      </div>
+      <div>
+        <label class="ml">Status</label>
+        <select class="ms" id="am-status">
+          <option value="todo">&#9675; Not Built</option>
+          <option value="wip">&#9888; In Progress</option>
+          <option value="built">&#10003; Built</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Group</label>
+        <select class="ms" id="am-group"></select>
+      </div>
+      <div>
+        <label class="ml">Parent Module <span style="color:var(--muted);font-size:10px">(optional — makes this a sub-module)</span></label>
+        <select class="ms" id="am-parent">
+          <option value="">— None (top-level module) —</option>
+        </select>
+      </div>
+      <div>
+        <label class="ml">Description</label>
+        <textarea class="ms" id="am-desc" rows="3" style="resize:vertical;font-family:'DM Sans',sans-serif;font-size:13px" placeholder="Brief description of what this module does…"></textarea>
+      </div>
+    </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+        <label class="ml" style="margin-bottom:8px">&#10133; Add Custom Group</label>
+        <div style="display:flex;gap:8px">
+          <input id="customGroupName" class="mi" placeholder="e.g. Reporting" style="background:var(--surface);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;flex:1;box-sizing:border-box">
+          <button class="btn" style="height:36px;padding:0 12px;white-space:nowrap" onclick="addCustomGroup()">Add Group</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAddModuleModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAddModule()">Add Module</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
