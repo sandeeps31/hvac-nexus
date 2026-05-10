@@ -624,7 +624,7 @@
 .pp-status-btn {
   background: transparent;
   border: none;
-  color: var(--text2);
+  color: var(--muted);
   cursor: pointer;
   padding: 5px 10px;
   font-family: 'DM Mono', monospace;
@@ -640,14 +640,17 @@
 .pp-status-btn.active.pp-st-yes {
   background: var(--green-dim);
   color: var(--green);
+  box-shadow: inset 0 0 0 1.5px var(--green);
 }
 .pp-status-btn.active.pp-st-no {
-  background: var(--surface2);
-  color: var(--text);
+  background: var(--danger-dim);
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1.5px var(--danger);
 }
 .pp-status-btn.active.pp-st-na {
   background: var(--surface2);
-  color: var(--muted);
+  color: var(--text2);
+  box-shadow: inset 0 0 0 1.5px var(--text2);
 }
 
 /* Edit drawer trigger + delete */
@@ -1027,68 +1030,45 @@ select.pp-input {
 .pp-drawer-body {
   flex: 1;
   min-height: 0;
-  padding: 18px 20px;
-  overflow-y: auto;
-}
-.pp-drawer-ftr {
-  padding: 12px 20px;
-  border-top: 1px solid var(--border);
+  padding: 16px 20px;
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-shrink: 0;
-  background: var(--surface2);
+  flex-direction: column;
 }
-.pp-drawer-lbl {
-  font-family: 'DM Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 5px;
-  margin-top: 14px;
-  display: block;
-}
-.pp-drawer-lbl:first-child { margin-top: 0; }
-.pp-drawer-input {
+.pp-drawer-textarea {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   width: 100%;
-  background: var(--surface3);
+  background: var(--surface2);
   border: 1.5px solid var(--border);
   border-radius: 7px;
   color: var(--text);
   font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
-  padding: 8px 11px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  padding: 14px 16px;
   outline: none;
+  resize: none;
   box-sizing: border-box;
   transition: border-color .15s;
 }
-.pp-drawer-input:focus { border-color: var(--accent); }
-.pp-drawer-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.pp-drawer-subs {
+.pp-drawer-textarea:focus { border-color: var(--accent); }
+.pp-drawer-textarea::placeholder { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.pp-drawer-ftr {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-.pp-drawer-sub-row {
-  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 6px;
-}
-.pp-drawer-sub-row input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  accent-color: var(--green);
+  gap: 8px;
   flex-shrink: 0;
+  background: var(--surface2);
 }
-.pp-drawer-sub-row .pp-drawer-input { flex: 1; font-size: 12.5px; padding: 6px 9px; }
-.pp-drawer-sub-row .pp-row-del { width: 24px; height: 24px; }
-.pp-drawer-sub-row .pp-notes-icon { padding: 3px 5px; font-size: 12px; }
+.pp-drawer-char-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 10.5px;
+  color: var(--muted);
+}
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1187,20 +1167,27 @@ select.pp-input {
 
   </div>
 
-  <!-- ITEM EDIT DRAWER -->
+  <!-- NOTES DRAWER (notes-only, matches company project plan templates page) -->
   <div class="pp-drawer-overlay" id="pp-drawer-overlay" onclick="ppCloseDrawer()"></div>
   <div class="pp-drawer" id="pp-drawer">
     <div class="pp-drawer-hdr">
       <div class="pp-drawer-hdr-text">
-        <h4 id="pp-drawer-title">Edit Item</h4>
+        <h4 id="pp-drawer-title">Notes</h4>
         <p class="pp-drawer-sub" id="pp-drawer-context">—</p>
       </div>
       <button class="pp-drawer-close" onclick="ppCloseDrawer()" title="Close (Esc)">✕</button>
     </div>
-    <div class="pp-drawer-body" id="pp-drawer-body"></div>
+    <div class="pp-drawer-body">
+      <textarea id="pp-drawer-notes" class="pp-drawer-textarea" placeholder="Things to check:
+- ...
+- ..."></textarea>
+    </div>
     <div class="pp-drawer-ftr">
-      <button class="btn" onclick="ppCloseDrawer()">Cancel</button>
-      <button class="btn primary" id="pp-drawer-save" onclick="ppSaveDrawer()">Save</button>
+      <span class="pp-drawer-char-count" id="pp-drawer-char-count">0 chars</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="ppCloseDrawer()">Cancel</button>
+        <button class="btn primary" onclick="ppSaveDrawer()">Save</button>
+      </div>
     </div>
   </div>
 
@@ -1234,10 +1221,11 @@ const PP_DEFAULT_PHASES = [
 ];
 
 const STATUS_LABELS = {
-  to_do:        { label: 'To do',        cls: 'pp-st-todo' },
+  to_do:        { label: '— Not set —',  cls: 'pp-st-todo' },
   in_progress:  { label: 'In progress',  cls: 'pp-st-prog' },
-  done:         { label: 'Done',         cls: 'pp-st-done' },
-  not_required: { label: 'Not required', cls: 'pp-st-nr'   },
+  done:         { label: 'Yes',          cls: 'pp-st-done' },
+  no:           { label: 'No',           cls: 'pp-st-no'   },
+  not_required: { label: 'N/A',          cls: 'pp-st-nr'   },
   blocked:      { label: 'Blocked',      cls: 'pp-st-blk'  }
 };
 
@@ -1537,7 +1525,6 @@ function ppRenderStage(stage, stageIdx) {
             <th style="width:160px">Assigned To</th>
             <th style="width:50px;text-align:center">Notes</th>
             <th style="width:140px;text-align:center">Status</th>
-            <th style="width:36px"></th>
             <th style="width:30px"></th>
           </tr>
         </thead>
@@ -1569,7 +1556,7 @@ function ppRenderItem(item, stageId) {
   const userName = ppLookupUserName(item.assignedTo);
   const status = item.status || 'to_do';
   const isYes = status === 'done';
-  const isNo  = status === 'to_do' || status === 'in_progress' || status === 'blocked';
+  const isNo  = status === 'no';
   const isNA  = status === 'not_required';
   const hasNotes = !!((item.notes && item.notes.trim()) || (item.comment && item.comment.trim()));
 
@@ -1599,17 +1586,14 @@ function ppRenderItem(item, stageId) {
         </select>
       </td>
       <td style="text-align:center">
-        <button class="pp-notes-icon ${hasNotes?'has-notes':''}" onclick="ppOpenItemDrawer('${item.id}', 'notes')" title="${hasNotes?'Edit notes':'Add notes'}">📝</button>
+        <button class="pp-notes-icon ${hasNotes?'has-notes':''}" onclick="ppOpenNotesDrawer('${item.id}')" title="${hasNotes?'Edit notes':'Add notes'}">📝</button>
       </td>
       <td style="text-align:center">
         <div class="pp-status-grp" role="group" aria-label="Status">
           <button class="pp-status-btn pp-st-yes ${isYes?'active':''}" onclick="ppSetItemStatus('${item.id}','done')" title="Yes">YES</button>
-          <button class="pp-status-btn pp-st-no  ${isNo?'active':''}"  onclick="ppSetItemStatus('${item.id}','to_do')" title="No / Not yet">NO</button>
+          <button class="pp-status-btn pp-st-no  ${isNo?'active':''}"  onclick="ppSetItemStatus('${item.id}','no')" title="No">NO</button>
           <button class="pp-status-btn pp-st-na  ${isNA?'active':''}"  onclick="ppSetItemStatus('${item.id}','not_required')" title="Not Applicable">N/A</button>
         </div>
-      </td>
-      <td>
-        <button class="pp-row-edit-btn" onclick="ppOpenItemDrawer('${item.id}')" title="Edit details">✎</button>
       </td>
       <td>
         <button class="pp-row-del" onclick="ppDeleteItem('${item.id}')" title="Delete">✕</button>
@@ -1647,9 +1631,6 @@ function ppRenderSubItem(sub, parentId) {
         </select>
       </td>
       <td colspan="2"></td>
-      <td>
-        <button class="pp-row-edit-btn" onclick="ppOpenItemDrawer('${parentId}')" title="Edit parent item">✎</button>
-      </td>
       <td>
         <button class="pp-row-del" onclick="ppDeleteSubItem('${parentId}','${sub.id}')" title="Delete sub-item">✕</button>
       </td>
@@ -2059,14 +2040,23 @@ function ppUpdateSubAssignee(parentId, subId, val) {
 function ppSetItemStatus(itemId, status) {
   const r = ppFindItem(itemId);
   if (!r) return;
-  const wasDone = r.item.status === 'done';
-  r.item.status = status;
-  if (status === 'done' && !wasDone) {
-    r.item.completedAt = ppToday();
-    r.item.completedBy = ppCurrentUserName();
-  } else if (status !== 'done') {
+  const cur = r.item.status || 'to_do';
+  const wasDone = cur === 'done';
+
+  // Click the same button that's already active → deselect (back to 'to_do' / unset)
+  if (cur === status) {
+    r.item.status = 'to_do';
     r.item.completedAt = null;
     r.item.completedBy = null;
+  } else {
+    r.item.status = status;
+    if (status === 'done' && !wasDone) {
+      r.item.completedAt = ppToday();
+      r.item.completedBy = ppCurrentUserName();
+    } else {
+      r.item.completedAt = null;
+      r.item.completedBy = null;
+    }
   }
   ppSave();
   ppRender();
@@ -2239,180 +2229,53 @@ function ppCloseAnyMenu() {
 // ─── Item edit modal ───────────────────────────────────────
 // ─── Item edit drawer ──────────────────────────────────────
 let PP_DRAWER_ITEM_ID = null;
-let PP_DRAWER_FOCUS_TAB = null;   // 'notes' to focus notes textarea on open
 
-function ppOpenItemDrawer(itemId, focusTab) {
+function ppOpenNotesDrawer(itemId) {
   const r = ppFindItem(itemId);
   if (!r) return;
   PP_DRAWER_ITEM_ID = itemId;
-  PP_DRAWER_FOCUS_TAB = focusTab || null;
-  ppRenderDrawer();
+  // Header
+  document.getElementById('pp-drawer-context').textContent = r.phase.name + ' · ' + r.stage.name + ' · ' + (r.item.description || 'Untitled');
+  // Textarea
+  const ta = document.getElementById('pp-drawer-notes');
+  ta.value = r.item.notes || '';
+  ppUpdateDrawerCharCount();
+  ta.oninput = ppUpdateDrawerCharCount;
+  // Show drawer
   document.getElementById('pp-drawer-overlay').classList.add('open');
   document.getElementById('pp-drawer').classList.add('open');
-  setTimeout(() => {
-    if (focusTab === 'notes') {
-      const ta = document.getElementById('pp-d-notes');
-      if (ta) { ta.focus(); ta.scrollIntoView({behavior:'smooth', block:'nearest'}); }
-    } else {
-      const desc = document.getElementById('pp-d-desc');
-      if (desc) desc.focus();
-    }
-  }, 240);
+  setTimeout(() => ta.focus(), 240);
 }
 
-function ppRenderDrawer() {
-  const r = ppFindItem(PP_DRAWER_ITEM_ID);
-  if (!r) return;
-  const it = r.item;
-
-  // Header
-  document.getElementById('pp-drawer-context').textContent = r.phase.name + ' · ' + r.stage.name;
-
-  // Assignee
-  let userOpts = '<option value="">— Unassigned —</option>';
-  for (const u of PP_USERS) {
-    const v = u.email || u.id;
-    const sel = (it.assignedTo === u.email || it.assignedTo === u.id) ? ' selected' : '';
-    userOpts += '<option value="' + ppEsc(v) + '"' + sel + '>' + ppEsc(u.name || u.email) + '</option>';
-  }
-
-  // Status (full set in drawer — Yes/No/N/A in row, but full options here including Blocked / In progress)
-  const statusOpts = Object.keys(STATUS_LABELS).map(k =>
-    '<option value="' + k + '"' + (it.status === k ? ' selected' : '') + '>' + STATUS_LABELS[k].label + '</option>'
-  ).join('');
-
-  // Sub-items list
-  let subsHtml = '<div class="pp-drawer-subs" id="pp-d-sublist">';
-  if (it.subs && it.subs.length) {
-    for (const s of it.subs) {
-      const isDone = s.status === 'done';
-      const subHasNotes = !!(s.notes && s.notes.trim());
-      subsHtml += `
-        <div class="pp-drawer-sub-row">
-          <input type="checkbox" ${isDone?'checked':''} onchange="ppToggleSubDone('${it.id}','${s.id}',this.checked);ppRenderDrawer()" />
-          <input class="pp-drawer-input" value="${ppEsc(s.description||'')}" placeholder="Sub-item description…"
-            onchange="ppDrawerSubDescChange('${s.id}', this.value)" />
-          <button class="pp-notes-icon ${subHasNotes?'has-notes':''}" onclick="ppOpenSubNotesDrawer('${s.id}')" title="${subHasNotes?'Edit notes':'Add notes'}">📝</button>
-          <button class="pp-row-del" onclick="ppDrawerSubDelete('${s.id}')" title="Remove">✕</button>
-        </div>`;
-    }
-  }
-  subsHtml += '</div>';
-
-  document.getElementById('pp-drawer-body').innerHTML = `
-    <label class="pp-drawer-lbl">Description</label>
-    <textarea id="pp-d-desc" class="pp-drawer-input" rows="2">${ppEsc(it.description||'')}</textarea>
-
-    <div class="pp-drawer-row">
-      <div>
-        <label class="pp-drawer-lbl">Status</label>
-        <select id="pp-d-status" class="pp-drawer-input">${statusOpts}</select>
-      </div>
-      <div>
-        <label class="pp-drawer-lbl">Assigned to</label>
-        <select id="pp-d-assignee" class="pp-drawer-input">${userOpts}</select>
-      </div>
-    </div>
-
-    <div class="pp-drawer-row">
-      <div>
-        <label class="pp-drawer-lbl">Due date</label>
-        <input type="date" id="pp-d-due" class="pp-drawer-input" value="${ppEsc(it.dueDate||'')}" />
-      </div>
-      <div>
-        <label class="pp-drawer-lbl">Link (URL)</label>
-        <input type="url" id="pp-d-link" class="pp-drawer-input" placeholder="https://…" value="${ppEsc(it.link||'')}" />
-      </div>
-    </div>
-
-    <label class="pp-drawer-lbl">Notes <span style="color:var(--text2);text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif;font-size:11px">— things to check, lessons learned, project-specific context</span></label>
-    <textarea id="pp-d-notes" class="pp-drawer-input" rows="6" placeholder="Things to check:
-- ...
-- ...">${ppEsc(it.notes||'')}</textarea>
-
-    <label class="pp-drawer-lbl">Sub-items</label>
-    ${subsHtml}
-    <button class="btn" onclick="ppDrawerAddSub()" style="margin-top:6px">＋ Add sub-item</button>
-
-    ${it.completedAt ? `<div style="margin-top:14px;padding:8px 12px;background:var(--green-dim);border:1px solid rgba(0,229,160,.3);border-radius:6px;font-size:12px;color:var(--green)">✓ Completed ${ppFmtDate(it.completedAt)}${it.completedBy ? ' by ' + ppEsc(it.completedBy) : ''}</div>` : ''}
-  `;
+function ppUpdateDrawerCharCount() {
+  const ta = document.getElementById('pp-drawer-notes');
+  const cc = document.getElementById('pp-drawer-char-count');
+  if (ta && cc) cc.textContent = (ta.value || '').length + ' chars';
 }
 
 function ppCloseDrawer() {
   document.getElementById('pp-drawer-overlay').classList.remove('open');
   document.getElementById('pp-drawer').classList.remove('open');
   PP_DRAWER_ITEM_ID = null;
-  PP_DRAWER_FOCUS_TAB = null;
 }
 
 function ppSaveDrawer() {
   const r = ppFindItem(PP_DRAWER_ITEM_ID);
-  if (!r) return;
-  const it = r.item;
-
-  const newStatus = document.getElementById('pp-d-status').value;
-  const wasDone = it.status === 'done';
-  const isDone = newStatus === 'done';
-
-  it.description = document.getElementById('pp-d-desc').value.trim();
-  it.status = newStatus;
-  it.assignedTo = document.getElementById('pp-d-assignee').value || null;
-  it.dueDate = document.getElementById('pp-d-due').value || null;
-  it.link = (document.getElementById('pp-d-link').value || '').trim() || null;
-  it.notes = (document.getElementById('pp-d-notes').value || '').trim() || null;
-  if (!wasDone && isDone) {
-    it.completedAt = ppToday();
-    it.completedBy = ppCurrentUserName();
-  } else if (wasDone && !isDone) {
-    it.completedAt = null;
-    it.completedBy = null;
+  if (!r) {
+    ppCloseDrawer();
+    return;
   }
+  const val = (document.getElementById('pp-drawer-notes').value || '').trim();
+  r.item.notes = val || null;
   ppCloseDrawer();
   ppSave();
   ppRender();
 }
 
-function ppDrawerSubDescChange(subId, val) {
-  const r = ppFindSubItem(PP_DRAWER_ITEM_ID, subId);
-  if (!r) return;
-  r.sub.description = val;
-}
-function ppDrawerSubDelete(subId) {
-  if (!confirm('Delete this sub-item?')) return;
-  const r = ppFindItem(PP_DRAWER_ITEM_ID);
-  if (!r) return;
-  r.item.subs = (r.item.subs || []).filter(s => s.id !== subId);
-  ppRenderDrawer();
-}
-function ppDrawerAddSub() {
-  const r = ppFindItem(PP_DRAWER_ITEM_ID);
-  if (!r) return;
-  if (!r.item.subs) r.item.subs = [];
-  r.item.subs.push({ id: ppUid('sub'), description: '', status: 'to_do', assignedTo: null, completedAt: null });
-  ppRenderDrawer();
-  // Focus the new sub input
-  setTimeout(() => {
-    const inputs = document.querySelectorAll('#pp-d-sublist .pp-drawer-input');
-    const last = inputs[inputs.length - 1];
-    if (last) last.focus();
-  }, 30);
-}
-
-function ppOpenSubNotesDrawer(subId) {
-  // For now, just alert until we add a sub-notes layer drawer
-  // (keeping it simple; sub notes can be edited via the drawer body's input)
-  const r = ppFindSubItem(PP_DRAWER_ITEM_ID, subId);
-  if (!r) return;
-  const cur = r.sub.notes || '';
-  const newVal = prompt('Sub-item notes (lessons / context for this specific sub-task):', cur);
-  if (newVal === null) return;
-  r.sub.notes = newVal.trim() || null;
-  ppRenderDrawer();
-}
-
-// Legacy compatibility — pp-modal reference is gone but some callers may still hit ppCloseModal/ppOpenItem
+// Legacy compatibility — old code paths
 function ppCloseModal() { ppCloseDrawer(); }
-function ppOpenItem(itemId) { ppOpenItemDrawer(itemId); }
+function ppOpenItem(itemId) { ppOpenNotesDrawer(itemId); }
+function ppOpenItemDrawer(itemId) { ppOpenNotesDrawer(itemId); }
 
 // ─── Save ──────────────────────────────────────────────────
 async function ppSave() {
