@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Page not found — HVAC Nexus</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0f1419;
+    --surface: #1a1f29;
+    --text: #e8eaed;
+    --text-muted: #9aa0a6;
+    --accent: #4a9eff;
+    --border: #2a3140;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+  }
+  h1 {
+    font-size: 48px;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: 20px;
+    margin-bottom: 16px;
+  }
+  p {
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .path {
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    background: var(--bg);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    display: inline-block;
+    margin: 8px 0;
+    font-size: 14px;
+    word-break: break-all;
+  }
+  .actions {
+    margin-top: 24px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  a.btn {
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: opacity 0.2s;
+  }
+  a.btn:hover { opacity: 0.85; }
+  a.btn.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .redirecting {
+    display: none;
+  }
+  .redirecting.active {
+    display: block;
+  }
+  .no-redirect.hidden {
+    display: none;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="redirecting" id="redirecting">
+    <h1>↻</h1>
+    <h2>Page moved</h2>
+    <p>This page has a new address. Redirecting you now…</p>
+    <p class="path" id="newPath"></p>
+  </div>
+
+  <div class="no-redirect" id="noRedirect">
+    <h1>404</h1>
+    <h2>Page not found</h2>
+    <p>We couldn't find:</p>
+    <p class="path" id="badPath"></p>
+    <div class="actions">
+      <a href="/" class="btn">Go to dashboard</a>
+      <a href="javascript:history.back()" class="btn secondary">Go back</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Smart redirect: if the old URL was hvac-*.html, send them to the new prefix-less version.
+  // Preserves query strings and hash fragments (e.g. ?id=DRG-001#section).
+  (function () {
+    const path = location.pathname;
+    const match = path.match(/\/hvac-(.+\.html)$/i);
+
+    if (match) {
+      const newPath = '/' + match[1] + location.search + location.hash;
+      document.getElementById('redirecting').classList.add('active');
+      document.getElementById('noRedirect').classList.add('hidden');
+      document.getElementById('newPath').textContent = newPath;
+      // Use replace() so the bad URL doesn't pollute browser history
+      setTimeout(function () { location.replace(newPath); }, 600);
+    } else {
+      document.getElementById('badPath').textContent = path;
+    }
+  })();
+</script>
+</body>
+</html>

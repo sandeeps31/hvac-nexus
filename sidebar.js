@@ -25,11 +25,11 @@
         <span class="sb-group-name">Financials</span>
       </div>
       <div class="sb-group-items" id="gitems-financials">
-        <div class="sb-item" onclick="navTo('hvac-budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
-        <div class="sb-item" onclick="navTo('hvac-progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span></div>
-        <div class="sb-item" onclick="navTo('hvac-vendor-invoices.html')"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
-        <div class="sb-item" onclick="navTo('hvac-variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span></div>
-        <div class="sb-item" onclick="navTo('hvac-subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span></div>
+        <div class="sb-item" onclick="navTo('budget.html')"><span class="sb-item-icon">📊</span><span class="sb-item-label">Budget</span></div>
+        <div class="sb-item" onclick="navTo('progress-claims.html')"><span class="sb-item-icon">📈</span><span class="sb-item-label">Progress claims</span></div>
+        <div class="sb-item" onclick="navTo('vendor-invoices.html')"><span class="sb-item-icon">🧾</span><span class="sb-item-label">Vendor invoices</span></div>
+        <div class="sb-item" onclick="navTo('variations.html')"><span class="sb-item-icon">🔄</span><span class="sb-item-label">Variations</span></div>
+        <div class="sb-item" onclick="navTo('subcontractor-variations.html')"><span class="sb-item-icon">👥</span><span class="sb-item-label">Subbie variations</span></div>
       </div>
     </div>
 
@@ -39,10 +39,10 @@
         <span class="sb-group-name">Procurement</span>
       </div>
       <div class="sb-group-items" id="gitems-procurement">
-        <div class="sb-item" onclick="navTo('hvac-procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
-        <div class="sb-item" onclick="navTo('hvac-procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
-        <div class="sb-item" onclick="navTo('hvac-material-receiving.html')"><span class="sb-item-icon">🚚</span><span class="sb-item-label">Material receiving</span></div>
-        <div class="sb-item" onclick="navTo('hvac-subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span></div>
+        <div class="sb-item" onclick="navTo('procurement-schedule.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Procurement schedule</span></div>
+        <div class="sb-item" onclick="navTo('procurement-pos.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Purchase orders</span></div>
+        <div class="sb-item" onclick="navTo('material-receiving.html')"><span class="sb-item-icon">🚚</span><span class="sb-item-label">Material receiving</span></div>
+        <div class="sb-item" onclick="navTo('subcontractor-agreements.html')"><span class="sb-item-icon">📝</span><span class="sb-item-label">Subcontractor agreements</span></div>
       </div>
     </div>
 
@@ -53,11 +53,11 @@
       </div>
       <div class="sb-group-items" id="gitems-technical">
         <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">❓</span><span class="sb-item-label">RFI</span></div>
-        <div class="sb-item" onclick="navTo('hvac-tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span></div>
-        <div class="sb-item" onclick="navTo('hvac-drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></div>
-        <div class="sb-item" onclick="navTo('hvac-specifications.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span></div>
-        <div class="sb-item" onclick="navTo('hvac-equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span></div>
-        <div class="sb-item" onclick="navTo('hvac-boards.html')"><span class="sb-item-icon">⚡</span><span class="sb-item-label">Boards Schedule</span></div>
+        <div class="sb-item" onclick="navTo('tech-submissions.html')"><span class="sb-item-icon">📤</span><span class="sb-item-label">Tech submissions</span></div>
+        <div class="sb-item" onclick="navTo('drawings.html')"><span class="sb-item-icon">📐</span><span class="sb-item-label">Drawings</span></div>
+        <div class="sb-item" onclick="navTo('specifications.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Specifications</span></div>
+        <div class="sb-item" onclick="navTo('equipment-schedule.html')"><span class="sb-item-icon">🗂️</span><span class="sb-item-label">Equipment schedules</span></div>
+        <div class="sb-item" onclick="navTo('boards.html')"><span class="sb-item-icon">⚡</span><span class="sb-item-label">Boards Schedule</span></div>
         <div class="sb-item" onclick="navTo('project-plan.html')"><span class="sb-item-icon">📅</span><span class="sb-item-label">Project plan</span></div>
       </div>
     </div>
@@ -68,9 +68,9 @@
         <span class="sb-group-name">Quality</span>
       </div>
       <div class="sb-group-items" id="gitems-quality">
-        <div class="sb-item" onclick="navTo('hvac-itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
-        <div class="sb-item" onclick="navTo('hvac-fire-register.html')"><span class="sb-item-icon">🔥</span><span class="sb-item-label">Passive fire</span></div>
-        <div class="sb-item" onclick="navTo('hvac-defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
+        <div class="sb-item" onclick="navTo('itp.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">ITPs</span></div>
+        <div class="sb-item" onclick="navTo('fire-register.html')"><span class="sb-item-icon">🔥</span><span class="sb-item-label">Passive fire</span></div>
+        <div class="sb-item" onclick="navTo('defects.html')"><span class="sb-item-icon">⚠️</span><span class="sb-item-label">Defects</span></div>
         <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">📄</span><span class="sb-item-label">NCR</span></div>
       </div>
     </div>
@@ -81,10 +81,10 @@
         <span class="sb-group-name">Commissioning</span>
       </div>
       <div class="sb-group-items" id="gitems-commissioning">
-        <div class="sb-item" onclick="navTo('hvac-commissioning-plan.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning plan</span></div>
-        <div class="sb-item" onclick="navTo('hvac-precommissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span></div>
+        <div class="sb-item" onclick="navTo('commissioning-plan.html')"><span class="sb-item-icon">📋</span><span class="sb-item-label">Commissioning plan</span></div>
+        <div class="sb-item" onclick="navTo('precommissioning.html')"><span class="sb-item-icon">✔️</span><span class="sb-item-label">Pre-commissioning</span></div>
         <div class="sb-item sb-item-disabled" style="opacity:.4;cursor:default"><span class="sb-item-icon">👁️</span><span class="sb-item-label">Witness testing</span></div>
-        <div class="sb-item" onclick="navTo('hvac-commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span></div>
+        <div class="sb-item" onclick="navTo('commissioning.html')"><span class="sb-item-icon">⚙️</span><span class="sb-item-label">Commissioning tracker</span></div>
       </div>
     </div>
 
@@ -94,8 +94,8 @@
         <span class="sb-group-name">Handover</span>
       </div>
       <div class="sb-group-items" id="gitems-handover">
-        <div class="sb-item" onclick="navTo('hvac-asset-register.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Asset register</span></div>
-        <div class="sb-item" onclick="navTo('hvac-om-manual.html')"><span class="sb-item-icon">📖</span><span class="sb-item-label">O&amp;M manuals</span></div>
+        <div class="sb-item" onclick="navTo('asset-register.html')"><span class="sb-item-icon">📦</span><span class="sb-item-label">Asset register</span></div>
+        <div class="sb-item" onclick="navTo('om-manual.html')"><span class="sb-item-icon">📖</span><span class="sb-item-label">O&amp;M manuals</span></div>
         <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">🔧</span><span class="sb-item-label">Maintenance plan</span></div>
         <div class="sb-item" style="opacity:.45;pointer-events:none"><span class="sb-item-icon">🎓</span><span class="sb-item-label">User training</span></div>
       </div>
@@ -214,6 +214,6 @@
     }catch(e){}
     localStorage.removeItem('hvacnexus_session');
     localStorage.removeItem('hvacnexus_company_id');
-    window.location.href='hvac-login.html';
+    window.location.href='login.html';
   };
 })();
