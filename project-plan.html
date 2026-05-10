@@ -363,11 +363,26 @@
   padding: 0 22px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
+  overflow-x: scroll;
+  overflow-y: hidden;
   flex-shrink: 0;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) var(--surface2);
 }
-.pp-tabs::-webkit-scrollbar { display: none; }
+.pp-tabs::-webkit-scrollbar {
+  height: 8px;
+  display: block;
+}
+.pp-tabs::-webkit-scrollbar-track {
+  background: var(--surface2);
+}
+.pp-tabs::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+.pp-tabs::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
 .pp-tab {
   padding: 9px 18px;
   font-size: 13px;
@@ -756,6 +771,7 @@
   color: var(--muted);
   font-size: 13px;
   padding-left: 8px;
+  flex-shrink: 0;
 }
 .pp-sub-desc {
   color: var(--text2);
@@ -764,9 +780,18 @@
   align-items: center;
   gap: 8px;
 }
+.pp-sub-desc-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pp-sub-desc-wrap .pp-step-input {
+  font-size: 12.5px;
+  color: var(--text2);
+}
 .pp-sub-strike {
   text-decoration: line-through;
-  color: var(--muted);
+  color: var(--muted) !important;
 }
 
 /* ── Empty state ── */
@@ -1607,22 +1632,28 @@ function ppRenderItem(item, stageId) {
 }
 
 function ppRenderSubItem(sub, parentId) {
-  const isDone = sub.status === 'done';
-  const userName = ppLookupUserName(sub.assignedTo);
+  const status = sub.status || 'to_do';
+  const isYes = status === 'done';
+  const isNo  = status === 'no';
+  const isNA  = status === 'not_required';
+  const isSettled = isYes || isNA;   // strikethrough when item is in a "settled" state
+  const hasNotes = !!(sub.notes && sub.notes.trim());
+
   let assigneeOpts = '<option value="">— Unassigned —</option>';
   for (const u of PP_USERS) {
     const v = u.email || u.id;
     const sel = (sub.assignedTo === u.email || sub.assignedTo === u.id) ? ' selected' : '';
     assigneeOpts += '<option value="' + ppEsc(v) + '"' + sel + '>' + ppEsc(u.name || u.email) + '</option>';
   }
+
   return `
     <tr class="pp-subitem-row">
       <td></td>
       <td>
-        <div class="pp-sub-desc ${isDone?'pp-sub-strike':''}">
-          <input type="checkbox" ${isDone?'checked':''} onchange="ppToggleSubDone('${parentId}','${sub.id}',this.checked)" style="accent-color:var(--green)" />
+        <div class="pp-sub-desc-wrap">
           <span class="pp-sub-bullet">↳</span>
-          <span style="flex:1">${ppEsc(sub.description)}</span>
+          <input class="pp-step-input ${isSettled?'pp-sub-strike':''}" value="${ppEsc(sub.description||'')}" placeholder="Sub-item description…"
+            onchange="ppUpdateSubDesc('${parentId}','${sub.id}', this.value)" />
         </div>
       </td>
       <td>
@@ -1630,7 +1661,16 @@ function ppRenderSubItem(sub, parentId) {
           ${assigneeOpts}
         </select>
       </td>
-      <td colspan="2"></td>
+      <td style="text-align:center">
+        <button class="pp-notes-icon ${hasNotes?'has-notes':''}" onclick="ppOpenSubNotesDrawer('${parentId}','${sub.id}')" title="${hasNotes?'Edit notes':'Add notes'}">📝</button>
+      </td>
+      <td style="text-align:center">
+        <div class="pp-status-grp" role="group" aria-label="Status">
+          <button class="pp-status-btn pp-st-yes ${isYes?'active':''}" onclick="ppSetSubStatus('${parentId}','${sub.id}','done')" title="Yes">YES</button>
+          <button class="pp-status-btn pp-st-no  ${isNo?'active':''}"  onclick="ppSetSubStatus('${parentId}','${sub.id}','no')" title="No">NO</button>
+          <button class="pp-status-btn pp-st-na  ${isNA?'active':''}"  onclick="ppSetSubStatus('${parentId}','${sub.id}','not_required')" title="Not Applicable">N/A</button>
+        </div>
+      </td>
       <td>
         <button class="pp-row-del" onclick="ppDeleteSubItem('${parentId}','${sub.id}')" title="Delete sub-item">✕</button>
       </td>
@@ -2026,6 +2066,33 @@ function ppUpdateSubAssignee(parentId, subId, val) {
   ppSave();
   ppRender();
 }
+function ppUpdateSubDesc(parentId, subId, val) {
+  const r = ppFindSubItem(parentId, subId);
+  if (!r) return;
+  r.sub.description = val;
+  ppSave();
+}
+function ppSetSubStatus(parentId, subId, status) {
+  const r = ppFindSubItem(parentId, subId);
+  if (!r) return;
+  const cur = r.sub.status || 'to_do';
+  const wasDone = cur === 'done';
+
+  // Click the same button that's already active → deselect (back to 'to_do' / unset)
+  if (cur === status) {
+    r.sub.status = 'to_do';
+    r.sub.completedAt = null;
+  } else {
+    r.sub.status = status;
+    if (status === 'done' && !wasDone) {
+      r.sub.completedAt = ppToday();
+    } else {
+      r.sub.completedAt = null;
+    }
+  }
+  ppSave();
+  ppRender();
+}
 function ppSetItemStatus(itemId, status) {
   const r = ppFindItem(itemId);
   if (!r) return;
@@ -2216,21 +2283,36 @@ function ppCloseAnyMenu() {
 }
 
 // ─── Item edit modal ───────────────────────────────────────
-// ─── Item edit drawer ──────────────────────────────────────
-let PP_DRAWER_ITEM_ID = null;
+// ─── Notes drawer (item or sub-item) ────────────────────────
+let PP_DRAWER_CTX = null;   // { kind: 'item'|'sub', itemId, subId? }
 
 function ppOpenNotesDrawer(itemId) {
   const r = ppFindItem(itemId);
   if (!r) return;
-  PP_DRAWER_ITEM_ID = itemId;
-  // Header
-  document.getElementById('pp-drawer-context').textContent = r.phase.name + ' · ' + r.stage.name + ' · ' + (r.item.description || 'Untitled');
-  // Textarea
+  PP_DRAWER_CTX = { kind: 'item', itemId: itemId };
+  document.getElementById('pp-drawer-title').textContent = 'Notes';
+  document.getElementById('pp-drawer-context').textContent =
+    r.phase.name + ' · ' + r.stage.name + ' · ' + (r.item.description || 'Untitled');
   const ta = document.getElementById('pp-drawer-notes');
   ta.value = r.item.notes || '';
   ppUpdateDrawerCharCount();
   ta.oninput = ppUpdateDrawerCharCount;
-  // Show drawer
+  document.getElementById('pp-drawer-overlay').classList.add('open');
+  document.getElementById('pp-drawer').classList.add('open');
+  setTimeout(() => ta.focus(), 240);
+}
+
+function ppOpenSubNotesDrawer(parentId, subId) {
+  const r = ppFindSubItem(parentId, subId);
+  if (!r) return;
+  PP_DRAWER_CTX = { kind: 'sub', itemId: parentId, subId: subId };
+  document.getElementById('pp-drawer-title').textContent = 'Sub-item Notes';
+  document.getElementById('pp-drawer-context').textContent =
+    r.phase.name + ' · ' + r.stage.name + ' · ' + (r.item.description || 'Item') + ' · ↳ ' + (r.sub.description || 'Sub-item');
+  const ta = document.getElementById('pp-drawer-notes');
+  ta.value = r.sub.notes || '';
+  ppUpdateDrawerCharCount();
+  ta.oninput = ppUpdateDrawerCharCount;
   document.getElementById('pp-drawer-overlay').classList.add('open');
   document.getElementById('pp-drawer').classList.add('open');
   setTimeout(() => ta.focus(), 240);
@@ -2245,17 +2327,20 @@ function ppUpdateDrawerCharCount() {
 function ppCloseDrawer() {
   document.getElementById('pp-drawer-overlay').classList.remove('open');
   document.getElementById('pp-drawer').classList.remove('open');
-  PP_DRAWER_ITEM_ID = null;
+  PP_DRAWER_CTX = null;
 }
 
 function ppSaveDrawer() {
-  const r = ppFindItem(PP_DRAWER_ITEM_ID);
-  if (!r) {
-    ppCloseDrawer();
-    return;
-  }
+  const ctx = PP_DRAWER_CTX;
+  if (!ctx) { ppCloseDrawer(); return; }
   const val = (document.getElementById('pp-drawer-notes').value || '').trim();
-  r.item.notes = val || null;
+  if (ctx.kind === 'sub') {
+    const r = ppFindSubItem(ctx.itemId, ctx.subId);
+    if (r) r.sub.notes = val || null;
+  } else {
+    const r = ppFindItem(ctx.itemId);
+    if (r) r.item.notes = val || null;
+  }
   ppCloseDrawer();
   ppSave();
   ppRender();
