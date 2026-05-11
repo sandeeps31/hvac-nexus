@@ -425,16 +425,6 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
 .precx-location.collapsed .precx-location-chev{transform:rotate(-90deg)}
 .precx-location-body{padding:6px 8px 8px}
 
-.precx-sublocation{background:var(--surface);border:1px solid var(--border);border-radius:7px;margin-bottom:6px;overflow:hidden}
-.precx-sublocation-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;user-select:none;transition:background .13s}
-.precx-sublocation-hdr:hover{background:var(--surface2)}
-.precx-sublocation.collapsed .precx-sublocation-hdr{border-bottom:none}
-.precx-sublocation.collapsed .precx-sublocation-body{display:none}
-.precx-sublocation-name{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);flex:1;letter-spacing:.3px}
-.precx-sublocation-chev{font-size:10px;color:var(--muted);transition:transform .2s}
-.precx-sublocation.collapsed .precx-sublocation-chev{transform:rotate(-90deg)}
-.precx-sublocation-body{padding:4px 4px 6px}
-
 
 /* ── PRECX LIST VIEW ── */
 .precx-list-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
@@ -539,9 +529,7 @@ tr.dep-blocked td:first-child{border-left:3px solid var(--warn)}
     <button class="btn btn-ghost btn-sm">⬇ Export</button>
     <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button>
   </div>
-
-    <a class="gear-btn" href="company-settings.html" title="Company Settings">&#9881;</a>
-  </div>
+</div>
 
 <!-- HOME — auto-redirects to tracker -->
 <div class="view active" id="view-home"></div>
@@ -918,7 +906,7 @@ async function confirmSync(){
           id:'tr'+uid(),tag:tag,
           clientDocNo:'',cxItpNo:genCxItpNo(),
           name:(r.desc||r.name||typeName+' '+tag).trim(),
-          type:typeName,location:(r.location||''),subloc:(r.sublocation||r.subloc||''),
+          type:typeName,location:(r.location||''),
           locServing:(r.locServing||r.area_served||''),design:design,actual:null,
           precxAuto:'',precxManual:'',mssb:'',boardLoc:'',mssbPowered:'',
           airflowVerif:'',localFuncCx:'',itcSubmitted:'',witnessed:'',intBmsCx:'',
@@ -1032,7 +1020,7 @@ async function renderTracker(){
       var d2=JSON.parse(raw2);
       var mssbTab=(d2.tabs||[]).find(function(t){return t.type==='mssb';});
       if(mssbTab)(mssbTab.rows||[]).forEach(function(r){
-        if(r.equip&&r.tag) mssbByEquip[r.equip.trim()]={mssbTag:r.tag,boardLoc:r.location||'',subloc:r.sublocation||''};
+        if(r.equip&&r.tag) mssbByEquip[r.equip.trim()]={mssbTag:r.tag,boardLoc:r.location||''};
       });
     }
   }catch(e){}
@@ -1231,7 +1219,6 @@ async function renderTracker(){
       col('cxItpNo','<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--purple)">'+escH2(t.cxItpNo||'—')+'</span>')+
       col('type','<span style="font-size:12px;color:var(--text)">'+escH2(t.type||'—')+'</span>')+
       col('location','<span style="font-size:12px;color:var(--text2)">'+escH2(t.location||'—')+'</span>')+
-      col('subloc','<span style="font-size:12px;color:var(--text2)">'+escH2(t.subloc||'—')+'</span>')+
       col('locServing',tx(t.locServing,idx,'locServing','Area served','130px'))+
       colS('autoStatus','','<span style="display:inline-block;padding:3px 9px;border-radius:20px;font-family:DM Mono,monospace;font-size:9.5px;background:var(--surface3);color:'+stColor+';border:1px solid '+stColor+'44">'+stLabel+'</span>')+
       col('precx',precxCell)+
@@ -1310,7 +1297,7 @@ function addWD(dateStr,days){
 
 // ── COLUMN VISIBILITY (Fix 4) ──
 var CX_COL_DEFS=[
-  {k:'clientDocNo',l:'Client Doc No',def:true},{k:'cxItpNo',l:'Cx ITP No',def:true},{k:'type',l:'Equipment Type',def:true},{k:'location',l:'Location',def:true},{k:'subloc',l:'Sub Location',def:true},
+  {k:'clientDocNo',l:'Client Doc No',def:true},{k:'cxItpNo',l:'Cx ITP No',def:true},{k:'type',l:'Equipment Type',def:true},{k:'location',l:'Location',def:true},
   {k:'locServing',l:'Location Serving',def:true},{k:'autoStatus',l:'Auto Status',def:true},
   {k:'precx',l:'Pre-Cx Complete',def:true},{k:'mssb',l:'MSSB',def:true},
   {k:'boardLoc',l:'Board Location',def:true},{k:'mssbPowered',l:'MSSB Powered',def:true},
@@ -1544,7 +1531,7 @@ function manualPrecx(idx){
   sel.focus();
 }
 function addTrackerRow(){trackerItems.push({
-  id:'tr'+uid(),tag:'',name:'',type:'',location:'',subloc:'',locServing:'',
+  id:'tr'+uid(),tag:'',name:'',type:'',location:'',locServing:'',
   clientDocNo:'',cxItpNo:genCxItpNo(),
   design:null,actual:null,
   precxAuto:'',precxManual:'',
@@ -1716,7 +1703,7 @@ function openEqPanel(idx){
   if(!t) return;
   if(!_epDocs[t.tag]) _epDocs[t.tag] = t.docs || {testSheets:[], supportDocs:[], notes:t.notes||''};
   document.getElementById('epTag').textContent = t.tag;
-  document.getElementById('epType').textContent = [t.type, t.location, t.subloc].filter(Boolean).join(' · ');
+  document.getElementById('epType').textContent = [t.type, t.location].filter(Boolean).join(' · ');
   renderEqPanel(idx);
   document.getElementById('eqPanel').classList.add('open');
   document.getElementById('eqPanelOverlay').classList.add('open');
@@ -1893,7 +1880,6 @@ function renderEqPanel(idx){
     +'<div class="eq-meta-item"><div class="eq-meta-lbl">Equipment ID</div><div class="eq-meta-val" style="font-family:DM Mono,monospace;color:var(--accent)">'+escH2(t.tag)+'</div></div>'
     +'<div class="eq-meta-item"><div class="eq-meta-lbl">Type</div><div class="eq-meta-val">'+escH2(t.type||'—')+'</div></div>'
     +'<div class="eq-meta-item"><div class="eq-meta-lbl">Location</div><div class="eq-meta-val">'+escH2(t.location||'—')+'</div></div>'
-    +'<div class="eq-meta-item"><div class="eq-meta-lbl">Sub-Location</div><div class="eq-meta-val">'+escH2(t.subloc||'—')+'</div></div>'
     +'</div></div>'
     +'<div class="eq-section"><div class="eq-section-title">Commissioning Status</div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
@@ -2171,7 +2157,6 @@ async function buildEquipPdf(tag,t,d){
   // Details
   var detY=H-220,detRows=[];
   if(t&&t.location)detRows.push(['Location',t.location]);
-  if(t&&t.subloc)detRows.push(['Sub-Location',t.subloc]);
   if(t&&t.type)detRows.push(['Equipment Type',t.type]);
   if(t&&t.clientDocNo)detRows.push(['Client Doc No',t.clientDocNo]);
   if(t&&t.cxItpNo)detRows.push(['Cx ITP No',t.cxItpNo]);
@@ -2477,7 +2462,6 @@ function savePrecx(){
 function openAreaModal(){
   document.getElementById('areaBuilding').value='';
   document.getElementById('areaLocation').value='';
-  document.getElementById('areaSubLocation').value='';
   document.getElementById('areaModal').classList.add('open');
   setTimeout(function(){document.getElementById('areaBuilding').focus();},120);
 }
@@ -2499,8 +2483,7 @@ async function getPrecxTemplateData(){
 function confirmAddArea(){
   var parts=[
     document.getElementById('areaBuilding').value.trim(),
-    document.getElementById('areaLocation').value.trim(),
-    document.getElementById('areaSubLocation').value.trim()
+    document.getElementById('areaLocation').value.trim()
   ].filter(Boolean);
   var name=parts.join(' — ');
   if(!name) name='Untitled Area';
@@ -2509,7 +2492,6 @@ function confirmAddArea(){
 
   var bld=document.getElementById('areaBuilding').value.trim();
   var loc=document.getElementById('areaLocation').value.trim();
-  var sub=document.getElementById('areaSubLocation').value.trim();
 
   if(templateSections&&templateSections.length){
     templateSections.forEach(function(tplSec){
@@ -2517,12 +2499,12 @@ function confirmAddArea(){
         return {id:puid(),text:text,yna:'',comment:'',trade:'',signoff:{}};
       });
       precxData.push({id:puid(),title:name+' — '+tplSec.title,
-        bld:bld,loc:loc,sub:sub,secTitle:tplSec.title,
+        bld:bld,loc:loc,secTitle:tplSec.title,
         collapsed:false,items:items,signoff:{}});
     });
   } else {
     precxData.push({id:puid(),title:name,
-      bld:bld,loc:loc,sub:sub,secTitle:name,
+      bld:bld,loc:loc,secTitle:name,
       collapsed:false,items:[],signoff:{}});
     showPrecxToast('No Pre-Cx template uploaded yet. Go to Company Settings → Pre-Cx Template to upload one.');
   }
@@ -2530,7 +2512,7 @@ function confirmAddArea(){
   savePrecx();
   closeAreaModal();
   // Navigate straight to the detail view for the new area
-  var newKey=(bld||'')+'|||'+(loc||'')+'|||'+(sub||'');
+  var newKey=(bld||'')+'|||'+(loc||'');
   if(document.getElementById('view-precx-detail')){
     showView('precx');  // ensure precx view is active first
     openPrecxDetail(newKey);
@@ -2620,26 +2602,23 @@ function parsePrecxTitle(title){
   return{
     building:parts[0]||'',
     location:parts[1]||'',
-    sublocation:parts[2]||'',
-    section:parts.slice(3).join(' — ')
+    section:parts.slice(2).join(' — ')
   };
 }
 
 function getAreaKey(sec){
-  // Use stored fields if available (new format)
-  if(sec.bld!==undefined||sec.loc!==undefined||sec.sub!==undefined){
-    return (sec.bld||'')+'|||'+(sec.loc||'')+'|||'+(sec.sub||'');
+  // Use stored fields if available (new format: bld + loc only)
+  if(sec.bld!==undefined||sec.loc!==undefined){
+    return (sec.bld||'')+'|||'+(sec.loc||'');
   }
   // Legacy: parse from title — area is everything except the last part
   var parts=(sec.title||'').split(' — ');
-  if(parts.length>=4){
-    return parts[0]+'|||'+parts[1]+'|||'+parts[2];
-  } else if(parts.length===3){
-    return parts[0]+'|||'+parts[1]+'|||'+'';
+  if(parts.length>=3){
+    return parts[0]+'|||'+parts[1];
   } else if(parts.length===2){
-    return parts[0]+'|||'+'|||'+'';
+    return parts[0]+'|||'+'';
   }
-  return sec.title+'|||'+'|||'+'';
+  return sec.title+'|||'+'';
 }
 
 function getAreaStatus(secs){
@@ -2677,7 +2656,6 @@ function renderPrecx(){
   // Populate filter dropdowns
   var blds=[...new Set(areaOrder.map(function(k){return k.split('|||')[0];}))].filter(Boolean);
   var locs=[...new Set(areaOrder.map(function(k){return k.split('|||')[1];}))].filter(Boolean);
-  var subs=[...new Set(areaOrder.map(function(k){return k.split('|||')[2];}))].filter(Boolean);
   function setOpts(selId, vals){
     var sel=document.getElementById(selId); if(!sel) return;
     var cur=sel.value;
@@ -2685,27 +2663,25 @@ function renderPrecx(){
     sel.innerHTML='<option value="">'+first+'</option>';
     vals.forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v;if(v===cur)o.selected=true;sel.appendChild(o);});
   }
-  setOpts('pf-bld',blds); setOpts('pf-loc',locs); setOpts('pf-sub',subs);
+  setOpts('pf-bld',blds); setOpts('pf-loc',locs);
 
   // Get filter values
   var fbld=(document.getElementById('pf-bld')||{}).value||'';
   var floc=(document.getElementById('pf-loc')||{}).value||'';
-  var fsub=(document.getElementById('pf-sub')||{}).value||'';
   var fst=(document.getElementById('pf-status')||{}).value||'';
 
   tbody.innerHTML='';
 
   if(!areaOrder.length){
-    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:48px"><span style="color:var(--muted)">No checklists yet — </span><button onclick="openAreaModal()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;font-family:DM Sans,sans-serif;text-decoration:underline">＋ Add Checklist</button><span style="color:var(--muted)"> to get started</span></td></tr>';
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:48px"><span style="color:var(--muted)">No checklists yet — </span><button onclick="openAreaModal()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;font-family:DM Sans,sans-serif;text-decoration:underline">＋ Add Checklist</button><span style="color:var(--muted)"> to get started</span></td></tr>';
     return;
   }
 
   areaOrder.forEach(function(key){
     var kparts=key.split('|||');
-    var bld=kparts[0]||'', loc=kparts[1]||'', sub=kparts[2]||'';
+    var bld=kparts[0]||'', loc=kparts[1]||'';
     if(fbld&&bld!==fbld) return;
     if(floc&&loc!==floc) return;
-    if(fsub&&sub!==fsub) return;
     var secs=areas[key];
     var prog=getAreaStatus(secs);
     if(fst&&prog.status!==fst) return;
@@ -2717,8 +2693,7 @@ function renderPrecx(){
     tr.innerHTML=
       '<td style="font-weight:600;color:var(--text)">'+escH(bld||'—')+'</td>'
       +'<td style="color:var(--text2)">'+escH(loc||'—')+'</td>'
-      +'<td><span class="precx-sublocation-name" style="letter-spacing:0">'+escH(sub||'—')+'</span></td>'
-      
+
       +'<td><div class="precx-prog-wrap">'
         +'<div class="precx-prog-bar"><div class="precx-prog-fill'+(prog.status==='inprogress'?' warn':prog.status==='notstarted'?' none':'')+'" style="width:'+prog.pct+'%"></div></div>'
         +'<span style="font-size:11px;color:'+pctColor+'">'+prog.answered+'/'+prog.total+'</span>'
@@ -2731,10 +2706,10 @@ function renderPrecx(){
 
 function openPrecxDetail(key){
   var kparts=key.split('|||');
-  var bld=kparts[0]||'', loc=kparts[1]||'', sub=kparts[2]||'';
+  var bld=kparts[0]||'', loc=kparts[1]||'';
   var secs=precxData.filter(function(s){return getAreaKey(s)===key;});
 
-  document.getElementById('precxDetailTitle').textContent=[bld,loc,sub].filter(Boolean).join(' — ')||'Checklist';
+  document.getElementById('precxDetailTitle').textContent=[bld,loc].filter(Boolean).join(' — ')||'Checklist';
   document.getElementById('precxDetailSub').textContent=secs.length+' section'+(secs.length!==1?'s':'')+' · '+
     secs.reduce(function(a,s){return a+s.items.length;},0)+' items';
 
@@ -3129,7 +3104,6 @@ var MSSB_FIXED_COLS=[
   {k:'tag',l:'Board ID',fixed:true,visible:true,type:'text',width:'180px'},
   {k:'type',l:'Type',fixed:false,visible:true,type:'text',width:'90px'},
   {k:'location',l:'Location',fixed:false,visible:true,type:'text',width:'110px'},
-  {k:'subloc',l:'Sub Location',fixed:false,visible:true,type:'text',width:'130px'},
   {k:'energised',l:'Energisation Status',fixed:false,visible:true,type:'yn',width:'130px'},
   {k:'commissioned',l:'Commissioned',fixed:false,visible:true,type:'yn',width:'120px'},
   {k:'comments',l:'Comments',fixed:false,visible:true,type:'text',width:'180px'},
@@ -3154,7 +3128,7 @@ async function loadMssbFromSchedule(){
     mssbTab.rows.forEach(function(r){
       var exists=mssbRows.find(function(x){return x.tag===r.tag&&x.tag!=='';});
       if(!exists){
-      mssbRows.push({id:mid(),tag:r.tag||'',type:'MSSB',location:r.location||'',subloc:r.sublocation||'',energised:'',commissioned:'',comments:'',itc_sub:'',itc_wit:''});
+      mssbRows.push({id:mid(),tag:r.tag||'',type:'MSSB',location:r.location||'',energised:'',commissioned:'',comments:'',itc_sub:'',itc_wit:''});
       imported++;
       }
     });
@@ -3186,20 +3160,18 @@ async function loadMssbFromSchedule(){
       }
       try{
       var rowsJs='['+match[1]+']';
-      // Safely extract tag/location/sublocation using regex
+      // Safely extract tag/location using regex
       var tagReg=/tag:'([^']*)'/g;
       var locReg=/location:'([^']*)'/g;
-      var subReg=/sublocation:'([^']*)'/g;
-      var tags=[],locs=[],subs=[];
+      var tags=[],locs=[];
       var m; while((m=tagReg.exec(rowsJs))!==null) tags.push(m[1]);
       locReg.lastIndex=0; while((m=locReg.exec(rowsJs))!==null) locs.push(m[1]);
-      subReg.lastIndex=0; while((m=subReg.exec(rowsJs))!==null) subs.push(m[1]);
       var imported=0;
       for(var i=0;i<tags.length;i++){
         var tag=tags[i]; if(!tag) continue;
         var exists=mssbRows.find(function(x){return x.tag===tag;});
         if(!exists){
-        mssbRows.push({id:mid(),tag:tag,type:'MSSB',location:locs[i]||'',subloc:subs[i]||'',energised:'',commissioned:'',comments:'',itc_sub:'',itc_wit:''});
+        mssbRows.push({id:mid(),tag:tag,type:'MSSB',location:locs[i]||'',energised:'',commissioned:'',comments:'',itc_sub:'',itc_wit:''});
         imported++;
         }
       }
@@ -3317,7 +3289,7 @@ function renderMssbSummary(){
 }
 
 function addMssbRow(){
-  mssbRows.push({id:mid(),tag:'',type:'',location:'',subloc:'',energised:'',commissioned:'',comments:'',itc_sub:'',itc_wit:''});
+  mssbRows.push({id:mid(),tag:'',type:'',location:'',energised:'',commissioned:'',comments:'',itc_sub:'',itc_wit:''});
   saveMssb();renderMssb();
   setTimeout(function(){var tags=document.querySelectorAll('#mssbTbody tr:last-child .mssb-ti');if(tags.length)tags[0].focus();},60);
 }
@@ -3540,9 +3512,7 @@ function toggleGroup(id){var items=document.getElementById('gitems-'+id);var che
   <label class="mo-label">Building</label>
   <input class="mo-input" id="areaBuilding" placeholder="e.g. Tower A, Block B…" maxlength="60" onkeydown="if(event.key==='Enter')document.getElementById('areaLocation').focus()"/>
   <label class="mo-label" style="margin-top:10px">Location</label>
-  <input class="mo-input" id="areaLocation" placeholder="e.g. Level 3, Roof, Basement…" maxlength="60" onkeydown="if(event.key==='Enter')document.getElementById('areaSubLocation').focus()"/>
-  <label class="mo-label" style="margin-top:10px">Sub Location</label>
-  <input class="mo-input" id="areaSubLocation" placeholder="e.g. North Wing, Plant Room…" maxlength="60" onkeydown="if(event.key==='Enter')confirmAddArea()"/>
+  <input class="mo-input" id="areaLocation" placeholder="e.g. Level 3, Roof, Basement…" maxlength="60" onkeydown="if(event.key==='Enter')confirmAddArea()"/>
   <div class="mo-actions">
     <button class="btn btn-ghost btn-sm" onclick="closeAreaModal()">Cancel</button>
     <button class="btn btn-primary btn-sm" onclick="confirmAddArea()">Create Checklist</button>
