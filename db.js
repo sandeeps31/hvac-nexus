@@ -57,7 +57,7 @@ async function authSignOut() {
   _authUser = null;
   _authCompanyId = null;
   localStorage.removeItem('hvacnexus_session');
-  window.location.href = 'hvac-login.html';
+  window.location.href = 'login.html';
 }
 
 async function authRefreshSession() {
@@ -166,7 +166,7 @@ const dbReady = new Promise(function(resolve){ _dbReadyResolve = resolve; });
 async function authGuard() {
   const ok = await authRefreshSession();
   if (!ok) {
-    window.location.href = 'hvac-login.html';
+    window.location.href = 'login.html';
     return false;
   }
   return true;
@@ -277,7 +277,7 @@ function sbForceLogout(reason) {
   } catch(e) {}
   // Short delay so toast is visible, then redirect
   setTimeout(() => {
-    window.location.href = 'hvac-login.html';
+    window.location.href = 'login.html';
   }, 1200);
 }
 
