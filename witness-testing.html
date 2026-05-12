@@ -337,6 +337,23 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .sig-confirm-row{display:flex;gap:8px;align-items:center;padding:14px 22px;border-top:1px solid var(--border);background:var(--surface2)}
 .sig-confirm-row .ack-text{flex:1;font-size:12px;color:var(--text2);line-height:1.5}
 
+/* ── Equipment ID not-found banner (yellow warning) ── */
+.eqid-notfound{display:flex;gap:9px;align-items:flex-start;background:var(--warn-dim);border:1px solid rgba(255,184,48,.35);border-radius:8px;padding:10px 14px;margin-top:10px;font-size:12.5px;color:var(--warn)}
+.eqid-notfound .ein-icon{font-size:16px;line-height:1.1;flex-shrink:0}
+.eqid-notfound .ein-title{font-weight:600}
+.eqid-notfound .ein-sub{margin-top:3px;color:var(--text2);font-size:12px;line-height:1.5}
+.eqid-notfound .ein-sub span{font-family:'DM Mono',monospace;color:var(--warn);font-weight:600}
+
+/* Dropdown of Cx tracker equipment items (shown under the Equipment ID input) */
+#eqIdDropdown{max-height:260px}
+#eqIdDropdown .sd-option-row{display:flex;flex-direction:column;gap:2px;padding:9px 14px;cursor:pointer;transition:background .1s;border-bottom:1px solid var(--border)}
+#eqIdDropdown .sd-option-row:last-child{border-bottom:none}
+#eqIdDropdown .sd-option-row:hover{background:var(--surface3)}
+#eqIdDropdown .sd-opt-tag{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:600}
+#eqIdDropdown .sd-opt-meta{font-size:11px;color:var(--text2);display:flex;gap:10px;flex-wrap:wrap}
+#eqIdDropdown .sd-opt-meta span{display:inline-flex;align-items:center;gap:3px}
+#eqIdDropdown .sd-empty{padding:14px;color:var(--muted);font-size:12px;text-align:center;font-style:italic}
+
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)}
 </style>
 <script>
@@ -491,7 +508,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div class="rs-hdr-block">
       <div class="rs-hdr-row">
         <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Runsheet No.</div><div class="rs-hdr-val mono" id="rs-num">—</div></div>
-        <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Equipment Tag</div><div class="rs-hdr-val mono" id="rs-eqtag">—</div></div>
+        <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Equipment ID</div><div class="rs-hdr-val mono" id="rs-eqtag">—</div></div>
         <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Equipment Name</div><div class="rs-hdr-val" id="rs-eqname">—</div></div>
         <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Status</div><div class="rs-hdr-val" id="rs-status">—</div></div>
       </div>
@@ -594,12 +611,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <p>Create a runsheet for a specific equipment item using a project witness template</p>
     </div>
     <div class="modal-body">
-      <label class="ml">Equipment Tag *</label>
-      <input class="mi" id="new-eqtag" placeholder="e.g. AHU-2.4-77" autocomplete="off" oninput="onEqTagInput()"/>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px">The unique identifier of the equipment being witnessed.</div>
+      <label class="ml">Equipment ID *</label>
+      <div class="searchable-wrap" style="margin-bottom:4px">
+        <input class="mi" id="new-eqid" placeholder="Type to search the commissioning tracker…" autocomplete="off"
+          oninput="onEqIdInput()"
+          onfocus="onEqIdFocus()"
+          onblur="setTimeout(closeEqIdDropdown,150)"/>
+        <div class="searchable-dropdown" id="eqIdDropdown"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px" id="eqIdHint">Pick an equipment ID from the commissioning tracker. Witness runsheets must link to a tracker entry.</div>
 
-      <label class="ml">Equipment Name (optional)</label>
-      <input class="mi" id="new-eqname" placeholder="e.g. Level 2 AHU - North"/>
+      <!-- Yellow not-found banner — shown when typed value isn't an exact match -->
+      <div id="eqIdNotFound" class="eqid-notfound" style="display:none">
+        <span class="ein-icon">⚠</span>
+        <div>
+          <div class="ein-title">Equipment ID not found</div>
+          <div class="ein-sub">"<span id="eqIdNotFoundValue"></span>" doesn't match any equipment in the commissioning tracker. Pick an existing ID from the dropdown, or add this equipment to the tracker first.</div>
+        </div>
+      </div>
 
       <label class="ml">Witness Template *</label>
       <select class="mi" id="new-template" onchange="onTemplateChange()">
@@ -759,6 +788,9 @@ var _sigCtx = null;           // signature pad canvas 2D context
 var _sigStrokes = [];         // array of strokes, each = [{x,y}, ...] for SVG path output
 var _sigCurrentStroke = null; // stroke currently being drawn
 var _sigBound = false;        // flag — have we attached canvas event handlers yet?
+var cxEquipment = [];         // commissioning tracker equipment items (filtered to those with non-empty tag)
+var _cxEquipLoaded = false;
+var _selectedEqItem = null;   // currently-selected Cx tracker row (when exact-matched)
 
 var PARTY_LABELS = {
   consultant: 'Consultant',
@@ -913,6 +945,7 @@ async function checkCxCompletion(equipmentTag){
 function onCxAckChange(){
   var chk = document.getElementById('cxAckChk');
   _cxStubAck = !!(chk && chk.checked);
+  updateCreateBtnState();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2124,11 +2157,17 @@ async function openNewRunsheetModal(){
   if(!_ptplsLoaded){
     await loadProjectTemplates();
   }
+  // Lazy-load Cx tracker equipment list on first open
+  if(!_cxEquipLoaded){
+    await loadCxTrackerEquipment();
+  }
   // Reset form
-  document.getElementById('new-eqtag').value = '';
-  document.getElementById('new-eqname').value = '';
+  document.getElementById('new-eqid').value = '';
   document.getElementById('new-schedule').value = '';
   document.getElementById('cxWarn').style.display = 'none';
+  document.getElementById('eqIdNotFound').style.display = 'none';
+  closeEqIdDropdown();
+  _selectedEqItem = null;
   // Reset Cx stub state
   _cxStubResult = null;
   _cxStubAck = false;
@@ -2145,7 +2184,6 @@ async function openNewRunsheetModal(){
   } else {
     sel.disabled = false;
     document.getElementById('tpl-empty-msg').style.display = 'none';
-    document.getElementById('newRsCreateBtn').disabled = false;
     sel.innerHTML = '<option value="">— Select a project template —</option>'
       + projectTemplates.map(function(t){
           var label = (t.formNo ? t.formNo + ' · ' : '') + (t.name || '(Untitled)') + ' (' + (t.equipment_type || '—') + ', ' + ((t.tests||[]).length) + ' tests)';
@@ -2154,27 +2192,152 @@ async function openNewRunsheetModal(){
   }
   document.getElementById('tpl-info').style.display = 'none';
 
+  // Disable Create until eqid AND template are both valid
+  updateCreateBtnState();
+
   document.getElementById('newRsModal').classList.add('open');
-  setTimeout(function(){var el=document.getElementById('new-eqtag');if(el)el.focus();},80);
+  setTimeout(function(){var el=document.getElementById('new-eqid');if(el)el.focus();},80);
 }
 
-// Live-fire the Cx check when the PM finishes typing an equipment tag.
-// Lightly debounced so we don't fire on every keystroke.
-var _cxStubTimer = null;
-function onEqTagInput(){
-  if(_cxStubTimer)clearTimeout(_cxStubTimer);
-  _cxStubTimer = setTimeout(runCxStub, 400);
+// ── Cx tracker equipment list ──
+// Pulls from dbGetCommissioning(_pNum), filters to rows with non-empty tag
+// (matches the filter the Cx tracker uses internally — see commissioning.html
+// line ~1132: "if(!t.tag || !t.tag.trim()) return false").
+async function loadCxTrackerEquipment(){
+  cxEquipment = [];
+  _cxEquipLoaded = true; // mark loaded even on error so we don't retry-loop
+  if(!_pNum)return;
+  try{
+    var raw = await dbGetCommissioning(_pNum);
+    if(Array.isArray(raw)){
+      cxEquipment = raw.filter(function(t){
+        return t && t.tag && String(t.tag).trim();
+      });
+    }
+  }catch(e){
+    console.warn('loadCxTrackerEquipment failed — will show empty list:', e.message);
+    cxEquipment = [];
+  }
 }
 
-async function runCxStub(){
-  var tag = (document.getElementById('new-eqtag').value||'').trim();
-  var warnEl = document.getElementById('cxWarn');
-  var stagesEl = document.getElementById('cxWarnStages');
-  if(!tag){
-    if(warnEl)warnEl.style.display='none';
-    _cxStubResult = null;
+// Look up a tracker item by exact tag match (trimmed, case-sensitive).
+// Returns the item or null.
+function findCxEquipmentByTag(tag){
+  if(!tag)return null;
+  var t = String(tag).trim();
+  if(!t)return null;
+  for(var i=0;i<cxEquipment.length;i++){
+    if(String(cxEquipment[i].tag||'').trim() === t) return cxEquipment[i];
+  }
+  return null;
+}
+
+// ── Equipment ID input handlers ──
+function onEqIdInput(){
+  var raw = (document.getElementById('new-eqid').value||'').trim();
+  renderEqIdDropdown(raw);
+  openEqIdDropdown();
+  validateEqIdMatch(raw);
+}
+
+function onEqIdFocus(){
+  var raw = (document.getElementById('new-eqid').value||'').trim();
+  renderEqIdDropdown(raw);
+  openEqIdDropdown();
+}
+
+function openEqIdDropdown(){
+  var dd = document.getElementById('eqIdDropdown');
+  if(dd)dd.classList.add('open');
+}
+function closeEqIdDropdown(){
+  var dd = document.getElementById('eqIdDropdown');
+  if(dd)dd.classList.remove('open');
+}
+
+function renderEqIdDropdown(filter){
+  var dd = document.getElementById('eqIdDropdown');
+  if(!dd)return;
+  var q = (filter||'').toLowerCase();
+  // Match on tag, name, type, or location — gives PM flexible search
+  var matches = cxEquipment.filter(function(t){
+    if(!q)return true;
+    return String(t.tag||'').toLowerCase().includes(q)
+      || String(t.name||'').toLowerCase().includes(q)
+      || String(t.type||'').toLowerCase().includes(q)
+      || String(t.location||'').toLowerCase().includes(q);
+  });
+
+  if(!cxEquipment.length){
+    dd.innerHTML = '<div class="sd-empty">No equipment in the commissioning tracker for this project yet. Add equipment in the Commissioning tracker first.</div>';
     return;
   }
+  if(!matches.length){
+    dd.innerHTML = '<div class="sd-empty">No matches. Try a different search, or add this equipment to the tracker first.</div>';
+    return;
+  }
+
+  // Cap at 50 results to keep the dropdown snappy
+  var capped = matches.slice(0, 50);
+  dd.innerHTML = capped.map(function(t){
+    var metaParts = [];
+    if(t.type)metaParts.push('<span>📦 '+escH(t.type)+'</span>');
+    if(t.location)metaParts.push('<span>📍 '+escH(t.location)+'</span>');
+    if(t.name)metaParts.push('<span>'+escH(t.name)+'</span>');
+    var meta = metaParts.length ? '<div class="sd-opt-meta">'+metaParts.join('')+'</div>' : '';
+    return '<div class="sd-option-row" onmousedown="pickEqId(\''+escH(t.tag)+'\')">'
+      + '<div class="sd-opt-tag">'+escH(t.tag)+'</div>'
+      + meta
+      + '</div>';
+  }).join('') + (matches.length > 50 ? '<div class="sd-empty">… and '+(matches.length-50)+' more — narrow your search</div>' : '');
+}
+
+function pickEqId(tag){
+  document.getElementById('new-eqid').value = tag;
+  closeEqIdDropdown();
+  validateEqIdMatch(tag);
+}
+
+// Verifies the typed value is an exact Cx tracker tag. Shows/hides
+// the yellow not-found banner and updates _selectedEqItem.
+// Also fires the Cx completion stub when match is found.
+async function validateEqIdMatch(raw){
+  var val = (raw||'').trim();
+  var nfBanner = document.getElementById('eqIdNotFound');
+  var nfVal = document.getElementById('eqIdNotFoundValue');
+  var warnEl = document.getElementById('cxWarn');
+
+  if(!val){
+    // Empty — hide both banners, clear selection
+    if(nfBanner)nfBanner.style.display='none';
+    if(warnEl)warnEl.style.display='none';
+    _selectedEqItem = null;
+    _cxStubResult = null;
+    updateCreateBtnState();
+    return;
+  }
+
+  var match = findCxEquipmentByTag(val);
+  if(match){
+    if(nfBanner)nfBanner.style.display='none';
+    _selectedEqItem = match;
+    // Run the Cx completion stub for this equipment (Step 6 logic)
+    await runCxStubFor(val);
+  } else {
+    // No match — show yellow banner, hide cx warning, block creation
+    _selectedEqItem = null;
+    _cxStubResult = null;
+    if(warnEl)warnEl.style.display='none';
+    if(nfVal)nfVal.textContent = val;
+    if(nfBanner)nfBanner.style.display='flex';
+  }
+  updateCreateBtnState();
+}
+
+// Runs the Cx completion stub against a known-good (already exact-matched) tag.
+async function runCxStubFor(tag){
+  var warnEl = document.getElementById('cxWarn');
+  var stagesEl = document.getElementById('cxWarnStages');
   try{
     var result = await checkCxCompletion(tag);
     _cxStubResult = result;
@@ -2187,14 +2350,29 @@ async function runCxStub(){
         }).join(' ');
       }
       if(warnEl)warnEl.style.display='flex';
-      // Reset ack since the stages may have changed
+      // Reset ack since the equipment may have changed
       _cxStubAck = false;
       var ackChk = document.getElementById('cxAckChk');
       if(ackChk)ackChk.checked = false;
     }
   }catch(e){
-    console.error('runCxStub error:', e);
+    console.error('runCxStubFor error:', e);
   }
+}
+
+// Enable Create Runsheet button only when: eqid matches, template selected,
+// and (if Cx incomplete) PM has acknowledged.
+function updateCreateBtnState(){
+  var btn = document.getElementById('newRsCreateBtn');
+  if(!btn)return;
+  var tplId = document.getElementById('new-template').value;
+  var disabled = false;
+  if(!_selectedEqItem) disabled = true;            // no exact eq match
+  if(!tplId) disabled = true;                       // no template
+  if(projectTemplates.length === 0) disabled = true;// no templates exist
+  // Cx ack: if check ran and found incompletes, ack required
+  if(_cxStubResult && !_cxStubResult.allComplete && !_cxStubAck) disabled = true;
+  btn.disabled = disabled;
 }
 
 function closeNewRunsheetModal(){
@@ -2205,9 +2383,14 @@ function onTemplateChange(){
   var sel = document.getElementById('new-template');
   var info = document.getElementById('tpl-info');
   var tpl = projectTemplates.find(function(t){return t.id === sel.value;});
-  if(!tpl){info.style.display = 'none';return;}
+  if(!tpl){
+    info.style.display = 'none';
+    updateCreateBtnState();
+    return;
+  }
   info.style.display = '';
   info.textContent = (tpl.tests||[]).length + ' tests will be snapshotted into the runsheet at creation. Edits to this template after that won\'t affect this runsheet.';
+  updateCreateBtnState();
 }
 
 // Generates the next runsheet number, scoped to this project.
@@ -2221,33 +2404,45 @@ function genRunsheetNumber(){
 }
 
 async function confirmNewRunsheet(){
-  var eqTag = (document.getElementById('new-eqtag').value||'').trim();
-  var eqName = (document.getElementById('new-eqname').value||'').trim();
+  var eqId = (document.getElementById('new-eqid').value||'').trim();
   var tplId = document.getElementById('new-template').value;
   var sched = document.getElementById('new-schedule').value || null;
 
-  if(!eqTag){alert('Equipment Tag is required.');return;}
+  if(!eqId){alert('Equipment ID is required.');return;}
   if(!tplId){alert('Please select a witness template.');return;}
   if(!_pNum){alert('No project selected.');return;}
+
+  // Re-validate against the Cx tracker — guards against the PM somehow
+  // bypassing the dropdown (paste + click before validate fires, etc).
+  var match = findCxEquipmentByTag(eqId);
+  if(!match){
+    alert('Equipment ID "'+eqId+'" was not found in the commissioning tracker. Pick an existing ID from the dropdown, or add this equipment to the tracker first.');
+    var nfBanner = document.getElementById('eqIdNotFound');
+    var nfVal = document.getElementById('eqIdNotFoundValue');
+    if(nfVal)nfVal.textContent = eqId;
+    if(nfBanner)nfBanner.style.display='flex';
+    return;
+  }
+  _selectedEqItem = match;
 
   var tpl = projectTemplates.find(function(t){return t.id === tplId;});
   if(!tpl){alert('Selected template not found.');return;}
 
-  // Make sure the Cx stub has fired for the current tag (in case PM typed
-  // fast and the debounce hadn't run yet)
-  if(_cxStubResult === null){
-    await runCxStub();
-  }
-
-  // If the Cx check came back with incomplete stages, require PM to ack.
-  // Per design doc: soft warning, doesn't block — but we DO require explicit
-  // acknowledgement so it's logged on the runsheet for audit.
+  // If the Cx completion check is showing incomplete stages, require PM ack.
+  // Per design doc: soft warning, doesn't block — but ack is logged on the
+  // runsheet for audit.
   if(_cxStubResult && !_cxStubResult.allComplete && !_cxStubAck){
     alert('Please acknowledge the commissioning warning to proceed, or tick the box and try again.');
     var ackChk = document.getElementById('cxAckChk');
     if(ackChk){ackChk.focus();}
     return;
   }
+
+  // Derive friendly equipment name from the tracker row (name field, or fall
+  // back to type/location if name is blank). PM never types this directly now.
+  var derivedName = (match.name && String(match.name).trim())
+    || [match.type, match.location].filter(Boolean).join(' · ')
+    || '';
 
   // Build the runsheet payload. NO client-generated id — DB assigns the UUID.
   // The template snapshot is the audit-immutability mechanism (per design doc).
@@ -2283,9 +2478,10 @@ async function confirmNewRunsheet(){
 
   var runsheet = {
     runsheet_number: genRunsheetNumber(),
-    equipment_tag: eqTag,
-    equipment_name: eqName,
-    template_id: tpl.id,             // Soft reference (project tier) — sanitised by helper if non-UUID
+    equipment_tag: eqId,                    // DB column kept as equipment_tag for back-compat with Step 1 schema
+    equipment_name: derivedName,             // Auto-derived from Cx tracker row (was user input before)
+    cx_tracker_id: match.id || null,         // Soft link to the tracker row (e.g. 'tr...') — handy for Step 9 stage-7 sync
+    template_id: tpl.id,                     // Soft reference (project tier) — sanitised by helper if non-UUID
     status: 'draft',
     attempt_number: 1,
     parent_runsheet_id: null,
@@ -2307,7 +2503,8 @@ async function confirmNewRunsheet(){
 
   try{
     var created = await dbCreateWitnessRunsheet(_pNum, runsheet);
-    btn.disabled = false; btn.textContent = 'Create Runsheet →';
+    btn.textContent = 'Create Runsheet →';
+    updateCreateBtnState();
     if(!created || !created.id){
       alert('Failed to create runsheet. See console.');
       return;
@@ -2317,7 +2514,8 @@ async function confirmNewRunsheet(){
     showToast('✓ Runsheet '+(created.runsheet_number||'')+' created');
     openRunsheetEditor(created.id);
   }catch(e){
-    btn.disabled = false; btn.textContent = 'Create Runsheet →';
+    btn.textContent = 'Create Runsheet →';
+    updateCreateBtnState();
     console.error('confirmNewRunsheet error:', e);
     alert('Failed to create runsheet. See console.');
   }
