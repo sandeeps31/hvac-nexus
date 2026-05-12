@@ -243,9 +243,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 /* ── Modal: Cx warning when active ── */
 .cx-warn-stages-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .cx-warn-stage{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(255,184,48,.12);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
-.cx-ack-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,184,48,.2)}
-.cx-ack-row input[type=checkbox]{cursor:pointer;width:14px;height:14px;accent-color:var(--warn)}
-.cx-ack-lbl{font-size:12px;color:var(--text2);cursor:pointer;user-select:none}
 
 /* ═══════════════════════════════════════════════════
    WITNESSES SECTION (Step 8)
@@ -663,11 +660,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
           <div style="font-weight:600">Commissioning incomplete</div>
           <div style="margin-top:3px">Some stages 1–6 are not yet signed off for this equipment. You can proceed, but the witness session may be premature.</div>
           <div class="cx-warn-stages-list" id="cxWarnStages"></div>
-          <div class="cx-ack-row">
-            <input type="checkbox" id="cxAckChk" onchange="onCxAckChange()"/>
-            <label for="cxAckChk" class="cx-ack-lbl">I acknowledge the incomplete stages and want to proceed anyway. (Logged on the runsheet for audit.)</label>
-          </div>
-          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-top:6px;font-style:italic">Demo data — real Cx tracker integration arrives in Step 9</div>
+          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-top:8px;font-style:italic">Demo data — real Cx tracker integration arrives in Step 9</div>
         </div>
       </div>
     </div>
@@ -793,7 +786,6 @@ var _activeTab = 'all';       // 'all' | 'rework' | 'completed'
 var _activeRunsheetId = null; // currently-open runsheet (editor view)
 var _rsDirty = false;         // unsaved changes flag on editor
 var _rsSaveTimer = null;      // debounce timer for runsheet auto-save
-var _cxStubAck = false;       // user ack of Cx warning in New Runsheet modal
 var _cxStubResult = null;     // last stub result (cached during modal lifetime)
 var _editingWitnessId = null; // null = adding new; uuid = editing existing
 var _sigWitnessId = null;     // witness currently being signed
@@ -952,13 +944,6 @@ async function checkCxCompletion(equipmentId){
     allComplete: false,
     incompleteStages: ['Pre-Cx Checklist', 'Airflow Balance', 'BMS Comms']
   };
-}
-
-// Called when the PM ticks the Cx ack checkbox in the New Runsheet modal.
-function onCxAckChange(){
-  var chk = document.getElementById('cxAckChk');
-  _cxStubAck = !!(chk && chk.checked);
-  updateCreateBtnState();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2183,9 +2168,6 @@ async function openNewRunsheetModal(){
   _selectedEqItem = null;
   // Reset Cx stub state
   _cxStubResult = null;
-  _cxStubAck = false;
-  var ackChk = document.getElementById('cxAckChk');
-  if(ackChk)ackChk.checked = false;
 
   // Populate template selector
   var sel = document.getElementById('new-template');
@@ -2369,18 +2351,14 @@ async function runCxStubFor(tag){
         }).join(' ');
       }
       if(warnEl)warnEl.style.display='flex';
-      // Reset ack since the equipment may have changed
-      _cxStubAck = false;
-      var ackChk = document.getElementById('cxAckChk');
-      if(ackChk)ackChk.checked = false;
     }
   }catch(e){
     console.error('runCxStubFor error:', e);
   }
 }
 
-// Enable Create Runsheet button only when: eqid matches, template selected,
-// and (if Cx incomplete) PM has acknowledged.
+// Enable Create Runsheet button only when: eqid matches and a template is selected.
+// The Cx warning banner is informational only — does not block creation.
 function updateCreateBtnState(){
   var btn = document.getElementById('newRsCreateBtn');
   if(!btn)return;
@@ -2389,8 +2367,6 @@ function updateCreateBtnState(){
   if(!_selectedEqItem) disabled = true;            // no exact eq match
   if(!tplId) disabled = true;                       // no template
   if(projectTemplates.length === 0) disabled = true;// no templates exist
-  // Cx ack: if check ran and found incompletes, ack required
-  if(_cxStubResult && !_cxStubResult.allComplete && !_cxStubAck) disabled = true;
   btn.disabled = disabled;
 }
 
@@ -2447,15 +2423,7 @@ async function confirmNewRunsheet(){
   var tpl = projectTemplates.find(function(t){return t.id === tplId;});
   if(!tpl){alert('Selected template not found.');return;}
 
-  // If the Cx completion check is showing incomplete stages, require PM ack.
-  // Per design doc: soft warning, doesn't block — but ack is logged on the
-  // runsheet for audit.
-  if(_cxStubResult && !_cxStubResult.allComplete && !_cxStubAck){
-    alert('Please acknowledge the commissioning warning to proceed, or tick the box and try again.');
-    var ackChk = document.getElementById('cxAckChk');
-    if(ackChk){ackChk.focus();}
-    return;
-  }
+  // Cx warning is informational only — never blocks creation.
 
   // Derive friendly equipment name from the tracker row (name field, or fall
   // back to type/location if name is blank). PM never types this directly now.
@@ -2486,12 +2454,15 @@ async function confirmNewRunsheet(){
 
   // Persist the Cx check result so the runsheet keeps an audit record
   // of which stages were incomplete at creation and whether PM acknowledged.
+  // Audit record of the Cx completion check at creation time.
+  // pm_acknowledged_warning was removed when the ack checkbox was dropped;
+  // kept as `false` for back-compat with any Step 9 code that reads it.
   var cxCheck = {
     checked: !!_cxStubResult,
     all_complete: _cxStubResult ? !!_cxStubResult.allComplete : null,
     incomplete_stages: (_cxStubResult && _cxStubResult.incompleteStages) || [],
-    pm_acknowledged_warning: !!_cxStubAck,
-    acknowledged_at: _cxStubAck ? new Date().toISOString() : null,
+    pm_acknowledged_warning: false,
+    acknowledged_at: null,
     source: 'stub-v1'  // Marker so Step 9 can detect/migrate old stub records
   };
 
