@@ -126,11 +126,16 @@
       target.outerHTML = SIDEBAR_HTML;
     }
 
-    // Mark active nav item based on current page
+    // Mark active nav item based on current page.
+    // Uses an exact match on the navTo('<filename>') target — substring matches
+    // would incorrectly highlight e.g. Pre-commissioning when on Commissioning
+    // tracker, because "precommissioning.html" contains "commissioning.html".
     var page = window.location.pathname.split('/').pop() || 'index.html';
     document.querySelectorAll('.sb-item').forEach(function(el){
       var onclick = el.getAttribute('onclick') || '';
-      if(onclick.indexOf(page) >= 0){
+      // Extract the navTo target: navTo('foo.html') → 'foo.html'
+      var m = onclick.match(/navTo\(['"]([^'"]+)['"]\)/);
+      if(m && m[1] === page){
         el.classList.add('active');
       }
     });
