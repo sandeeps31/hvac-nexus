@@ -344,14 +344,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .eqid-notfound .ein-sub{margin-top:3px;color:var(--text2);font-size:12px;line-height:1.5}
 .eqid-notfound .ein-sub span{font-family:'DM Mono',monospace;color:var(--warn);font-weight:600}
 
-/* Dropdown of Cx tracker equipment items (shown under the Equipment ID input) */
-#eqIdDropdown{max-height:260px}
+/* Searchable input + dropdown — defensive base rules in case theme.css doesn't define them */
+.searchable-wrap{position:relative;width:100%}
+.searchable-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#0e1726;border:1px solid var(--border);border-radius:8px;z-index:2000;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none}
+.searchable-dropdown.open{display:block}
+
+/* Dropdown of Cx tracker equipment items (shown under the Equipment ID input).
+   Overrides parent .searchable-dropdown: forces an opaque solid background
+   and high z-index so the form fields below don't bleed through. */
+#eqIdDropdown{
+  max-height:220px;
+  background:#0e1726;           /* solid opaque colour (not var(--surface2) which can be translucent) */
+  z-index:5000;                 /* above all sibling form fields */
+  box-shadow:0 12px 32px rgba(0,0,0,.6);
+}
 #eqIdDropdown .sd-option-row{display:flex;flex-direction:column;gap:2px;padding:9px 14px;cursor:pointer;transition:background .1s;border-bottom:1px solid var(--border)}
 #eqIdDropdown .sd-option-row:last-child{border-bottom:none}
 #eqIdDropdown .sd-option-row:hover{background:var(--surface3)}
 #eqIdDropdown .sd-opt-tag{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);font-weight:600}
-#eqIdDropdown .sd-opt-meta{font-size:11px;color:var(--text2);display:flex;gap:10px;flex-wrap:wrap}
-#eqIdDropdown .sd-opt-meta span{display:inline-flex;align-items:center;gap:3px}
+#eqIdDropdown .sd-opt-meta{font-size:11px;color:var(--text2);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#eqIdDropdown .sd-opt-meta span{display:inline-flex;align-items:center}
+#eqIdDropdown .sd-sep{color:var(--muted);opacity:.6}
 #eqIdDropdown .sd-empty{padding:14px;color:var(--muted);font-size:12px;text-align:center;font-style:italic}
 
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)}
@@ -910,7 +923,7 @@ function openRunsheetEditor(rsId){
   var el;
   el=document.getElementById('backToListBtn');if(el)el.style.display='';
   el=document.getElementById('newRsBtn');if(el)el.style.display='none';
-  el=document.getElementById('bcCurr');if(el)el.textContent = (rs.runsheet_number||rs.equipment_tag||'Runsheet');
+  el=document.getElementById('bcCurr');if(el)el.textContent = (rs.runsheet_number||rs.equipment_id||rs.equipment_tag||'Runsheet');
 
   showView('runsheet');
   renderRunsheetEditor();
@@ -929,12 +942,12 @@ function openRunsheetEditor(rsId){
 //   - dbGetCommissioning(_pNum) for tracker rows
 //   - dbGetITPInstances(...) for installation ITP completion
 //   - dbGetPrecxData(...) for Pre-Cx checklist (once that table exists)
-// Match the row by equipmentTag, then check the six stage flags.
+// Match the row by equipmentId, then check the six stage flags.
 // ═══════════════════════════════════════════════════════════════════════
-async function checkCxCompletion(equipmentTag){
+async function checkCxCompletion(equipmentId){
   // STUB — fixed response for every equipment tag.
   // For empty tags, treat as "no check possible" → no warning.
-  if(!equipmentTag) return { allComplete: true, incompleteStages: [] };
+  if(!equipmentId) return { allComplete: true, incompleteStages: [] };
   return {
     allComplete: false,
     incompleteStages: ['Pre-Cx Checklist', 'Airflow Balance', 'BMS Comms']
@@ -1110,7 +1123,7 @@ function renderRunsheetEditor(){
 
 function renderRsHeader(rs){
   document.getElementById('rs-num').textContent = rs.runsheet_number || '—';
-  document.getElementById('rs-eqtag').textContent = rs.equipment_tag || '—';
+  document.getElementById('rs-eqtag').textContent = rs.equipment_id || rs.equipment_tag || '—';
   document.getElementById('rs-eqname').textContent = rs.equipment_name || '—';
   document.getElementById('rs-tplname').textContent = (rs.template_snapshot && rs.template_snapshot.name) || '—';
   document.getElementById('rs-eqtype').textContent = (rs.template_snapshot && rs.template_snapshot.equipment_type) || '—';
@@ -1949,7 +1962,7 @@ function filterAll(){
     var equipType = (r.template_snapshot && r.template_snapshot.equipment_type) || '';
     var match = !q
       || (r.runsheet_number||'').toLowerCase().includes(q)
-      || (r.equipment_tag||'').toLowerCase().includes(q)
+      || ((r.equipment_id||r.equipment_tag)||'').toLowerCase().includes(q)
       || (r.equipment_name||'').toLowerCase().includes(q)
       || (r.template_snapshot && (r.template_snapshot.name||'').toLowerCase().includes(q));
     var equipMatch = !ef || equipType === ef;
@@ -1968,7 +1981,7 @@ function filterRework(){
     var equipType = (r.template_snapshot && r.template_snapshot.equipment_type) || '';
     var match = !q
       || (r.runsheet_number||'').toLowerCase().includes(q)
-      || (r.equipment_tag||'').toLowerCase().includes(q)
+      || ((r.equipment_id||r.equipment_tag)||'').toLowerCase().includes(q)
       || (r.equipment_name||'').toLowerCase().includes(q);
     var equipMatch = !ef || equipType === ef;
     return match && equipMatch;
@@ -1983,7 +1996,7 @@ function filterCompleted(){
     var equipType = (r.template_snapshot && r.template_snapshot.equipment_type) || '';
     var match = !q
       || (r.runsheet_number||'').toLowerCase().includes(q)
-      || (r.equipment_tag||'').toLowerCase().includes(q)
+      || ((r.equipment_id||r.equipment_tag)||'').toLowerCase().includes(q)
       || (r.equipment_name||'').toLowerCase().includes(q);
     var equipMatch = !ef || equipType === ef;
     return match && equipMatch;
@@ -2034,11 +2047,11 @@ function renderDefects(rs){
 }
 
 function renderEquipCell(rs){
-  var tag = rs.equipment_tag || '—';
+  var id = rs.equipment_id || rs.equipment_tag || '—';
   var name = rs.equipment_name || '';
   var attempt = (rs.attempt_number && rs.attempt_number > 1)
     ? '<span class="attempt-pill">Attempt #'+rs.attempt_number+'</span>' : '';
-  return '<div class="eq-tag">'+escH(tag)+attempt+'</div>'
+  return '<div class="eq-tag">'+escH(id)+attempt+'</div>'
     + (name ? '<div class="eq-name">'+escH(name)+'</div>' : '');
 }
 
@@ -2281,10 +2294,16 @@ function renderEqIdDropdown(filter){
   var capped = matches.slice(0, 50);
   dd.innerHTML = capped.map(function(t){
     var metaParts = [];
-    if(t.type)metaParts.push('<span>📦 '+escH(t.type)+'</span>');
-    if(t.location)metaParts.push('<span>📍 '+escH(t.location)+'</span>');
-    if(t.name)metaParts.push('<span>'+escH(t.name)+'</span>');
-    var meta = metaParts.length ? '<div class="sd-opt-meta">'+metaParts.join('')+'</div>' : '';
+    if(t.type)metaParts.push('<span>'+escH(t.type)+'</span>');
+    if(t.location)metaParts.push('<span>'+escH(t.location)+'</span>');
+    // Skip name if it's empty or just duplicates the tag/type
+    var nm = String(t.name||'').trim();
+    var tg = String(t.tag||'').trim();
+    var ty = String(t.type||'').trim();
+    if(nm && nm !== tg && nm !== ty && nm !== (ty+' '+tg).trim()){
+      metaParts.push('<span>'+escH(nm)+'</span>');
+    }
+    var meta = metaParts.length ? '<div class="sd-opt-meta">'+metaParts.join('<span class="sd-sep">·</span>')+'</div>' : '';
     return '<div class="sd-option-row" onmousedown="pickEqId(\''+escH(t.tag)+'\')">'
       + '<div class="sd-opt-tag">'+escH(t.tag)+'</div>'
       + meta
@@ -2478,7 +2497,7 @@ async function confirmNewRunsheet(){
 
   var runsheet = {
     runsheet_number: genRunsheetNumber(),
-    equipment_tag: eqId,                    // DB column kept as equipment_tag for back-compat with Step 1 schema
+    equipment_id: eqId,                      // DB column renamed from equipment_tag to equipment_id (migration: migration-equipment-rename.sql)
     equipment_name: derivedName,             // Auto-derived from Cx tracker row (was user input before)
     cx_tracker_id: match.id || null,         // Soft link to the tracker row (e.g. 'tr...') — handy for Step 9 stage-7 sync
     template_id: tpl.id,                     // Soft reference (project tier) — sanitised by helper if non-UUID
@@ -2549,7 +2568,7 @@ async function deleteRunsheet(rsId){
     alert('Cannot delete a signed-off runsheet. Locked records are part of the audit trail.');
     return;
   }
-  if(!confirm('Delete runsheet '+(rs.runsheet_number||'')+' for '+(rs.equipment_tag||'')+'?\n\nThis cannot be undone.'))return;
+  if(!confirm('Delete runsheet '+(rs.runsheet_number||'')+' for '+(rs.equipment_id||rs.equipment_tag||'')+'?\n\nThis cannot be undone.'))return;
   try{
     var ok = await dbDeleteWitnessRunsheet(rsId);
     if(!ok){alert('Delete failed. See console.');return;}

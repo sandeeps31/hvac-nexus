@@ -515,7 +515,7 @@ async function dbSetItpResponses(projectNum, data) {
 //
 // Templates are read whole, so `data` JSONB holds everything (incl.
 // equipment_type, tests[], source_template_id, source_template_version).
-// Runsheets need fast filtering, so normalised columns (equipment_tag,
+// Runsheets need fast filtering, so normalised columns (equipment_id,
 // status, attempt_number, parent_runsheet_id, scheduled_date, signed_at)
 // are hoisted from the runsheet object on save; the rest lives in `data`
 // (template_snapshot, cx_completion_check, tests[], witnesses[], comments,
@@ -547,7 +547,10 @@ function _isUUID(s) {
 function _witnessRunsheetToRow(runsheet) {
   var r = runsheet || {};
   // Pull normalised fields out; everything else goes in `data`.
-  var equipment_tag      = r.equipment_tag || r.equipmentTag || null;
+  // Input aliases: equipment_id is canonical, but equipment_tag/equipmentTag
+  // are accepted as legacy aliases (pre-rename callers) so transitional code
+  // doesn't silently drop the field.
+  var equipment_id       = r.equipment_id || r.equipmentId || r.equipment_tag || r.equipmentTag || null;
   var template_id        = r.template_id || r.templateId || null;
   var status             = r.status || 'draft';
   var attempt_number     = (typeof r.attempt_number === 'number') ? r.attempt_number
@@ -560,7 +563,7 @@ function _witnessRunsheetToRow(runsheet) {
   // (and id/timestamps which the DB owns) so we don't double-store them.
   var data = {};
   Object.keys(r).forEach(function(k){
-    if (['id','company_id','project_num','equipment_tag','equipmentTag',
+    if (['id','company_id','project_num','equipment_id','equipmentId','equipment_tag','equipmentTag',
          'template_id','templateId','status','attempt_number','attemptNumber',
          'parent_runsheet_id','parentRunsheetId','scheduled_date','scheduledDate',
          'signed_at','signedAt','created_at','updated_at'].indexOf(k) === -1) {
@@ -568,7 +571,7 @@ function _witnessRunsheetToRow(runsheet) {
     }
   });
   return {
-    equipment_tag: equipment_tag,
+    equipment_id: equipment_id,
     template_id: template_id,
     status: status,
     attempt_number: attempt_number,
@@ -587,7 +590,7 @@ function _witnessRowToRunsheet(row) {
   out.id                 = row.id;
   out.company_id         = row.company_id;
   out.project_num        = row.project_num;
-  out.equipment_tag      = row.equipment_tag;
+  out.equipment_id       = row.equipment_id;
   out.template_id        = row.template_id;
   out.status             = row.status;
   out.attempt_number     = row.attempt_number;
@@ -787,19 +790,19 @@ async function dbGetWitnessRunsheet(id) {
   }
 }
 
-// Fetch all runsheets for a given equipment tag — useful for the re-witness
+// Fetch all runsheets for a given equipment ID — useful for the re-witness
 // chain display and for the drawings/equipment cross-links.
-async function dbGetWitnessRunsheetsByEquipment(projectNum, equipmentTag) {
-  if (!projectNum || !equipmentTag) return [];
+async function dbGetWitnessRunsheetsByEquipment(projectNum, equipmentId) {
+  if (!projectNum || !equipmentId) return [];
   try {
     var rows = await sbFetch(
       'witness_runsheets?project_num=eq.'+encodeURIComponent(projectNum)+
-      '&equipment_tag=eq.'+encodeURIComponent(equipmentTag)+
+      '&equipment_id=eq.'+encodeURIComponent(equipmentId)+
       '&select=*&order=attempt_number.asc'
     );
     return (rows || []).map(_witnessRowToRunsheet);
   } catch(e) {
-    console.warn('dbGetWitnessRunsheetsByEquipment('+projectNum+','+equipmentTag+') failed:', e.message);
+    console.warn('dbGetWitnessRunsheetsByEquipment('+projectNum+','+equipmentId+') failed:', e.message);
     return [];
   }
 }
@@ -817,7 +820,7 @@ async function dbCreateWitnessRunsheet(projectNum, runsheet) {
     var body = {
       company_id: companyId,
       project_num: projectNum,
-      equipment_tag: row.equipment_tag,
+      equipment_id: row.equipment_id,
       template_id: _isUUID(row.template_id) ? row.template_id : null,
       status: row.status,
       attempt_number: row.attempt_number,
@@ -859,7 +862,7 @@ async function dbSaveWitnessRunsheet(id, patch) {
       // Caller passed a full runsheet object — split it
       var row = _witnessRunsheetToRow(patch);
       body = {
-        equipment_tag: row.equipment_tag,
+        equipment_id: row.equipment_id,
         template_id: row.template_id,
         status: row.status,
         attempt_number: row.attempt_number,
@@ -933,7 +936,7 @@ async function dbCreateRewitnessRunsheet(originalId) {
     }
     // Build the new runsheet, preserving the template snapshot and equipment link.
     var fresh = {
-      equipment_tag: original.equipment_tag,
+      equipment_id: original.equipment_id,
       template_id: original.template_id,
       status: 'draft',
       attempt_number: (original.attempt_number || 1) + 1,
@@ -1004,8 +1007,8 @@ async function dbGetWitnessRunsheetsByStatus(projectNum, status) {
 // ── Convenience: walk a re-witness chain for an equipment ──
 // Returns [attempt1, attempt2, attempt3, ...] sorted by attempt_number ascending.
 // Used by the witness landing page to render attempt history.
-async function dbGetWitnessAttemptChain(projectNum, equipmentTag) {
-  return await dbGetWitnessRunsheetsByEquipment(projectNum, equipmentTag);
+async function dbGetWitnessAttemptChain(projectNum, equipmentId) {
+  return await dbGetWitnessRunsheetsByEquipment(projectNum, equipmentId);
 }
 
 // ── Drawings ──
