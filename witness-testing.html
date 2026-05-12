@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="theme.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❄️</text></svg>">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Witness Testing — HVAC NEXUS</title>
+<style>
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;min-height:100vh}
+
+/* ── SIDEBAR ── */
+.sb{width:230px;position:fixed;top:0;left:0;bottom:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden}
+.sb.sm{width:52px}
+.sb-top{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-brand{display:flex;align-items:center;gap:9px;overflow:hidden}.sb-icon{font-size:20px;flex-shrink:0}.sb-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.sb-toggle{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}.sb-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.sb-proj-block{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-proj-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.sb-proj-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-proj-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0;scrollbar-width:thin}
+.sb-nav::-webkit-scrollbar{width:4px}.sb-nav::-webkit-scrollbar-track{background:transparent}.sb-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;position:relative;overflow:hidden;text-decoration:none}.sb-item:hover{background:var(--surface2);color:var(--text)}.sb-item.active{background:var(--accent-dim);color:var(--accent);border-left-color:var(--accent)}
+.sb-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}.sb-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.sb-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 16px 4px;cursor:pointer;user-select:none;transition:background .13s}.sb-group-hdr:hover{background:var(--surface2)}
+.sb-group-chev{font-size:10px;color:var(--muted);flex-shrink:0;width:10px}.sb-group-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.sb-group-items .sb-item{padding-left:28px}
+.sb.sm .sb-name,.sb.sm .sb-proj-block,.sb.sm .sb-group-hdr,.sb.sm .sb-item-label,.sb.sm .sb-user-name{display:none}
+.sb.sm .sb-group-items{display:block !important}.sb.sm .sb-item{padding:9px 14px;justify-content:center;border-left:none;overflow:visible}
+.sb.sm .sb-top{padding:14px 12px 10px;justify-content:center}.sb.sm .sb-footer{justify-content:center}.sb.sm .sb-item-icon{width:auto}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.main{margin-left:230px;transition:margin-left .25s}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px}.bcl{color:var(--text2);cursor:pointer}.bcl:hover{color:var(--accent)}.bcs{color:var(--muted)}.bcc{color:var(--text);font-weight:500}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.bp{background:var(--accent);color:#080c12}.bp:hover{background:#33d4ff}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text);border-color:var(--muted);background:var(--surface2)}
+.bsm{padding:5px 12px;font-size:12px}
+.bdanger{background:transparent;color:var(--danger);border:1px solid rgba(255,77,109,.3)}.bdanger:hover{background:var(--danger-dim)}
+
+/* ── TABS ── */
+.tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:0;align-items:center}
+.tab-btn{padding:11px 18px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--text2);background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:8px;position:relative}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-count{font-family:'DM Mono',monospace;font-size:10px;padding:1px 7px;border-radius:9px;background:var(--surface3);border:1px solid var(--border);color:var(--muted)}
+.tab-btn.active .tab-count{background:var(--accent-dim);border-color:rgba(0,200,255,.3);color:var(--accent)}
+.tab-btn.has-rework .tab-count{background:rgba(255,184,48,.12);border-color:rgba(255,184,48,.3);color:var(--warn)}
+.tab-btn.has-rework.active .tab-count{background:var(--warn-dim);border-color:rgba(255,184,48,.4);color:var(--warn)}
+
+/* ── VIEWS ── */
+.view{display:none}.view.active{display:block}
+.tab-content{display:none}.tab-content.active{display:block}
+
+/* ── TOOLBAR ── */
+.reg-toolbar{padding:12px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px;width:280px}
+.search-box:focus-within{border-color:var(--accent)}
+.search-box input{background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%}
+.search-box input::placeholder{color:var(--muted)}
+.fsel{background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:6px 10px;outline:none;cursor:pointer}
+.fsel:focus{border-color:var(--accent);color:var(--text)}.fsel option{background:var(--surface2)}
+
+/* ── TABLE ── */
+.reg-page{padding:16px 24px 60px}
+.reg-tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.reg-tbl thead tr{background:var(--surface2)}
+.reg-tbl th{padding:9px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.reg-tbl td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.reg-tbl tbody tr:last-child td{border-bottom:none}
+.reg-tbl tbody tr:hover td{background:var(--surface2)}
+.rs-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent)}
+.eq-tag{font-family:'DM Mono',monospace;font-size:12px;color:var(--text);font-weight:600}
+.eq-name{font-size:12px;color:var(--text2);margin-top:1px}
+.attempt-pill{font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;background:var(--surface3);border:1px solid var(--border);color:var(--muted);margin-left:6px;white-space:nowrap}
+
+/* ── STATUS BADGES ── */
+.status-badge{font-family:'DM Mono',monospace;font-size:10px;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.sb-draft{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.sb-in_progress{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.25)}
+.sb-signed_off{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.25)}
+.sb-failed_pending_rework{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+.sb-cancelled{background:var(--surface3);color:var(--muted);border:1px solid var(--border);text-decoration:line-through}
+
+/* ── WITNESS COUNT CHIP ── */
+.witnesses-chip{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)}
+.witnesses-chip .signed-count{color:var(--green);font-weight:600}
+.witnesses-chip .pending-count{color:var(--muted)}
+
+/* ── DEFECT COUNT ── */
+.defect-chip{display:inline-flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,77,109,.1);color:var(--danger);border:1px solid rgba(255,77,109,.25);white-space:nowrap}
+.defect-chip-zero{display:inline-flex;align-items:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+
+/* ── ACTION BUTTONS ── */
+.act-btns-grid{display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap}
+.act-btn{width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .13s;position:relative}
+.act-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.act-btn.danger:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-dim)}
+.act-btn.warn:hover{border-color:var(--warn);color:var(--warn);background:var(--warn-dim)}
+.act-btn .tip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface2);color:var(--text);font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:500}
+.act-btn:hover .tip{opacity:1}
+.btn-rewitness{padding:5px 12px;border-radius:6px;border:1px solid rgba(255,184,48,.3);background:var(--warn-dim);color:var(--warn);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .13s}
+.btn-rewitness:hover{background:rgba(255,184,48,.18);border-color:var(--warn)}
+
+/* ── EMPTY STATE ── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;gap:16px;color:var(--muted)}
+.empty-icon{font-size:48px;opacity:.3}
+.empty-title{font-family:'Syne',sans-serif;font-size:16px;color:var(--text2)}
+.empty-sub{font-size:13px;color:var(--muted);text-align:center;max-width:380px;line-height:1.6}
+
+/* ── MODALS ── */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.mo.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;max-width:96vw;transform:translateY(10px);transition:transform .2s;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.mo.open .modal{transform:translateY(0)}
+.modal-hdr{padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-hdr h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text)}
+.modal-hdr p{color:var(--text2);font-size:12.5px;margin-top:3px}
+.modal-body{padding:18px 22px;overflow-y:auto;flex:1}
+.modal-footer{padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;align-items:center}
+.ml{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;margin-top:14px;display:block}
+.ml:first-child{margin-top:0}
+.mi{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;box-sizing:border-box}
+.mi:focus{border-color:var(--accent)}.mi::placeholder{color:var(--muted)}
+
+/* ── CX WARNING BANNER (in new runsheet modal) ── */
+.cx-warn{background:var(--warn-dim);border:1px solid rgba(255,184,48,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:12.5px;color:var(--warn);display:flex;gap:9px;align-items:flex-start}
+.cx-warn-icon{flex-shrink:0;font-size:16px;line-height:1.1}
+.cx-warn-stages{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);margin-top:4px}
+
+/* ── PLACEHOLDER VIEW (Step 7 editor not built yet) ── */
+.placeholder-view{padding:60px 24px;display:flex;flex-direction:column;align-items:center;gap:20px;max-width:640px;margin:0 auto}
+.placeholder-card{background:var(--surface);border:1px dashed var(--border);border-radius:14px;padding:32px 24px;width:100%;text-align:center}
+.placeholder-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px}
+.placeholder-sub{font-size:13px;color:var(--text2);line-height:1.7}
+.placeholder-meta{margin-top:18px;padding:14px;background:var(--surface2);border-radius:8px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);text-align:left}
+.placeholder-meta-row{display:flex;justify-content:space-between;padding:3px 0}
+.placeholder-meta-lbl{color:var(--muted)}
+.placeholder-meta-val{color:var(--text)}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+</style>
+<script>
+// ── HVAC Nexus Auth Guard ──
+(async function(){
+  if(typeof dbReady !== 'undefined') await dbReady;
+  var DEV_BYPASS=false;
+  if(DEV_BYPASS)return;
+  var stored=localStorage.getItem('hvacnexus_session');
+  if(!stored){window.location.href='login.html';return;}
+  try{
+    var sess=JSON.parse(stored);
+    if(Date.now()/1000<(sess.expires_at||0)-60){
+      if(typeof _authSession!=='undefined')_authSession=sess;
+      return;
+    }
+    var SURL='https://qbsjrccrgkbevncvxbio.supabase.co';
+    var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFic2pyY2NyZ2tiZXZuY3Z4YmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjU5MjIsImV4cCI6MjA5MDYwMTkyMn0.Y8CYH3QXjEVsYIyXEiUM_imjNpDokRE1h9iNmRh_JoA';
+    var r=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SKEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sess.refresh_token})});
+    if(r.ok){var d=await r.json();localStorage.setItem('hvacnexus_session',JSON.stringify(d));}
+    else{localStorage.removeItem('hvacnexus_session');window.location.href='login.html';}
+  }catch(e){window.location.href='login.html';}
+})();
+</script>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="app-sidebar"></div>
+<script src="sidebar.js"></script>
+
+<!-- MAIN -->
+<div class="main" id="mainWrap">
+
+  <div class="topbar">
+    <div class="bc">
+      <span class="bcl" onclick="navTo('project-dashboard.html')">Project Dashboard</span><span class="bcs">›</span>
+      <span class="bcc" id="bcCurr">Witness Testing</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="bg bsm btn" id="backToListBtn" style="display:none" onclick="showList()">← Back to Runsheets</button>
+      <button class="bp bsm btn" id="newRsBtn" onclick="openNewRunsheetModal()">＋ New Runsheet</button>
+    </div>
+  </div>
+
+  <!-- LIST VIEW (with tabs) -->
+  <div class="view active" id="view-list">
+
+    <!-- TABS BAR -->
+    <div class="tabs-bar">
+      <button class="tab-btn active" id="tab-all" onclick="switchTab('all')">
+        <span>All Runsheets</span>
+        <span class="tab-count" id="tabCount-all">0</span>
+      </button>
+      <button class="tab-btn has-rework" id="tab-rework" onclick="switchTab('rework')">
+        <span>↻ Needs Re-Witness</span>
+        <span class="tab-count" id="tabCount-rework">0</span>
+      </button>
+      <button class="tab-btn" id="tab-completed" onclick="switchTab('completed')">
+        <span>Completed</span>
+        <span class="tab-count" id="tabCount-completed">0</span>
+      </button>
+    </div>
+
+    <!-- TOOLBAR (shared across tabs) -->
+    <div class="reg-toolbar">
+      <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search by equipment, runsheet no, template…" oninput="renderActiveTab()"></div>
+      <select class="fsel" id="filterEquip" onchange="renderActiveTab()" style="font-size:12px"><option value="">All Equipment Types</option></select>
+      <select class="fsel" id="filterStatus" onchange="renderActiveTab()" style="font-size:12px;display:none">
+        <option value="">All Statuses</option>
+        <option value="draft">Draft</option>
+        <option value="in_progress">In Progress</option>
+        <option value="signed_off">Signed Off</option>
+        <option value="failed_pending_rework">Failed — Pending Rework</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="rsCount"></span>
+    </div>
+
+    <div class="reg-page">
+
+      <!-- TAB 1: ALL RUNSHEETS -->
+      <div class="tab-content active" id="tabc-all">
+        <table class="reg-tbl">
+          <thead>
+            <tr>
+              <th style="width:110px">Runsheet No.</th>
+              <th>Equipment</th>
+              <th style="width:130px">Equipment Type</th>
+              <th style="width:160px">Status</th>
+              <th style="width:100px">Witnesses</th>
+              <th style="width:100px">Date</th>
+              <th style="width:90px;text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="body-all"></tbody>
+        </table>
+      </div>
+
+      <!-- TAB 2: NEEDS RE-WITNESS -->
+      <div class="tab-content" id="tabc-rework">
+        <table class="reg-tbl">
+          <thead>
+            <tr>
+              <th style="width:110px">Runsheet No.</th>
+              <th>Equipment</th>
+              <th style="width:130px">Equipment Type</th>
+              <th style="width:90px">Failed Tests</th>
+              <th style="width:90px">Defects</th>
+              <th style="width:100px">Failed On</th>
+              <th style="width:160px;text-align:right">Action</th>
+            </tr>
+          </thead>
+          <tbody id="body-rework"></tbody>
+        </table>
+      </div>
+
+      <!-- TAB 3: COMPLETED -->
+      <div class="tab-content" id="tabc-completed">
+        <table class="reg-tbl">
+          <thead>
+            <tr>
+              <th style="width:110px">Runsheet No.</th>
+              <th>Equipment</th>
+              <th style="width:130px">Equipment Type</th>
+              <th style="width:120px">Outcome</th>
+              <th style="width:100px">Witnesses</th>
+              <th style="width:100px">Signed Off</th>
+              <th style="width:80px;text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="body-completed"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RUNSHEET PLACEHOLDER VIEW (Step 7 will replace this with the real editor) -->
+  <div class="view" id="view-runsheet">
+    <div class="placeholder-view">
+      <div class="placeholder-card">
+        <div style="font-size:48px;opacity:.4;margin-bottom:14px">📋</div>
+        <div class="placeholder-title">Runsheet Editor — coming in Step 7</div>
+        <div class="placeholder-sub">The runsheet is created and saved to the database. The in-line test editing surface (pass/fail per test, comments, photos, witness sign-off) is the next build step.</div>
+        <div class="placeholder-meta" id="placeholderMeta"></div>
+      </div>
+      <button class="btn bg" onclick="showList()">← Back to Runsheets</button>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- NEW RUNSHEET MODAL -->
+<div class="mo" id="newRsModal" onclick="if(event.target===this)closeNewRunsheetModal()">
+  <div class="modal" style="width:560px">
+    <div class="modal-hdr">
+      <h3>＋ New Witness Runsheet</h3>
+      <p>Create a runsheet for a specific equipment item using a project witness template</p>
+    </div>
+    <div class="modal-body">
+      <label class="ml">Equipment Tag *</label>
+      <input class="mi" id="new-eqtag" placeholder="e.g. AHU-2.4-77" autocomplete="off"/>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">The unique identifier of the equipment being witnessed.</div>
+
+      <label class="ml">Equipment Name (optional)</label>
+      <input class="mi" id="new-eqname" placeholder="e.g. Level 2 AHU - North"/>
+
+      <label class="ml">Witness Template *</label>
+      <select class="mi" id="new-template" onchange="onTemplateChange()">
+        <option value="">— Select a project template —</option>
+      </select>
+      <div id="tpl-empty-msg" style="font-size:11px;color:var(--warn);margin-top:6px;display:none">
+        No project witness templates available. Set up templates in <a onclick="navTo('witness-templates.html')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Project Settings → Witness Templates</a> first.
+      </div>
+      <div id="tpl-info" style="font-size:11px;color:var(--muted);margin-top:6px;display:none"></div>
+
+      <label class="ml">Scheduled Date (optional)</label>
+      <input class="mi" id="new-schedule" type="date"/>
+
+      <!-- Cx soft warning placeholder — design doc: "Soft warning if Cx stages 1-6 incomplete (doesn't block)" -->
+      <!-- Will activate once commissioning tracker integration lands in Step 9 -->
+      <div id="cxWarn" class="cx-warn" style="display:none">
+        <div class="cx-warn-icon">⚠</div>
+        <div>
+          <div style="font-weight:600">Commissioning incomplete</div>
+          <div style="margin-top:3px">Some stages 1–6 are not yet signed off for this equipment. You can proceed, but the witness session may be premature.</div>
+          <div class="cx-warn-stages" id="cxWarnStages"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span style="flex:1;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)" id="newRsHint"></span>
+      <button class="bg bsm btn" onclick="closeNewRunsheetModal()">Cancel</button>
+      <button class="bp bsm btn" id="newRsCreateBtn" onclick="confirmNewRunsheet()">Create Runsheet →</button>
+    </div>
+  </div>
+</div>
+
+<script src="head-common.js"></script>
+<script src="db.js"></script>
+<script>
+'use strict';
+
+// ── GLOBALS ──
+var runsheets = [];           // all runsheets for current project
+var projectTemplates = [];    // project witness templates (for the New Runsheet modal)
+var _ptplsLoaded = false;
+var _dataLoaded = false;      // guard for any future save() calls
+var _cachedCS = {};
+var _proj = null;
+var _pNum = '';
+var _activeTab = 'all';       // 'all' | 'rework' | 'completed'
+var _activeRunsheetId = null; // currently-open runsheet (placeholder view)
+
+// ── STATUS LABELS ──
+var STATUS_LABELS = {
+  draft: 'Draft',
+  in_progress: 'In Progress',
+  signed_off: '✓ Signed Off',
+  failed_pending_rework: '⚠ Failed',
+  cancelled: '— Cancelled'
+};
+
+// ── UTILS ──
+function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function fmtDate(d){if(!d)return '—';var p=String(d).split('T')[0].split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+
+function showToast(msg){
+  var t=document.createElement('div');
+  t.className='toast';
+  t.innerHTML=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.remove();},2800);
+}
+
+// ── NAV / SIDEBAR ──
+function navTo(url){
+  var b=window.location.href.substring(0,window.location.href.lastIndexOf('/')+1);
+  window.location.href=b+url;
+}
+var SBK='hvacnexus_sb_collapsed';
+function toggleSB(){
+  var sb=document.getElementById('sidebar');if(!sb)return;
+  var c=!sb.classList.contains('sm');
+  localStorage.setItem(SBK,c?'1':'0');applySB(c);
+}
+function applySB(c){
+  var sb=document.getElementById('sidebar');
+  var main=document.getElementById('mainWrap');
+  var btn=document.getElementById('sbToggleBtn');
+  if(sb)sb.classList.toggle('sm',c);
+  if(main)main.style.marginLeft=c?'var(--sb-sm)':'230px';
+  if(btn)btn.textContent=c?'\u00BB':'\u00AB';
+}
+function toggleGroup(g){
+  var el=document.getElementById('gitems-'+g);
+  var ch=document.getElementById('gchev-'+g);
+  if(!el)return;
+  var open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  if(ch)ch.style.transform=open?'rotate(-90deg)':'';
+}
+
+// ── STORAGE ──
+async function load(){
+  if(!_pNum){
+    console.warn('load() called without _pNum — no project selected');
+    runsheets = [];
+    _dataLoaded = true;
+    return;
+  }
+  try{
+    var rs = await dbGetWitnessRunsheets(_pNum);
+    runsheets = Array.isArray(rs) ? rs : [];
+  }catch(e){
+    console.error('load() error:',e);
+    runsheets = [];
+  }
+  _dataLoaded = true;
+}
+
+async function loadProjectTemplates(){
+  if(!_pNum){projectTemplates = []; _ptplsLoaded = true; return;}
+  try{
+    var pt = await dbGetProjectWitnessTemplates(_pNum);
+    projectTemplates = Array.isArray(pt) ? pt : [];
+  }catch(e){
+    console.error('loadProjectTemplates error:',e);
+    projectTemplates = [];
+  }
+  _ptplsLoaded = true;
+}
+
+// ── VIEW MANAGEMENT ──
+function showView(id){
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  var el=document.getElementById('view-'+id);
+  if(el)el.classList.add('active');
+}
+
+function showList(){
+  _activeRunsheetId = null;
+  var el;
+  el=document.getElementById('backToListBtn');if(el)el.style.display='none';
+  el=document.getElementById('newRsBtn');if(el)el.style.display='';
+  el=document.getElementById('bcCurr');if(el)el.textContent='Witness Testing';
+  showView('list');
+  renderActiveTab();
+}
+
+function showRunsheetPlaceholder(rsId){
+  _activeRunsheetId = rsId;
+  var rs = runsheets.find(function(r){return r.id===rsId;});
+  if(!rs){showList();return;}
+
+  var el;
+  el=document.getElementById('backToListBtn');if(el)el.style.display='';
+  el=document.getElementById('newRsBtn');if(el)el.style.display='none';
+  el=document.getElementById('bcCurr');if(el)el.textContent = (rs.runsheet_number||rs.equipment_tag||'Runsheet');
+
+  // Populate placeholder meta
+  var meta = document.getElementById('placeholderMeta');
+  if(meta){
+    var rows = [
+      ['Runsheet No.', rs.runsheet_number || '—'],
+      ['Equipment', rs.equipment_tag || '—'],
+      ['Equipment Name', rs.equipment_name || '—'],
+      ['Status', STATUS_LABELS[rs.status] || rs.status || '—'],
+      ['Attempt', '#' + (rs.attempt_number || 1)],
+      ['Template', (rs.template_snapshot && rs.template_snapshot.name) || '—'],
+      ['Tests', (rs.tests || []).length],
+      ['Scheduled Date', fmtDate(rs.scheduled_date)],
+      ['Created', fmtDate(rs.created_at)],
+      ['DB id', rs.id]
+    ];
+    meta.innerHTML = rows.map(function(r){
+      return '<div class="placeholder-meta-row"><span class="placeholder-meta-lbl">'+escH(r[0])+'</span><span class="placeholder-meta-val">'+escH(r[1])+'</span></div>';
+    }).join('');
+  }
+  showView('runsheet');
+}
+
+// ── TABS ──
+function switchTab(tab){
+  _activeTab = tab;
+  ['all','rework','completed'].forEach(function(t){
+    var btn=document.getElementById('tab-'+t);
+    var content=document.getElementById('tabc-'+t);
+    if(btn)btn.classList.toggle('active', t===tab);
+    if(content)content.classList.toggle('active', t===tab);
+  });
+  // Status filter only makes sense on the "All" tab
+  var fs=document.getElementById('filterStatus');
+  if(fs)fs.style.display = (tab==='all') ? '' : 'none';
+  renderActiveTab();
+}
+
+// ── FILTERED LISTS PER TAB ──
+function filterAll(){
+  var q=(document.getElementById('srch')||{}).value.toLowerCase();
+  var ef=(document.getElementById('filterEquip')||{}).value||'';
+  var sf=(document.getElementById('filterStatus')||{}).value||'';
+  return runsheets.filter(function(r){
+    var equipType = (r.template_snapshot && r.template_snapshot.equipment_type) || '';
+    var match = !q
+      || (r.runsheet_number||'').toLowerCase().includes(q)
+      || (r.equipment_tag||'').toLowerCase().includes(q)
+      || (r.equipment_name||'').toLowerCase().includes(q)
+      || (r.template_snapshot && (r.template_snapshot.name||'').toLowerCase().includes(q));
+    var equipMatch = !ef || equipType === ef;
+    var statusMatch = !sf || r.status === sf;
+    return match && equipMatch && statusMatch;
+  });
+}
+
+function filterRework(){
+  // Runsheets that failed and are waiting on re-witness.
+  // When the defects module lands (Step 9), tighten this to: failed_pending_rework AND all linked defects closed.
+  var q=(document.getElementById('srch')||{}).value.toLowerCase();
+  var ef=(document.getElementById('filterEquip')||{}).value||'';
+  return runsheets.filter(function(r){
+    if(r.status !== 'failed_pending_rework')return false;
+    var equipType = (r.template_snapshot && r.template_snapshot.equipment_type) || '';
+    var match = !q
+      || (r.runsheet_number||'').toLowerCase().includes(q)
+      || (r.equipment_tag||'').toLowerCase().includes(q)
+      || (r.equipment_name||'').toLowerCase().includes(q);
+    var equipMatch = !ef || equipType === ef;
+    return match && equipMatch;
+  });
+}
+
+function filterCompleted(){
+  var q=(document.getElementById('srch')||{}).value.toLowerCase();
+  var ef=(document.getElementById('filterEquip')||{}).value||'';
+  return runsheets.filter(function(r){
+    if(['signed_off','failed_pending_rework','cancelled'].indexOf(r.status) === -1)return false;
+    var equipType = (r.template_snapshot && r.template_snapshot.equipment_type) || '';
+    var match = !q
+      || (r.runsheet_number||'').toLowerCase().includes(q)
+      || (r.equipment_tag||'').toLowerCase().includes(q)
+      || (r.equipment_name||'').toLowerCase().includes(q);
+    var equipMatch = !ef || equipType === ef;
+    return match && equipMatch;
+  });
+}
+
+function populateEquipFilter(){
+  var sel = document.getElementById('filterEquip');
+  if(!sel)return;
+  var cur = sel.value;
+  var types = [];
+  runsheets.forEach(function(r){
+    var et = (r.template_snapshot && r.template_snapshot.equipment_type) || '';
+    if(et && types.indexOf(et)===-1)types.push(et);
+  });
+  types.sort();
+  sel.innerHTML = '<option value="">All Equipment Types</option>' + types.map(function(t){
+    return '<option value="'+escH(t)+'"'+(t===cur?' selected':'')+'>'+escH(t)+'</option>';
+  }).join('');
+}
+
+function updateTabCounts(){
+  document.getElementById('tabCount-all').textContent = runsheets.length;
+  document.getElementById('tabCount-rework').textContent = runsheets.filter(function(r){return r.status==='failed_pending_rework';}).length;
+  document.getElementById('tabCount-completed').textContent = runsheets.filter(function(r){return ['signed_off','failed_pending_rework','cancelled'].indexOf(r.status)!==-1;}).length;
+}
+
+// ── RENDER HELPERS ──
+function renderStatus(status){
+  var lbl = STATUS_LABELS[status] || status || '—';
+  return '<span class="status-badge sb-'+escH(status||'draft')+'">'+escH(lbl)+'</span>';
+}
+
+function renderWitnesses(rs){
+  var witnesses = rs.witnesses || [];
+  var total = witnesses.length;
+  if(total === 0){
+    return '<span class="witnesses-chip"><span class="pending-count">—</span></span>';
+  }
+  var signed = witnesses.filter(function(w){return w && w.signed_at;}).length;
+  return '<span class="witnesses-chip"><span class="signed-count">'+signed+'</span> of <span>'+total+'</span></span>';
+}
+
+function renderDefects(rs){
+  var defects = rs.defects_raised || [];
+  if(!defects.length)return '<span class="defect-chip-zero">—</span>';
+  return '<span class="defect-chip">⚠ '+defects.length+'</span>';
+}
+
+function renderEquipCell(rs){
+  var tag = rs.equipment_tag || '—';
+  var name = rs.equipment_name || '';
+  var attempt = (rs.attempt_number && rs.attempt_number > 1)
+    ? '<span class="attempt-pill">Attempt #'+rs.attempt_number+'</span>' : '';
+  return '<div class="eq-tag">'+escH(tag)+attempt+'</div>'
+    + (name ? '<div class="eq-name">'+escH(name)+'</div>' : '');
+}
+
+function getEquipType(rs){
+  return (rs.template_snapshot && rs.template_snapshot.equipment_type) || '—';
+}
+
+// ── RENDER TABS ──
+function renderActiveTab(){
+  populateEquipFilter();
+  updateTabCounts();
+  if(_activeTab === 'all') return renderAll();
+  if(_activeTab === 'rework') return renderRework();
+  if(_activeTab === 'completed') return renderCompleted();
+}
+
+function renderAll(){
+  var list = filterAll();
+  var cnt = document.getElementById('rsCount');
+  if(cnt)cnt.textContent = list.length + ' runsheet' + (list.length!==1?'s':'');
+
+  var rows = '';
+  list.forEach(function(r){
+    rows += '<tr style="cursor:pointer" onclick="showRunsheetPlaceholder(\''+escH(r.id)+'\')">'
+      + '<td><span class="rs-num">'+escH(r.runsheet_number||'—')+'</span></td>'
+      + '<td>'+renderEquipCell(r)+'</td>'
+      + '<td><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(getEquipType(r))+'</span></td>'
+      + '<td>'+renderStatus(r.status)+'</td>'
+      + '<td>'+renderWitnesses(r)+'</td>'
+      + '<td style="color:var(--text2);font-size:12px">'+fmtDate(r.scheduled_date || r.signed_at || r.created_at)+'</td>'
+      + '<td onclick="event.stopPropagation()">'
+        + '<div class="act-btns-grid">'
+          + '<button class="act-btn" onclick="showRunsheetPlaceholder(\''+escH(r.id)+'\')" title="Open"><span class="tip">Open</span>→</button>'
+          + '<button class="act-btn danger" onclick="deleteRunsheet(\''+escH(r.id)+'\')" title="Delete"><span class="tip">Delete</span>🗑</button>'
+        + '</div>'
+      + '</td>'
+      + '</tr>';
+  });
+
+  document.getElementById('body-all').innerHTML = rows
+    || '<tr><td colspan="7"><div class="empty-state">'
+      + '<div class="empty-icon">📋</div>'
+      + '<div class="empty-title">No witness runsheets yet</div>'
+      + '<div class="empty-sub">Click "+ New Runsheet" above to create the first one for this project. You\'ll need a project witness template set up first — manage them in Project Settings → Witness Templates.</div>'
+    + '</div></td></tr>';
+}
+
+function renderRework(){
+  var list = filterRework();
+  var cnt = document.getElementById('rsCount');
+  if(cnt)cnt.textContent = list.length + ' awaiting re-witness';
+
+  var rows = '';
+  list.forEach(function(r){
+    var failedTests = (r.tests||[]).filter(function(t){return t && t.result==='fail';}).length;
+    rows += '<tr style="cursor:pointer" onclick="showRunsheetPlaceholder(\''+escH(r.id)+'\')">'
+      + '<td><span class="rs-num">'+escH(r.runsheet_number||'—')+'</span></td>'
+      + '<td>'+renderEquipCell(r)+'</td>'
+      + '<td><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(getEquipType(r))+'</span></td>'
+      + '<td><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--warn)">'+failedTests+'</span></td>'
+      + '<td>'+renderDefects(r)+'</td>'
+      + '<td style="color:var(--text2);font-size:12px">'+fmtDate(r.signed_at || r.scheduled_date)+'</td>'
+      + '<td style="text-align:right" onclick="event.stopPropagation()">'
+        + '<button class="btn-rewitness" onclick="initiateRewitness(\''+escH(r.id)+'\')" title="Create a new attempt with failed tests carried forward">↻ Re-Witness</button>'
+      + '</td>'
+      + '</tr>';
+  });
+
+  document.getElementById('body-rework').innerHTML = rows
+    || '<tr><td colspan="7"><div class="empty-state">'
+      + '<div class="empty-icon">✓</div>'
+      + '<div class="empty-title">Nothing awaiting re-witness</div>'
+      + '<div class="empty-sub">When a runsheet is signed off with failures, it lands here so you can initiate a re-witness once the defects are closed.</div>'
+    + '</div></td></tr>';
+}
+
+function renderCompleted(){
+  var list = filterCompleted();
+  var cnt = document.getElementById('rsCount');
+  if(cnt)cnt.textContent = list.length + ' completed';
+
+  var rows = '';
+  list.forEach(function(r){
+    var outcome;
+    if(r.status === 'signed_off') outcome = '<span class="status-badge sb-signed_off">✓ Pass</span>';
+    else if(r.status === 'failed_pending_rework') outcome = '<span class="status-badge sb-failed_pending_rework">⚠ Fail</span>';
+    else outcome = '<span class="status-badge sb-cancelled">— Cancelled</span>';
+
+    rows += '<tr style="cursor:pointer" onclick="showRunsheetPlaceholder(\''+escH(r.id)+'\')">'
+      + '<td><span class="rs-num">'+escH(r.runsheet_number||'—')+'</span></td>'
+      + '<td>'+renderEquipCell(r)+'</td>'
+      + '<td><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+escH(getEquipType(r))+'</span></td>'
+      + '<td>'+outcome+'</td>'
+      + '<td>'+renderWitnesses(r)+'</td>'
+      + '<td style="color:var(--text2);font-size:12px">'+fmtDate(r.signed_at || r.created_at)+'</td>'
+      + '<td style="text-align:right" onclick="event.stopPropagation()">'
+        + '<div class="act-btns-grid">'
+          + '<button class="act-btn" onclick="showRunsheetPlaceholder(\''+escH(r.id)+'\')" title="View"><span class="tip">View</span>👁</button>'
+        + '</div>'
+      + '</td>'
+      + '</tr>';
+  });
+
+  document.getElementById('body-completed').innerHTML = rows
+    || '<tr><td colspan="7"><div class="empty-state">'
+      + '<div class="empty-icon">📦</div>'
+      + '<div class="empty-title">No completed runsheets yet</div>'
+      + '<div class="empty-sub">Runsheets that have been signed off (pass or fail) or cancelled will be archived here for reporting and handover.</div>'
+    + '</div></td></tr>';
+}
+
+// ── NEW RUNSHEET MODAL ──
+async function openNewRunsheetModal(){
+  if(!_pNum){alert('No project selected.');return;}
+  // Lazy-load project templates on first open
+  if(!_ptplsLoaded){
+    await loadProjectTemplates();
+  }
+  // Reset form
+  document.getElementById('new-eqtag').value = '';
+  document.getElementById('new-eqname').value = '';
+  document.getElementById('new-schedule').value = '';
+  document.getElementById('cxWarn').style.display = 'none';
+
+  // Populate template selector
+  var sel = document.getElementById('new-template');
+  if(projectTemplates.length === 0){
+    sel.innerHTML = '<option value="">— No templates available —</option>';
+    sel.disabled = true;
+    document.getElementById('tpl-empty-msg').style.display = '';
+    document.getElementById('newRsCreateBtn').disabled = true;
+  } else {
+    sel.disabled = false;
+    document.getElementById('tpl-empty-msg').style.display = 'none';
+    document.getElementById('newRsCreateBtn').disabled = false;
+    sel.innerHTML = '<option value="">— Select a project template —</option>'
+      + projectTemplates.map(function(t){
+          var label = (t.formNo ? t.formNo + ' · ' : '') + (t.name || '(Untitled)') + ' (' + (t.equipment_type || '—') + ', ' + ((t.tests||[]).length) + ' tests)';
+          return '<option value="'+escH(t.id)+'">'+escH(label)+'</option>';
+        }).join('');
+  }
+  document.getElementById('tpl-info').style.display = 'none';
+
+  document.getElementById('newRsModal').classList.add('open');
+  setTimeout(function(){var el=document.getElementById('new-eqtag');if(el)el.focus();},80);
+}
+
+function closeNewRunsheetModal(){
+  document.getElementById('newRsModal').classList.remove('open');
+}
+
+function onTemplateChange(){
+  var sel = document.getElementById('new-template');
+  var info = document.getElementById('tpl-info');
+  var tpl = projectTemplates.find(function(t){return t.id === sel.value;});
+  if(!tpl){info.style.display = 'none';return;}
+  info.style.display = '';
+  info.textContent = (tpl.tests||[]).length + ' tests will be snapshotted into the runsheet at creation. Edits to this template after that won\'t affect this runsheet.';
+}
+
+// Generates the next runsheet number, scoped to this project.
+function genRunsheetNumber(){
+  var max = 0;
+  runsheets.forEach(function(r){
+    var m = (r.runsheet_number||'').match(/WRS-(\d+)/);
+    if(m){var n = parseInt(m[1]); if(n>max)max = n;}
+  });
+  return 'WRS-' + String(max+1).padStart(4,'0');
+}
+
+async function confirmNewRunsheet(){
+  var eqTag = (document.getElementById('new-eqtag').value||'').trim();
+  var eqName = (document.getElementById('new-eqname').value||'').trim();
+  var tplId = document.getElementById('new-template').value;
+  var sched = document.getElementById('new-schedule').value || null;
+
+  if(!eqTag){alert('Equipment Tag is required.');return;}
+  if(!tplId){alert('Please select a witness template.');return;}
+  if(!_pNum){alert('No project selected.');return;}
+
+  var tpl = projectTemplates.find(function(t){return t.id === tplId;});
+  if(!tpl){alert('Selected template not found.');return;}
+
+  // Build the runsheet payload. NO client-generated id — DB assigns the UUID.
+  // The template snapshot is the audit-immutability mechanism (per design doc).
+  var templateSnapshot = JSON.parse(JSON.stringify(tpl));
+
+  // Hydrate the runsheet's tests[] from the template tests, with result=pending
+  var runsheetTests = (tpl.tests || []).map(function(t){
+    return {
+      id: t.id,
+      test_name: t.test_name || '',
+      description: t.description || '',
+      acceptance_criteria: t.acceptance_criteria || '',
+      reference_standard: t.reference_standard || '',
+      photo_required: !!t.photo_required,
+      // Live result fields (filled in during witness session in Step 7)
+      result: null,           // 'pass' | 'fail' | null (pending)
+      comment: '',
+      photos: [],
+      tested_at: null
+    };
+  });
+
+  var runsheet = {
+    runsheet_number: genRunsheetNumber(),
+    equipment_tag: eqTag,
+    equipment_name: eqName,
+    template_id: tpl.id,             // Soft reference (project tier) — sanitised by helper if non-UUID
+    status: 'draft',
+    attempt_number: 1,
+    parent_runsheet_id: null,
+    scheduled_date: sched,
+    template_snapshot: templateSnapshot,
+    tests: runsheetTests,
+    witnesses: [],
+    comments: '',
+    photos: [],
+    defects_raised: [],
+    overall_outcome: null,
+    cx_completion_check: {
+      // Will be populated when commissioning tracker integration lands in Step 9
+      checked: false,
+      all_complete: null,
+      incomplete_stages: [],
+      pm_acknowledged_warning: false
+    },
+    initiated_at: new Date().toISOString(),
+    initiated_by: (_cachedCS.userName||_cachedCS.contactName||'PM').split(' ')[0]
+  };
+
+  var btn = document.getElementById('newRsCreateBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+
+  try{
+    var created = await dbCreateWitnessRunsheet(_pNum, runsheet);
+    btn.disabled = false; btn.textContent = 'Create Runsheet →';
+    if(!created || !created.id){
+      alert('Failed to create runsheet. See console.');
+      return;
+    }
+    runsheets.unshift(created);  // newest-first
+    closeNewRunsheetModal();
+    showToast('✓ Runsheet '+(created.runsheet_number||'')+' created');
+    // Take the user straight to the (placeholder) editor
+    showRunsheetPlaceholder(created.id);
+  }catch(e){
+    btn.disabled = false; btn.textContent = 'Create Runsheet →';
+    console.error('confirmNewRunsheet error:', e);
+    alert('Failed to create runsheet. See console.');
+  }
+}
+
+// ── RE-WITNESS ──
+async function initiateRewitness(rsId){
+  if(!rsId)return;
+  if(!confirm('Create a re-witness runsheet?\n\nA new runsheet will be created with attempt_number incremented. Only failed tests carry forward; passed tests are retained as historical record on the previous attempt.'))return;
+  try{
+    var newRs = await dbCreateRewitnessRunsheet(rsId);
+    if(!newRs || !newRs.id){
+      alert('Failed to create re-witness runsheet. The original may have no failed tests carried forward. See console.');
+      return;
+    }
+    runsheets.unshift(newRs);
+    renderActiveTab();
+    showToast('✓ Re-witness runsheet created (Attempt #'+(newRs.attempt_number||2)+')');
+    showRunsheetPlaceholder(newRs.id);
+  }catch(e){
+    console.error('initiateRewitness error:',e);
+    alert('Failed to create re-witness runsheet. See console.');
+  }
+}
+
+// ── DELETE ──
+async function deleteRunsheet(rsId){
+  var rs = runsheets.find(function(r){return r.id===rsId;});
+  if(!rs)return;
+  if(rs.status === 'signed_off' || rs.status === 'failed_pending_rework'){
+    alert('Cannot delete a signed-off runsheet. Locked records are part of the audit trail.');
+    return;
+  }
+  if(!confirm('Delete runsheet '+(rs.runsheet_number||'')+' for '+(rs.equipment_tag||'')+'?\n\nThis cannot be undone.'))return;
+  try{
+    var ok = await dbDeleteWitnessRunsheet(rsId);
+    if(!ok){alert('Delete failed. See console.');return;}
+    runsheets = runsheets.filter(function(r){return r.id!==rsId;});
+    renderActiveTab();
+    showToast('✓ Runsheet deleted');
+  }catch(e){
+    console.error('deleteRunsheet error:',e);
+    alert('Delete failed. See console.');
+  }
+}
+
+// ── INIT ──
+async function initWitnessTesting(){
+  // Wait for db.js to be ready before any load/save
+  if(typeof dbReady !== 'undefined') await dbReady;
+
+  try{ _cachedCS = await dbGetCompanySettings() || {}; }catch(e){ _cachedCS = {}; }
+
+  _proj = (typeof dbGetCurrentProject==='function') ? (dbGetCurrentProject()||{}) : {};
+  _pNum = _proj.num || _proj.number || '';
+
+  await load();
+
+  // Sidebar setup
+  applySB(localStorage.getItem(SBK)==='1');
+  var sb_name=document.getElementById('sb-proj-name');if(sb_name)sb_name.textContent = _proj.name || '—';
+  var sb_num=document.getElementById('sb-proj-num');if(sb_num)sb_num.textContent = _pNum || '—';
+  var u = (typeof dbGetCurrentUser==='function') ? dbGetCurrentUser() : null;
+  if(u){
+    var av=document.getElementById('sb-av');if(av)av.textContent = (u.name||u.username||'?')[0].toUpperCase();
+    var sun=document.getElementById('sb-user');if(sun)sun.textContent = u.name || u.username || '—';
+  }
+
+  // Default to All Runsheets tab
+  switchTab('all');
+}
+
+window.addEventListener('DOMContentLoaded', initWitnessTesting);
+</script>
+
+</body>
+</html>
