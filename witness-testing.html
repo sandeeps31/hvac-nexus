@@ -364,6 +364,38 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 #eqIdDropdown .sd-sep{color:var(--muted);opacity:.6}
 #eqIdDropdown .sd-empty{padding:14px;color:var(--muted);font-size:12px;text-align:center;font-style:italic}
 
+/* ── Submit & Lock confirmation modal ── */
+.scm-summary{background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.scm-row{display:grid;grid-template-columns:120px 1fr;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border)}
+.scm-row:last-child{border-bottom:none}
+.scm-row-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.scm-row-val{font-size:13px;color:var(--text)}
+.scm-row-outcome{background:var(--surface3)}
+.scm-row-outcome .scm-row-val{font-family:'Syne',sans-serif;font-weight:700}
+
+.scm-block-lbl{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--warn);margin-bottom:8px}
+.scm-block-lbl-pass{color:var(--green)}
+.scm-failed-list{background:rgba(255,184,48,.05);border:1px solid rgba(255,184,48,.25);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.scm-failed-row{font-size:12.5px;color:var(--text);display:flex;align-items:flex-start;gap:8px}
+.scm-failed-row .sf-num{font-family:'DM Mono',monospace;color:var(--warn);font-size:11px;flex-shrink:0;margin-top:1px;min-width:18px}
+.scm-failed-row .sf-name{font-weight:600;color:var(--text)}
+.scm-failed-row .sf-comment{color:var(--text2);font-size:11.5px;margin-top:2px;line-height:1.4}
+.scm-block-sub{font-size:12px;color:var(--text2);line-height:1.5;margin-top:6px}
+.scm-block-sub code{background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:11px;color:var(--text)}
+
+/* ── Defects Raised section (on locked runsheets) ── */
+.defects-raised-section{margin:14px 24px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.drs-hdr{padding:11px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.drs-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1}
+.drs-count-pill{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:10px;background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3);letter-spacing:.5px}
+.drs-row{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px;font-size:13px}
+.drs-row:last-child{border-bottom:none}
+.drs-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--warn);font-weight:700;flex-shrink:0;min-width:62px;padding-top:1px}
+.drs-desc{flex:1;color:var(--text);line-height:1.4}
+.drs-status{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:10px;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0}
+.drs-status-open{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+.drs-status-closed{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)}
 </style>
 <script>
@@ -579,13 +611,23 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <button class="add-test-btn" id="addTestBtn" onclick="rsAddTest()">＋ Add Test</button>
     </div>
 
-    <!-- ALL-SIGNED SOFT-LOCK BANNER (visible when every witness has signed) -->
+    <!-- ALL-SIGNED BANNER + SUBMIT BUTTON (visible when every witness has signed and runsheet not yet locked) -->
     <div id="allSignedBanner" class="all-signed-banner" style="display:none">
       <div class="asb-icon">✓</div>
       <div style="flex:1">
         <div class="asb-title">All witnesses signed — ready to submit</div>
-        <div class="asb-sub">Tests are now locked (soft lock). The explicit "Submit & Lock" button arrives in Step 9 along with auto-defect creation, commissioning tracker sync, and PDF report generation. Until then, you can still add witnesses or undo a signature.</div>
+        <div class="asb-sub" id="asb-sub">Click Submit &amp; Lock to finalise. The runsheet will be locked, any failed tests will raise defects in the Cx defect register, and the commissioning tracker will be updated.</div>
       </div>
+      <button class="btn bp" id="submitLockBtn" onclick="openSubmitConfirm()" style="white-space:nowrap;align-self:center">Submit &amp; Lock →</button>
+    </div>
+
+    <!-- DEFECTS RAISED SECTION (appears after sign-off if any failed tests led to defects) -->
+    <div id="defectsRaisedSection" class="defects-raised-section" style="display:none">
+      <div class="drs-hdr">
+        <span class="drs-title">Defects Raised at Sign-Off</span>
+        <span class="drs-count-pill" id="drs-count-pill">0</span>
+      </div>
+      <div id="drs-list"></div>
     </div>
 
     <!-- WITNESSES SECTION -->
@@ -765,6 +807,56 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     </div>
     <div class="modal-footer">
       <button class="bg bsm btn" onclick="closeViewSignatureModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUBMIT & LOCK CONFIRMATION MODAL -->
+<div class="mo" id="submitConfirmModal" onclick="if(event.target===this)closeSubmitConfirm()">
+  <div class="modal" style="width:580px">
+    <div class="modal-hdr">
+      <h3 id="scmHdrTitle">Submit &amp; Lock Runsheet</h3>
+      <p id="scmHdrSub">Confirm the sign-off ceremony. This action is permanent — once locked the runsheet becomes part of the audit trail.</p>
+    </div>
+    <div class="modal-body" style="padding:18px 22px">
+
+      <!-- Summary card showing what's about to happen -->
+      <div class="scm-summary">
+        <div class="scm-row">
+          <div class="scm-row-lbl">Equipment</div>
+          <div class="scm-row-val" id="scm-equipment">—</div>
+        </div>
+        <div class="scm-row">
+          <div class="scm-row-lbl">Tests</div>
+          <div class="scm-row-val" id="scm-tests">—</div>
+        </div>
+        <div class="scm-row">
+          <div class="scm-row-lbl">Witnesses</div>
+          <div class="scm-row-val" id="scm-witnesses">—</div>
+        </div>
+        <div class="scm-row scm-row-outcome">
+          <div class="scm-row-lbl">Outcome</div>
+          <div class="scm-row-val" id="scm-outcome">—</div>
+        </div>
+      </div>
+
+      <!-- Failed-tests block (shown only when failures exist) -->
+      <div id="scm-failed-block" style="display:none;margin-top:14px">
+        <div class="scm-block-lbl">⚠ Failed tests — defects will be raised</div>
+        <div class="scm-failed-list" id="scm-failed-list"></div>
+        <div class="scm-block-sub">One defect per failed test will be added to the <strong>Cx defect register</strong> with status <code>open</code>. The runsheet status will become <strong>failed_pending_rework</strong>. Re-witness is initiated once these defects are closed.</div>
+      </div>
+
+      <!-- Pass-only block (shown when no failures) -->
+      <div id="scm-pass-block" style="display:none;margin-top:14px">
+        <div class="scm-block-lbl scm-block-lbl-pass">✓ All tests passed</div>
+        <div class="scm-block-sub">The runsheet will be <strong>signed off</strong> and locked. The commissioning tracker will mark this equipment as witnessed (stage 7 = Y).</div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closeSubmitConfirm()">Cancel</button>
+      <button class="bp bsm btn" id="scmConfirmBtn" onclick="confirmSubmitAndLock()">Confirm Submit &amp; Lock</button>
     </div>
   </div>
 </div>
@@ -1096,6 +1188,7 @@ function renderRunsheetEditor(){
   renderRsHeader(rs);
   renderRsTests(rs);
   renderWitnesses(rs);
+  renderDefectsRaised(rs);
 
   // Disable / enable bottom actions based on lock state
   var cancelBtn = document.getElementById('cancelRsBtn');
@@ -1921,6 +2014,312 @@ function viewWitnessSignature(witnessId){
 
 function closeViewSignatureModal(){
   document.getElementById('viewSigModal').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SIGN-OFF CEREMONY (Step 9)
+// ═══════════════════════════════════════════════════════════════════════
+// When all witnesses have signed and PM clicks "Submit & Lock":
+//   1. Compute new status — signed_off (all pass) or failed_pending_rework (any fail)
+//   2. Generate one defect per failed test, append to cx_defects register
+//   3. If pass — flip the Cx tracker row's `witnessed` field to 'Y'
+//   4. Save the runsheet with locked status + audit fields
+//
+// Failure modes are handled progressively: if defects-save fails, the runsheet
+// itself is NOT locked (the JS roll-back). PM can retry without losing data.
+
+// ── Summarise what will happen on submit ──
+function _summariseRunsheet(rs){
+  var tests = (rs && rs.tests) || [];
+  var passCount = tests.filter(function(t){return t.result === 'pass';}).length;
+  var failCount = tests.filter(function(t){return t.result === 'fail';}).length;
+  var pendingCount = tests.filter(function(t){return !t.result;}).length;
+  var failedTests = tests.filter(function(t){return t.result === 'fail';});
+  var newStatus = failCount > 0 ? 'failed_pending_rework' : 'signed_off';
+  var newOutcome = failCount > 0 ? 'fail' : 'pass';
+  return {
+    total: tests.length,
+    passCount: passCount,
+    failCount: failCount,
+    pendingCount: pendingCount,
+    failedTests: failedTests,
+    newStatus: newStatus,
+    newOutcome: newOutcome
+  };
+}
+
+// ── Submit confirmation modal ──
+function openSubmitConfirm(){
+  var rs = runsheets.find(function(r){return r.id===_activeRunsheetId;});
+  if(!rs)return;
+  if(_rsLocked(rs)){alert('This runsheet is already locked.');return;}
+  if(!_allWitnessesSigned(rs)){
+    alert('Not all witnesses have signed yet. Every witness must sign before submitting.');
+    return;
+  }
+
+  var summary = _summariseRunsheet(rs);
+
+  // Guard: don't allow submit if any tests are pending
+  if(summary.pendingCount > 0){
+    alert(summary.pendingCount + ' test(s) still pending. Mark every test as Pass or Fail before submitting.');
+    return;
+  }
+  // Guard: don't allow submit if no tests at all
+  if(summary.total === 0){
+    alert('This runsheet has no tests. Add at least one test before submitting.');
+    return;
+  }
+
+  // Populate summary card
+  document.getElementById('scm-equipment').textContent =
+    (rs.equipment_id || rs.equipment_tag || '—') + (rs.equipment_name ? ' · ' + rs.equipment_name : '');
+  document.getElementById('scm-tests').textContent =
+    summary.total + ' total · ' + summary.passCount + ' pass · ' + summary.failCount + ' fail';
+  var signedW = (rs.witnesses||[]).map(function(w){return w.name;}).join(', ');
+  document.getElementById('scm-witnesses').textContent = (rs.witnesses||[]).length + ' signed — ' + signedW;
+  var outcomeEl = document.getElementById('scm-outcome');
+  if(summary.newStatus === 'signed_off'){
+    outcomeEl.innerHTML = '<span style="color:var(--green)">✓ Pass — runsheet will be signed off</span>';
+  } else {
+    outcomeEl.innerHTML = '<span style="color:var(--warn)">⚠ Fail — pending re-witness once defects close</span>';
+  }
+
+  // Pass/fail block
+  var failedBlock = document.getElementById('scm-failed-block');
+  var passBlock = document.getElementById('scm-pass-block');
+  if(summary.failCount > 0){
+    failedBlock.style.display = '';
+    passBlock.style.display = 'none';
+    var listEl = document.getElementById('scm-failed-list');
+    listEl.innerHTML = summary.failedTests.map(function(t, i){
+      return '<div class="scm-failed-row">'
+        + '<span class="sf-num">'+(i+1)+'.</span>'
+        + '<div style="flex:1">'
+        +   '<div class="sf-name">'+escH(t.test_name||'(Unnamed test)')+'</div>'
+        +   (t.comment ? '<div class="sf-comment">'+escH(t.comment)+'</div>' : '<div class="sf-comment" style="color:var(--muted);font-style:italic">No comment provided</div>')
+        + '</div>'
+        + '</div>';
+    }).join('');
+  } else {
+    failedBlock.style.display = 'none';
+    passBlock.style.display = '';
+  }
+
+  document.getElementById('submitConfirmModal').classList.add('open');
+}
+
+function closeSubmitConfirm(){
+  document.getElementById('submitConfirmModal').classList.remove('open');
+}
+
+// ── The actual ceremony ──
+async function confirmSubmitAndLock(){
+  var rs = runsheets.find(function(r){return r.id===_activeRunsheetId;});
+  if(!rs)return;
+  if(_rsLocked(rs)){closeSubmitConfirm();return;}
+
+  // Re-validate state in case something changed between opening the modal and clicking confirm
+  if(!_allWitnessesSigned(rs)){
+    alert('A witness was unsigned while this dialog was open. Please review and try again.');
+    closeSubmitConfirm();
+    renderWitnesses(rs);
+    return;
+  }
+  var summary = _summariseRunsheet(rs);
+  if(summary.pendingCount > 0 || summary.total === 0){
+    alert('Runsheet state changed. Please review.');
+    closeSubmitConfirm();
+    return;
+  }
+
+  var btn = document.getElementById('scmConfirmBtn');
+  btn.disabled = true; btn.textContent = 'Processing…';
+
+  try {
+    // ── STEP 1: Raise defects in the Cx defect register (if any failures) ──
+    var newDefects = [];
+    var defectIdsRaised = [];
+    if(summary.failCount > 0){
+      // Load existing defects so we can append + generate next number
+      var existing = [];
+      try{
+        var raw = await dbGetProject('cx_defects', _pNum);
+        if(Array.isArray(raw))existing = raw;
+      }catch(e){
+        console.warn('Could not load existing cx_defects — starting fresh:', e.message);
+      }
+      // Find the next CX-D number — robust against deletions
+      var maxNum = 0;
+      existing.forEach(function(d){
+        var m = (d.num||'').match(/CX-D(\d+)/);
+        if(m){var n = parseInt(m[1], 10); if(n > maxNum)maxNum = n;}
+      });
+
+      summary.failedTests.forEach(function(t, idx){
+        maxNum += 1;
+        var defNum = 'CX-D' + String(maxNum).padStart(3, '0');
+        var defId = 'df' + Date.now() + '-' + Math.floor(Math.random()*9999) + '-' + idx;
+        var equipId = rs.equipment_id || rs.equipment_tag || '';
+        // Description format: include test name + PM-entered comment if present
+        var desc = '[Witness] ' + (t.test_name || '(Unnamed test)');
+        if(t.comment && t.comment.trim()) desc += ' — ' + t.comment.trim();
+        var defect = {
+          id: defId,
+          num: defNum,
+          desc: desc,
+          tag: equipId,                         // matches existing cx_defects shape
+          status: 'open',
+          // Witness-specific cross-reference fields (Step 11 uses these for re-witness flagging)
+          source: 'witness',
+          runsheet_id: rs.id,
+          runsheet_number: rs.runsheet_number || '',
+          test_id: t.id || null,
+          test_name: t.test_name || '',
+          raised_at: new Date().toISOString()
+        };
+        newDefects.push(defect);
+        defectIdsRaised.push(defNum);
+      });
+
+      // Persist the combined defects array
+      try {
+        await dbSetProject('cx_defects', _pNum, existing.concat(newDefects));
+      } catch(e) {
+        console.error('Defect register save failed:', e);
+        alert('Failed to raise defects in the Cx defect register. Runsheet has NOT been locked. Please try again or contact support.\n\nError: ' + e.message);
+        btn.disabled = false; btn.textContent = 'Confirm Submit & Lock';
+        return;
+      }
+    }
+
+    // ── STEP 2: Sync Cx tracker stage 7 (witnessed='Y' only on full pass) ──
+    var trackerSynced = false;
+    var trackerSkipReason = '';
+    if(summary.newStatus === 'signed_off'){
+      try {
+        var trackerItems = await dbGetCommissioning(_pNum);
+        if(Array.isArray(trackerItems) && trackerItems.length){
+          // Match by cx_tracker_id (soft link captured at runsheet creation),
+          // fall back to matching by equipment id (current tag) for robustness.
+          var equipId = rs.equipment_id || rs.equipment_tag || '';
+          var trackerRow = null;
+          if(rs.cx_tracker_id){
+            trackerRow = trackerItems.find(function(t){return t && t.id === rs.cx_tracker_id;});
+          }
+          if(!trackerRow && equipId){
+            trackerRow = trackerItems.find(function(t){return t && String(t.tag||'').trim() === equipId;});
+          }
+          if(trackerRow){
+            trackerRow.witnessed = 'Y';
+            await dbSetCommissioning(_pNum, trackerItems);
+            trackerSynced = true;
+          } else {
+            trackerSkipReason = 'No matching tracker row found';
+          }
+        } else {
+          trackerSkipReason = 'Tracker is empty';
+        }
+      } catch(e) {
+        // Don't block sign-off on tracker sync failure — the runsheet is still
+        // the authoritative record. Log and continue.
+        console.warn('Tracker stage-7 sync failed (non-blocking):', e.message);
+        trackerSkipReason = 'Sync error — see console';
+      }
+    }
+
+    // ── STEP 3: Update the runsheet itself and lock it ──
+    rs.status = summary.newStatus;
+    rs.overall_outcome = summary.newOutcome;
+    rs.defects_raised = (rs.defects_raised || []).concat(defectIdsRaised);
+    rs.completed_at = new Date().toISOString();
+    rs.completed_by = (_cachedCS.userName || _cachedCS.contactName || 'PM').split(' ')[0];
+    rs.submission_summary = {
+      total_tests: summary.total,
+      passed: summary.passCount,
+      failed: summary.failCount,
+      defects_raised: defectIdsRaised.length,
+      tracker_synced: trackerSynced,
+      tracker_skip_reason: trackerSkipReason || null,
+      signed_off_at: new Date().toISOString()
+    };
+
+    if(_rsSaveTimer)clearTimeout(_rsSaveTimer);
+    await dbSaveWitnessRunsheet(rs.id, rs);
+
+    _rsDirty = false;
+    closeSubmitConfirm();
+    btn.disabled = false; btn.textContent = 'Confirm Submit & Lock';
+
+    // Toast + re-render to apply the hard lock
+    if(summary.failCount > 0){
+      showToast('⚠ Runsheet '+(rs.runsheet_number||'')+' submitted — '+defectIdsRaised.length+' defect(s) raised');
+    } else {
+      showToast('✓ Runsheet '+(rs.runsheet_number||'')+' signed off' + (trackerSynced ? ' — tracker updated' : ''));
+    }
+    renderRunsheetEditor();
+  } catch(e) {
+    console.error('confirmSubmitAndLock unexpected error:', e);
+    alert('Unexpected error during sign-off. The runsheet may be in an inconsistent state — please refresh and verify.\n\nError: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Confirm Submit & Lock';
+  }
+}
+
+// ── Defects Raised section render ──
+function renderDefectsRaised(rs){
+  var section = document.getElementById('defectsRaisedSection');
+  if(!section)return;
+  var defectIds = (rs && rs.defects_raised) || [];
+  if(!defectIds.length){
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  document.getElementById('drs-count-pill').textContent = defectIds.length;
+
+  // Load defect details from the cx_defects register so we can show desc + status
+  // Async — we render with placeholders first, then update once data is in.
+  var listEl = document.getElementById('drs-list');
+  listEl.innerHTML = defectIds.map(function(num){
+    return '<div class="drs-row" data-num="'+escH(num)+'">'
+      +   '<span class="drs-num">'+escH(num)+'</span>'
+      +   '<span class="drs-desc" style="color:var(--muted);font-style:italic">Loading…</span>'
+      + '</div>';
+  }).join('');
+
+  (async function(){
+    try{
+      var existing = await dbGetProject('cx_defects', _pNum);
+      if(!Array.isArray(existing))existing = [];
+      var byNum = {};
+      existing.forEach(function(d){byNum[d.num] = d;});
+
+      listEl.innerHTML = defectIds.map(function(num){
+        var d = byNum[num];
+        if(!d){
+          return '<div class="drs-row" data-num="'+escH(num)+'">'
+            + '<span class="drs-num">'+escH(num)+'</span>'
+            + '<span class="drs-desc" style="color:var(--muted);font-style:italic">Defect not found in register (may have been deleted)</span>'
+            + '</div>';
+        }
+        var statusKey = (d.status === 'closed') ? 'closed' : 'open';
+        var statusLbl = statusKey === 'closed' ? '✓ Closed' : 'Open';
+        return '<div class="drs-row" data-num="'+escH(num)+'">'
+          + '<span class="drs-num">'+escH(num)+'</span>'
+          + '<span class="drs-desc">'+escH(d.desc || '(no description)')+'</span>'
+          + '<span class="drs-status drs-status-'+statusKey+'">'+escH(statusLbl)+'</span>'
+          + '</div>';
+      }).join('');
+    } catch(e) {
+      console.warn('renderDefectsRaised: could not load cx_defects:', e.message);
+      listEl.innerHTML = defectIds.map(function(num){
+        return '<div class="drs-row" data-num="'+escH(num)+'">'
+          + '<span class="drs-num">'+escH(num)+'</span>'
+          + '<span class="drs-desc" style="color:var(--muted);font-style:italic">Defect register unavailable</span>'
+          + '</div>';
+      }).join('');
+    }
+  })();
 }
 
 
