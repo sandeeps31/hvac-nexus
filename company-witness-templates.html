@@ -585,8 +585,9 @@ function confirmNewTpl(){
 
   rememberEquipType(equipType);
 
+  // Build the template payload WITHOUT a client-generated id — the DB will
+  // assign a UUID via gen_random_uuid(). Sending a non-UUID id causes 22P02.
   var tpl = {
-    id: nid(),
     formNo: genTplNum(),
     name: name,
     equipment_type: equipType,
@@ -595,17 +596,23 @@ function confirmNewTpl(){
     createdDate: todayStr(),
     modifiedDate: todayStr()
   };
-  templates.push(tpl);
 
-  // Save the new template and grab the DB id back (in case Postgres assigned one)
+  // Disable the create button to prevent double-submit
+  var btns = document.querySelectorAll('#newTplModal .modal-footer button');
+  btns.forEach(function(b){b.disabled = true;});
+
   dbSaveWitnessTemplate(tpl).then(function(newId){
-    if(newId && newId !== tpl.id){
-      // Reconcile: prefer the DB-assigned UUID
-      tpl.id = newId;
+    btns.forEach(function(b){b.disabled = false;});
+    if(!newId){
+      alert('Failed to create template — no id returned from database. See console.');
+      return;
     }
+    tpl.id = newId;
+    templates.push(tpl);
     closeNewTplModal();
     openEditor(tpl.id);
   }).catch(function(e){
+    btns.forEach(function(b){b.disabled = false;});
     console.error('Create failed:',e);
     alert('Failed to create template. See console.');
   });
@@ -847,16 +854,22 @@ function duplicateTpl(tplId){
   var orig = templates.find(function(t){return t.id===tplId;});
   if(!orig)return;
   var copy = JSON.parse(JSON.stringify(orig));
-  copy.id = nid();
+  // Strip the top-level id — DB will assign a fresh UUID. (Test sub-ids inside
+  // copy.tests are fine; they live inside the JSONB blob, no UUID constraint.)
+  delete copy.id;
   copy.formNo = genTplNum();
   copy.name = (orig.name||'(Untitled)') + ' (Copy)';
   copy.createdDate = todayStr();
   copy.modifiedDate = todayStr();
-  // Re-id all tests so they have fresh ids in the copy
+  // Re-id all tests (JSONB sub-objects) so they have fresh ids in the copy
   (copy.tests||[]).forEach(function(test){test.id = nid();});
-  templates.push(copy);
   dbSaveWitnessTemplate(copy).then(function(newId){
-    if(newId && newId !== copy.id) copy.id = newId;
+    if(!newId){
+      alert('Failed to duplicate — no id returned from database. See console.');
+      return;
+    }
+    copy.id = newId;
+    templates.push(copy);
     renderRegister();
     showToast('✓ Template duplicated');
   }).catch(function(e){

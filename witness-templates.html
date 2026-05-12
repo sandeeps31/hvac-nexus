@@ -663,8 +663,8 @@ function confirmNewTpl(){
 
   rememberEquipType(equipType);
 
+  // No client-generated id — DB assigns the UUID via gen_random_uuid().
   var tpl = {
-    id: nid(),
     formNo: genTplNum(),
     name: name,
     equipment_type: equipType,
@@ -674,15 +674,22 @@ function confirmNewTpl(){
     modifiedDate: todayStr()
     // No source_template_id — this is a from-scratch project template
   };
-  templates.push(tpl);
+
+  var btns = document.querySelectorAll('#newTplModal .modal-footer button');
+  btns.forEach(function(b){b.disabled = true;});
 
   dbSaveProjectWitnessTemplate(_pNum, tpl).then(function(newId){
-    if(newId && newId !== tpl.id){
-      tpl.id = newId;
+    btns.forEach(function(b){b.disabled = false;});
+    if(!newId){
+      alert('Failed to create template — no id returned from database. See console.');
+      return;
     }
+    tpl.id = newId;
+    templates.push(tpl);
     closeNewTplModal();
     openEditor(tpl.id);
   }).catch(function(e){
+    btns.forEach(function(b){b.disabled = false;});
     console.error('Create failed:',e);
     alert('Failed to create template. See console.');
   });
@@ -925,7 +932,8 @@ function duplicateTpl(tplId){
   if(!orig)return;
   if(!_pNum){alert('No project selected.');return;}
   var copy = JSON.parse(JSON.stringify(orig));
-  copy.id = nid();
+  // Strip top-level id — DB will assign a fresh UUID.
+  delete copy.id;
   copy.formNo = genTplNum();
   copy.name = (orig.name||'(Untitled)') + ' (Copy)';
   copy.createdDate = todayStr();
@@ -935,11 +943,15 @@ function duplicateTpl(tplId){
   delete copy.source_template_version;
   delete copy.source_template_name;
   delete copy.pulled_at;
-  // Re-id all tests so they have fresh ids in the copy
+  // Re-id all tests (JSONB sub-objects) so they have fresh ids in the copy
   (copy.tests||[]).forEach(function(test){test.id = nid();});
-  templates.push(copy);
   dbSaveProjectWitnessTemplate(_pNum, copy).then(function(newId){
-    if(newId && newId !== copy.id) copy.id = newId;
+    if(!newId){
+      alert('Failed to duplicate — no id returned from database. See console.');
+      return;
+    }
+    copy.id = newId;
+    templates.push(copy);
     renderRegister();
     showToast('✓ Template duplicated');
   }).catch(function(e){

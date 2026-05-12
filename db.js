@@ -532,6 +532,18 @@ async function dbSetItpResponses(projectNum, data) {
 
 // ── Internal: hoist normalised columns out of a runsheet object ──
 // Returns { col1, col2, ..., data } ready to send to Postgres.
+
+// ── Internal: is `s` a valid UUID? ──
+// Witness tables use Postgres UUID columns with DEFAULT gen_random_uuid().
+// Client-generated ids (e.g. 'wt' + Date.now()) are NOT valid UUIDs and must
+// never be sent as the row id — the DB rejects with 22P02. Helpers use this
+// to decide whether to PATCH (real UUID = existing row) or POST (anything else
+// = new row, let the DB assign the UUID). Self-healing: stale client ids are
+// silently treated as inserts rather than crashing the save.
+function _isUUID(s) {
+  if (typeof s !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
 function _witnessRunsheetToRow(runsheet) {
   var r = runsheet || {};
   // Pull normalised fields out; everything else goes in `data`.
@@ -606,6 +618,7 @@ async function dbGetWitnessTemplates() {
 
 async function dbGetWitnessTemplate(id) {
   if (!id) return null;
+  if (!_isUUID(id)) return null;
   try {
     var rows = await sbFetch('witness_templates?id=eq.'+encodeURIComponent(id)+'&select=id,data,created_at,updated_at&limit=1');
     if (!rows || !rows.length) return null;
@@ -628,15 +641,15 @@ async function dbSaveWitnessTemplate(template) {
     Object.keys(t).forEach(function(k){
       if (['id','company_id','created_at','updated_at'].indexOf(k) === -1) data[k] = t[k];
     });
-    if (id) {
-      // Update existing
+    if (_isUUID(id)) {
+      // Update existing (only when we have a real DB-assigned UUID)
       var updated = await sbFetch('witness_templates?id=eq.'+encodeURIComponent(id), {
         method: 'PATCH',
         body: JSON.stringify({ data: data, updated_at: new Date().toISOString() })
       });
       return (updated && updated[0]) ? updated[0].id : id;
     } else {
-      // Insert new
+      // Insert new — DB assigns the UUID via DEFAULT gen_random_uuid()
       var companyId = null;
       try {
         if (typeof authGetCompanyId === 'function') companyId = authGetCompanyId();
@@ -656,6 +669,10 @@ async function dbSaveWitnessTemplate(template) {
 
 async function dbDeleteWitnessTemplate(id) {
   if (!id) return false;
+  if (!_isUUID(id)) {
+    console.warn('dbDeleteWitnessTemplate refused: id is not a valid UUID:', id);
+    return false;
+  }
   try {
     await sbFetch('witness_templates?id=eq.'+encodeURIComponent(id), { method: 'DELETE' });
     return true;
@@ -683,6 +700,7 @@ async function dbGetProjectWitnessTemplates(projectNum) {
 
 async function dbGetProjectWitnessTemplate(id) {
   if (!id) return null;
+  if (!_isUUID(id)) return null;
   try {
     var rows = await sbFetch('project_witness_templates?id=eq.'+encodeURIComponent(id)+'&select=id,data,project_num,created_at,updated_at&limit=1');
     if (!rows || !rows.length) return null;
@@ -705,7 +723,7 @@ async function dbSaveProjectWitnessTemplate(projectNum, template) {
     Object.keys(t).forEach(function(k){
       if (['id','company_id','project_num','created_at','updated_at'].indexOf(k) === -1) data[k] = t[k];
     });
-    if (id) {
+    if (_isUUID(id)) {
       var updated = await sbFetch('project_witness_templates?id=eq.'+encodeURIComponent(id), {
         method: 'PATCH',
         body: JSON.stringify({ data: data, updated_at: new Date().toISOString() })
@@ -731,6 +749,10 @@ async function dbSaveProjectWitnessTemplate(projectNum, template) {
 
 async function dbDeleteProjectWitnessTemplate(id) {
   if (!id) return false;
+  if (!_isUUID(id)) {
+    console.warn('dbDeleteProjectWitnessTemplate refused: id is not a valid UUID:', id);
+    return false;
+  }
   try {
     await sbFetch('project_witness_templates?id=eq.'+encodeURIComponent(id), { method: 'DELETE' });
     return true;
@@ -754,6 +776,7 @@ async function dbGetWitnessRunsheets(projectNum) {
 
 async function dbGetWitnessRunsheet(id) {
   if (!id) return null;
+  if (!_isUUID(id)) return null;
   try {
     var rows = await sbFetch('witness_runsheets?id=eq.'+encodeURIComponent(id)+'&select=*&limit=1');
     if (!rows || !rows.length) return null;
@@ -790,14 +813,15 @@ async function dbCreateWitnessRunsheet(projectNum, runsheet) {
       if (!companyId) companyId = localStorage.getItem('hvacnexus_company_id');
     } catch(e) {}
     var row = _witnessRunsheetToRow(runsheet);
+    // UUID columns reject non-UUID values — coerce non-UUIDs to null.
     var body = {
       company_id: companyId,
       project_num: projectNum,
       equipment_tag: row.equipment_tag,
-      template_id: row.template_id,
+      template_id: _isUUID(row.template_id) ? row.template_id : null,
       status: row.status,
       attempt_number: row.attempt_number,
-      parent_runsheet_id: row.parent_runsheet_id,
+      parent_runsheet_id: _isUUID(row.parent_runsheet_id) ? row.parent_runsheet_id : null,
       scheduled_date: row.scheduled_date,
       signed_at: row.signed_at,
       data: row.data
@@ -820,6 +844,12 @@ async function dbCreateWitnessRunsheet(projectNum, runsheet) {
 // If `patch` contains a `data` key already, we trust the caller has built the full data blob.
 async function dbSaveWitnessRunsheet(id, patch) {
   if (!id) return null;
+  if (!_isUUID(id)) {
+    // Caller passed a client-generated id — this would 400 against Postgres UUID column.
+    // Refuse rather than crash; the caller should have used dbCreateWitnessRunsheet for new rows.
+    console.warn('dbSaveWitnessRunsheet refused: id is not a valid UUID:', id);
+    return null;
+  }
   try {
     var body;
     if (patch && typeof patch === 'object' && 'data' in patch && Object.keys(patch).length <= 8) {
@@ -854,6 +884,10 @@ async function dbSaveWitnessRunsheet(id, patch) {
 
 async function dbDeleteWitnessRunsheet(id) {
   if (!id) return false;
+  if (!_isUUID(id)) {
+    console.warn('dbDeleteWitnessRunsheet refused: id is not a valid UUID:', id);
+    return false;
+  }
   try {
     await sbFetch('witness_runsheets?id=eq.'+encodeURIComponent(id), { method: 'DELETE' });
     return true;
