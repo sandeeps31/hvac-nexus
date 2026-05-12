@@ -506,6 +506,474 @@ async function dbSetItpResponses(projectNum, data) {
   return await dbSetProject('itp_responses', projectNum, data);
 }
 
+// ═══════════════════════════════════════════════════
+// WITNESS TESTING HELPERS
+// 3-tier mirror of the ITP pattern:
+//   witness_templates          → company master library (multi-row)
+//   project_witness_templates  → duplicated into project (multi-row)
+//   witness_runsheets          → instance per equipment event (multi-row)
+//
+// Templates are read whole, so `data` JSONB holds everything (incl.
+// equipment_type, tests[], source_template_id, source_template_version).
+// Runsheets need fast filtering, so normalised columns (equipment_tag,
+// status, attempt_number, parent_runsheet_id, scheduled_date, signed_at)
+// are hoisted from the runsheet object on save; the rest lives in `data`
+// (template_snapshot, cx_completion_check, tests[], witnesses[], comments,
+// photos[], defects_raised[], pdf_report_url, runsheet_number,
+// overall_outcome, completed_at, completed_by).
+//
+// Status values (per design doc):
+//   'draft'                  → created, not started
+//   'in_progress'            → testing under way
+//   'signed_off'             → all witnesses signed, overall pass, locked
+//   'failed_pending_rework'  → all witnesses signed, ≥1 test failed, locked
+//   'cancelled'              → session abandoned
+// ═══════════════════════════════════════════════════
+
+// ── Internal: hoist normalised columns out of a runsheet object ──
+// Returns { col1, col2, ..., data } ready to send to Postgres.
+function _witnessRunsheetToRow(runsheet) {
+  var r = runsheet || {};
+  // Pull normalised fields out; everything else goes in `data`.
+  var equipment_tag      = r.equipment_tag || r.equipmentTag || null;
+  var template_id        = r.template_id || r.templateId || null;
+  var status             = r.status || 'draft';
+  var attempt_number     = (typeof r.attempt_number === 'number') ? r.attempt_number
+                         : (typeof r.attemptNumber === 'number')  ? r.attemptNumber
+                         : 1;
+  var parent_runsheet_id = r.parent_runsheet_id || r.parentRunsheetId || null;
+  var scheduled_date     = r.scheduled_date || r.scheduledDate || null;
+  var signed_at          = r.signed_at || r.signedAt || null;
+  // Build a copy of the full object for `data`, but strip the columns we hoisted
+  // (and id/timestamps which the DB owns) so we don't double-store them.
+  var data = {};
+  Object.keys(r).forEach(function(k){
+    if (['id','company_id','project_num','equipment_tag','equipmentTag',
+         'template_id','templateId','status','attempt_number','attemptNumber',
+         'parent_runsheet_id','parentRunsheetId','scheduled_date','scheduledDate',
+         'signed_at','signedAt','created_at','updated_at'].indexOf(k) === -1) {
+      data[k] = r[k];
+    }
+  });
+  return {
+    equipment_tag: equipment_tag,
+    template_id: template_id,
+    status: status,
+    attempt_number: attempt_number,
+    parent_runsheet_id: parent_runsheet_id,
+    scheduled_date: scheduled_date,
+    signed_at: signed_at,
+    data: data
+  };
+}
+
+// ── Internal: flatten a DB row back into a runsheet object ──
+// Merges normalised columns back into the object alongside `data`.
+function _witnessRowToRunsheet(row) {
+  if (!row) return null;
+  var out = Object.assign({}, row.data || {});
+  out.id                 = row.id;
+  out.company_id         = row.company_id;
+  out.project_num        = row.project_num;
+  out.equipment_tag      = row.equipment_tag;
+  out.template_id        = row.template_id;
+  out.status             = row.status;
+  out.attempt_number     = row.attempt_number;
+  out.parent_runsheet_id = row.parent_runsheet_id;
+  out.scheduled_date     = row.scheduled_date;
+  out.signed_at          = row.signed_at;
+  out.created_at         = row.created_at;
+  out.updated_at         = row.updated_at;
+  return out;
+}
+
+// ── Witness Templates (company-level master library) ──
+async function dbGetWitnessTemplates() {
+  try {
+    var rows = await sbFetch('witness_templates?select=id,data,created_at,updated_at&order=created_at.asc');
+    return (rows || []).map(function(r){
+      var t = Object.assign({}, r.data || {});
+      t.id = r.id;
+      t.created_at = r.created_at;
+      t.updated_at = r.updated_at;
+      return t;
+    });
+  } catch(e) {
+    console.warn('dbGetWitnessTemplates failed:', e.message);
+    return [];
+  }
+}
+
+async function dbGetWitnessTemplate(id) {
+  if (!id) return null;
+  try {
+    var rows = await sbFetch('witness_templates?id=eq.'+encodeURIComponent(id)+'&select=id,data,created_at,updated_at&limit=1');
+    if (!rows || !rows.length) return null;
+    var r = rows[0];
+    var t = Object.assign({}, r.data || {});
+    t.id = r.id; t.created_at = r.created_at; t.updated_at = r.updated_at;
+    return t;
+  } catch(e) {
+    console.warn('dbGetWitnessTemplate('+id+') failed:', e.message);
+    return null;
+  }
+}
+
+async function dbSaveWitnessTemplate(template) {
+  try {
+    var t = template || {};
+    var id = t.id || null;
+    // Build data blob without DB-owned fields
+    var data = {};
+    Object.keys(t).forEach(function(k){
+      if (['id','company_id','created_at','updated_at'].indexOf(k) === -1) data[k] = t[k];
+    });
+    if (id) {
+      // Update existing
+      var updated = await sbFetch('witness_templates?id=eq.'+encodeURIComponent(id), {
+        method: 'PATCH',
+        body: JSON.stringify({ data: data, updated_at: new Date().toISOString() })
+      });
+      return (updated && updated[0]) ? updated[0].id : id;
+    } else {
+      // Insert new
+      var companyId = null;
+      try {
+        if (typeof authGetCompanyId === 'function') companyId = authGetCompanyId();
+        if (!companyId) companyId = localStorage.getItem('hvacnexus_company_id');
+      } catch(e) {}
+      var inserted = await sbFetch('witness_templates', {
+        method: 'POST',
+        body: JSON.stringify({ company_id: companyId, data: data })
+      });
+      return (inserted && inserted[0]) ? inserted[0].id : null;
+    }
+  } catch(e) {
+    console.warn('dbSaveWitnessTemplate failed:', e.message);
+    return null;
+  }
+}
+
+async function dbDeleteWitnessTemplate(id) {
+  if (!id) return false;
+  try {
+    await sbFetch('witness_templates?id=eq.'+encodeURIComponent(id), { method: 'DELETE' });
+    return true;
+  } catch(e) {
+    console.warn('dbDeleteWitnessTemplate('+id+') failed:', e.message);
+    return false;
+  }
+}
+
+// ── Project Witness Templates (duplicated from company at import) ──
+async function dbGetProjectWitnessTemplates(projectNum) {
+  if (!projectNum) return [];
+  try {
+    var rows = await sbFetch('project_witness_templates?project_num=eq.'+encodeURIComponent(projectNum)+'&select=id,data,created_at,updated_at&order=created_at.asc');
+    return (rows || []).map(function(r){
+      var t = Object.assign({}, r.data || {});
+      t.id = r.id; t.created_at = r.created_at; t.updated_at = r.updated_at;
+      return t;
+    });
+  } catch(e) {
+    console.warn('dbGetProjectWitnessTemplates('+projectNum+') failed:', e.message);
+    return [];
+  }
+}
+
+async function dbGetProjectWitnessTemplate(id) {
+  if (!id) return null;
+  try {
+    var rows = await sbFetch('project_witness_templates?id=eq.'+encodeURIComponent(id)+'&select=id,data,project_num,created_at,updated_at&limit=1');
+    if (!rows || !rows.length) return null;
+    var r = rows[0];
+    var t = Object.assign({}, r.data || {});
+    t.id = r.id; t.project_num = r.project_num; t.created_at = r.created_at; t.updated_at = r.updated_at;
+    return t;
+  } catch(e) {
+    console.warn('dbGetProjectWitnessTemplate('+id+') failed:', e.message);
+    return null;
+  }
+}
+
+async function dbSaveProjectWitnessTemplate(projectNum, template) {
+  if (!projectNum) return null;
+  try {
+    var t = template || {};
+    var id = t.id || null;
+    var data = {};
+    Object.keys(t).forEach(function(k){
+      if (['id','company_id','project_num','created_at','updated_at'].indexOf(k) === -1) data[k] = t[k];
+    });
+    if (id) {
+      var updated = await sbFetch('project_witness_templates?id=eq.'+encodeURIComponent(id), {
+        method: 'PATCH',
+        body: JSON.stringify({ data: data, updated_at: new Date().toISOString() })
+      });
+      return (updated && updated[0]) ? updated[0].id : id;
+    } else {
+      var companyId = null;
+      try {
+        if (typeof authGetCompanyId === 'function') companyId = authGetCompanyId();
+        if (!companyId) companyId = localStorage.getItem('hvacnexus_company_id');
+      } catch(e) {}
+      var inserted = await sbFetch('project_witness_templates', {
+        method: 'POST',
+        body: JSON.stringify({ company_id: companyId, project_num: projectNum, data: data })
+      });
+      return (inserted && inserted[0]) ? inserted[0].id : null;
+    }
+  } catch(e) {
+    console.warn('dbSaveProjectWitnessTemplate('+projectNum+') failed:', e.message);
+    return null;
+  }
+}
+
+async function dbDeleteProjectWitnessTemplate(id) {
+  if (!id) return false;
+  try {
+    await sbFetch('project_witness_templates?id=eq.'+encodeURIComponent(id), { method: 'DELETE' });
+    return true;
+  } catch(e) {
+    console.warn('dbDeleteProjectWitnessTemplate('+id+') failed:', e.message);
+    return false;
+  }
+}
+
+// ── Witness Runsheets (instance per equipment witness event) ──
+async function dbGetWitnessRunsheets(projectNum) {
+  if (!projectNum) return [];
+  try {
+    var rows = await sbFetch('witness_runsheets?project_num=eq.'+encodeURIComponent(projectNum)+'&select=*&order=created_at.desc');
+    return (rows || []).map(_witnessRowToRunsheet);
+  } catch(e) {
+    console.warn('dbGetWitnessRunsheets('+projectNum+') failed:', e.message);
+    return [];
+  }
+}
+
+async function dbGetWitnessRunsheet(id) {
+  if (!id) return null;
+  try {
+    var rows = await sbFetch('witness_runsheets?id=eq.'+encodeURIComponent(id)+'&select=*&limit=1');
+    if (!rows || !rows.length) return null;
+    return _witnessRowToRunsheet(rows[0]);
+  } catch(e) {
+    console.warn('dbGetWitnessRunsheet('+id+') failed:', e.message);
+    return null;
+  }
+}
+
+// Fetch all runsheets for a given equipment tag — useful for the re-witness
+// chain display and for the drawings/equipment cross-links.
+async function dbGetWitnessRunsheetsByEquipment(projectNum, equipmentTag) {
+  if (!projectNum || !equipmentTag) return [];
+  try {
+    var rows = await sbFetch(
+      'witness_runsheets?project_num=eq.'+encodeURIComponent(projectNum)+
+      '&equipment_tag=eq.'+encodeURIComponent(equipmentTag)+
+      '&select=*&order=attempt_number.asc'
+    );
+    return (rows || []).map(_witnessRowToRunsheet);
+  } catch(e) {
+    console.warn('dbGetWitnessRunsheetsByEquipment('+projectNum+','+equipmentTag+') failed:', e.message);
+    return [];
+  }
+}
+
+async function dbCreateWitnessRunsheet(projectNum, runsheet) {
+  if (!projectNum) return null;
+  try {
+    var companyId = null;
+    try {
+      if (typeof authGetCompanyId === 'function') companyId = authGetCompanyId();
+      if (!companyId) companyId = localStorage.getItem('hvacnexus_company_id');
+    } catch(e) {}
+    var row = _witnessRunsheetToRow(runsheet);
+    var body = {
+      company_id: companyId,
+      project_num: projectNum,
+      equipment_tag: row.equipment_tag,
+      template_id: row.template_id,
+      status: row.status,
+      attempt_number: row.attempt_number,
+      parent_runsheet_id: row.parent_runsheet_id,
+      scheduled_date: row.scheduled_date,
+      signed_at: row.signed_at,
+      data: row.data
+    };
+    var inserted = await sbFetch('witness_runsheets', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    if (!inserted || !inserted[0]) return null;
+    return _witnessRowToRunsheet(inserted[0]);
+  } catch(e) {
+    console.warn('dbCreateWitnessRunsheet('+projectNum+') failed:', e.message);
+    return null;
+  }
+}
+
+// Patch a runsheet. Accepts either:
+//   - a partial object with only the fields to change, OR
+//   - a full runsheet object (we'll hoist normalised columns and put the rest in data)
+// If `patch` contains a `data` key already, we trust the caller has built the full data blob.
+async function dbSaveWitnessRunsheet(id, patch) {
+  if (!id) return null;
+  try {
+    var body;
+    if (patch && typeof patch === 'object' && 'data' in patch && Object.keys(patch).length <= 8) {
+      // Caller passed a structured PATCH — pass through, just add updated_at
+      body = Object.assign({}, patch, { updated_at: new Date().toISOString() });
+    } else {
+      // Caller passed a full runsheet object — split it
+      var row = _witnessRunsheetToRow(patch);
+      body = {
+        equipment_tag: row.equipment_tag,
+        template_id: row.template_id,
+        status: row.status,
+        attempt_number: row.attempt_number,
+        parent_runsheet_id: row.parent_runsheet_id,
+        scheduled_date: row.scheduled_date,
+        signed_at: row.signed_at,
+        data: row.data,
+        updated_at: new Date().toISOString()
+      };
+    }
+    var updated = await sbFetch('witness_runsheets?id=eq.'+encodeURIComponent(id), {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    });
+    if (!updated || !updated[0]) return null;
+    return _witnessRowToRunsheet(updated[0]);
+  } catch(e) {
+    console.warn('dbSaveWitnessRunsheet('+id+') failed:', e.message);
+    return null;
+  }
+}
+
+async function dbDeleteWitnessRunsheet(id) {
+  if (!id) return false;
+  try {
+    await sbFetch('witness_runsheets?id=eq.'+encodeURIComponent(id), { method: 'DELETE' });
+    return true;
+  } catch(e) {
+    console.warn('dbDeleteWitnessRunsheet('+id+') failed:', e.message);
+    return false;
+  }
+}
+
+// Re-witness flow: clones a runsheet, carries forward only failed tests,
+// increments attempt_number, links via parent_runsheet_id.
+// Returns the newly-created runsheet object, or null on failure.
+async function dbCreateRewitnessRunsheet(originalId) {
+  if (!originalId) return null;
+  try {
+    var original = await dbGetWitnessRunsheet(originalId);
+    if (!original) {
+      console.warn('dbCreateRewitnessRunsheet: original runsheet not found:', originalId);
+      return null;
+    }
+    // Carry forward only failed tests; reset their pass/fail state to pending.
+    var originalTests = (original.tests || []);
+    var carriedTests = originalTests
+      .filter(function(t){ return t && t.result === 'fail'; })
+      .map(function(t){
+        // Strip prior result/comments/photos so the test is fresh, but keep
+        // the test definition (name, criteria, expected value, etc.).
+        var fresh = Object.assign({}, t);
+        delete fresh.result;
+        delete fresh.actual_value;
+        delete fresh.actualValue;
+        delete fresh.comments;
+        delete fresh.photos;
+        delete fresh.tested_at;
+        delete fresh.testedAt;
+        delete fresh.tested_by;
+        delete fresh.testedBy;
+        return fresh;
+      });
+    if (!carriedTests.length) {
+      console.warn('dbCreateRewitnessRunsheet: no failed tests to carry forward from', originalId);
+      return null;
+    }
+    // Build the new runsheet, preserving the template snapshot and equipment link.
+    var fresh = {
+      equipment_tag: original.equipment_tag,
+      template_id: original.template_id,
+      status: 'draft',
+      attempt_number: (original.attempt_number || 1) + 1,
+      parent_runsheet_id: original.id,
+      scheduled_date: null,
+      signed_at: null,
+      // Copy snapshot + non-state fields from `data`
+      template_snapshot: original.template_snapshot || null,
+      equipment_name: original.equipment_name || null,
+      tests: carriedTests,
+      witnesses: [],         // fresh sign-off required
+      comments: '',
+      photos: []
+    };
+    return await dbCreateWitnessRunsheet(original.project_num, fresh);
+  } catch(e) {
+    console.warn('dbCreateRewitnessRunsheet('+originalId+') failed:', e.message);
+    return null;
+  }
+}
+
+// ── Convenience: pull a company template into a project ──
+// Snapshots the company template into project_witness_templates, recording
+// source_template_id + source_template_version for audit (per design doc).
+// Returns the new project template object, or null on failure.
+async function dbPullWitnessTemplateToProject(projectNum, companyTemplateId) {
+  if (!projectNum || !companyTemplateId) return null;
+  try {
+    var src = await dbGetWitnessTemplate(companyTemplateId);
+    if (!src) {
+      console.warn('dbPullWitnessTemplateToProject: company template not found:', companyTemplateId);
+      return null;
+    }
+    // Build the project-tier copy. Strip id/timestamps; add audit linkage.
+    var copy = {};
+    Object.keys(src).forEach(function(k){
+      if (['id','created_at','updated_at'].indexOf(k) === -1) copy[k] = src[k];
+    });
+    copy.source_template_id = src.id;
+    copy.source_template_version = src.updated_at || src.created_at || null;
+    copy.pulled_at = new Date().toISOString();
+    var newId = await dbSaveProjectWitnessTemplate(projectNum, copy);
+    if (!newId) return null;
+    return await dbGetProjectWitnessTemplate(newId);
+  } catch(e) {
+    console.warn('dbPullWitnessTemplateToProject('+projectNum+','+companyTemplateId+') failed:', e.message);
+    return null;
+  }
+}
+
+// ── Convenience: get all runsheets for a given status (filter helper) ──
+// e.g. dbGetWitnessRunsheetsByStatus('GCT001', 'failed_pending_rework')
+async function dbGetWitnessRunsheetsByStatus(projectNum, status) {
+  if (!projectNum || !status) return [];
+  try {
+    var rows = await sbFetch(
+      'witness_runsheets?project_num=eq.'+encodeURIComponent(projectNum)+
+      '&status=eq.'+encodeURIComponent(status)+
+      '&select=*&order=created_at.desc'
+    );
+    return (rows || []).map(_witnessRowToRunsheet);
+  } catch(e) {
+    console.warn('dbGetWitnessRunsheetsByStatus('+projectNum+','+status+') failed:', e.message);
+    return [];
+  }
+}
+
+// ── Convenience: walk a re-witness chain for an equipment ──
+// Returns [attempt1, attempt2, attempt3, ...] sorted by attempt_number ascending.
+// Used by the witness landing page to render attempt history.
+async function dbGetWitnessAttemptChain(projectNum, equipmentTag) {
+  return await dbGetWitnessRunsheetsByEquipment(projectNum, equipmentTag);
+}
+
 // ── Drawings ──
 async function dbGetDrawings(projectNum) {
   return await dbGetProject('drawings', projectNum) || [];
