@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sample FCU Witness Runsheet — HVAC NEXUS</title>
+<style>
+:root{
+  --bg:#0a1220;
+  --surface:#0e1726;
+  --surface2:#131e30;
+  --surface3:#1a2640;
+  --border:#243352;
+  --text:#e2e8f0;
+  --text2:#cbd5e1;
+  --muted:#64748b;
+  --accent:#00c8ff;
+  --accent-dim:rgba(0,200,255,.12);
+  --green:#00e5a0;
+  --green-dim:rgba(0,229,160,.12);
+  --warn:#ffb830;
+  --warn-dim:rgba(255,184,48,.12);
+  --danger:#ff5d6c;
+  --danger-dim:rgba(255,93,108,.12);
+  --radius:10px;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans','Inter',-apple-system,sans-serif;font-size:13.5px;min-height:100vh;margin:0;padding:0}
+
+/* Header */
+.page-header{padding:18px 24px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:16px}
+.page-title{font-family:'Syne','Inter',sans-serif;font-size:20px;font-weight:800;color:var(--text);margin:0}
+.page-subtitle{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:1px}
+
+.sample-tag{display:inline-block;background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3);padding:4px 12px;border-radius:14px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase}
+
+/* Locked banner */
+.locked-banner{display:flex;gap:12px;align-items:flex-start;background:var(--surface3);border-bottom:1px solid var(--border);padding:14px 24px;color:var(--text2)}
+.locked-banner .lock-icon{font-size:20px;flex-shrink:0;line-height:1.1}
+.locked-banner .lock-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--green)}
+.locked-banner .lock-sub{font-size:12.5px;color:var(--text2);margin-top:2px}
+
+/* Header block (4-col grid) */
+.rs-hdr-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;margin:14px 24px 12px;overflow:hidden}
+.rs-hdr-row{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)}
+.rs-hdr-row:last-child{border-bottom:none}
+.rs-hdr-row.outcome-row{background:var(--surface2);grid-template-columns:1fr 1fr}
+.rs-hdr-cell{padding:10px 16px;border-right:1px solid var(--border)}
+.rs-hdr-cell:last-child{border-right:none}
+.rs-hdr-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.rs-hdr-val{font-size:13px;color:var(--text);font-weight:500}
+.rs-hdr-val.mono{font-family:'DM Mono',monospace;color:var(--accent)}
+
+.status-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:10px;padding:3px 9px;border-radius:11px;letter-spacing:.5px}
+.sb-failed_pending_rework{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+.sb-signed_off{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+
+.outcome-pill{display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:11px;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.outcome-fail{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+
+.progress-bar{display:inline-flex;align-items:center;gap:8px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)}
+.progress-track{width:120px;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;border:1px solid var(--border)}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));transition:width .25s}
+
+/* Toolbar */
+.rs-editor-bar{padding:10px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);background:var(--surface);font-size:12px}
+.rs-editor-bar-lbl{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+
+.rs-editor-body{padding:14px 24px}
+
+/* Tests table */
+.tests-tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:visible;margin-top:6px}
+.tests-tbl{width:100%;border-collapse:collapse}
+.tests-tbl thead{background:var(--surface2)}
+.tests-tbl th{padding:9px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.tests-tbl td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;font-size:13px}
+.tests-tbl tr:last-child td{border-bottom:none}
+.tests-tbl tr.test-fail-row{background:rgba(255,184,48,.04)}
+.tests-tbl tr.test-pass-row{background:rgba(0,229,160,.03)}
+.test-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-align:center;padding-top:14px !important}
+.test-input,.test-ta{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;padding:5px 8px;width:100%;box-sizing:border-box;opacity:.7;cursor:default}
+.test-ta{min-height:36px;resize:none}
+.test-input::placeholder{color:var(--muted)}
+.test-name-cell{display:flex;flex-direction:column;gap:4px}
+.test-chips{display:flex;gap:4px;flex-wrap:wrap}
+.test-chip{font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:4px;letter-spacing:.5px}
+.test-chip-photoreq{background:var(--surface3);color:var(--text2);border:1px solid var(--border)}
+.test-chip-modified{background:rgba(255,184,48,.12);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+
+/* Pass/Fail toggle */
+.pf-toggle{display:inline-flex;border:1.5px solid var(--border);border-radius:7px;overflow:hidden;background:var(--surface3)}
+.pf-btn{padding:6px 12px;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;background:transparent;border:none;color:var(--muted);letter-spacing:.5px;border-right:1px solid var(--border)}
+.pf-btn:last-child{border-right:none}
+.pf-btn.active.pf-pass{background:var(--green-dim);color:var(--green)}
+.pf-btn.active.pf-fail{background:var(--warn-dim);color:var(--warn)}
+
+/* Photos */
+.photos-cell{display:flex;flex-direction:column;gap:6px;align-items:center}
+.photos-row{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+.photo-thumb{width:34px;height:34px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:14px}
+.photo-count{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.5px}
+
+/* Witnesses */
+.ws-section{margin:24px 24px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.ws-hdr{padding:11px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.ws-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1;display:flex;align-items:center;gap:9px}
+.ws-progress-pill{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:10px;letter-spacing:.5px;background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+
+.ws-card{display:flex;align-items:flex-start;gap:14px;padding:14px 16px;border-bottom:1px solid var(--border);background:rgba(0,229,160,.04)}
+.ws-card:last-child{border-bottom:none}
+.ws-card-main{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0}
+.ws-card-name{font-size:14px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.ws-card-meta{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);display:flex;gap:14px;flex-wrap:wrap}
+.ws-card-meta-item{display:flex;align-items:center;gap:5px}
+.ws-card-meta-item .label{color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-size:9px}
+
+.party-chip{display:inline-flex;align-items:center;font-family:'DM Mono',monospace;font-size:9px;padding:3px 9px;border-radius:10px;white-space:nowrap;letter-spacing:.5px;text-transform:uppercase}
+.party-consultant{background:rgba(167,139,250,.15);color:#c4b5fd;border:1px solid rgba(167,139,250,.3)}
+.party-head_contractor{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.3)}
+.party-certifier{background:rgba(255,184,48,.12);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+
+.ws-sig-thumb{width:140px;height:54px;border:1.5px solid var(--border);border-radius:6px;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:4px}
+.ws-sig-thumb svg{max-width:100%;max-height:100%;display:block}
+
+.ws-status-pill{font-family:'DM Mono',monospace;font-size:10px;padding:3px 9px;border-radius:10px;white-space:nowrap;letter-spacing:.3px;background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+
+/* Defects raised */
+.defects-raised-section{margin:14px 24px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.drs-hdr{padding:11px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.drs-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);flex:1}
+.drs-count-pill{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:10px;background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3);letter-spacing:.5px}
+.drs-row{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px;font-size:13px}
+.drs-row:last-child{border-bottom:none}
+.drs-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--warn);font-weight:700;flex-shrink:0;min-width:62px;padding-top:1px}
+.drs-desc{flex:1;color:var(--text);line-height:1.4}
+.drs-status{font-family:'DM Mono',monospace;font-size:10px;padding:2px 9px;border-radius:10px;letter-spacing:.5px;text-transform:uppercase;background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+
+.rs-bottom-actions{display:flex;align-items:center;gap:10px;padding:20px 24px 60px;color:var(--muted);font-size:12px;font-style:italic}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1 class="page-title">Witness Testing</h1>
+  <span style="color:var(--muted)">›</span>
+  <span style="color:var(--text2);font-size:13px">WRS-0014</span>
+  <span style="flex:1"></span>
+  <span class="sample-tag">📋 Sample Mockup</span>
+</div>
+
+<!-- Locked banner — runsheet was signed off cleanly -->
+<div class="locked-banner">
+  <span class="lock-icon">🔒</span>
+  <div>
+    <div class="lock-title">🔒 Signed off — locked</div>
+    <div class="lock-sub">All witnesses have signed and this runsheet is locked as part of the audit trail.</div>
+  </div>
+</div>
+
+<!-- Header block -->
+<div class="rs-hdr-block">
+  <div class="rs-hdr-row">
+    <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Runsheet No.</div><div class="rs-hdr-val mono">WRS-0014</div></div>
+    <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Equipment ID</div><div class="rs-hdr-val mono">FCU-L3-12</div></div>
+    <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Equipment Name</div><div class="rs-hdr-val">Level 3 Open Office FCU</div></div>
+    <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Status</div><div class="rs-hdr-val"><span class="status-badge sb-failed_pending_rework">Failed — Pending Rework</span></div></div>
+  </div>
+  <div class="rs-hdr-row">
+    <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Template</div><div class="rs-hdr-val">WIT-FCU-01 · FCU Witness Test</div></div>
+    <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Equipment Type</div><div class="rs-hdr-val">Fan Coil Unit</div></div>
+    <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Attempt</div><div class="rs-hdr-val mono">#1</div></div>
+    <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Scheduled</div><div class="rs-hdr-val">12/05/2026</div></div>
+  </div>
+  <div class="rs-hdr-row outcome-row">
+    <div class="rs-hdr-cell">
+      <div class="rs-hdr-lbl">Overall Outcome</div>
+      <div><span class="outcome-pill outcome-fail">⚠ Fail — 2 test(s)</span></div>
+    </div>
+    <div class="rs-hdr-cell">
+      <div class="rs-hdr-lbl">Progress</div>
+      <div><span class="progress-bar"><span class="progress-track"><span class="progress-fill" style="width:100%"></span></span><span>13 / 13 tested (100%)</span></span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Tests table -->
+<div class="rs-editor-bar">
+  <span class="rs-editor-bar-lbl">Tests · 13</span>
+  <span style="flex:1"></span>
+  <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">Locked at sign-off</span>
+</div>
+
+<div class="rs-editor-body">
+  <div class="tests-tbl-wrap">
+    <table class="tests-tbl">
+      <thead>
+        <tr>
+          <th style="width:36px">#</th>
+          <th style="width:18%">Test Name</th>
+          <th>Description / Criteria</th>
+          <th style="width:13%">Reference</th>
+          <th style="width:130px;text-align:center">Result</th>
+          <th style="width:18%">Comment</th>
+          <th style="width:110px;text-align:center">Photos</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Test 1: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">1</td>
+          <td><div class="test-name-cell"><input class="test-input" value="Nameplate verification" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Confirm FCU model, serial number, electrical ratings and refrigerant data on nameplate match approved schedule and shop drawings.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>Nameplate data matches approved equipment schedule; no discrepancies in model number, kW rating, or supply voltage.</textarea>
+          </td>
+          <td><input class="test-input" value="Schedule MS-04" readonly/></td>
+          <td style="text-align:center">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+              <div class="pf-toggle">
+                <button class="pf-btn pf-pass active">Pass</button>
+                <button class="pf-btn pf-fail">Fail</button>
+              </div>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>Matches schedule — Daikin FXMQ50PVE, 5.6 kW, 415V/3ph.</textarea></td>
+          <td>
+            <div class="photos-cell">
+              <div class="photos-row"><div class="photo-thumb">🖼</div></div>
+              <div class="photo-count">1 photo</div>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Test 2: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">2</td>
+          <td><div class="test-name-cell"><input class="test-input" value="Power supply check" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Verify supply voltage at FCU isolator, correct phasing, and isolator operates lockout/tagout cleanly.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>Line-to-line voltage within ±5% of nameplate; isolator turns off all phases; phasing correct on rotation tester.</textarea>
+          </td>
+          <td><input class="test-input" value="AS/NZS 3000:2018" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass active">Pass</button>
+              <button class="pf-btn pf-fail">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>413V L-L, phasing correct, isolator OK.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div></div><div class="photo-count">1 photo</div></div></td>
+        </tr>
+
+        <!-- Test 3: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">3</td>
+          <td><div class="test-name-cell"><input class="test-input" value="Pre-start inspection" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Visual inspection: installation level, access for maintenance, drain trap correctly installed and primed, all panels secure.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>No visible defects; FCU level within 3mm/m; drain trap depth meets manufacturer requirement; service access ≥600mm.</textarea>
+          </td>
+          <td><input class="test-input" value="Mfr install manual §4.2" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass active">Pass</button>
+              <button class="pf-btn pf-fail">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly></textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div><div class="photo-thumb">🖼</div></div><div class="photo-count">2 photos</div></div></td>
+        </tr>
+
+        <!-- Test 4: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">4</td>
+          <td><div class="test-name-cell"><input class="test-input" value="Initial start-up" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Energise FCU and start fan on each speed (low/medium/high). Verify smooth start, no abnormal noise or vibration, correct rotation.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>Fan starts on all three speeds without trip; no unusual noise/vibration; rotation direction matches arrow on housing.</textarea>
+          </td>
+          <td><input class="test-input" value="Mfr commissioning §6.1" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass active">Pass</button>
+              <button class="pf-btn pf-fail">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>All three speeds run smooth, no faults.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div></div><div class="photo-count">1 photo</div></div></td>
+        </tr>
+
+        <!-- Test 5: FAIL -->
+        <tr class="test-fail-row">
+          <td class="test-num">5</td>
+          <td>
+            <div class="test-name-cell">
+              <input class="test-input" value="Supply airflow measurement" readonly/>
+              <div class="test-chips">
+                <span class="test-chip test-chip-photoreq">📷 Photo req</span>
+              </div>
+            </div>
+          </td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Measure supply airflow at FCU outlet using calibrated hood/anemometer. Compare with design airflow per schedule.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>Measured airflow within ±10% of design schedule value at all three fan speeds.</textarea>
+          </td>
+          <td><input class="test-input" value="AS 1668.1:2015" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass">Pass</button>
+              <button class="pf-btn pf-fail active">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>Design 320 L/s on high. Measured 268 L/s — 16% below. Filter clean. Suspect ductwork restriction downstream — head contractor to investigate.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div><div class="photo-thumb">🖼</div><div class="photo-thumb">🖼</div></div><div class="photo-count">3 photos</div></div></td>
+        </tr>
+
+        <!-- Test 6: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">6</td>
+          <td><div class="test-name-cell"><input class="test-input" value="Static pressure check" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Measure external static pressure across FCU at design airflow. Compare with fan curve operating range.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>Static pressure falls within fan curve operating envelope at measured airflow.</textarea>
+          </td>
+          <td><input class="test-input" value="Mfr fan curve" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass active">Pass</button>
+              <button class="pf-btn pf-fail">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>180 Pa at measured flow — within curve.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div></div><div class="photo-count">1 photo</div></div></td>
+        </tr>
+
+        <!-- Test 7: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">7</td>
+          <td><div class="test-name-cell"><input class="test-input" value="CHW flow verification" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Open CHW control valve fully. Measure flow rate at FCU coil using balancing valve / ultrasonic meter. Confirm flow switch activates.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>Measured flow within ±10% of design L/s. Flow switch contact closes within 30s of valve opening.</textarea>
+          </td>
+          <td><input class="test-input" value="Hydraulic schedule" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass active">Pass</button>
+              <button class="pf-btn pf-fail">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>0.18 L/s vs 0.19 design. Flow switch closes at 12s.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div></div><div class="photo-count">1 photo</div></div></td>
+        </tr>
+
+        <!-- Test 8: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">8</td>
+          <td><div class="test-name-cell"><input class="test-input" value="CHW valve operation" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Drive control valve through 0% / 25% / 50% / 75% / 100% positions via BMS override. Verify smooth modulation, no hunting. Confirm fail-safe spring-return position.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>Valve modulates smoothly across full range; fail-safe position matches spec (normally closed for CHW).</textarea>
+          </td>
+          <td><input class="test-input" value="Controls spec §3.4" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass active">Pass</button>
+              <button class="pf-btn pf-fail">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>Smooth modulation, NC on power loss confirmed.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div></div><div class="photo-count">1 photo</div></div></td>
+        </tr>
+
+        <!-- Test 9: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">9</td>
+          <td><div class="test-name-cell"><input class="test-input" value="Temperature performance" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>With CHW at design flow & temperature, measure supply air ΔT across cooling coil. Compare with manufacturer's selection data.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>Measured ΔT within ±2°C of manufacturer's selection at design conditions.</textarea>
+          </td>
+          <td><input class="test-input" value="Mfr selection data" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass active">Pass</button>
+              <button class="pf-btn pf-fail">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>Return 24°C, supply 13°C, ΔT 11°C — within spec.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div></div><div class="photo-count">1 photo</div></div></td>
+        </tr>
+
+        <!-- Test 10: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">10</td>
+          <td><div class="test-name-cell"><input class="test-input" value="Condensate drain test" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Pour 1L water into drain pan. Verify free drainage to riser/stack with no pooling, no leaks at pan or trap, P-trap primed.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>Water clears pan within 60 seconds; no leaks observed; P-trap retains water seal.</textarea>
+          </td>
+          <td><input class="test-input" value="NCC F4.6" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass active">Pass</button>
+              <button class="pf-btn pf-fail">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>Drains clean in 35s, no leaks.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div><div class="photo-thumb">🖼</div></div><div class="photo-count">2 photos</div></div></td>
+        </tr>
+
+        <!-- Test 11: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">11</td>
+          <td><div class="test-name-cell"><input class="test-input" value="Filter pressure differential" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Measure pressure drop across new/clean filter at design airflow.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>ΔP within manufacturer's new-filter range for installed filter grade.</textarea>
+          </td>
+          <td><input class="test-input" value="AS 1324.1 / Mfr data" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass active">Pass</button>
+              <button class="pf-btn pf-fail">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>28 Pa — within new-filter range.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div></div><div class="photo-count">1 photo</div></div></td>
+        </tr>
+
+        <!-- Test 12: FAIL -->
+        <tr class="test-fail-row">
+          <td class="test-num">12</td>
+          <td>
+            <div class="test-name-cell">
+              <input class="test-input" value="BMS communication" readonly/>
+              <div class="test-chips">
+                <span class="test-chip test-chip-modified">⚙ Modified</span>
+              </div>
+            </div>
+          </td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Confirm BMS reads supply air temp, return air temp, fan speed, valve position, fan status, and fault alarm at the head-end.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>All six BMS points read correctly at head-end and match local FCU controller display within tolerance.</textarea>
+          </td>
+          <td><input class="test-input" value="Controls spec §5.2" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass">Pass</button>
+              <button class="pf-btn pf-fail active">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>Supply air temp, return air temp, fan status, valve position all read OK. Fan speed feedback always shows '0' at BMS regardless of actual speed. Fault alarm point not mapped at head-end. Controls contractor to address.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div><div class="photo-thumb">🖼</div></div><div class="photo-count">2 photos</div></div></td>
+        </tr>
+
+        <!-- Test 13: PASS -->
+        <tr class="test-pass-row">
+          <td class="test-num">13</td>
+          <td><div class="test-name-cell"><input class="test-input" value="Local setpoint adjustment" readonly/></div></td>
+          <td>
+            <textarea class="test-input test-ta" readonly>Adjust setpoint at local controller through full range. Verify FCU responds correctly and value is read back to BMS.</textarea>
+            <textarea class="test-input test-ta" style="margin-top:4px" readonly>Local setpoint adjustment changes FCU output as expected; BMS reads same setpoint within 1 minute.</textarea>
+          </td>
+          <td><input class="test-input" value="Controls spec §4.3" readonly/></td>
+          <td style="text-align:center">
+            <div class="pf-toggle">
+              <button class="pf-btn pf-pass active">Pass</button>
+              <button class="pf-btn pf-fail">Fail</button>
+            </div>
+          </td>
+          <td><textarea class="test-input test-ta" readonly>Set 19°C → 24°C, valve and fan respond. BMS reads back.</textarea></td>
+          <td><div class="photos-cell"><div class="photos-row"><div class="photo-thumb">🖼</div></div><div class="photo-count">1 photo</div></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Witnesses -->
+<div class="ws-section">
+  <div class="ws-hdr">
+    <div class="ws-title">
+      <span>Witnesses</span>
+      <span class="ws-progress-pill">3 / 3 signed</span>
+    </div>
+  </div>
+
+  <!-- Witness 1: Consultant -->
+  <div class="ws-card">
+    <div class="ws-card-main">
+      <div class="ws-card-name">
+        <span>James Patterson</span>
+        <span class="party-chip party-consultant">Consultant</span>
+      </div>
+      <div class="ws-card-meta">
+        <div class="ws-card-meta-item"><span class="label">Company</span><span>WSP Mechanical</span></div>
+        <div class="ws-card-meta-item"><span class="label">Email</span><span>j.patterson@wsp.com.au</span></div>
+        <div class="ws-card-meta-item"><span class="label">Signed</span><span>12/05/2026 14:23</span></div>
+      </div>
+    </div>
+    <div class="ws-sig-thumb">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 70" preserveAspectRatio="xMidYMid meet">
+        <path d="M10 50 Q15 20 25 35 T45 40 Q50 25 60 32 L65 45 Q70 25 78 38 Q82 50 90 35 M95 25 Q100 50 110 32 Q115 20 122 38 L128 30 Q135 50 144 32 M150 28 Q155 48 165 35 T185 42 Q190 28 200 38" fill="none" stroke="#0a2540" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div><span class="ws-status-pill">✓ Signed</span></div>
+  </div>
+
+  <!-- Witness 2: Head Contractor -->
+  <div class="ws-card">
+    <div class="ws-card-main">
+      <div class="ws-card-name">
+        <span>Maria Costa</span>
+        <span class="party-chip party-head_contractor">Head Contractor</span>
+      </div>
+      <div class="ws-card-meta">
+        <div class="ws-card-meta-item"><span class="label">Company</span><span>CPB Contractors</span></div>
+        <div class="ws-card-meta-item"><span class="label">Email</span><span>m.costa@cpbcon.com.au</span></div>
+        <div class="ws-card-meta-item"><span class="label">Signed</span><span>12/05/2026 14:31</span></div>
+      </div>
+    </div>
+    <div class="ws-sig-thumb">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 70" preserveAspectRatio="xMidYMid meet">
+        <path d="M15 45 Q20 15 30 30 Q35 45 45 28 L52 42 Q58 18 68 35 M75 22 Q80 50 92 30 T112 35 Q118 22 128 40 L135 32 M142 35 Q148 50 158 30 Q165 18 175 38 L185 28 Q192 45 200 38" fill="none" stroke="#0a2540" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div><span class="ws-status-pill">✓ Signed</span></div>
+  </div>
+
+  <!-- Witness 3: Certifier -->
+  <div class="ws-card">
+    <div class="ws-card-main">
+      <div class="ws-card-name">
+        <span>Robert Chen</span>
+        <span class="party-chip party-certifier">Certifier</span>
+      </div>
+      <div class="ws-card-meta">
+        <div class="ws-card-meta-item"><span class="label">Company</span><span>BCA Certifiers</span></div>
+        <div class="ws-card-meta-item"><span class="label">Email</span><span>r.chen@bcacert.com.au</span></div>
+        <div class="ws-card-meta-item"><span class="label">Signed</span><span>12/05/2026 14:42</span></div>
+      </div>
+    </div>
+    <div class="ws-sig-thumb">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 70" preserveAspectRatio="xMidYMid meet">
+        <path d="M12 40 Q18 20 28 35 L35 28 Q42 48 52 30 T72 38 Q78 25 88 40 M95 30 Q102 48 112 32 L120 42 Q128 22 138 35 M145 30 Q152 48 162 32 Q168 20 178 38 L188 30 Q195 42 205 35" fill="none" stroke="#0a2540" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div><span class="ws-status-pill">✓ Signed</span></div>
+  </div>
+</div>
+
+<!-- Defects Raised -->
+<div class="defects-raised-section">
+  <div class="drs-hdr">
+    <span class="drs-title">Defects Raised at Sign-Off</span>
+    <span class="drs-count-pill">2</span>
+  </div>
+  <div>
+    <div class="drs-row">
+      <span class="drs-num">CX-D018</span>
+      <span class="drs-desc">[Witness] Supply airflow measurement — Design 320 L/s on high. Measured 268 L/s — 16% below. Filter clean. Suspect ductwork restriction downstream — head contractor to investigate.</span>
+      <span class="drs-status">Open</span>
+    </div>
+    <div class="drs-row">
+      <span class="drs-num">CX-D019</span>
+      <span class="drs-desc">[Witness] BMS communication — Supply air temp, return air temp, fan status, valve position all read OK. Fan speed feedback always shows '0' at BMS regardless of actual speed. Fault alarm point not mapped at head-end. Controls contractor to address.</span>
+      <span class="drs-status">Open</span>
+    </div>
+  </div>
+</div>
+
+<div class="rs-bottom-actions">
+  — Sample mockup. Defects flow to the Cx defect register. Re-witness initiated once both defects close. —
+</div>
+
+</body>
+</html>

@@ -554,6 +554,48 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   .pd-footer{margin-top:12pt;padding-top:5pt;border-top:.5pt solid #999;font-size:7.5pt;color:#666;display:flex;justify-content:space-between;align-items:center}
 }
 
+/* ═══════════════════════════════════════════════════
+   ATTEMPT CHAIN BANNER (Step 11)
+═══════════════════════════════════════════════════ */
+.attempt-banner{margin:14px 24px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px 14px;display:flex;align-items:center;gap:12px;font-size:12.5px}
+.attempt-banner.is-historical{border-left:3px solid var(--muted)}
+.attempt-banner.is-current{border-left:3px solid var(--accent);background:var(--accent-dim)}
+.ab-icon{font-size:18px;flex-shrink:0;line-height:1}
+.ab-body{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ab-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text)}
+.ab-sub{font-size:11.5px;color:var(--text2)}
+.ab-chain{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;font-family:'DM Mono',monospace;font-size:10.5px}
+.ab-chain-item{padding:2px 8px;border-radius:5px;background:var(--surface3);border:1px solid var(--border);color:var(--text2);cursor:pointer;transition:all .12s;display:inline-flex;align-items:center;gap:4px}
+.ab-chain-item:hover{color:var(--accent);border-color:var(--accent)}
+.ab-chain-item.current{background:var(--accent-dim);color:var(--accent);border-color:var(--accent);cursor:default}
+.ab-chain-arrow{color:var(--muted);font-size:10px;align-self:center}
+.ab-chain-status{font-size:9px;padding:1px 5px;border-radius:3px;letter-spacing:.3px;text-transform:uppercase;margin-left:4px}
+.abs-signed_off{background:var(--green-dim);color:var(--green)}
+.abs-failed_pending_rework{background:var(--warn-dim);color:var(--warn)}
+.abs-draft, .abs-in_progress{background:var(--surface3);color:var(--text2)}
+.abs-cancelled{background:var(--danger-dim);color:var(--danger)}
+
+/* Test chip — carried from prior attempt */
+.test-chip-carried{background:rgba(167,139,250,.12);color:#c4b5fd;border:1px solid rgba(167,139,250,.3)}
+
+/* Initiate Re-Witness button */
+.btn-rewitness{padding:8px 16px;border-radius:6px;border:1px solid rgba(0,200,255,.4);background:var(--accent-dim);color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .12s}
+.btn-rewitness:hover{background:rgba(0,200,255,.2);border-color:var(--accent)}
+.btn-rewitness:disabled{opacity:.5;cursor:not-allowed}
+
+/* Defects-status banner (for Needs Re-Witness tab) */
+.dstatus-pill{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:10px;letter-spacing:.3px;text-transform:uppercase}
+.dstatus-all-closed{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+.dstatus-some-open{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
+.dstatus-pending{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+
+/* Re-witness modal summary */
+.rwm-summary{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:var(--text2)}
+.rwm-summary-row{display:flex;align-items:center;gap:8px}
+.rwm-summary-icon{font-size:14px;flex-shrink:0;width:18px;text-align:center}
+.rwm-defect-warning{margin-top:10px;background:var(--warn-dim);border:1px solid rgba(255,184,48,.3);border-radius:8px;padding:11px 14px;color:var(--text);font-size:12.5px;display:flex;align-items:flex-start;gap:8px}
+.rwm-defect-warning-icon{font-size:16px;color:var(--warn);flex-shrink:0;line-height:1}
+
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)}
 
 </style>
@@ -656,6 +698,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
       <!-- TAB 2: NEEDS RE-WITNESS -->
       <div class="tab-content" id="tabc-rework">
+        <div class="rewitness-needed-banner">
+          <span class="rwnb-icon">↻</span>
+          <div>Runsheets that signed off with failures, awaiting a re-witness attempt. <strong>Once defects close in the Cx defect register</strong>, the team can return here to initiate the next attempt — passing tests carry forward automatically.</div>
+        </div>
         <table class="reg-tbl">
           <thead>
             <tr>
@@ -702,6 +748,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <div>
         <div class="lock-title" id="lockedTitle">Runsheet locked</div>
         <div class="lock-sub" id="lockedSub">This runsheet has been signed off and is part of the audit trail. Editing is disabled.</div>
+      </div>
+    </div>
+
+    <!-- ATTEMPT CHAIN BANNER (Step 11) — shows when runsheet is part of a re-witness chain -->
+    <div id="attemptBanner" class="attempt-banner" style="display:none">
+      <span class="ab-icon" id="ab-icon">↻</span>
+      <div class="ab-body">
+        <div class="ab-title" id="ab-title">—</div>
+        <div class="ab-sub" id="ab-sub">—</div>
+        <div class="ab-chain" id="ab-chain"></div>
       </div>
     </div>
 
@@ -808,6 +864,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div class="rs-bottom-actions">
       <button class="btn bg" onclick="showList()">← Back to Runsheets</button>
       <span style="flex:1"></span>
+      <button class="btn-rewitness" id="rewitnessBtn" onclick="openRewitnessModal()" style="display:none">↻ Initiate Re-Witness</button>
       <button class="btn bdanger" id="cancelRsBtn" onclick="cancelRunsheet()">Cancel Runsheet</button>
     </div>
 
@@ -1017,6 +1074,48 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div class="modal-footer">
       <button class="bg bsm btn" onclick="closeSubmitConfirm()">Cancel</button>
       <button class="bp bsm btn" id="scmConfirmBtn" onclick="confirmSubmitAndLock()">Confirm Submit &amp; Lock</button>
+    </div>
+  </div>
+</div>
+
+<!-- INITIATE RE-WITNESS MODAL (Step 11) -->
+<div class="mo" id="rewitnessModal" onclick="if(event.target===this)closeRewitnessModal()">
+  <div class="modal" style="width:560px">
+    <div class="modal-hdr">
+      <h3>Initiate Re-Witness</h3>
+      <p>Create attempt <span id="rwm-next-attempt">#2</span> for this equipment. Passing tests carry over; failed tests reset for re-witnessing.</p>
+    </div>
+    <div class="modal-body" style="padding:18px 22px">
+
+      <div class="rwm-summary">
+        <div class="rwm-summary-row">
+          <span class="rwm-summary-icon">📋</span>
+          <span><strong id="rwm-equip">—</strong> · attempt <span id="rwm-attempt-display">—</span></span>
+        </div>
+        <div class="rwm-summary-row">
+          <span class="rwm-summary-icon" style="color:var(--green)">✓</span>
+          <span><strong id="rwm-pass-count">0</strong> passing tests will be carried over (marked as "carried from attempt 1")</span>
+        </div>
+        <div class="rwm-summary-row">
+          <span class="rwm-summary-icon" style="color:var(--warn)">↻</span>
+          <span><strong id="rwm-fail-count">0</strong> failed tests will reset to pending for re-witnessing</span>
+        </div>
+      </div>
+
+      <!-- Defect warning (shown when there are still open witness-origin defects) -->
+      <div id="rwm-defect-warning" class="rwm-defect-warning" style="display:none">
+        <span class="rwm-defect-warning-icon">⚠</span>
+        <div>
+          <div style="font-weight:600;margin-bottom:3px"><span id="rwm-open-defect-count">0</span> witness-origin defect(s) still open</div>
+          <div style="color:var(--text2);line-height:1.5" id="rwm-open-defect-list"></div>
+          <div style="color:var(--text2);font-size:11.5px;margin-top:6px;line-height:1.5">Proceeding with open defects is allowed — the new runsheet's failed tests will still need to pass. Note: this is logged on the new runsheet for audit.</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="bg bsm btn" onclick="closeRewitnessModal()">Cancel</button>
+      <button class="bp bsm btn" id="rwmConfirmBtn" onclick="confirmRewitness()">Create Re-Witness Runsheet →</button>
     </div>
   </div>
 </div>
@@ -1323,7 +1422,15 @@ function renderRunsheetEditor(){
         sub = 'All witnesses have signed and this runsheet is locked as part of the audit trail.';
       } else if(rs.status === 'failed_pending_rework'){
         title = '⚠ Failed — locked, pending re-witness';
-        sub = 'Witnesses signed off with one or more failed tests. Once defects are closed, initiate a re-witness from the Needs Re-Witness tab.';
+        // Detect whether this runsheet has already been re-witnessed
+        var alreadyReWitnessed = _findRewitnessChildren(rs.id).length > 0;
+        if(alreadyReWitnessed){
+          sub = 'This runsheet has been re-witnessed (see banner above).';
+        } else {
+          sub = 'Witnesses signed off with one or more failed tests. Once defects close, click Initiate Re-Witness to start a new attempt.';
+          // Show the Initiate Re-Witness button
+          if(initBtn)initBtn.style.display='';
+        }
       } else if(rs.status === 'cancelled'){
         title = '— Cancelled';
         sub = 'This runsheet was cancelled before sign-off.';
@@ -1356,6 +1463,8 @@ function renderRunsheetEditor(){
   renderRsTests(rs);
   renderWitnesses(rs);
   renderDefectsRaised(rs);
+  renderAttemptBanner(rs);                 // Step 11: chain banner if part of a re-witness chain
+  _updateRewitnessButtonVisibility(rs);    // Step 11: show button only on failed_pending_rework with no child
 
   // Disable / enable bottom actions based on lock state
   var cancelBtn = document.getElementById('cancelRsBtn');
@@ -1483,6 +1592,8 @@ function renderRsTests(rs){
     if(diff === 'modified') chips.innerHTML += '<span class="test-chip test-chip-modified" title="One or more fields differ from the original template">⚙ Modified</span>';
     if(diff === 'added') chips.innerHTML += '<span class="test-chip test-chip-added" title="Added by PM on this runsheet — not from template">＋ PM-added</span>';
     if(test.photo_required) chips.innerHTML += '<span class="test-chip test-chip-photoreq" title="Photo required for this test">📷 Photo req</span>';
+    if(test.carried_from_attempt) chips.innerHTML += '<span class="test-chip test-chip-carried" title="Test passed in attempt #'+test.carried_from_attempt+' — result carried forward, not re-witnessed">↳ Carried from #'+test.carried_from_attempt+'</span>';
+    if(test.carried_from_attempt) chips.innerHTML += '<span class="test-chip test-chip-carried" title="This test passed on a previous attempt and was carried forward — no re-test required">↻ Carried from attempt #'+test.carried_from_attempt+'</span>';
     if(chips.innerHTML)nameWrap.appendChild(chips);
     tdName.appendChild(nameWrap);
     tr.appendChild(tdName);
@@ -1519,11 +1630,13 @@ function renderRsTests(rs){
     tdRes.style.textAlign='center';
     var toggleWrap = document.createElement('div');
     toggleWrap.style.display='flex';toggleWrap.style.flexDirection='column';toggleWrap.style.alignItems='center';toggleWrap.style.gap='3px';
+    // Carried-from-prior-attempt tests are locked — PM cannot change a result inherited from earlier audit
+    var testLocked = locked || !!test.carried_from_attempt;
     var toggle = document.createElement('div');
     toggle.className='pf-toggle';
     var passBtn = document.createElement('button');
     passBtn.className='pf-btn pf-pass' + (test.result==='pass' ? ' active' : '');
-    passBtn.textContent='Pass';passBtn.disabled = locked;
+    passBtn.textContent='Pass';passBtn.disabled = testLocked;
     passBtn.onclick = (function(tt){return function(){
       tt.result = (tt.result === 'pass') ? null : 'pass';
       tt.tested_at = tt.result ? new Date().toISOString() : null;
@@ -1532,7 +1645,7 @@ function renderRsTests(rs){
     };})(test);
     var failBtn = document.createElement('button');
     failBtn.className='pf-btn pf-fail' + (test.result==='fail' ? ' active' : '');
-    failBtn.textContent='Fail';failBtn.disabled = locked;
+    failBtn.textContent='Fail';failBtn.disabled = testLocked;
     failBtn.onclick = (function(tt){return function(){
       tt.result = (tt.result === 'fail') ? null : 'fail';
       tt.tested_at = tt.result ? new Date().toISOString() : null;
@@ -2302,7 +2415,9 @@ function buildPrintDoc(rs){
   // ── Tests table ──
   var testsRows = (rs.tests || []).map(function(t, idx){
     var resKey = t.result === 'pass' ? 'pass' : (t.result === 'fail' ? 'fail' : 'pending');
-    var resLbl = t.result === 'pass' ? '✓ Pass' : (t.result === 'fail' ? '✗ Fail' : '— Pending');
+    var carriedSuffix = (t.result === 'pass' && t.carried_from_attempt)
+      ? ' (Carried from attempt #' + t.carried_from_attempt + ')' : '';
+    var resLbl = t.result === 'pass' ? ('✓ Pass' + carriedSuffix) : (t.result === 'fail' ? '✗ Fail' : '— Pending');
     var rowCls = t.result === 'fail' ? 'pd-test-fail-row' : '';
     var photoCount = (t.photos || []).length;
     return '<tr class="'+rowCls+'">'
@@ -2434,6 +2549,237 @@ function _cacheDefectsForPrint(defects){
   });
   window._cachedDefectsByNum = by;
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// RE-WITNESS FLOW + ATTEMPT CHAIN (Step 11)
+// ═══════════════════════════════════════════════════════════════════════
+// When a runsheet fails (status=failed_pending_rework), the PM eventually
+// re-witnesses it. This block handles:
+//   1. Attempt chain banner — shows on every runsheet that's part of a chain.
+//   2. Initiate Re-Witness button — visible on failed_pending_rework runsheets.
+//   3. Re-witness creation — soft-warns about open defects, then creates the new runsheet.
+//   4. Inherited test indicator — "carried from attempt 1" chip on re-witnessed runsheets.
+//   5. Needs Re-Witness tab — populated with failed runsheets and defect-close status.
+
+// ── Attempt chain banner ──
+// Loads sibling runsheets for the same equipment via dbGetWitnessAttemptChain,
+// renders the chain inline with clickable hops to other attempts.
+async function renderAttemptBanner(rs){
+  var banner = document.getElementById('attemptBanner');
+  if(!banner)return;
+
+  // Don't render until we know the chain has more than one attempt
+  banner.style.display = 'none';
+  if(!rs)return;
+  var equipId = rs.equipment_id || rs.equipment_tag;
+  if(!equipId)return;
+
+  try {
+    var chain = await dbGetWitnessAttemptChain(rs.project_num || _pNum, equipId);
+    if(!Array.isArray(chain) || chain.length < 2){
+      // No siblings — single attempt — no banner needed
+      return;
+    }
+    // Sort by attempt_number ascending (just in case the helper didn't)
+    chain.sort(function(a,b){return (a.attempt_number||1) - (b.attempt_number||1);});
+
+    var currentAttempt = rs.attempt_number || 1;
+    var isLatest = chain[chain.length-1].id === rs.id;
+    var icon = document.getElementById('ab-icon');
+    var title = document.getElementById('ab-title');
+    var sub = document.getElementById('ab-sub');
+    var chainEl = document.getElementById('ab-chain');
+
+    if(isLatest && chain.length > 1){
+      // This IS the latest attempt — show "Re-witness of attempt N"
+      banner.classList.remove('is-historical');
+      banner.classList.add('is-current');
+      icon.textContent = '↻';
+      title.textContent = 'Re-witness — attempt #' + currentAttempt;
+      sub.textContent = 'This runsheet is a re-witness of an earlier failed attempt. Click any attempt to view it.';
+    } else {
+      // This is an earlier (non-latest) attempt — direct user to the latest
+      banner.classList.remove('is-current');
+      banner.classList.add('is-historical');
+      icon.textContent = '🕘';
+      var latest = chain[chain.length-1];
+      title.textContent = 'Earlier attempt — superseded by attempt #' + (latest.attempt_number||chain.length);
+      sub.textContent = 'A re-witness exists for this equipment. The latest attempt is the active record.';
+    }
+
+    // Build chain HTML
+    chainEl.innerHTML = chain.map(function(c, i){
+      var isCurrent = c.id === rs.id;
+      var statusKey = c.status || 'draft';
+      var statusLbl = (STATUS_LABELS[statusKey] || statusKey).split(' ')[0];   // short label
+      var arrow = (i > 0) ? '<span class="ab-chain-arrow">→</span>' : '';
+      var click = isCurrent ? '' : ' onclick="openRunsheetEditor(\''+escH(c.id)+'\')"';
+      return arrow + '<span class="ab-chain-item'+(isCurrent?' current':'')+'"'+click+'>'
+        + 'Attempt #' + (c.attempt_number||1)
+        + ' · ' + escH(c.runsheet_number||'')
+        + '<span class="ab-chain-status abs-'+escH(statusKey)+'">'+escH(statusLbl)+'</span>'
+        + '</span>';
+    }).join('');
+
+    banner.style.display = 'flex';
+  } catch(e) {
+    console.warn('renderAttemptBanner failed:', e.message);
+  }
+}
+
+// ── Initiate Re-Witness flow ──
+
+// Show the button on failed runsheets only. Called from renderRunsheetEditor.
+function _updateRewitnessButtonVisibility(rs){
+  var btn = document.getElementById('rewitnessBtn');
+  if(!btn)return;
+  // Only failed_pending_rework runsheets are eligible for re-witness.
+  // Once a re-witness exists (next-attempt runsheet exists), hide the button to
+  // prevent duplicate chain branches.
+  if(!rs || rs.status !== 'failed_pending_rework'){
+    btn.style.display = 'none';
+    return;
+  }
+  // Check if a child (attempt #N+1) already exists
+  var hasChild = runsheets.some(function(r){
+    return r && r.parent_runsheet_id === rs.id;
+  });
+  btn.style.display = hasChild ? 'none' : '';
+}
+
+// Check defect status — returns counts of {open, closed, total} for this runsheet's defects
+async function _checkRunsheetDefectStatus(rs){
+  var defectIds = (rs && rs.defects_raised) || [];
+  if(!defectIds.length){
+    return { total: 0, open: 0, closed: 0, openList: [] };
+  }
+  try {
+    var existing = await dbGetProject('cx_defects', _pNum);
+    if(!Array.isArray(existing))existing = [];
+    var byNum = {};
+    existing.forEach(function(d){byNum[d.num] = d;});
+    var open = 0, closed = 0;
+    var openList = [];
+    defectIds.forEach(function(num){
+      var d = byNum[num];
+      if(d){
+        if(d.status === 'closed') closed++;
+        else { open++; openList.push({num: num, desc: d.desc||''}); }
+      } else {
+        // Defect not found — treat as open (it may have been deleted, but we don't assume)
+        open++; openList.push({num: num, desc: '(not found in register)'});
+      }
+    });
+    return { total: defectIds.length, open: open, closed: closed, openList: openList };
+  } catch(e) {
+    console.warn('_checkRunsheetDefectStatus failed:', e.message);
+    return { total: defectIds.length, open: defectIds.length, closed: 0, openList: [] };
+  }
+}
+
+// Open the Initiate Re-Witness modal with pre-flight summary
+async function openRewitnessModal(){
+  var rs = runsheets.find(function(r){return r.id===_activeRunsheetId;});
+  if(!rs)return;
+  if(rs.status !== 'failed_pending_rework'){
+    alert('Re-witness can only be initiated on failed runsheets.');
+    return;
+  }
+
+  // Check for existing child
+  var hasChild = runsheets.some(function(r){return r && r.parent_runsheet_id === rs.id;});
+  if(hasChild){
+    alert('A re-witness for this runsheet already exists. Use the attempt chain banner to navigate to it.');
+    return;
+  }
+
+  // Build summary
+  var tests = rs.tests || [];
+  var passCount = tests.filter(function(t){return t.result === 'pass';}).length;
+  var failCount = tests.filter(function(t){return t.result === 'fail';}).length;
+  var equipId = rs.equipment_id || rs.equipment_tag || '—';
+  var attempt = rs.attempt_number || 1;
+
+  document.getElementById('rwm-equip').textContent = equipId;
+  document.getElementById('rwm-attempt-display').textContent = '#' + attempt;
+  document.getElementById('rwm-next-attempt').textContent = '#' + (attempt + 1);
+  document.getElementById('rwm-pass-count').textContent = passCount;
+  document.getElementById('rwm-fail-count').textContent = failCount;
+
+  // Async-check defect status for the soft warning
+  var defectStatus = await _checkRunsheetDefectStatus(rs);
+  var warn = document.getElementById('rwm-defect-warning');
+  if(defectStatus.open > 0){
+    document.getElementById('rwm-open-defect-count').textContent = defectStatus.open;
+    document.getElementById('rwm-open-defect-list').innerHTML =
+      defectStatus.openList.slice(0, 5).map(function(d){
+        return '<div style="margin-top:3px"><span style="font-family:DM Mono,monospace;color:var(--warn);font-weight:600">'+escH(d.num)+'</span> · '+escH(d.desc.length > 70 ? d.desc.substring(0,70)+'…' : d.desc)+'</div>';
+      }).join('')
+      + (defectStatus.openList.length > 5 ? '<div style="color:var(--muted);margin-top:3px">… and '+(defectStatus.openList.length-5)+' more</div>' : '');
+    warn.style.display = '';
+  } else {
+    warn.style.display = 'none';
+  }
+
+  document.getElementById('rewitnessModal').classList.add('open');
+}
+
+function closeRewitnessModal(){
+  document.getElementById('rewitnessModal').classList.remove('open');
+}
+
+// Confirm re-witness creation — calls dbCreateRewitnessRunsheet and navigates
+async function confirmRewitness(){
+  var rs = runsheets.find(function(r){return r.id===_activeRunsheetId;});
+  if(!rs)return;
+  var btn = document.getElementById('rwmConfirmBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+
+  try {
+    // Capture the defect status snapshot for audit
+    var defectStatus = await _checkRunsheetDefectStatus(rs);
+
+    var created = await dbCreateRewitnessRunsheet(rs.id);
+    if(!created){
+      alert('Failed to create re-witness runsheet. Check console for details.');
+      btn.disabled = false; btn.textContent = 'Create Re-Witness Runsheet →';
+      return;
+    }
+
+    // Stamp audit info on the new runsheet: how many defects were still open at creation
+    created.rewitness_audit = {
+      original_runsheet_id: rs.id,
+      original_attempt_number: rs.attempt_number || 1,
+      original_defects_total: defectStatus.total,
+      defects_open_at_creation: defectStatus.open,
+      defects_closed_at_creation: defectStatus.closed,
+      created_at: new Date().toISOString(),
+      created_by: (_cachedCS.userName || _cachedCS.contactName || 'PM').split(' ')[0]
+    };
+
+    // Save the audit annotation
+    try {
+      await dbSaveWitnessRunsheet(created.id, created);
+    } catch(e) {
+      console.warn('Could not persist rewitness_audit annotation (non-blocking):', e.message);
+    }
+
+    // Push into local list so it appears in the tab
+    runsheets.unshift(created);
+
+    closeRewitnessModal();
+    showToast('✓ Re-witness '+(created.runsheet_number||'')+' created — attempt #'+(created.attempt_number||1));
+    btn.disabled = false; btn.textContent = 'Create Re-Witness Runsheet →';
+
+    // Navigate to the new runsheet
+    openRunsheetEditor(created.id);
+  } catch(e) {
+    console.error('confirmRewitness error:', e);
+    alert('Unexpected error during re-witness creation. See console.');
+    btn.disabled = false; btn.textContent = 'Create Re-Witness Runsheet →';
+  }
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════
 // SIGN-OFF CEREMONY (Step 9)
@@ -2776,12 +3122,19 @@ function filterAll(){
 }
 
 function filterRework(){
-  // Runsheets that failed and are waiting on re-witness.
-  // When the defects module lands (Step 9), tighten this to: failed_pending_rework AND all linked defects closed.
+  // Runsheets that failed AND haven't been re-witnessed yet.
+  // A runsheet is "already re-witnessed" if another runsheet exists with
+  // parent_runsheet_id === this.id. Those move out of the Needs Re-Witness tab.
   var q=(document.getElementById('srch')||{}).value.toLowerCase();
   var ef=(document.getElementById('filterEquip')||{}).value||'';
+  // Build a set of parent ids that have been re-witnessed
+  var hasChild = {};
+  runsheets.forEach(function(r){
+    if(r.parent_runsheet_id)hasChild[r.parent_runsheet_id] = true;
+  });
   return runsheets.filter(function(r){
     if(r.status !== 'failed_pending_rework')return false;
+    if(hasChild[r.id])return false;  // already re-witnessed
     var equipType = (r.template_snapshot && r.template_snapshot.equipment_type) || '';
     var match = !q
       || (r.runsheet_number||'').toLowerCase().includes(q)
@@ -3333,21 +3686,9 @@ async function confirmNewRunsheet(){
 // ── RE-WITNESS ──
 async function initiateRewitness(rsId){
   if(!rsId)return;
-  if(!confirm('Create a re-witness runsheet?\n\nA new runsheet will be created with attempt_number incremented. Only failed tests carry forward; passed tests are retained as historical record on the previous attempt.'))return;
-  try{
-    var newRs = await dbCreateRewitnessRunsheet(rsId);
-    if(!newRs || !newRs.id){
-      alert('Failed to create re-witness runsheet. The original may have no failed tests carried forward. See console.');
-      return;
-    }
-    runsheets.unshift(newRs);
-    renderActiveTab();
-    showToast('✓ Re-witness runsheet created (Attempt #'+(newRs.attempt_number||2)+')');
-    openRunsheetEditor(newRs.id);
-  }catch(e){
-    console.error('initiateRewitness error:',e);
-    alert('Failed to create re-witness runsheet. See console.');
-  }
+  // Set the active runsheet so the modal pulls from the right context, then open
+  _activeRunsheetId = rsId;
+  await openRewitnessModal();
 }
 
 // ── DELETE ──

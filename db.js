@@ -911,41 +911,58 @@ async function dbCreateRewitnessRunsheet(originalId) {
       console.warn('dbCreateRewitnessRunsheet: original runsheet not found:', originalId);
       return null;
     }
-    // Carry forward only failed tests; reset their pass/fail state to pending.
+    var originalAttempt = original.attempt_number || 1;
+    // Carry forward ALL tests:
+    //   - Failed tests → reset to pending (must be re-witnessed)
+    //   - Passing tests → keep result + carried_from_attempt flag (audit trail)
+    //   - Pending tests → reset (shouldn't exist on a submitted runsheet anyway)
     var originalTests = (original.tests || []);
-    var carriedTests = originalTests
-      .filter(function(t){ return t && t.result === 'fail'; })
-      .map(function(t){
-        // Strip prior result/comments/photos so the test is fresh, but keep
-        // the test definition (name, criteria, expected value, etc.).
-        var fresh = Object.assign({}, t);
+    if (!originalTests.length) {
+      console.warn('dbCreateRewitnessRunsheet: no tests on original to carry forward');
+      return null;
+    }
+    var carriedTests = originalTests.map(function(t){
+      var fresh = Object.assign({}, t);
+      if (t && t.result === 'pass') {
+        // Inherit pass — keep result, comment, photos, tested_at, but flag as carried
+        // so the PDF can show "Pass (from attempt 1)" rather than pretending re-tested.
+        fresh.carried_from_attempt = originalAttempt;
+        // Strip any deprecated synonyms quietly
+        delete fresh.actual_value;
+        delete fresh.actualValue;
+        delete fresh.tested_by;
+        delete fresh.testedBy;
+      } else {
+        // Failed or pending → reset to pending
         delete fresh.result;
         delete fresh.actual_value;
         delete fresh.actualValue;
+        delete fresh.comment;
         delete fresh.comments;
         delete fresh.photos;
         delete fresh.tested_at;
         delete fresh.testedAt;
         delete fresh.tested_by;
         delete fresh.testedBy;
-        return fresh;
-      });
-    if (!carriedTests.length) {
-      console.warn('dbCreateRewitnessRunsheet: no failed tests to carry forward from', originalId);
-      return null;
-    }
+        delete fresh.carried_from_attempt;
+        fresh.result = null;
+        fresh.photos = [];
+      }
+      return fresh;
+    });
     // Build the new runsheet, preserving the template snapshot and equipment link.
     var fresh = {
       equipment_id: original.equipment_id,
       template_id: original.template_id,
       status: 'draft',
-      attempt_number: (original.attempt_number || 1) + 1,
+      attempt_number: originalAttempt + 1,
       parent_runsheet_id: original.id,
       scheduled_date: null,
       signed_at: null,
       // Copy snapshot + non-state fields from `data`
       template_snapshot: original.template_snapshot || null,
       equipment_name: original.equipment_name || null,
+      cx_tracker_id: original.cx_tracker_id || null,        // preserve tracker link
       tests: carriedTests,
       witnesses: [],         // fresh sign-off required
       comments: '',
