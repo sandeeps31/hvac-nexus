@@ -396,7 +396,184 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .drs-status-open{background:var(--warn-dim);color:var(--warn);border:1px solid rgba(255,184,48,.3)}
 .drs-status-closed{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,.3)}
 
+/* ── Toolbar button (used in editor toolbar) ── */
+.btn-toolbar{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface3);color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .12s}
+.btn-toolbar:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
+.btn-toolbar:disabled{opacity:.5;cursor:not-allowed}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PRINT DOCUMENT — screen state: hidden.
+   Print state: visible, everything else hidden.
+   The print doc is built into #printDoc on-demand by printRunsheet().
+═══════════════════════════════════════════════════════════════════ */
+.print-doc{display:none}
+
+@media print {
+  /* Hide everything except the print doc */
+  body > *:not(#printDoc){display:none !important}
+  #printDoc{display:block !important}
+
+  /* Page setup — A4 portrait with sensible margins.
+     Browser will inject page numbers/runsheet ref into the bottom margin
+     via the printable footer block at the end of #printDoc. */
+  @page{
+    size: A4 portrait;
+    margin: 14mm 14mm 18mm 14mm;
+  }
+
+  body{
+    background:#fff !important;
+    color:#000 !important;
+    font-family:Arial, Helvetica, sans-serif !important;
+    font-size:9.5pt;
+    margin:0;
+    padding:0;
+  }
+
+  /* ── Top header band on every page ── */
+  .pd-runheader{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    padding:0 0 6pt 0;
+    border-bottom:1.5pt solid #0a2540;
+    margin-bottom:10pt;
+  }
+  .pd-runheader-l{display:flex;flex-direction:column;gap:1pt}
+  .pd-brand{font-family:'Helvetica',sans-serif;font-size:14pt;font-weight:800;color:#0a2540;letter-spacing:.5pt}
+  .pd-brand-sub{font-size:7.5pt;color:#666;letter-spacing:1pt;text-transform:uppercase;font-weight:600}
+  .pd-runheader-r{text-align:right;font-size:8pt;color:#444}
+  .pd-runheader-r .rh-rsno{font-size:11pt;font-weight:700;color:#0a2540;font-family:'Helvetica',sans-serif}
+  .pd-runheader-r .rh-meta{font-size:8pt;margin-top:1pt}
+
+  /* ── Status pill ── */
+  .pd-status-pill{display:inline-block;padding:1.5pt 8pt;border-radius:9pt;font-size:8pt;font-weight:700;letter-spacing:.4pt;text-transform:uppercase}
+  .pd-status-signed_off{background:#d6f5e6;color:#00805a;border:1pt solid #00b884}
+  .pd-status-failed_pending_rework{background:#fff1d6;color:#a06a00;border:1pt solid #d49a1a}
+  .pd-status-cancelled{background:#eee;color:#555;border:1pt solid #aaa}
+  .pd-status-draft, .pd-status-in_progress{background:#e6f3ff;color:#0066b3;border:1pt solid #4ba5d9}
+
+  /* ── DRAFT watermark (only on non-locked statuses) ── */
+  .pd-watermark{
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%) rotate(-32deg);
+    font-family:'Helvetica',sans-serif;
+    font-size:110pt;
+    font-weight:900;
+    color:rgba(220,30,30,.10);
+    border:8pt solid rgba(220,30,30,.10);
+    padding:8pt 28pt;
+    border-radius:12pt;
+    z-index:0;
+    pointer-events:none;
+    letter-spacing:6pt;
+  }
+
+  /* ── Section title ── */
+  .pd-section{margin-top:10pt;page-break-inside:avoid}
+  .pd-section.allow-break{page-break-inside:auto}
+  .pd-section-title{font-family:'Helvetica',sans-serif;font-size:10pt;font-weight:700;color:#0a2540;text-transform:uppercase;letter-spacing:1pt;border-bottom:.5pt solid #999;padding-bottom:2pt;margin-bottom:6pt}
+
+  /* ── Header info card (key-value pairs at top of report) ── */
+  .pd-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:.5pt solid #aaa;border-radius:3pt;overflow:hidden;font-size:9pt}
+  .pd-info-row{display:grid;grid-template-columns:34mm 1fr;border-bottom:.4pt solid #ddd;background:#fff}
+  .pd-info-row:nth-last-child(-n+2){border-bottom:none}
+  .pd-info-row.full{grid-column:1 / -1}
+  .pd-info-lbl{padding:3pt 6pt;background:#f4f6f9;font-weight:600;color:#555;font-size:8pt;text-transform:uppercase;letter-spacing:.3pt}
+  .pd-info-val{padding:3pt 8pt;color:#000;font-family:Arial, Helvetica, sans-serif}
+  .pd-info-val.mono{font-family:'Courier New',monospace;font-weight:600}
+
+  .pd-summary-band{margin-top:8pt;padding:6pt 10pt;background:#f4f6f9;border-left:3pt solid #0a2540;display:flex;gap:24pt;align-items:center;font-size:9pt}
+  .pd-summary-band .sb-grp{display:flex;flex-direction:column;gap:1pt}
+  .pd-summary-band .sb-lbl{font-size:7pt;text-transform:uppercase;color:#666;letter-spacing:.6pt;font-weight:600}
+  .pd-summary-band .sb-val{font-size:11pt;font-weight:700;color:#0a2540}
+  .pd-summary-band .sb-val.pass{color:#00805a}
+  .pd-summary-band .sb-val.fail{color:#a06a00}
+
+  /* ── Tests table ── */
+  .pd-tests-tbl{width:100%;border-collapse:collapse;font-size:8.5pt;margin-top:4pt}
+  .pd-tests-tbl thead{display:table-header-group !important}    /* repeat headers on every page */
+  .pd-tests-tbl tfoot{display:table-row-group}
+  .pd-tests-tbl th{
+    background:#0a2540;
+    color:#fff;
+    text-align:left;
+    padding:4pt 5pt;
+    font-size:7.5pt;
+    text-transform:uppercase;
+    letter-spacing:.4pt;
+    font-weight:700;
+    border:.4pt solid #0a2540;
+  }
+  .pd-tests-tbl td{
+    border:.4pt solid #bbb;
+    padding:4pt 5pt;
+    vertical-align:top;
+    page-break-inside:avoid;
+  }
+  .pd-tests-tbl tr{page-break-inside:avoid}
+  .pd-tests-tbl .pd-test-num{font-family:'Courier New',monospace;font-weight:700;color:#666;text-align:center;width:6mm}
+  .pd-tests-tbl .pd-test-name{font-weight:700;color:#0a2540;font-size:8.5pt}
+  .pd-tests-tbl .pd-test-name-desc{font-weight:400;color:#333;font-size:8pt;margin-top:1pt;line-height:1.35}
+  .pd-tests-tbl .pd-test-crit{color:#444;font-size:7.5pt;font-style:italic;margin-top:2pt;line-height:1.35}
+  .pd-tests-tbl .pd-test-ref{font-family:'Courier New',monospace;font-size:7.5pt;color:#666}
+  .pd-tests-tbl .pd-test-comment{font-size:7.5pt;color:#333;line-height:1.4}
+  .pd-tests-tbl .pd-test-photos{font-family:'Courier New',monospace;font-size:7pt;color:#666;text-align:center;white-space:nowrap}
+
+  .pd-result-pill{display:inline-block;padding:1pt 8pt;border-radius:8pt;font-size:7.5pt;font-weight:700;letter-spacing:.4pt;text-transform:uppercase;text-align:center;min-width:22mm}
+  .pd-result-pass{background:#d6f5e6;color:#00805a;border:.6pt solid #00b884}
+  .pd-result-fail{background:#fff1d6;color:#a06a00;border:.6pt solid #d49a1a}
+  .pd-result-pending{background:#eee;color:#555;border:.6pt solid #aaa}
+
+  .pd-test-fail-row{background:#fffaef !important}
+  .pd-test-fail-row td{border-color:#d49a1a !important;background:#fffaef !important}
+
+  /* ── Witnesses ── */
+  .pd-witness-grid{display:grid;grid-template-columns:1fr 1fr;gap:6pt;margin-top:4pt}
+  .pd-witness-card{
+    border:.5pt solid #999;
+    border-radius:3pt;
+    padding:6pt 8pt;
+    page-break-inside:avoid;
+    background:#fafbfc;
+    display:flex;
+    flex-direction:column;
+    gap:3pt;
+  }
+  .pd-witness-name-row{display:flex;justify-content:space-between;align-items:baseline;gap:8pt}
+  .pd-witness-name{font-weight:700;font-size:10pt;color:#0a2540}
+  .pd-party-chip{display:inline-block;padding:1pt 7pt;border-radius:7pt;font-size:7pt;font-weight:600;letter-spacing:.3pt;text-transform:uppercase}
+  .pd-party-consultant{background:#ede7fa;color:#5e3fb8;border:.5pt solid #c4b5fd}
+  .pd-party-head_contractor{background:#dbf2ff;color:#005a8e;border:.5pt solid #66b8e0}
+  .pd-party-certifier{background:#fff1d6;color:#a06a00;border:.5pt solid #d49a1a}
+  .pd-party-other{background:#eee;color:#555;border:.5pt solid #aaa}
+  .pd-witness-meta{font-size:7.5pt;color:#555;display:flex;flex-direction:column;gap:1pt}
+  .pd-witness-meta .ml{font-size:6.5pt;text-transform:uppercase;color:#888;letter-spacing:.3pt}
+  .pd-witness-sig{background:#fff;border:.4pt solid #aaa;border-radius:2pt;margin-top:3pt;height:18mm;display:flex;align-items:center;justify-content:center;padding:2pt}
+  .pd-witness-sig svg{max-width:100%;max-height:100%}
+  .pd-witness-sig.empty{color:#aaa;font-style:italic;font-size:8pt}
+  .pd-witness-sig-foot{font-size:7pt;color:#555;font-family:'Courier New',monospace;display:flex;justify-content:space-between;margin-top:2pt}
+
+  /* ── Defects raised ── */
+  .pd-defects-tbl{width:100%;border-collapse:collapse;font-size:8.5pt;margin-top:4pt}
+  .pd-defects-tbl thead{display:table-header-group}
+  .pd-defects-tbl th{background:#0a2540;color:#fff;text-align:left;padding:4pt 5pt;font-size:7.5pt;text-transform:uppercase;letter-spacing:.4pt;font-weight:700;border:.4pt solid #0a2540}
+  .pd-defects-tbl td{border:.4pt solid #bbb;padding:4pt 5pt;vertical-align:top;page-break-inside:avoid}
+  .pd-defects-tbl .pd-defect-num{font-family:'Courier New',monospace;font-weight:700;color:#a06a00;width:22mm;white-space:nowrap}
+  .pd-defects-tbl .pd-defect-status{width:18mm;text-align:center}
+
+  /* ── Cx note (warning at top) ── */
+  .pd-cx-note{margin-top:6pt;padding:5pt 8pt;background:#fff8e6;border-left:3pt solid #d49a1a;font-size:8pt;color:#664400}
+  .pd-cx-note strong{color:#a06a00}
+
+  /* ── Footer ── */
+  .pd-footer{margin-top:12pt;padding-top:5pt;border-top:.5pt solid #999;font-size:7.5pt;color:#666;display:flex;justify-content:space-between;align-items:center}
+}
+
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+
 </style>
 <script>
 // ── HVAC Nexus Auth Guard ──
@@ -586,6 +763,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <span class="rs-editor-bar-lbl">Tests · <span id="testCount">0</span></span>
       <span style="flex:1"></span>
       <span class="editor-save-ind" id="rsSaveInd">✓ Saved</span>
+      <button class="btn-toolbar" id="printRsBtn" onclick="printRunsheet()" title="Print or save as PDF">🖨 Print / PDF</button>
     </div>
 
     <!-- TESTS TABLE -->
@@ -860,6 +1038,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     </div>
   </div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PRINT DOCUMENT (built on-demand when PM clicks Print/PDF).
+     Hidden in screen view; shown in print view via @media print rules.
+     Cleared after window.print() returns.
+     ═══════════════════════════════════════════════════════════════════ -->
+<div id="printDoc" class="print-doc" aria-hidden="true"></div>
 
 <script src="head-common.js"></script>
 <script src="db.js"></script>
@@ -2017,6 +2202,262 @@ function closeViewSignatureModal(){
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// PRINT / PDF REPORT (Step 10)
+// ═══════════════════════════════════════════════════════════════════════
+// Uses window.print() with @media print CSS for multi-page-aware output.
+// Builds a hidden #printDoc element with the complete runsheet rendering,
+// fires print(), then clears it. Signatures render as inline SVG (vector
+// crisp at any print resolution). Locked runsheets print as the audit
+// record; drafts/in-progress print with a diagonal DRAFT watermark.
+//
+// Filename: temporarily set document.title to runsheet number + equipment
+// + date so Chrome's "Save as PDF" defaults to a sensible filename.
+
+function printRunsheet(){
+  var rs = runsheets.find(function(r){return r.id===_activeRunsheetId;});
+  if(!rs){alert('No active runsheet to print.');return;}
+
+  // Build the print doc
+  var html = buildPrintDoc(rs);
+  var holder = document.getElementById('printDoc');
+  if(!holder)return;
+  holder.innerHTML = html;
+
+  // Set a sensible filename hint via document.title (Chrome uses this
+  // for the default "Save as PDF" name). Save original to restore after.
+  var origTitle = document.title;
+  var datePart = (function(){
+    var d = new Date();
+    return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  })();
+  var eqId = rs.equipment_id || rs.equipment_tag || 'EQUIPMENT';
+  var rsNum = rs.runsheet_number || 'WRS';
+  // Sanitise for filename — strip slashes etc.
+  var titleSafe = (rsNum + '_' + eqId + '_' + datePart).replace(/[^\w\-_.]/g, '_');
+  document.title = titleSafe;
+
+  // Fire print after a tick so the DOM is flushed
+  setTimeout(function(){
+    window.print();
+    // Restore title + clear the print doc shortly after the print dialog returns
+    setTimeout(function(){
+      document.title = origTitle;
+      holder.innerHTML = '';
+    }, 500);
+  }, 50);
+}
+
+// ── Build the print DOM ──
+function buildPrintDoc(rs){
+  var summary = _summariseRunsheet(rs);
+  var locked = _rsLocked(rs);
+  var statusKey = rs.status || 'draft';
+  var statusLabel = (STATUS_LABELS[statusKey] || statusKey).toUpperCase();
+  var equipId = rs.equipment_id || rs.equipment_tag || '—';
+  var tpl = rs.template_snapshot || {};
+
+  var now = new Date();
+  var nowStr = String(now.getDate()).padStart(2,'0') + '/' +
+               String(now.getMonth()+1).padStart(2,'0') + '/' +
+               now.getFullYear() + ' ' +
+               String(now.getHours()).padStart(2,'0') + ':' +
+               String(now.getMinutes()).padStart(2,'0');
+
+  // Watermark only on non-locked statuses (drafts in-progress get the DRAFT overlay)
+  var watermark = locked ? '' : '<div class="pd-watermark">DRAFT</div>';
+
+  // ── Header band (top of every printed page) ──
+  var projDisplay = '';
+  try {
+    var proj = JSON.parse(localStorage.getItem('hvacnexus_current_project') || '{}');
+    if(proj.name)projDisplay = proj.name;
+    if(proj.number)projDisplay += (projDisplay ? ' · ' : '') + proj.number;
+  } catch(e) {}
+
+  var runheader = ''
+    + '<div class="pd-runheader">'
+    +   '<div class="pd-runheader-l">'
+    +     '<div class="pd-brand">HVAC NEXUS</div>'
+    +     '<div class="pd-brand-sub">Witness Test Runsheet</div>'
+    +   '</div>'
+    +   '<div class="pd-runheader-r">'
+    +     '<div class="rh-rsno">'+escH(rs.runsheet_number || '—')+'</div>'
+    +     '<div class="rh-meta">'+escH(projDisplay || '—')+'</div>'
+    +     '<div class="rh-meta">Generated '+escH(nowStr)+'</div>'
+    +   '</div>'
+    + '</div>';
+
+  // ── Header info card ──
+  var infoCard = ''
+    + '<div class="pd-info-grid">'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">Equipment ID</div><div class="pd-info-val mono">'+escH(equipId)+'</div></div>'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">Status</div><div class="pd-info-val"><span class="pd-status-pill pd-status-'+escH(statusKey)+'">'+escH(statusLabel)+'</span></div></div>'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">Equipment Name</div><div class="pd-info-val">'+escH(rs.equipment_name || '—')+'</div></div>'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">Equipment Type</div><div class="pd-info-val">'+escH(tpl.equipment_type || '—')+'</div></div>'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">Template</div><div class="pd-info-val">'+escH((tpl.formNo ? tpl.formNo + ' · ' : '') + (tpl.name || '—'))+'</div></div>'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">Attempt</div><div class="pd-info-val mono">#'+(rs.attempt_number || 1)+'</div></div>'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">Scheduled</div><div class="pd-info-val">'+escH(fmtDate(rs.scheduled_date))+'</div></div>'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">Initiated by</div><div class="pd-info-val">'+escH(rs.initiated_by || '—')+'</div></div>'
+    + '</div>';
+
+  // ── Summary band (counts) ──
+  var outcomeText = summary.newOutcome === 'pass' ? 'PASS — All Tests' : (summary.newOutcome === 'fail' ? 'FAIL — ' + summary.failCount + ' test(s)' : 'In Progress');
+  var outcomeCls = summary.newOutcome === 'pass' ? 'pass' : (summary.newOutcome === 'fail' ? 'fail' : '');
+  var summaryBand = ''
+    + '<div class="pd-summary-band">'
+    +   '<div class="sb-grp"><div class="sb-lbl">Total Tests</div><div class="sb-val">'+summary.total+'</div></div>'
+    +   '<div class="sb-grp"><div class="sb-lbl">Passed</div><div class="sb-val pass">'+summary.passCount+'</div></div>'
+    +   '<div class="sb-grp"><div class="sb-lbl">Failed</div><div class="sb-val fail">'+summary.failCount+'</div></div>'
+    +   (summary.pendingCount ? '<div class="sb-grp"><div class="sb-lbl">Pending</div><div class="sb-val">'+summary.pendingCount+'</div></div>' : '')
+    +   '<div class="sb-grp"><div class="sb-lbl">Outcome</div><div class="sb-val '+outcomeCls+'">'+escH(outcomeText)+'</div></div>'
+    + '</div>';
+
+  // ── Cx note (if applicable) ──
+  var cxc = rs.cx_completion_check || {};
+  var cxNote = '';
+  if(cxc.checked && cxc.all_complete === false && (cxc.incomplete_stages||[]).length){
+    cxNote = '<div class="pd-cx-note"><strong>Commissioning stages incomplete at creation:</strong> '
+      + escH((cxc.incomplete_stages||[]).join(', '))
+      + '. Witness session proceeded with this acknowledgement on the runsheet for audit.</div>';
+  }
+
+  // ── Tests table ──
+  var testsRows = (rs.tests || []).map(function(t, idx){
+    var resKey = t.result === 'pass' ? 'pass' : (t.result === 'fail' ? 'fail' : 'pending');
+    var resLbl = t.result === 'pass' ? '✓ Pass' : (t.result === 'fail' ? '✗ Fail' : '— Pending');
+    var rowCls = t.result === 'fail' ? 'pd-test-fail-row' : '';
+    var photoCount = (t.photos || []).length;
+    return '<tr class="'+rowCls+'">'
+      + '<td class="pd-test-num">'+(idx+1)+'</td>'
+      + '<td>'
+      +   '<div class="pd-test-name">'+escH(t.test_name || '(Unnamed)')+'</div>'
+      +   (t.description ? '<div class="pd-test-name-desc">'+escH(t.description)+'</div>' : '')
+      +   (t.acceptance_criteria ? '<div class="pd-test-crit"><strong>Criteria:</strong> '+escH(t.acceptance_criteria)+'</div>' : '')
+      + '</td>'
+      + '<td class="pd-test-ref">'+escH(t.reference_standard || '—')+'</td>'
+      + '<td style="text-align:center"><span class="pd-result-pill pd-result-'+resKey+'">'+escH(resLbl)+'</span></td>'
+      + '<td class="pd-test-comment">'+escH(t.comment || '')+'</td>'
+      + '<td class="pd-test-photos">'+(photoCount ? photoCount + ' 📷' : '—')+'</td>'
+      + '</tr>';
+  }).join('');
+
+  var testsSection = ''
+    + '<div class="pd-section allow-break">'
+    +   '<div class="pd-section-title">Tests</div>'
+    +   '<table class="pd-tests-tbl">'
+    +     '<thead><tr>'
+    +       '<th>#</th>'
+    +       '<th>Test &amp; Acceptance Criteria</th>'
+    +       '<th>Reference</th>'
+    +       '<th style="text-align:center">Result</th>'
+    +       '<th>Comment</th>'
+    +       '<th style="text-align:center">Photos</th>'
+    +     '</tr></thead>'
+    +     '<tbody>'+testsRows+'</tbody>'
+    +   '</table>'
+    + '</div>';
+
+  // ── Witnesses ──
+  var witnessCards = ((rs.witnesses || []).map(function(w){
+    var partyKey = w.party || 'other';
+    var partyLabel = (partyKey === 'other' && w.party_other) ? w.party_other : (PARTY_LABELS[partyKey] || 'Other');
+    var sigHtml = w.signature_svg
+      ? w.signature_svg
+      : '<span style="color:#aaa;font-style:italic;font-size:8pt">Not signed</span>';
+    return '<div class="pd-witness-card">'
+      + '<div class="pd-witness-name-row">'
+      +   '<div class="pd-witness-name">'+escH(w.name || '(Unnamed)')+'</div>'
+      +   '<span class="pd-party-chip pd-party-'+escH(partyKey)+'">'+escH(partyLabel)+'</span>'
+      + '</div>'
+      + '<div class="pd-witness-meta">'
+      +   (w.company ? '<div><span class="ml">Company</span> '+escH(w.company)+'</div>' : '')
+      +   (w.email ? '<div><span class="ml">Email</span> '+escH(w.email)+'</div>' : '')
+      + '</div>'
+      + '<div class="pd-witness-sig'+(w.signature_svg?'':' empty')+'">'+sigHtml+'</div>'
+      + '<div class="pd-witness-sig-foot">'
+      +   '<span>Signature</span>'
+      +   '<span>'+(w.signed_at ? escH(fmtDateTime(w.signed_at)) : '—')+'</span>'
+      + '</div>'
+      + '</div>';
+  }).join(''));
+
+  var witnessesSection = '';
+  if((rs.witnesses || []).length){
+    witnessesSection = ''
+      + '<div class="pd-section">'
+      +   '<div class="pd-section-title">Witnesses</div>'
+      +   '<div class="pd-witness-grid">'+witnessCards+'</div>'
+      + '</div>';
+  }
+
+  // ── Defects raised section ──
+  // For the print, we render from defects_raised[] (just defect numbers).
+  // We don't have their descriptions inline because they live in cx_defects.
+  // We'll write them in if we have them cached (renderDefectsRaised populates
+  // a global cache); fall back to just listing the numbers otherwise.
+  var defectsSection = '';
+  var defectIds = (rs.defects_raised || []);
+  if(defectIds.length){
+    // Try to enrich from a cached register if available
+    var defectsByNum = window._cachedDefectsByNum || {};
+    var defRows = defectIds.map(function(num){
+      var d = defectsByNum[num];
+      var desc = d ? d.desc : '(Description not available in this print — see Cx defect register)';
+      var status = d ? (d.status || 'open') : 'open';
+      var statusLbl = status === 'closed' ? '✓ Closed' : 'Open';
+      var statusCls = status === 'closed' ? 'pd-status-signed_off' : 'pd-status-failed_pending_rework';
+      return '<tr>'
+        + '<td class="pd-defect-num">'+escH(num)+'</td>'
+        + '<td>'+escH(desc)+'</td>'
+        + '<td class="pd-defect-status"><span class="pd-status-pill '+statusCls+'">'+escH(statusLbl)+'</span></td>'
+        + '</tr>';
+    }).join('');
+    defectsSection = ''
+      + '<div class="pd-section">'
+      +   '<div class="pd-section-title">Defects Raised at Sign-Off</div>'
+      +   '<table class="pd-defects-tbl">'
+      +     '<thead><tr><th style="width:22mm">Defect #</th><th>Description</th><th style="width:18mm">Status</th></tr></thead>'
+      +     '<tbody>'+defRows+'</tbody>'
+      +   '</table>'
+      + '</div>';
+  }
+
+  // ── Sign-off audit footer ──
+  var auditFooter = '';
+  if(rs.completed_at){
+    auditFooter = ''
+      + '<div class="pd-section" style="margin-top:14pt">'
+      +   '<div class="pd-section-title">Audit Trail</div>'
+      +   '<div class="pd-info-grid">'
+      +     '<div class="pd-info-row full"><div class="pd-info-lbl">Submitted by</div><div class="pd-info-val">'+escH(rs.completed_by || '—')+'</div></div>'
+      +     '<div class="pd-info-row full"><div class="pd-info-lbl">Submitted at</div><div class="pd-info-val">'+escH(fmtDateTime(rs.completed_at))+'</div></div>'
+      +     (rs.submission_summary && rs.submission_summary.tracker_synced ?
+            '<div class="pd-info-row full"><div class="pd-info-lbl">Cx tracker</div><div class="pd-info-val">Stage 7 marked as witnessed (Y)</div></div>' : '')
+      +   '</div>'
+      + '</div>';
+  }
+
+  // ── Bottom footer (only renders once at end — page numbers are not directly available in CSS counters cross-browser, so we put the meta line at the bottom instead) ──
+  var footer = ''
+    + '<div class="pd-footer">'
+    +   '<span>HVAC NEXUS · Witness Test Runsheet '+escH(rs.runsheet_number || '')+'</span>'
+    +   '<span>Generated '+escH(nowStr)+'</span>'
+    + '</div>';
+
+  return watermark + runheader + infoCard + summaryBand + cxNote + testsSection + witnessesSection + defectsSection + auditFooter + footer;
+}
+
+// Cache cx_defects descriptions so the print fn can enrich the defects table.
+// Called from renderDefectsRaised when it loads the register.
+function _cacheDefectsForPrint(defects){
+  var by = {};
+  (defects || []).forEach(function(d){
+    if(d && d.num)by[d.num] = d;
+  });
+  window._cachedDefectsByNum = by;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // SIGN-OFF CEREMONY (Step 9)
 // ═══════════════════════════════════════════════════════════════════════
 // When all witnesses have signed and PM clicks "Submit & Lock":
@@ -2293,6 +2734,7 @@ function renderDefectsRaised(rs){
       if(!Array.isArray(existing))existing = [];
       var byNum = {};
       existing.forEach(function(d){byNum[d.num] = d;});
+      _cacheDefectsForPrint(existing);  // make defects available to printRunsheet
 
       listEl.innerHTML = defectIds.map(function(num){
         var d = byNum[num];
