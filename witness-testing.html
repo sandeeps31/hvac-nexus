@@ -453,24 +453,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   .pd-status-cancelled{background:#eee;color:#555;border:1pt solid #aaa}
   .pd-status-draft, .pd-status-in_progress{background:#e6f3ff;color:#0066b3;border:1pt solid #4ba5d9}
 
-  /* ── DRAFT watermark (only on non-locked statuses) ── */
-  .pd-watermark{
-    position:fixed;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%) rotate(-32deg);
-    font-family:'Helvetica',sans-serif;
-    font-size:110pt;
-    font-weight:900;
-    color:rgba(220,30,30,.10);
-    border:8pt solid rgba(220,30,30,.10);
-    padding:8pt 28pt;
-    border-radius:12pt;
-    z-index:0;
-    pointer-events:none;
-    letter-spacing:6pt;
-  }
-
   /* ── Section title ── */
   .pd-section{margin-top:10pt;page-break-inside:avoid}
   .pd-section.allow-break{page-break-inside:auto}
@@ -2207,8 +2189,7 @@ function closeViewSignatureModal(){
 // Uses window.print() with @media print CSS for multi-page-aware output.
 // Builds a hidden #printDoc element with the complete runsheet rendering,
 // fires print(), then clears it. Signatures render as inline SVG (vector
-// crisp at any print resolution). Locked runsheets print as the audit
-// record; drafts/in-progress print with a diagonal DRAFT watermark.
+// crisp at any print resolution).
 //
 // Filename: temporarily set document.title to runsheet number + equipment
 // + date so Chrome's "Save as PDF" defaults to a sensible filename.
@@ -2262,9 +2243,6 @@ function buildPrintDoc(rs){
                now.getFullYear() + ' ' +
                String(now.getHours()).padStart(2,'0') + ':' +
                String(now.getMinutes()).padStart(2,'0');
-
-  // Watermark only on non-locked statuses (drafts in-progress get the DRAFT overlay)
-  var watermark = locked ? '' : '<div class="pd-watermark">DRAFT</div>';
 
   // ── Header band (top of every printed page) ──
   var projDisplay = '';
@@ -2444,7 +2422,7 @@ function buildPrintDoc(rs){
     +   '<span>Generated '+escH(nowStr)+'</span>'
     + '</div>';
 
-  return watermark + runheader + infoCard + summaryBand + cxNote + testsSection + witnessesSection + defectsSection + auditFooter + footer;
+  return runheader + infoCard + summaryBand + cxNote + testsSection + witnessesSection + defectsSection + auditFooter + footer;
 }
 
 // Cache cx_defects descriptions so the print fn can enrich the defects table.
