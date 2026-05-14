@@ -1691,11 +1691,16 @@ function showConfirm(title,bodyHtml,onConfirm,opts){
   function cancelFn(){modal.remove();document.removeEventListener('keydown',keyFn);if(opts.onCancel)opts.onCancel();}
   function confirmFn(){modal.remove();document.removeEventListener('keydown',keyFn);if(onConfirm)onConfirm();}
   function keyFn(e){if(e.key==='Escape')cancelFn();else if(e.key==='Enter')confirmFn();}
-  document.addEventListener('keydown',keyFn);
-  modal.addEventListener('click',function(e){if(e.target===modal)cancelFn();});
   document.getElementById('cmCancel').onclick=cancelFn;
   document.getElementById('cmOk').onclick=confirmFn;
-  setTimeout(function(){var ok=document.getElementById('cmOk');if(ok)ok.focus();},0);
+  // Defer the keydown + backdrop-click listeners by one tick.
+  // Without this, the click event that opened the modal (e.g. selecting a status in the
+  // batch dropdown) can bubble into the freshly-appended modal and immediately close it.
+  setTimeout(function(){
+    document.addEventListener('keydown',keyFn);
+    modal.addEventListener('click',function(e){if(e.target===modal)cancelFn();});
+    var ok=document.getElementById('cmOk');if(ok)ok.focus();
+  },0);
 }
 
 // Field-label map for confirm-dialog wording
