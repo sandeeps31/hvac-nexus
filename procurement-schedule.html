@@ -210,7 +210,6 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
     <span class="bcl" onclick="window.location.href='index.html'">My Projects</span><span class="bcs">›</span>
     <span class="bcl" onclick="navTo('login.html')" style="cursor:pointer" onclick="window.location.href='project-dashboard.html'">Greenfield Commercial Tower</span class would be here><span class="bcs">›</span>
     <span class="bcc">Procurement Schedule</span>
-    <span id="equipTypePill" style="display:none;margin-left:10px;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.25);border-radius:20px;font-family:'DM Mono',monospace;font-size:11px;padding:3px 10px;font-weight:600"></span>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button class="bg bsm btn" onclick="runSync()">⟳ Sync from Equipment Schedule</button>
@@ -234,6 +233,14 @@ textarea.proc-edit{resize:vertical;min-height:36px;font-size:12px;line-height:1.
 <!-- TOOLBAR -->
 <div class="toolbar">
   <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="searchInput" placeholder="Search asset ID, location, manufacturer…" oninput="renderTable()"></div>
+  <select id="statusFilter" onchange="renderTable()" style="background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:7px 28px 7px 12px;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23889' d='M0 0l5 6 5-6z'/></svg>&quot;);background-repeat:no-repeat;background-position:right 10px center;transition:border-color .15s">
+    <option value="">All statuses</option>
+    <option value="Not ordered">Not ordered</option>
+    <option value="Ordered">Ordered</option>
+    <option value="Ready">Ready</option>
+    <option value="Delivered">Delivered</option>
+    <option value="Supplied by others">Supplied by others</option>
+  </select>
   <button class="bg bsm btn" onclick="clearAllColFilters()" id="clearFiltersBtn" style="display:none">✕ Clear filters</button>
   <!-- View toggle -->
   <div style="display:flex;align-items:center;gap:0;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;overflow:hidden;margin-left:auto;font-family:'DM Mono',monospace;font-size:11px">
@@ -850,11 +857,15 @@ document.addEventListener('click',function(e){
 // FILTERS — combine free-text search box with per-column filters and sort
 function getFilteredItems(){
   var q=(document.getElementById('searchInput').value||'').toLowerCase();
+  var statusEl=document.getElementById('statusFilter');
+  var statusVal=statusEl?statusEl.value:'';
+  if(statusEl){statusEl.style.borderColor=statusVal?'var(--accent)':'var(--border)';statusEl.style.color=statusVal?'var(--accent)':'var(--text)';}
   var arr=items.filter(function(i){
     if(q){
       var hit=(i.equipId||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q);
       if(!hit)return false;
     }
+    if(statusVal&&(i.status||'')!==statusVal)return false;
     return rowMatchesColFilters(i);
   });
   return applySortIfNeeded(arr);
@@ -951,34 +962,6 @@ function renderTable(){
   var filtered=getFilteredItems();
   updateSummary(filtered);
   document.getElementById('rowCount').textContent=filtered.length+' item'+(filtered.length!==1?'s':'');
-  // Update equipment type pill
-  var pill=document.getElementById('equipTypePill');
-  if(pill){
-    var tf=document.getElementById('typeFilter');
-    var filterType=tf?tf.value:'';
-    if(filterType){
-      pill.textContent='Equipment Type — '+filterType;
-      pill.style.display='';
-      pill.style.background='var(--accent-dim)';
-      pill.style.color='var(--accent)';
-    } else {
-      // Get unique types
-      var types=[...new Set(filtered.map(function(i){return i.equipType;}).filter(Boolean))];
-      if(types.length===1){
-        pill.textContent='Equipment Type — '+types[0];
-        pill.style.display='';
-        pill.style.background='var(--accent-dim)';
-        pill.style.color='var(--accent)';
-      } else if(types.length>1){
-        pill.textContent='All Types ('+types.length+')';
-        pill.style.display='';
-        pill.style.background='var(--surface3)';
-        pill.style.color='var(--text2)';
-      } else {
-        pill.style.display='none';
-      }
-    }
-  }
   if(_currentView==='summary'){renderSummary();return;}
   var tbody=document.getElementById('procTbody');
   tbody.innerHTML='';
