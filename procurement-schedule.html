@@ -360,7 +360,22 @@ function nid(){return 'ps'+Date.now().toString(36)+Math.random().toString(36).sl
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 function today(){return new Date().toISOString().split('T')[0];}
-function fmtD(d){if(!d)return '—';try{var p=d.split('-');var dt=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));return dt.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
+function fmtD(d){
+  if(!d)return '—';
+  // Input is ISO 'YYYY-MM-DD' from <input type="date"> / database storage.
+  // Don't use `new Date(...)` here — timezone offsets can shift the day back by one
+  // (the well-known JS date pitfall). Split the string directly and zero-pad.
+  try{
+    var p=String(d).split('-');
+    if(p.length!==3)return d;
+    var y=p[0],m=p[1],day=p[2];
+    // Bail out if any piece isn't numeric — preserves garbage strings unchanged
+    if(!/^\d+$/.test(y)||!/^\d+$/.test(m)||!/^\d+$/.test(day))return d;
+    if(m.length===1)m='0'+m;
+    if(day.length===1)day='0'+day;
+    return day+'-'+m+'-'+y;
+  }catch(e){return d;}
+}
 function addWeeks(ds,w){
   if(!ds||!w) return null;
   var p=ds.split('-');
@@ -1734,6 +1749,7 @@ function getStagedBatchChanges(){
 function formatStagedChange(field,value){
   var label=BATCH_FIELD_LABELS[field]||field;
   if(field==='leadWeeks')return {label:label,value:value+' week'+(value===1?'':'s'),verb:'Set'};
+  if(field==='orderDate'||field==='deliveryDate')return {label:label,value:fmtD(value),verb:'Set'};
   if(field==='comments'){
     var preview=value.length>80?value.slice(0,80)+'…':value;
     return {label:label,value:preview,verb:'Append'};
