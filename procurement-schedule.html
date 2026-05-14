@@ -627,9 +627,33 @@ function getColValue(item,colId){
 }
 
 function getDistinctValuesForCol(colId){
+  // Excel-style: values shown for this column reflect rows that pass every OTHER filter
+  // (search, status, and other column filters). The column's own filter is excluded so
+  // the user can always see and untick what they previously selected.
+  var q=((document.getElementById('searchInput')||{}).value||'').toLowerCase();
+  var statusEl=document.getElementById('statusFilter');
+  var statusVal=statusEl?statusEl.value:'';
   var seen={};
   items.forEach(function(it){
     if(!it.equipId||!it.equipId.trim())return;
+    // Apply search
+    if(q){
+      var hit=(it.equipId||'').toLowerCase().includes(q)||(it.location||'').toLowerCase().includes(q)||(it.manufacturer||'').toLowerCase().includes(q)||(it.equipType||'').toLowerCase().includes(q)||(it.model||'').toLowerCase().includes(q);
+      if(!hit)return;
+    }
+    // Apply status filter
+    if(statusVal&&(it.status||'')!==statusVal)return;
+    // Apply column filters EXCEPT the one for this column
+    var fkeys=Object.keys(_colFilters);
+    for(var i=0;i<fkeys.length;i++){
+      var fk=fkeys[i];
+      if(fk===colId)continue;
+      var f=_colFilters[fk];
+      if(!f||f.selected===null||f.selected===undefined)continue;
+      var fv=getColValue(it,fk);
+      var fMatchVal=fv===''?'(blank)':fv;
+      if(f.selected.indexOf(fMatchVal)<0)return;
+    }
     var v=getColValue(it,colId);
     var k=v===''?'(blank)':v;
     seen[k]=true;
@@ -641,6 +665,20 @@ function getDistinctValuesForCol(colId){
     if(!isNaN(an)&&!isNaN(bn))return an-bn;
     return a.localeCompare(b);
   });
+}
+
+// Full distinct set across ALL items, ignoring all filters. Used by hasActiveColFilters
+// to detect whether a column's filter is meaningfully narrowing the data (i.e. selected
+// is a strict subset of every value that exists in the dataset).
+function getAllDistinctValuesForCol(colId){
+  var seen={};
+  items.forEach(function(it){
+    if(!it.equipId||!it.equipId.trim())return;
+    var v=getColValue(it,colId);
+    var k=v===''?'(blank)':v;
+    seen[k]=true;
+  });
+  return Object.keys(seen);
 }
 
 function rowMatchesColFilters(item){
@@ -662,7 +700,7 @@ function hasActiveColFilters(){
   for(var i=0;i<keys.length;i++){
     var f=_colFilters[keys[i]];
     if(!f||f.selected===null||f.selected===undefined)continue;
-    var distinct=getDistinctValuesForCol(keys[i]);
+    var distinct=getAllDistinctValuesForCol(keys[i]);
     if(f.selected.length<distinct.length)return true;
   }
   return false;
@@ -703,7 +741,7 @@ function toggleFilterDrop(e,colId){
   _filterDropOpen=colId;
   // Initialise selected set if not set yet
   if(!_colFilters[colId]||_colFilters[colId].selected===null||_colFilters[colId].selected===undefined){
-    _colFilters[colId]={search:'',selected:getDistinctValuesForCol(colId)};
+    _colFilters[colId]={search:'',selected:getAllDistinctValuesForCol(colId)};
   }
   renderFilterDrop(e.currentTarget);
 }
@@ -757,7 +795,7 @@ function renderFilterDrop(anchorEl){
 function escFilterAttr(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 function setFilterSearch(colId,val){
-  if(!_colFilters[colId])_colFilters[colId]={search:'',selected:getDistinctValuesForCol(colId)};
+  if(!_colFilters[colId])_colFilters[colId]={search:'',selected:getAllDistinctValuesForCol(colId)};
   _colFilters[colId].search=val;
   // When search has text, narrow `selected` to ONLY values matching that search.
   // This matches Excel/Google Sheets UX: typing in the filter search auto-applies
@@ -780,7 +818,7 @@ function setFilterSearch(colId,val){
 }
 
 function toggleFilterValue(colId,val,checked){
-  if(!_colFilters[colId])_colFilters[colId]={search:'',selected:getDistinctValuesForCol(colId)};
+  if(!_colFilters[colId])_colFilters[colId]={search:'',selected:getAllDistinctValuesForCol(colId)};
   var sel=_colFilters[colId].selected||[];
   if(checked){if(sel.indexOf(val)<0)sel.push(val);}
   else {sel=sel.filter(function(v){return v!==val;});}
@@ -792,7 +830,7 @@ function toggleFilterValue(colId,val,checked){
 }
 
 function toggleFilterAll(colId,checked){
-  if(!_colFilters[colId])_colFilters[colId]={search:'',selected:getDistinctValuesForCol(colId)};
+  if(!_colFilters[colId])_colFilters[colId]={search:'',selected:getAllDistinctValuesForCol(colId)};
   var distinct=getDistinctValuesForCol(colId);
   var search=(_colFilters[colId].search||'').toLowerCase();
   var visibleVals=distinct.filter(function(v){return !search||String(v).toLowerCase().indexOf(search)>=0;});
@@ -836,7 +874,7 @@ function renderHeaderCell(label,colId){
   if(_sortKey===colId){sortIcon=_sortDir==='asc'?' <span class="sort-arrow active">▲</span>':' <span class="sort-arrow active">▼</span>';}
   else sortIcon=' <span class="sort-arrow inactive">↕</span>';
   var f=_colFilters[colId];
-  var distinctCount=getDistinctValuesForCol(colId).length;
+  var distinctCount=getAllDistinctValuesForCol(colId).length;
   var hasFilter=f&&f.selected&&f.selected.length<distinctCount;
   var filterIconCls='filter-icon'+(hasFilter?' filtered':'');
   return '<div class="th-stack">'
