@@ -696,6 +696,8 @@ function rowMatchesColFilters(item){
 }
 
 function hasActiveColFilters(){
+  var statusEl=document.getElementById('statusFilter');
+  if(statusEl&&statusEl.value)return true;
   var keys=Object.keys(_colFilters);
   for(var i=0;i<keys.length;i++){
     var f=_colFilters[keys[i]];
@@ -857,6 +859,10 @@ function clearFilterCol(colId){
 function clearAllColFilters(){
   _colFilters={};
   _sortKey=null;_sortDir='asc';
+  var statusEl=document.getElementById('statusFilter');
+  if(statusEl)statusEl.value='';
+  var searchEl=document.getElementById('searchInput');
+  if(searchEl)searchEl.value='';
   saveSortFilter();
   renderTable();
 }
@@ -1661,30 +1667,88 @@ function updateBatchBar(){
   var allChk=document.getElementById('selectAllChk');
   if(allChk){var filtered=getFilteredItems();allChk.checked=filtered.length>0&&filtered.every(function(i){return _selectedIds.has(i.id);});}
 }
+// Reusable confirm modal — used by batch updates so multi-row writes
+// always require an explicit confirm step. Body can include HTML.
+function showConfirm(title,bodyHtml,onConfirm,opts){
+  opts=opts||{};
+  var existing=document.getElementById('confirmModal');
+  if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.className='mo open';
+  modal.id='confirmModal';
+  modal.innerHTML=
+    '<div class="modal" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;width:440px;max-width:96vw;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.5)">'
+    +'<div style="padding:18px 22px 12px;border-bottom:1px solid var(--border)">'
+    +'<div style="font-family:\'DM Sans\',sans-serif;font-size:15px;font-weight:700;color:var(--text)">'+escH(title)+'</div>'
+    +'</div>'
+    +'<div style="padding:18px 22px;font-family:\'DM Sans\',sans-serif;font-size:13px;color:var(--text2);line-height:1.5">'+bodyHtml+'</div>'
+    +'<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:var(--surface2)">'
+    +'<button id="cmCancel" style="background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--text2);font-family:\'DM Sans\',sans-serif;font-size:13px;font-weight:600;padding:7px 16px;cursor:pointer">Cancel</button>'
+    +'<button id="cmOk" style="background:var(--accent);border:none;border-radius:7px;color:#080c12;font-family:\'DM Sans\',sans-serif;font-size:13px;font-weight:700;padding:7px 18px;cursor:pointer">'+escH(opts.okLabel||'Confirm')+'</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(modal);
+  function cancelFn(){modal.remove();document.removeEventListener('keydown',keyFn);if(opts.onCancel)opts.onCancel();}
+  function confirmFn(){modal.remove();document.removeEventListener('keydown',keyFn);if(onConfirm)onConfirm();}
+  function keyFn(e){if(e.key==='Escape')cancelFn();else if(e.key==='Enter')confirmFn();}
+  document.addEventListener('keydown',keyFn);
+  modal.addEventListener('click',function(e){if(e.target===modal)cancelFn();});
+  document.getElementById('cmCancel').onclick=cancelFn;
+  document.getElementById('cmOk').onclick=confirmFn;
+  setTimeout(function(){var ok=document.getElementById('cmOk');if(ok)ok.focus();},0);
+}
+
+// Field-label map for confirm-dialog wording
+var BATCH_FIELD_LABELS={status:'Order Status',orderDate:'Order Date',leadWeeks:'Lead Weeks'};
+
 function applyBatchField(field,value){
   if(!value||_selectedIds.size===0)return;
   if(field==='leadWeeks')value=parseInt(value)||'';
-  _selectedIds.forEach(function(id){
-    var item=items.find(function(i){return i.id===id;});
-    if(!item)return;
-    item[field]=value;
-    if(field==='status'&&value==='Delivered'&&!item.deliveryDate)item.deliveryDate=today();
-    item.eta=(item.orderDate&&item.leadWeeks)?calcETA(item.orderDate,item.leadWeeks):'';
-  });
-  save();renderTable();updateSummary();
-  showToast('✓ Updated '+_selectedIds.size+' items');
+  if(!value&&value!==0)return;
+  var count=_selectedIds.size;
+  var label=BATCH_FIELD_LABELS[field]||field;
+  var displayVal=field==='leadWeeks'?(value+' week'+(value===1?'':'s')):value;
+  // Reset the input that triggered this so cancelling doesn't leave a stuck value
+  var inputId=field==='status'?'batchStatus':field==='orderDate'?'batchOrderDate':field==='leadWeeks'?'batchLeadWeeks':null;
+  function resetInput(){if(!inputId)return;var el=document.getElementById(inputId);if(el)el.value='';}
+  var body=
+    'Set <b style="color:var(--text)">'+escH(label)+'</b> to '
+    +'<b style="color:var(--accent)">'+escH(String(displayVal))+'</b> for '
+    +'<b style="color:var(--text)">'+count+' item'+(count===1?'':'s')+'</b>?'
+    +'<div style="margin-top:10px;font-size:12px;color:var(--muted)">This will overwrite the existing value on every selected row.</div>';
+  showConfirm('Confirm batch update',body,function(){
+    _selectedIds.forEach(function(id){
+      var item=items.find(function(i){return i.id===id;});
+      if(!item)return;
+      item[field]=value;
+      if(field==='status'&&value==='Delivered'&&!item.deliveryDate)item.deliveryDate=today();
+      item.eta=(item.orderDate&&item.leadWeeks)?calcETA(item.orderDate,item.leadWeeks):'';
+    });
+    save();renderTable();updateSummary();
+    showToast('✓ Updated '+count+' items');
+    resetInput();
+  },{okLabel:'Update '+count,onCancel:resetInput});
 }
+
 function applyBatchComments(){
   var val=document.getElementById('batchComments').value.trim();
   if(!val||_selectedIds.size===0)return;
-  _selectedIds.forEach(function(id){
-    var item=items.find(function(i){return i.id===id;});
-    if(!item)return;
-    item.comments=item.comments?(item.comments+'\n'+val):val;
-  });
-  document.getElementById('batchComments').value='';
-  save();renderTable();updateSummary();
-  showToast('✓ Comments appended to '+_selectedIds.size+' items');
+  var count=_selectedIds.size;
+  var preview=val.length>80?val.slice(0,80)+'…':val;
+  var body=
+    'Append this comment to <b style="color:var(--text)">'+count+' item'+(count===1?'':'s')+'</b>?'
+    +'<div style="margin-top:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text);white-space:pre-wrap;word-break:break-word">'+escH(preview)+'</div>'
+    +'<div style="margin-top:10px;font-size:12px;color:var(--muted)">Existing comments are kept; this is added on a new line.</div>';
+  showConfirm('Confirm batch comment',body,function(){
+    _selectedIds.forEach(function(id){
+      var item=items.find(function(i){return i.id===id;});
+      if(!item)return;
+      item.comments=item.comments?(item.comments+'\n'+val):val;
+    });
+    document.getElementById('batchComments').value='';
+    save();renderTable();updateSummary();
+    showToast('✓ Comments appended to '+count+' items');
+  },{okLabel:'Append to '+count});
 }
 
 // ── COLUMN SETTINGS ──
