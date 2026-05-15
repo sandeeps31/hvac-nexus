@@ -282,6 +282,20 @@ textarea.proc-edit:focus{min-height:60px;overflow:auto}
   </div>
   <button onclick="document.getElementById('approvalBanner').style.display='none'" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px">✕</button>
 </div>
+<!-- OVERDUE BANNER -->
+<div id="overdueBanner" style="display:none;margin:0 24px 12px;padding:12px 18px;background:rgba(255,90,90,.08);border:1px solid rgba(255,90,90,.3);border-radius:10px;align-items:center;gap:12px">
+  <span style="font-size:18px">⚠️</span>
+  <div style="flex:1">
+    <div id="overdueBannerText" style="font-size:13px;font-weight:600;color:var(--danger)"></div>
+    <div style="font-size:12px;color:var(--text2);margin-top:2px">These items have passed their ETA and are not marked as delivered.</div>
+  </div>
+  <button onclick="setAlertFilter('overdue');document.getElementById('overdueBanner').style.display='none';" style="background:var(--danger);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;padding:8px 18px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">View</button>
+  <button onclick="dismissOverdueBanner()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px">✕</button>
+</div>
+
+<!-- ALERT CHIPS — clickable counts that filter the table -->
+<div id="alertChips" style="display:none;margin:0 24px 12px;align-items:center;gap:8px;flex-wrap:wrap"></div>
+
 <div id="fullView" style="padding:16px 24px 60px"><div style="overflow:auto;border-radius:var(--radius);max-height:calc(100vh - 280px)"><table class="proc-tbl" id="procTable">
     <thead>
       <tr id="procThead">
@@ -300,15 +314,32 @@ textarea.proc-edit:focus{min-height:60px;overflow:auto}
     <h3 id="modalTitle">Add Procurement Item</h3>
     <p class="msub">Enter item details. ETA auto-calculates from order date + lead time.</p>
     <label class="ml">Equipment ID</label>
-    <input class="mi" id="f-equipid" placeholder="e.g. GCT001/FCU/L01/0001" oninput="updateModalEquipPreview()"/>
+    <input class="mi" id="f-equipid" placeholder="e.g. GCT001/FCU/L01/0001 or Unistruts-L01" oninput="updateModalEquipPreview()"/>
+    <!-- Preview card — shown when equipId matches an Equipment Schedule entry -->
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px" id="equipPreview">
       <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">Location</div><div style="font-size:12px;color:var(--text2)" id="prev-location">—</div></div>
       <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">Manufacturer</div><div style="font-size:12px;color:var(--text2)" id="prev-manufacturer">—</div></div>
       <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">Model</div><div style="font-size:12px;color:var(--text2)" id="prev-model">—</div></div>
       <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">Equipment Type</div><div style="font-size:12px;color:var(--text2)" id="prev-type">—</div></div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:5px">
+    <div id="prev-info" style="font-size:11px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:5px">
       <span style="color:var(--accent)">ℹ</span> Location, Manufacturer, Model and Type are pulled live from the Equipment Schedule
+    </div>
+    <!-- Ad-hoc inputs — shown when equipId doesn't match the Equipment Schedule -->
+    <div id="adHocFields" style="display:none;background:rgba(255,184,48,.06);border:1px solid rgba(255,184,48,.25);border-radius:8px;padding:10px 14px;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--warn);margin-bottom:8px;display:flex;align-items:center;gap:5px">
+        <span>✎</span> Ad-hoc item — not linked to Equipment Schedule. Fill in details manually.
+      </div>
+      <div class="mgrid2">
+        <div><label class="ml">Location</label><input class="mi" id="f-location" placeholder="e.g. Level 1 — Plant Room"/></div>
+        <div><label class="ml">Manufacturer</label><input class="mi" id="f-manufacturer" placeholder="e.g. Unistrut"/></div>
+      </div>
+      <div class="mgrid2">
+        <div><label class="ml">Model</label><input class="mi" id="f-model" placeholder="e.g. P1000"/></div>
+        <div><label class="ml">Equipment Type</label><input class="mi" id="f-equiptype" placeholder="e.g. Unistruts" list="adhocTypes"/>
+          <datalist id="adhocTypes"></datalist>
+        </div>
+      </div>
     </div>
     <div class="mgrid2">
       <div><label class="ml">Qty ordered</label><input class="mi" id="f-qty" type="number" placeholder="e.g. 24"/></div>
@@ -519,6 +550,9 @@ async function runSync(){
       var mod=getRowField(row,tab,['model','Model']);
       var ex=items.find(function(i){return i.equipId===id;});
       if(ex){
+        // Don't clobber ad-hoc rows even if their equipId happens to match. They're
+        // managed manually by the user and have no real link to Equipment Schedule.
+        if(ex.adHoc){return;}
         ex.building=building;ex.location=loc;ex.manufacturer=mfr;ex.model=mod;ex.equipType=typeLabel;
         updated++;
       } else {
@@ -718,6 +752,7 @@ function rowMatchesColFilters(item){
 function hasActiveColFilters(){
   var statusEl=document.getElementById('statusFilter');
   if(statusEl&&statusEl.value)return true;
+  if(_alertFilter)return true;
   var keys=Object.keys(_colFilters);
   for(var i=0;i<keys.length;i++){
     var f=_colFilters[keys[i]];
@@ -879,6 +914,7 @@ function clearFilterCol(colId){
 function clearAllColFilters(){
   _colFilters={};
   _sortKey=null;_sortDir='asc';
+  _alertFilter=null;
   var statusEl=document.getElementById('statusFilter');
   if(statusEl)statusEl.value='';
   var searchEl=document.getElementById('searchInput');
@@ -919,17 +955,133 @@ document.addEventListener('click',function(e){
 });
 
 // FILTERS — combine free-text search box with per-column filters and sort
+// Alert filter — set by clicking a chip in the alert strip. One alert filter at a time.
+var _alertFilter=null;
+var _overdueBannerDismissed=false;
+
+// Predicates for each alert chip. Each returns true if the item matches that alert.
+// `now` is an ISO date string for "today" so we can mock it in tests.
+function isOverdue(item,now){
+  if(!item.eta)return false;
+  if(item.status==='Delivered'||item.status==='Supplied by others')return false;
+  return item.eta<now;
+}
+function isDueThisWeek(item,now,weekFromNow){
+  if(!item.eta)return false;
+  if(item.status==='Delivered'||item.status==='Supplied by others')return false;
+  return item.eta>=now&&item.eta<=weekFromNow;
+}
+function isNotYetOrdered(item){
+  return (item.status||'Not ordered')==='Not ordered';
+}
+
+var ALERT_DEFS={
+  overdue:{
+    label:'Overdue',
+    icon:'🔴',
+    color:'var(--danger)',
+    bg:'rgba(255,90,90,.12)',
+    border:'rgba(255,90,90,.4)',
+    predicate:function(it){return isOverdue(it,today());}
+  },
+  dueThisWeek:{
+    label:'Due this week',
+    icon:'🟡',
+    color:'var(--warn)',
+    bg:'rgba(255,184,48,.12)',
+    border:'rgba(255,184,48,.4)',
+    predicate:function(it){
+      var t=today();
+      var d=new Date(t);d.setDate(d.getDate()+7);
+      var week=d.toISOString().slice(0,10);
+      return isDueThisWeek(it,t,week);
+    }
+  },
+  notYetOrdered:{
+    label:'Not yet ordered',
+    icon:'⚪',
+    color:'var(--text2)',
+    bg:'rgba(150,170,190,.10)',
+    border:'rgba(150,170,190,.30)',
+    predicate:isNotYetOrdered
+  }
+};
+
+// Render the chip strip. Counts come from the FULL items list (not filtered) — chips
+// represent "what's pending across the whole project", not "what's pending in the current view".
+function renderAlertChips(){
+  var cont=document.getElementById('alertChips');
+  if(!cont)return;
+  var html='';
+  Object.keys(ALERT_DEFS).forEach(function(key){
+    var def=ALERT_DEFS[key];
+    var count=items.filter(def.predicate).length;
+    if(count===0)return;
+    var active=_alertFilter===key;
+    var bg=active?def.bg:'var(--surface2)';
+    var border=active?def.border:'var(--border)';
+    var color=active?def.color:'var(--text2)';
+    html+='<button onclick="toggleAlertFilter(\''+key+'\')" '
+      +'style="background:'+bg+';border:1px solid '+border+';border-radius:20px;padding:6px 12px;'
+      +'font-family:\'DM Sans\',sans-serif;font-size:12px;font-weight:600;color:'+color+';'
+      +'cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s">'
+      +'<span style="font-size:8px">'+def.icon+'</span>'
+      +escH(def.label)
+      +'<span style="background:'+(active?'rgba(0,0,0,.25)':'var(--surface3)')+';color:inherit;font-family:\'DM Mono\',monospace;font-size:11px;padding:1px 7px;border-radius:10px">'+count+'</span>'
+      +'</button>';
+  });
+  if(html){
+    cont.innerHTML=html;
+    cont.style.display='flex';
+  } else {
+    cont.style.display='none';
+    // If the active alert chip's count dropped to zero, clear the filter
+    if(_alertFilter){_alertFilter=null;renderTable();}
+  }
+}
+
+function toggleAlertFilter(key){
+  _alertFilter=_alertFilter===key?null:key;
+  renderTable();
+}
+
+function setAlertFilter(key){
+  _alertFilter=key;
+  renderTable();
+}
+
+// On-load overdue banner — shows once per session, dismissible
+function checkOverdueBanner(){
+  if(_overdueBannerDismissed)return;
+  var count=items.filter(ALERT_DEFS.overdue.predicate).length;
+  var banner=document.getElementById('overdueBanner');
+  if(!banner)return;
+  if(count>0){
+    document.getElementById('overdueBannerText').textContent=
+      count+' item'+(count===1?' is':'s are')+' past their ETA';
+    banner.style.display='flex';
+  } else {
+    banner.style.display='none';
+  }
+}
+function dismissOverdueBanner(){
+  _overdueBannerDismissed=true;
+  document.getElementById('overdueBanner').style.display='none';
+}
+
 function getFilteredItems(){
   var q=(document.getElementById('searchInput').value||'').toLowerCase();
   var statusEl=document.getElementById('statusFilter');
   var statusVal=statusEl?statusEl.value:'';
   if(statusEl){statusEl.style.borderColor=statusVal?'var(--accent)':'var(--border)';statusEl.style.color=statusVal?'var(--accent)':'var(--text)';}
+  var alertPred=_alertFilter&&ALERT_DEFS[_alertFilter]?ALERT_DEFS[_alertFilter].predicate:null;
   var arr=items.filter(function(i){
     if(q){
       var hit=(i.equipId||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q)||(i.manufacturer||'').toLowerCase().includes(q)||(i.equipType||'').toLowerCase().includes(q)||(i.model||'').toLowerCase().includes(q);
       if(!hit)return false;
     }
     if(statusVal&&(i.status||'')!==statusVal)return false;
+    if(alertPred&&!alertPred(i))return false;
     return rowMatchesColFilters(i);
   });
   return applySortIfNeeded(arr);
@@ -939,7 +1091,9 @@ function getFilteredItems(){
 function populateFilters(){
   // The clear-filters button visibility is the only thing that needs syncing each render
   var btn=document.getElementById('clearFiltersBtn');
-  if(btn)btn.style.display=(hasActiveColFilters()||_sortKey)?'inline-flex':'none';
+  if(btn)btn.style.display=(hasActiveColFilters()||_sortKey||_alertFilter)?'inline-flex':'none';
+  // Refresh alert chip counts on every render
+  renderAlertChips();
 }
 
 // RENDER TABLE
@@ -1022,6 +1176,12 @@ function inlineUpdate(id,field,value,skipBatch){
 }
 
 function renderTable(){
+  // Recompute ETA from orderDate + leadWeeks on every item before anything reads them.
+  // Without this, the per-row recalc inside the loop happens AFTER populateFilters has
+  // already computed alert chip counts, leading to chip vs banner disagreement.
+  items.forEach(function(it){
+    if(it.orderDate&&it.leadWeeks){it.eta=calcETA(it.orderDate,it.leadWeeks);}
+  });
   populateFilters();
   var filtered=getFilteredItems();
   updateSummary(filtered);
@@ -1243,6 +1403,11 @@ function openAddModal(){
   document.getElementById('f-comments').value='';
   document.getElementById('etaPreview').textContent='—';
   document.getElementById('deleteBtn').style.display='none';
+  // Reset ad-hoc fields
+  ['f-location','f-manufacturer','f-model','f-equiptype'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.value='';
+  });
+  populateAdHocTypeOptions();
   updateModalEquipPreview();
   document.getElementById('addModal').classList.add('open');
   setTimeout(function(){document.getElementById('f-equipid').focus();},80);
@@ -1266,16 +1431,45 @@ function openEditModal(id){
   document.getElementById('f-comments').value=item.comments||'';
   document.getElementById('etaPreview').textContent=item.eta?fmtD(item.eta):'—';
   document.getElementById('deleteBtn').style.display='';
+  // Pre-fill ad-hoc fields if the item has them stored (it's an ad-hoc row)
+  document.getElementById('f-location').value=item.location||'';
+  document.getElementById('f-manufacturer').value=item.manufacturer||'';
+  document.getElementById('f-model').value=item.model||'';
+  document.getElementById('f-equiptype').value=item.equipType||'';
+  populateAdHocTypeOptions();
   updateModalEquipPreview();
   document.getElementById('addModal').classList.add('open');
 }
+// Build the datalist of existing equipment types so ad-hoc rows can pick from / extend the same set.
+// Mixing free text with autocomplete keeps consistency without forcing the user.
+function populateAdHocTypeOptions(){
+  var dl=document.getElementById('adhocTypes');
+  if(!dl)return;
+  var types={};
+  items.forEach(function(it){var t=it.equipType||(_equipLookup[it.equipId]||{}).equipType;if(t)types[t]=true;});
+  dl.innerHTML=Object.keys(types).sort().map(function(t){return '<option value="'+escH(t)+'"/>';}).join('');
+}
 function updateModalEquipPreview(){
   var id=(document.getElementById('f-equipid').value||'').trim();
-  var eq=_equipLookup[id]||{};
-  document.getElementById('prev-location').textContent=eq.location||'—';
-  document.getElementById('prev-manufacturer').textContent=eq.manufacturer||'—';
-  document.getElementById('prev-model').textContent=eq.model||'—';
-  document.getElementById('prev-type').textContent=eq.equipType||'—';
+  var eq=_equipLookup[id];
+  var preview=document.getElementById('equipPreview');
+  var info=document.getElementById('prev-info');
+  var adhoc=document.getElementById('adHocFields');
+  if(eq){
+    // Recognised → show preview, hide ad-hoc inputs
+    preview.style.display='grid';
+    info.style.display='flex';
+    adhoc.style.display='none';
+    document.getElementById('prev-location').textContent=eq.location||'—';
+    document.getElementById('prev-manufacturer').textContent=eq.manufacturer||'—';
+    document.getElementById('prev-model').textContent=eq.model||'—';
+    document.getElementById('prev-type').textContent=eq.equipType||'—';
+  } else {
+    // Ad-hoc (or blank ID) → hide preview, show editable inputs
+    preview.style.display='none';
+    info.style.display='none';
+    adhoc.style.display=id?'block':'none'; // don't show empty-state ad-hoc until they've typed an ID
+  }
 }
 function closeModal(){document.getElementById('addModal').classList.remove('open');}
 function saveItem(){
@@ -1284,6 +1478,7 @@ function saveItem(){
   var od=document.getElementById('f-orderdate').value;
   var lw=document.getElementById('f-leadtime').value;
   var eta=od&&lw?calcETA(od,lw):'';
+  var isAdHoc=!_equipLookup[equipId];
   var item={
     id:editingId||('ps'+nid()),
     equipId:equipId,
@@ -1296,6 +1491,16 @@ function saveItem(){
     eta:eta,
     comments:document.getElementById('f-comments').value.trim()
   };
+  // For ad-hoc rows, persist the manually-entered metadata onto the item itself.
+  // Render and getColValue already fall back to item.location/etc when _equipLookup misses,
+  // so storing these here is all that's needed for filters, sort, and display to work.
+  if(isAdHoc){
+    item.location=document.getElementById('f-location').value.trim();
+    item.manufacturer=document.getElementById('f-manufacturer').value.trim();
+    item.model=document.getElementById('f-model').value.trim();
+    item.equipType=document.getElementById('f-equiptype').value.trim();
+    item.adHoc=true; // tag so we can identify these later (e.g. exclude from sync compare)
+  }
   if(editingId){var idx=items.findIndex(function(i){return i.id===editingId;});if(idx>=0)items[idx]=item;else items.push(item);}
   else items.push(item);
   save();closeModal();renderTable();
@@ -1642,6 +1847,7 @@ function exportCSV(){openExportModal();}
   renderTable();
   checkEquipSync();
   renderApprovalBanner();
+  checkOverdueBanner();
 })();
 </script>
 <script>
@@ -1751,7 +1957,9 @@ function formatStagedChange(field,value){
   if(field==='leadWeeks')return {label:label,value:value+' week'+(value===1?'':'s'),verb:'Set'};
   if(field==='orderDate'||field==='deliveryDate')return {label:label,value:fmtD(value),verb:'Set'};
   if(field==='comments'){
-    var preview=value.length>80?value.slice(0,80)+'…':value;
+    // Match the same stamping that applyBatchChanges does, so the preview is faithful
+    var stamped='['+fmtD(today())+'] '+value;
+    var preview=stamped.length>80?stamped.slice(0,80)+'…':stamped;
     return {label:label,value:preview,verb:'Append'};
   }
   return {label:label,value:String(value),verb:'Set'};
@@ -1794,7 +2002,11 @@ function applyBatchChanges(){
       if(changes.orderDate!==undefined)item.orderDate=changes.orderDate;
       if(changes.leadWeeks!==undefined)item.leadWeeks=changes.leadWeeks;
       if(changes.comments!==undefined){
-        item.comments=item.comments?(item.comments+'\n'+changes.comments):changes.comments;
+        // Prefix every batch-appended entry with today's date so the comments column
+        // doubles as a mini activity log. fmtD(today()) keeps the format identical
+        // to every other date display in the module (DD-MM-YYYY).
+        var stamped='['+fmtD(today())+'] '+changes.comments;
+        item.comments=item.comments?(item.comments+'\n'+stamped):stamped;
       }
       // Recompute ETA after any change to orderDate / leadWeeks
       item.eta=(item.orderDate&&item.leadWeeks)?calcETA(item.orderDate,item.leadWeeks):'';
