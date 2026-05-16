@@ -559,6 +559,9 @@ function _witnessRunsheetToRow(runsheet) {
   var parent_runsheet_id = r.parent_runsheet_id || r.parentRunsheetId || null;
   var scheduled_date     = r.scheduled_date || r.scheduledDate || null;
   var signed_at          = r.signed_at || r.signedAt || null;
+  // Feature B: system test runsheets aren't tied to a Cx tracker row.
+  // Default to 'equipment' so existing callers see no behavioural change.
+  var runsheet_type      = r.runsheet_type || r.runsheetType || 'equipment';
   // Build a copy of the full object for `data`, but strip the columns we hoisted
   // (and id/timestamps which the DB owns) so we don't double-store them.
   var data = {};
@@ -566,7 +569,8 @@ function _witnessRunsheetToRow(runsheet) {
     if (['id','company_id','project_num','equipment_id','equipmentId','equipment_tag','equipmentTag',
          'template_id','templateId','status','attempt_number','attemptNumber',
          'parent_runsheet_id','parentRunsheetId','scheduled_date','scheduledDate',
-         'signed_at','signedAt','created_at','updated_at'].indexOf(k) === -1) {
+         'signed_at','signedAt','runsheet_type','runsheetType',
+         'created_at','updated_at'].indexOf(k) === -1) {
       data[k] = r[k];
     }
   });
@@ -578,6 +582,7 @@ function _witnessRunsheetToRow(runsheet) {
     parent_runsheet_id: parent_runsheet_id,
     scheduled_date: scheduled_date,
     signed_at: signed_at,
+    runsheet_type: runsheet_type,
     data: data
   };
 }
@@ -597,6 +602,7 @@ function _witnessRowToRunsheet(row) {
   out.parent_runsheet_id = row.parent_runsheet_id;
   out.scheduled_date     = row.scheduled_date;
   out.signed_at          = row.signed_at;
+  out.runsheet_type      = row.runsheet_type || 'equipment';  // null-safe for pre-migration rows
   out.created_at         = row.created_at;
   out.updated_at         = row.updated_at;
   return out;
@@ -827,6 +833,7 @@ async function dbCreateWitnessRunsheet(projectNum, runsheet) {
       parent_runsheet_id: _isUUID(row.parent_runsheet_id) ? row.parent_runsheet_id : null,
       scheduled_date: row.scheduled_date,
       signed_at: row.signed_at,
+      runsheet_type: row.runsheet_type || 'equipment',
       data: row.data
     };
     var inserted = await sbFetch('witness_runsheets', {
@@ -869,6 +876,7 @@ async function dbSaveWitnessRunsheet(id, patch) {
         parent_runsheet_id: row.parent_runsheet_id,
         scheduled_date: row.scheduled_date,
         signed_at: row.signed_at,
+        runsheet_type: row.runsheet_type || 'equipment',
         data: row.data,
         updated_at: new Date().toISOString()
       };
@@ -959,10 +967,12 @@ async function dbCreateRewitnessRunsheet(originalId) {
       parent_runsheet_id: original.id,
       scheduled_date: null,
       signed_at: null,
+      runsheet_type: original.runsheet_type || 'equipment',  // preserve system vs equipment
       // Copy snapshot + non-state fields from `data`
       template_snapshot: original.template_snapshot || null,
       equipment_name: original.equipment_name || null,
       cx_tracker_id: original.cx_tracker_id || null,        // preserve tracker link
+      scope_description: original.scope_description || null, // preserve system scope
       tests: carriedTests,
       witnesses: [],         // fresh sign-off required
       comments: '',

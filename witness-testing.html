@@ -596,6 +596,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .rwm-defect-warning{margin-top:10px;background:var(--warn-dim);border:1px solid rgba(255,184,48,.3);border-radius:8px;padding:11px 14px;color:var(--text);font-size:12.5px;display:flex;align-items:flex-start;gap:8px}
 .rwm-defect-warning-icon{font-size:16px;color:var(--warn);flex-shrink:0;line-height:1}
 
+/* ═══════════════════════════════════════════════════
+   FEATURE B — System Test Runsheets
+═══════════════════════════════════════════════════ */
+/* Type toggle (equipment vs system) at top of New Runsheet modal */
+.systype-toggle-wrap{margin-bottom:14px}
+.systype-toggle-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.systype-opt{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;transition:all .12s;background:var(--surface3)}
+.systype-opt:hover{border-color:var(--accent);background:var(--accent-dim)}
+.systype-opt input[type=radio]{display:none}
+.systype-radio{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;margin-top:2px;background:var(--surface2);position:relative;transition:all .12s}
+.systype-opt input[type=radio]:checked + .systype-radio{border-color:var(--accent);background:var(--accent-dim)}
+.systype-opt input[type=radio]:checked + .systype-radio::after{content:'';position:absolute;top:2px;left:2px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.systype-opt input[type=radio]:checked ~ .systype-lbl .st-title{color:var(--accent)}
+.systype-opt:has(input[type=radio]:checked){border-color:var(--accent);background:var(--accent-dim)}
+.systype-lbl{display:flex;flex-direction:column;gap:2px;min-width:0}
+.systype-lbl .st-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text)}
+.systype-lbl .st-sub{font-size:11px;color:var(--text2);line-height:1.4}
+
+/* System chip — shown on system runsheets across the UI */
+.system-chip{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;letter-spacing:.4px;text-transform:uppercase;background:rgba(167,139,250,.15);color:#c4b5fd;border:1px solid rgba(167,139,250,.3);white-space:nowrap}
+
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)}
 
 </style>
@@ -765,8 +786,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div class="rs-hdr-block">
       <div class="rs-hdr-row">
         <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Runsheet No.</div><div class="rs-hdr-val mono" id="rs-num">—</div></div>
-        <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Equipment ID</div><div class="rs-hdr-val mono" id="rs-eqtag">—</div></div>
-        <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Equipment Name</div><div class="rs-hdr-val" id="rs-eqname">—</div></div>
+        <div class="rs-hdr-cell"><div class="rs-hdr-lbl" id="rs-eqtag-lbl">Equipment ID</div><div class="rs-hdr-val mono" id="rs-eqtag">—</div></div>
+        <div class="rs-hdr-cell"><div class="rs-hdr-lbl" id="rs-eqname-lbl">Equipment Name</div><div class="rs-hdr-val" id="rs-eqname">—</div></div>
         <div class="rs-hdr-cell"><div class="rs-hdr-lbl">Status</div><div class="rs-hdr-val" id="rs-status">—</div></div>
       </div>
       <div class="rs-hdr-row">
@@ -880,23 +901,60 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <p>Create a runsheet for a specific equipment item using a project witness template</p>
     </div>
     <div class="modal-body">
-      <label class="ml">Equipment ID *</label>
-      <div class="searchable-wrap" style="margin-bottom:4px">
-        <input class="mi" id="new-eqid" placeholder="Type to search the commissioning tracker…" autocomplete="off"
-          oninput="onEqIdInput()"
-          onfocus="onEqIdFocus()"
-          onblur="setTimeout(closeEqIdDropdown,150)"/>
-        <div class="searchable-dropdown" id="eqIdDropdown"></div>
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px" id="eqIdHint">Pick an equipment ID from the commissioning tracker. Witness runsheets must link to a tracker entry.</div>
 
-      <!-- Yellow not-found banner — shown when typed value isn't an exact match -->
-      <div id="eqIdNotFound" class="eqid-notfound" style="display:none">
-        <span class="ein-icon">⚠</span>
-        <div>
-          <div class="ein-title">Equipment ID not found</div>
-          <div class="ein-sub">"<span id="eqIdNotFoundValue"></span>" doesn't match any equipment in the commissioning tracker. Pick an existing ID from the dropdown, or add this equipment to the tracker first.</div>
+      <!-- Feature B: System test toggle -->
+      <div class="systype-toggle-wrap">
+        <div class="systype-toggle-row">
+          <label class="systype-opt">
+            <input type="radio" name="rstype" value="equipment" checked onchange="onRunsheetTypeChange()"/>
+            <span class="systype-radio"></span>
+            <span class="systype-lbl">
+              <span class="st-title">Equipment Test</span>
+              <span class="st-sub">Tied to a Cx tracker equipment item (FCU, AHU, pump, etc.)</span>
+            </span>
+          </label>
+          <label class="systype-opt">
+            <input type="radio" name="rstype" value="system" onchange="onRunsheetTypeChange()"/>
+            <span class="systype-radio"></span>
+            <span class="systype-lbl">
+              <span class="st-title">System Test</span>
+              <span class="st-sub">Fire test, stair pressurisation, smoke control — not tied to one equipment</span>
+            </span>
+          </label>
         </div>
+      </div>
+
+      <!-- ── EQUIPMENT MODE ── -->
+      <div id="newrs-equipment-mode">
+        <label class="ml">Equipment ID *</label>
+        <div class="searchable-wrap" style="margin-bottom:4px">
+          <input class="mi" id="new-eqid" placeholder="Type to search the commissioning tracker…" autocomplete="off"
+            oninput="onEqIdInput()"
+            onfocus="onEqIdFocus()"
+            onblur="setTimeout(closeEqIdDropdown,150)"/>
+          <div class="searchable-dropdown" id="eqIdDropdown"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px" id="eqIdHint">Pick an equipment ID from the commissioning tracker. Witness runsheets must link to a tracker entry.</div>
+
+        <!-- Yellow not-found banner — shown when typed value isn't an exact match -->
+        <div id="eqIdNotFound" class="eqid-notfound" style="display:none">
+          <span class="ein-icon">⚠</span>
+          <div>
+            <div class="ein-title">Equipment ID not found</div>
+            <div class="ein-sub">"<span id="eqIdNotFoundValue"></span>" doesn't match any equipment in the commissioning tracker. Pick an existing ID from the dropdown, or add this equipment to the tracker first.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SYSTEM MODE ── (hidden by default; shown when System Test selected) -->
+      <div id="newrs-system-mode" style="display:none">
+        <label class="ml">System Name / Identifier *</label>
+        <input class="mi" id="new-sys-id" placeholder="e.g. FIRE-N-01" autocomplete="off" oninput="onSysIdInput()"/>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">A short identifier for this system test. Used as the equipment ID on the runsheet and PDF.</div>
+
+        <label class="ml">Scope Description *</label>
+        <input class="mi" id="new-sys-scope" placeholder="e.g. Stair Pressurisation — North Core" autocomplete="off" oninput="onSysIdInput()"/>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Plain-language description of what's being tested.</div>
       </div>
 
       <label class="ml">Witness Template *</label>
@@ -911,8 +969,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
       <label class="ml">Scheduled Date (optional)</label>
       <input class="mi" id="new-schedule" type="date"/>
 
-      <!-- Cx soft warning — populated by checkCxCompletion stub (Step 6). -->
-      <!-- Real cross-module sync arrives in Step 9; this UI is wired and acknowledged-state is persisted. -->
+      <!-- Cx soft warning — populated by checkCxCompletion stub (Step 6). Only relevant for equipment runsheets. -->
       <div id="cxWarn" class="cx-warn" style="display:none">
         <div class="cx-warn-icon">⚠</div>
         <div style="flex:1">
@@ -1154,6 +1211,7 @@ var _sigBound = false;        // flag — have we attached canvas event handlers
 var cxEquipment = [];         // commissioning tracker equipment items (filtered to those with non-empty tag)
 var _cxEquipLoaded = false;
 var _selectedEqItem = null;   // currently-selected Cx tracker row (when exact-matched)
+var _newRsType = 'equipment'; // Feature B: 'equipment' | 'system' — drives modal mode
 
 var PARTY_LABELS = {
   consultant: 'Consultant',
@@ -1477,8 +1535,16 @@ function renderRunsheetEditor(){
 
 function renderRsHeader(rs){
   document.getElementById('rs-num').textContent = rs.runsheet_number || '—';
+
+  // Feature B: swap labels for system runsheets
+  var isSystem = (rs.runsheet_type === 'system');
+  var eqLbl = document.getElementById('rs-eqtag-lbl');
+  var nameLbl = document.getElementById('rs-eqname-lbl');
+  if(eqLbl)eqLbl.textContent = isSystem ? 'System ID' : 'Equipment ID';
+  if(nameLbl)nameLbl.textContent = isSystem ? 'Scope' : 'Equipment Name';
+
   document.getElementById('rs-eqtag').textContent = rs.equipment_id || rs.equipment_tag || '—';
-  document.getElementById('rs-eqname').textContent = rs.equipment_name || '—';
+  document.getElementById('rs-eqname').textContent = rs.scope_description || rs.equipment_name || '—';
   document.getElementById('rs-tplname').textContent = (rs.template_snapshot && rs.template_snapshot.name) || '—';
   document.getElementById('rs-eqtype').textContent = (rs.template_snapshot && rs.template_snapshot.equipment_type) || '—';
   document.getElementById('rs-attempt').textContent = '#' + (rs.attempt_number || 1);
@@ -1487,7 +1553,8 @@ function renderRsHeader(rs){
   var statEl = document.getElementById('rs-status');
   if(statEl){
     var lbl = STATUS_LABELS[rs.status] || rs.status || '—';
-    statEl.innerHTML = '<span class="status-badge sb-'+escH(rs.status||'draft')+'">'+escH(lbl)+'</span>';
+    var sysBadge = isSystem ? ' <span class="system-chip" style="margin-left:5px">⚙ System</span>' : '';
+    statEl.innerHTML = '<span class="status-badge sb-'+escH(rs.status||'draft')+'">'+escH(lbl)+'</span>'+sysBadge;
   }
 
   // Overall outcome pill
@@ -2379,12 +2446,19 @@ function buildPrintDoc(rs){
     + '</div>';
 
   // ── Header info card ──
+  // Feature B: swap labels for system runsheets
+  var pdIsSystem = (rs.runsheet_type === 'system');
+  var pdEqIdLbl = pdIsSystem ? 'System ID' : 'Equipment ID';
+  var pdEqNameLbl = pdIsSystem ? 'Scope' : 'Equipment Name';
+  var pdEqNameVal = rs.scope_description || rs.equipment_name || '—';
+  var pdEqTypeLbl = pdIsSystem ? 'Test Type' : 'Equipment Type';
+  var pdEqTypeVal = pdIsSystem ? 'System Test' : (tpl.equipment_type || '—');
   var infoCard = ''
     + '<div class="pd-info-grid">'
-    +   '<div class="pd-info-row"><div class="pd-info-lbl">Equipment ID</div><div class="pd-info-val mono">'+escH(equipId)+'</div></div>'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">'+escH(pdEqIdLbl)+'</div><div class="pd-info-val mono">'+escH(equipId)+'</div></div>'
     +   '<div class="pd-info-row"><div class="pd-info-lbl">Status</div><div class="pd-info-val"><span class="pd-status-pill pd-status-'+escH(statusKey)+'">'+escH(statusLabel)+'</span></div></div>'
-    +   '<div class="pd-info-row"><div class="pd-info-lbl">Equipment Name</div><div class="pd-info-val">'+escH(rs.equipment_name || '—')+'</div></div>'
-    +   '<div class="pd-info-row"><div class="pd-info-lbl">Equipment Type</div><div class="pd-info-val">'+escH(tpl.equipment_type || '—')+'</div></div>'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">'+escH(pdEqNameLbl)+'</div><div class="pd-info-val">'+escH(pdEqNameVal)+'</div></div>'
+    +   '<div class="pd-info-row"><div class="pd-info-lbl">'+escH(pdEqTypeLbl)+'</div><div class="pd-info-val">'+escH(pdEqTypeVal)+'</div></div>'
     +   '<div class="pd-info-row"><div class="pd-info-lbl">Template</div><div class="pd-info-val">'+escH((tpl.formNo ? tpl.formNo + ' · ' : '') + (tpl.name || '—'))+'</div></div>'
     +   '<div class="pd-info-row"><div class="pd-info-lbl">Attempt</div><div class="pd-info-val mono">#'+(rs.attempt_number || 1)+'</div></div>'
     +   '<div class="pd-info-row"><div class="pd-info-lbl">Scheduled</div><div class="pd-info-val">'+escH(fmtDate(rs.scheduled_date))+'</div></div>'
@@ -2959,9 +3033,10 @@ async function confirmSubmitAndLock(){
     }
 
     // ── STEP 2: Sync Cx tracker stage 7 (witnessed='Y' only on full pass) ──
+    // Feature B: skip for system runsheets — they're not tied to a tracker row.
     var trackerSynced = false;
     var trackerSkipReason = '';
-    if(summary.newStatus === 'signed_off'){
+    if(summary.newStatus === 'signed_off' && (rs.runsheet_type || 'equipment') === 'equipment'){
       try {
         var trackerItems = await dbGetCommissioning(_pNum);
         if(Array.isArray(trackerItems) && trackerItems.length){
@@ -2991,6 +3066,8 @@ async function confirmSubmitAndLock(){
         console.warn('Tracker stage-7 sync failed (non-blocking):', e.message);
         trackerSkipReason = 'Sync error — see console';
       }
+    } else if(summary.newStatus === 'signed_off' && rs.runsheet_type === 'system'){
+      trackerSkipReason = 'System runsheet — no tracker sync applicable';
     }
 
     // ── STEP 3: Update the runsheet itself and lock it ──
@@ -3208,7 +3285,10 @@ function renderEquipCell(rs){
   var name = rs.equipment_name || '';
   var attempt = (rs.attempt_number && rs.attempt_number > 1)
     ? '<span class="attempt-pill">Attempt #'+rs.attempt_number+'</span>' : '';
-  return '<div class="eq-tag">'+escH(id)+attempt+'</div>'
+  var sysChip = (rs.runsheet_type === 'system')
+    ? '<span class="system-chip" title="System test — not tied to a single equipment item">⚙ System</span>'
+    : '';
+  return '<div class="eq-tag">'+escH(id)+sysChip+attempt+'</div>'
     + (name ? '<div class="eq-name">'+escH(name)+'</div>' : '');
 }
 
@@ -3340,6 +3420,13 @@ async function openNewRunsheetModal(){
   _selectedEqItem = null;
   // Reset Cx stub state
   _cxStubResult = null;
+  // Feature B: reset type to equipment, clear system fields, force radio state
+  _newRsType = 'equipment';
+  var sysIdEl = document.getElementById('new-sys-id'); if(sysIdEl)sysIdEl.value = '';
+  var sysScopeEl = document.getElementById('new-sys-scope'); if(sysScopeEl)sysScopeEl.value = '';
+  var eqRadio = document.querySelector('input[name="rstype"][value="equipment"]');
+  if(eqRadio)eqRadio.checked = true;
+  onRunsheetTypeChange();  // sync UI to equipment mode
 
   // Populate template selector
   var sel = document.getElementById('new-template');
@@ -3411,6 +3498,39 @@ function onEqIdFocus(){
   var raw = (document.getElementById('new-eqid').value||'').trim();
   renderEqIdDropdown(raw);
   openEqIdDropdown();
+}
+
+// ── Feature B: System test type toggle ──
+// Switches the New Runsheet modal between equipment-mode and system-mode UI.
+// In system mode, the Cx tracker dropdown / validation / Cx warning are all
+// bypassed — system tests aren't tied to a single tracker row.
+function onRunsheetTypeChange(){
+  var radios = document.querySelectorAll('input[name="rstype"]');
+  var val = 'equipment';
+  radios.forEach(function(r){ if(r.checked)val = r.value; });
+  _newRsType = val;
+
+  var eqMode  = document.getElementById('newrs-equipment-mode');
+  var sysMode = document.getElementById('newrs-system-mode');
+  if(val === 'system'){
+    if(eqMode)eqMode.style.display = 'none';
+    if(sysMode)sysMode.style.display = '';
+    // Hide Cx warning when in system mode — not applicable
+    var cxw = document.getElementById('cxWarn');
+    if(cxw)cxw.style.display = 'none';
+    // Reset equipment-mode selection state so confirm doesn't accidentally use it
+    _selectedEqItem = null;
+    _cxStubResult = null;
+  } else {
+    if(eqMode)eqMode.style.display = '';
+    if(sysMode)sysMode.style.display = 'none';
+  }
+  updateCreateBtnState();
+}
+
+// ── Feature B: System ID + scope input handler ──
+function onSysIdInput(){
+  updateCreateBtnState();
 }
 
 function openEqIdDropdown(){
@@ -3536,9 +3656,20 @@ function updateCreateBtnState(){
   if(!btn)return;
   var tplId = document.getElementById('new-template').value;
   var disabled = false;
-  if(!_selectedEqItem) disabled = true;            // no exact eq match
-  if(!tplId) disabled = true;                       // no template
-  if(projectTemplates.length === 0) disabled = true;// no templates exist
+
+  if(_newRsType === 'system'){
+    // System mode: require sys-id + scope (both non-empty)
+    var sysId = (document.getElementById('new-sys-id').value||'').trim();
+    var sysScope = (document.getElementById('new-sys-scope').value||'').trim();
+    if(!sysId) disabled = true;
+    if(!sysScope) disabled = true;
+  } else {
+    // Equipment mode: require Cx tracker match
+    if(!_selectedEqItem) disabled = true;
+  }
+
+  if(!tplId) disabled = true;                        // no template
+  if(projectTemplates.length === 0) disabled = true; // no templates exist
   btn.disabled = disabled;
 }
 
@@ -3571,37 +3702,45 @@ function genRunsheetNumber(){
 }
 
 async function confirmNewRunsheet(){
-  var eqId = (document.getElementById('new-eqid').value||'').trim();
+  if(!_pNum){alert('No project selected.');return;}
   var tplId = document.getElementById('new-template').value;
   var sched = document.getElementById('new-schedule').value || null;
-
-  if(!eqId){alert('Equipment ID is required.');return;}
   if(!tplId){alert('Please select a witness template.');return;}
-  if(!_pNum){alert('No project selected.');return;}
-
-  // Re-validate against the Cx tracker — guards against the PM somehow
-  // bypassing the dropdown (paste + click before validate fires, etc).
-  var match = findCxEquipmentByTag(eqId);
-  if(!match){
-    alert('Equipment ID "'+eqId+'" was not found in the commissioning tracker. Pick an existing ID from the dropdown, or add this equipment to the tracker first.');
-    var nfBanner = document.getElementById('eqIdNotFound');
-    var nfVal = document.getElementById('eqIdNotFoundValue');
-    if(nfVal)nfVal.textContent = eqId;
-    if(nfBanner)nfBanner.style.display='flex';
-    return;
-  }
-  _selectedEqItem = match;
 
   var tpl = projectTemplates.find(function(t){return t.id === tplId;});
   if(!tpl){alert('Selected template not found.');return;}
 
-  // Cx warning is informational only — never blocks creation.
-
-  // Derive friendly equipment name from the tracker row (name field, or fall
-  // back to type/location if name is blank). PM never types this directly now.
-  var derivedName = (match.name && String(match.name).trim())
-    || [match.type, match.location].filter(Boolean).join(' · ')
-    || '';
+  // Branch on type (Feature B)
+  var eqId, equipmentName, cxTrackerId, scopeDescription;
+  if(_newRsType === 'system'){
+    // System mode: free-text ID + scope, no Cx tracker validation
+    eqId = (document.getElementById('new-sys-id').value||'').trim();
+    scopeDescription = (document.getElementById('new-sys-scope').value||'').trim();
+    if(!eqId){alert('System Name / Identifier is required.');return;}
+    if(!scopeDescription){alert('Scope Description is required.');return;}
+    equipmentName = scopeDescription;  // for display purposes — the scope IS the name
+    cxTrackerId = null;
+  } else {
+    // Equipment mode: re-validate against the Cx tracker
+    eqId = (document.getElementById('new-eqid').value||'').trim();
+    if(!eqId){alert('Equipment ID is required.');return;}
+    var match = findCxEquipmentByTag(eqId);
+    if(!match){
+      alert('Equipment ID "'+eqId+'" was not found in the commissioning tracker. Pick an existing ID from the dropdown, or add this equipment to the tracker first.');
+      var nfBanner = document.getElementById('eqIdNotFound');
+      var nfVal = document.getElementById('eqIdNotFoundValue');
+      if(nfVal)nfVal.textContent = eqId;
+      if(nfBanner)nfBanner.style.display='flex';
+      return;
+    }
+    _selectedEqItem = match;
+    // Derive friendly equipment name from the tracker row
+    equipmentName = (match.name && String(match.name).trim())
+      || [match.type, match.location].filter(Boolean).join(' · ')
+      || '';
+    cxTrackerId = match.id || null;
+    scopeDescription = null;
+  }
 
   // Build the runsheet payload. NO client-generated id — DB assigns the UUID.
   // The template snapshot is the audit-immutability mechanism (per design doc).
@@ -3625,25 +3764,26 @@ async function confirmNewRunsheet(){
   });
 
   // Persist the Cx check result so the runsheet keeps an audit record
-  // of which stages were incomplete at creation and whether PM acknowledged.
-  // Audit record of the Cx completion check at creation time.
-  // pm_acknowledged_warning was removed when the ack checkbox was dropped;
-  // kept as `false` for back-compat with any Step 9 code that reads it.
-  var cxCheck = {
-    checked: !!_cxStubResult,
-    all_complete: _cxStubResult ? !!_cxStubResult.allComplete : null,
-    incomplete_stages: (_cxStubResult && _cxStubResult.incompleteStages) || [],
-    pm_acknowledged_warning: false,
-    acknowledged_at: null,
-    source: 'stub-v1'  // Marker so Step 9 can detect/migrate old stub records
-  };
+  // of which stages were incomplete at creation. System runsheets skip the check.
+  var cxCheck = (_newRsType === 'system')
+    ? { checked: false, all_complete: null, incomplete_stages: [], pm_acknowledged_warning: false, acknowledged_at: null, source: 'system-runsheet' }
+    : {
+        checked: !!_cxStubResult,
+        all_complete: _cxStubResult ? !!_cxStubResult.allComplete : null,
+        incomplete_stages: (_cxStubResult && _cxStubResult.incompleteStages) || [],
+        pm_acknowledged_warning: false,
+        acknowledged_at: null,
+        source: 'stub-v1'
+      };
 
   var runsheet = {
     runsheet_number: genRunsheetNumber(),
-    equipment_id: eqId,                      // DB column renamed from equipment_tag to equipment_id (migration: migration-equipment-rename.sql)
-    equipment_name: derivedName,             // Auto-derived from Cx tracker row (was user input before)
-    cx_tracker_id: match.id || null,         // Soft link to the tracker row (e.g. 'tr...') — handy for Step 9 stage-7 sync
-    template_id: tpl.id,                     // Soft reference (project tier) — sanitised by helper if non-UUID
+    runsheet_type: _newRsType,               // Feature B: 'equipment' | 'system'
+    equipment_id: eqId,
+    equipment_name: equipmentName,
+    cx_tracker_id: cxTrackerId,              // null for system runsheets
+    scope_description: scopeDescription,     // null for equipment runsheets
+    template_id: tpl.id,
     status: 'draft',
     attempt_number: 1,
     parent_runsheet_id: null,
