@@ -229,7 +229,7 @@ textarea.proc-edit:focus{min-height:60px;overflow:auto}
     <span class="bcc">Procurement Schedule</span>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
-    <button class="bg bsm btn" onclick="runSync()">⟳ Sync from Equipment Schedule</button>
+    <button class="bg bsm btn" onclick="openSyncScopeModal()" title="Configure which equipment types sync into procurement">⟳ Sync scope</button>
     <button class="bg bsm btn" onclick="openGroupSettings()" title="Group equipment types as bulk procurement lines">⊞ Group Settings</button>
     <button class="bg bsm btn" onclick="openColSettings()">⚙ Columns</button>
     <button class="bg bsm btn" onclick="openExportModal()">⬇ Export</button>
@@ -454,6 +454,11 @@ var _tsLookup={}; // equipId -> {status, approvedDate} from tech subs
 var _equipLookup={}; // equipId -> {location, manufacturer, model, equipType} — always master
 // Set of equipment types the user has flagged as bulk (rendered as a single grouped row)
 var _groupedTypes=new Set();
+// Sync scope: which equipment types from Equipment Schedule should appear in procurement.
+// null = "not yet configured" → behave as if all types are in scope (preserves existing
+// behaviour for projects created before this feature shipped). After first save, this
+// becomes a Set of explicit type labels.
+var _syncScope=null;
 // Persisted UI state for which group rows are expanded
 var _expandedGroups=new Set();
 // Status → colour map used in both the table render and the summary view
@@ -581,17 +586,179 @@ function rebuildEquipLookup(eqRaw){
   });
 }
 
-async function runSync(){
+// ── SYNC SCOPE ──
+// User-controlled allow-list of which equipment types should sync into procurement.
+// Source of truth is proj_settings[<projectId>_proc_sync_scope] = array of type labels.
+// On a brand-new project the value is missing, in which case _syncScope stays null and
+// isTypeInScope() returns true for everything (no breaking change).
+
+function isTypeInScope(typeLabel){
+  if(_syncScope===null)return true; // unconfigured → all in scope
+  return _syncScope.has(typeLabel);
+}
+
+async function loadSyncScope(){
+  try{
+    var pId=(_psProj.id||_psPNum||'').toLowerCase();
+    var scope=await dbGetProject('proj_settings',pId+'_proc_sync_scope');
+    if(Array.isArray(scope)){
+      _syncScope=new Set(scope);
+    }
+  }catch(e){_syncScope=null;}
+}
+
+async function saveSyncScope(){
+  try{
+    var pId=(_psProj.id||_psPNum||'').toLowerCase();
+    await dbSetProject('proj_settings',pId+'_proc_sync_scope',_syncScope?Array.from(_syncScope):null);
+  }catch(e){console.warn('Could not persist sync scope:',e);}
+}
+
+// Build the list of all type labels that exist in the source Equipment Schedule, with
+// per-type counts of (a) source rows and (b) currently-imported rows in procurement.
+function _enumerateScopeTypes(rawEquip){
+  var info={};
+  // First pass — count source rows by type
+  (rawEquip&&rawEquip.tabs||[]).forEach(function(tab){
+    if(!Array.isArray(tab.rows))return;
+    var t=getTypeLabel(tab);
+    if(!info[t])info[t]={type:t,sourceCount:0,procCount:0};
+    tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
+      var id=(row.tag||row.equipment_id||'').trim();
+      if(id)info[t].sourceCount++;
+    });
+  });
+  // Second pass — count procurement rows (non-ad-hoc) by type
+  items.forEach(function(it){
+    if(it.adHoc)return;
+    var t=it.equipType||'(Untyped)';
+    if(!info[t])info[t]={type:t,sourceCount:0,procCount:0};
+    info[t].procCount++;
+  });
+  return Object.values(info).sort(function(a,b){return a.type.localeCompare(b.type);});
+}
+
+// Open the sync scope modal. Lists all types from Equipment Schedule with checkboxes
+// reflecting current scope. Save closes the modal and triggers a scoped sync.
+async function openSyncScopeModal(){
   var raw=null;
   try{raw=await dbGetEquipment(_psPNum);}catch(e){}
+  if(!raw||!raw.tabs||!raw.tabs.length){
+    showToast('No equipment schedule data found.');
+    return;
+  }
+  // Cache the raw blob so the scoped sync that fires on Save doesn't refetch
+  _scopeModalRaw=raw;
+  var infos=_enumerateScopeTypes(raw);
+  // Pending set — what the user is editing in the modal, separate from _syncScope
+  // so Cancel doesn't mutate the real scope.
+  _scopePending=new Set(_syncScope?Array.from(_syncScope):infos.map(function(i){return i.type;}));
+  var rows=infos.map(function(info){
+    var checked=_scopePending.has(info.type);
+    return '<label class="ss-row'+(checked?' checked':'')+'">'
+      +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleScopeType(this,\''+escH(info.type).replace(/'/g,"\\'")+'\')">'
+      +'<span class="ss-name">'+escH(info.type)+'</span>'
+      +'<span class="ss-count" title="Rows currently in procurement / rows in equipment schedule">'+info.procCount+' / '+info.sourceCount+'</span>'
+      +'</label>';
+  }).join('');
+  document.getElementById('scopeModalList').innerHTML=rows;
+  document.getElementById('scopeModal').classList.add('open');
+  updateScopeModalSummary();
+}
+
+function toggleScopeType(cb,type){
+  if(cb.checked)_scopePending.add(type);else _scopePending.delete(type);
+  cb.closest('.ss-row').classList.toggle('checked',cb.checked);
+  updateScopeModalSummary();
+}
+
+function scopeQuickSelect(mode){
+  var infos=_enumerateScopeTypes(_scopeModalRaw);
+  if(mode==='all')_scopePending=new Set(infos.map(function(i){return i.type;}));
+  else if(mode==='none')_scopePending=new Set();
+  // Re-render checkboxes from pending
+  Array.from(document.querySelectorAll('#scopeModalList .ss-row')).forEach(function(row){
+    var name=row.querySelector('.ss-name').textContent;
+    var cb=row.querySelector('input');
+    var checked=_scopePending.has(name);
+    cb.checked=checked;
+    row.classList.toggle('checked',checked);
+  });
+  updateScopeModalSummary();
+}
+
+function updateScopeModalSummary(){
+  var el=document.getElementById('scopeModalSummary');
+  if(!el)return;
+  // Calculate how many procurement rows would be removed because their type is leaving scope
+  var toRemove=items.filter(function(it){
+    if(it.adHoc)return false;
+    return !_scopePending.has(it.equipType||'(Untyped)');
+  }).length;
+  if(toRemove>0){
+    el.innerHTML='<span style="color:var(--danger)">⚠ '+toRemove+' existing row'+(toRemove===1?'':'s')+' will be removed</span>';
+  } else {
+    el.textContent=_scopePending.size+' type'+(_scopePending.size===1?'':'s')+' in scope';
+  }
+}
+
+function closeSyncScopeModal(){
+  document.getElementById('scopeModal').classList.remove('open');
+  _scopeModalRaw=null;
+  _scopePending=null;
+}
+
+// Save scope + trigger sync. If any rows would be removed because their type left scope,
+// show a confirm step first so the user knows what they're losing.
+function applySyncScope(){
+  if(!_scopePending)return;
+  var newScope=new Set(_scopePending);
+  // Find rows that would be removed
+  var toRemove=items.filter(function(it){
+    if(it.adHoc)return false;
+    return !newScope.has(it.equipType||'(Untyped)');
+  });
+  var raw=_scopeModalRaw;
+  function commit(){
+    _syncScope=newScope;
+    saveSyncScope();
+    closeSyncScopeModal();
+    runScopedSync(raw);
+  }
+  if(toRemove.length>0){
+    // Group by type for the confirm body
+    var byType={};
+    toRemove.forEach(function(it){var t=it.equipType||'(Untyped)';byType[t]=(byType[t]||0)+1;});
+    var typeLines=Object.keys(byType).sort().map(function(t){
+      return '<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text2);padding:3px 0">• '+escH(t)+' — '+byType[t]+' row'+(byType[t]===1?'':'s')+'</div>';
+    }).join('');
+    var body=
+      '<b style="color:var(--danger)">'+toRemove.length+' row'+(toRemove.length===1?'':'s')+'</b> will be removed from procurement because the following type'+(Object.keys(byType).length===1?' is':'s are')+' no longer in scope:'
+      +'<div style="margin:10px 0;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px">'+typeLines+'</div>'
+      +'<div style="font-size:12px;color:var(--danger);font-weight:600">Any status, comments, order dates, or delivery data on those rows will be lost.</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:6px">Ad-hoc items are never affected.</div>';
+    showConfirm('Remove out-of-scope rows?',body,commit,{okLabel:'Remove '+toRemove.length});
+  } else {
+    commit();
+  }
+}
+
+// Scoped sync. Same as runSync but (a) respects _syncScope when adding/updating rows,
+// (b) removes existing non-ad-hoc rows whose type is no longer in scope.
+async function runScopedSync(raw){
+  if(!raw){try{raw=await dbGetEquipment(_psPNum);}catch(e){}}
   if(!raw||!raw.tabs||!raw.tabs.length){showToast('No equipment schedule data found.');return;}
-  // Refresh the master lookup FIRST so the table render reads the new values
   rebuildEquipLookup(raw);
+  // First, remove any non-ad-hoc rows whose type is now out of scope
+  var removed=items.filter(function(it){return !it.adHoc&&!isTypeInScope(it.equipType||'(Untyped)');}).length;
+  if(removed>0){
+    items=items.filter(function(it){return it.adHoc||isTypeInScope(it.equipType||'(Untyped)');});
+  }
   var added=0,updated=0;
-  var existing=new Set(items.map(function(i){return i.equipId;}));
   raw.tabs.forEach(function(tab){
     if(!Array.isArray(tab.rows))return;
     var typeLabel=getTypeLabel(tab);
+    if(!isTypeInScope(typeLabel))return;
     tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
       var id=(row.tag||row.equipment_id||'').trim();
       if(!id)return;
@@ -601,11 +768,7 @@ async function runSync(){
       var mod=getRowField(row,tab,['model','Model']);
       var ex=items.find(function(i){return i.equipId===id;});
       if(ex){
-        // Don't clobber ad-hoc rows even if their equipId happens to match. They're
-        // managed manually by the user and have no real link to Equipment Schedule.
-        if(ex.adHoc){return;}
-        // Only count as updated if at least one field actually changed (so the toast
-        // doesn't lie when nothing real has happened).
+        if(ex.adHoc)return;
         var changed=(ex.building!==building)||(ex.location!==loc)||(ex.manufacturer!==mfr)||(ex.model!==mod)||(ex.equipType!==typeLabel);
         ex.building=building;ex.location=loc;ex.manufacturer=mfr;ex.model=mod;ex.equipType=typeLabel;
         if(changed)updated++;
@@ -617,21 +780,30 @@ async function runSync(){
           subApproval:'',status:'Not ordered',orderDate:'',leadWeeks:'',
           qty:1,qtyDelivered:0,eta:'',comments:''
         });
-        existing.add(id);
         added++;
       }
     });
   });
   save();
   dismissSyncBanner();
-  loadColSettings();// Migrate legacy assetId → equipId
-items.forEach(function(i){if(!i.equipId&&i.assetId)i.equipId=i.assetId;});
-renderTable();updateSummary();checkEquipSync();
+  items.forEach(function(i){if(!i.equipId&&i.assetId)i.equipId=i.assetId;});
+  renderTable();updateSummary();checkEquipSync();
   var msg=[];
-  if(updated)msg.push(updated+' item'+(updated>1?'s':'')+' updated');
-  if(added)msg.push(added+' new item'+(added>1?'s':'')+' added');
+  if(updated)msg.push(updated+' updated');
+  if(added)msg.push(added+' added');
+  if(removed)msg.push(removed+' removed');
   showToast('✓ Sync complete — '+(msg.join(', ')||'No changes'));
 }
+
+// Legacy runSync kept as a thin wrapper: the banner buttons call this. It just calls
+// the scoped sync — scope is whatever's currently configured (or "all" if unconfigured).
+async function runSync(){
+  return runScopedSync();
+}
+
+// Working state for the scope modal
+var _scopePending=null;
+var _scopeModalRaw=null;
 
 function renderApprovalBanner(){
   var banner=document.getElementById('approvalBanner');
@@ -1485,7 +1657,9 @@ function openEditModal(id){
   if(hint)hint.textContent=tsLeadTime&&!userLeadTime?'from tech sub: '+tsLeadTime+'w':tsLeadTime?'tech sub: '+tsLeadTime+'w':'';
   document.getElementById('f-comments').value=item.comments||'';
   document.getElementById('etaPreview').textContent=item.eta?fmtD(item.eta):'—';
-  document.getElementById('deleteBtn').style.display='';
+  // Per-row delete is ad-hoc-only. Linked rows must be removed via Sync Scope so we
+  // don't end up with "ghost" deletes that get silently overwritten on next sync.
+  document.getElementById('deleteBtn').style.display=item.adHoc?'':'none';
   // Pre-fill ad-hoc fields if the item has them stored (it's an ad-hoc row)
   document.getElementById('f-location').value=item.location||'';
   document.getElementById('f-manufacturer').value=item.manufacturer||'';
@@ -1733,9 +1907,24 @@ function saveItem(){
   save();closeModal();renderTable();
 }
 function deleteItem(){
-  if(!editingId||!confirm('Delete this item?'))return;
-  items=items.filter(function(i){return i.id!==editingId;});
-  save();closeModal();renderTable();
+  if(!editingId)return;
+  var item=items.find(function(i){return i.id===editingId;});
+  if(!item)return;
+  // Paranoia guard: the delete button is hidden for linked rows already, but the function
+  // could theoretically be called from elsewhere. Refuse if the item isn't ad-hoc.
+  if(!item.adHoc){
+    showToast('Linked items must be removed via Sync Scope.');
+    return;
+  }
+  var body=
+    'Delete <b style="color:var(--text)">'+escH(item.equipId||'(no ID)')+'</b>?'
+    +'<div style="margin-top:10px;font-size:12px;color:var(--muted)">This row is ad-hoc and won\'t come back on next sync. Any status, comments, or order data will be lost.</div>';
+  showConfirm('Delete item',body,function(){
+    var did=editingId;
+    items=items.filter(function(i){return i.id!==did;});
+    save();closeModal();renderTable();
+    showToast('✓ Item deleted');
+  },{okLabel:'Delete'});
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -2124,6 +2313,9 @@ function exportCSV(){openExportModal();}
   // Project Areas — used by the ad-hoc item modal's Location picker. Fire-and-forget;
   // if it hasn't completed by the time the modal opens, the picker falls back to text.
   loadLocationPaths();
+  // Sync scope — which equipment types should appear in procurement. Fire-and-forget;
+  // if it hasn't loaded by the time sync fires, scope defaults to "all in scope".
+  loadSyncScope();
 })();
 </script>
 <script>
@@ -2709,7 +2901,46 @@ window.addEventListener('DOMContentLoaded',function(){
     </div>
   </div>
 </div>
+
+<!-- SYNC SCOPE MODAL — controls which equipment types sync into procurement -->
+<div class="mo" id="scopeModal">
+  <div class="modal" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;width:520px;max-width:96vw;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-weight:700;font-size:15px">Sync scope</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Pick which equipment types should sync into procurement. Ad-hoc items are never affected.</div>
+      </div>
+      <button onclick="closeSyncScopeModal()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">✕</button>
+    </div>
+    <div style="padding:14px 20px 4px;overflow-y:auto;flex:1">
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <button onclick="scopeQuickSelect('all')" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif">Select all</button>
+        <button onclick="scopeQuickSelect('none')" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif">Clear</button>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;padding:0 4px;display:flex;justify-content:space-between">
+        <span>Equipment type</span>
+        <span title="In procurement now / Available in equipment schedule">In proc / Available</span>
+      </div>
+      <div id="scopeModalList" style="border:1px solid var(--border);border-radius:8px;background:var(--surface2);max-height:360px;overflow-y:auto"></div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:space-between;align-items:center;background:var(--surface2)">
+      <div id="scopeModalSummary" style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="closeSyncScopeModal()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:12px;padding:6px 14px">Cancel</button>
+        <button onclick="applySyncScope()" style="background:var(--accent);border:none;border-radius:8px;color:#080c12;font-size:12px;font-weight:700;padding:6px 16px;cursor:pointer">Save & sync</button>
+      </div>
+    </div>
+  </div>
+</div>
 <style>
+/* Sync scope modal rows */
+.ss-row{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid rgba(30,48,80,.4);transition:background .12s}
+.ss-row:last-child{border-bottom:none}
+.ss-row:hover{background:var(--surface3)}
+.ss-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.ss-row .ss-name{flex:1;font-size:13px;color:var(--text)}
+.ss-row .ss-count{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface3);padding:2px 8px;border-radius:10px}
+.ss-row.checked .ss-name{color:var(--accent);font-weight:600}
 .gs-row{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-radius:6px;transition:background .12s}
 .gs-row:hover{background:var(--surface2)}
 .gs-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
