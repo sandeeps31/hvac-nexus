@@ -902,6 +902,8 @@ function getColValue(item,colId){
   }
   if(colId==='eta')return String(item.eta||'');
   if(colId==='deliveryDate')return String(item.deliveryDate||'');
+  if(colId==='qty')return String(item.qty==null||item.qty===''?'':item.qty);
+  if(colId==='qtyDelivered')return String(item.qtyDelivered==null||item.qtyDelivered===''?'':item.qtyDelivered);
   if(colId==='comments')return String(item.comments||'');
   return String(item[colId]||'');
 }
@@ -1353,6 +1355,10 @@ function inlineUpdate(id,field,value,skipBatch){
   var item=items.find(function(i){return i.id===id;});
   if(!item) return;
   if(field==='leadWeeks') value=parseInt(value)||'';
+  if(field==='qty'||field==='qtyDelivered'){
+    var n=parseInt(value,10);
+    value=(isNaN(n)||n<0)?'':n;
+  }
   // Auto-set delivery date when status set to Delivered
   if(field==='status'&&value==='Delivered'&&!item.deliveryDate){
     item.deliveryDate=today();
@@ -1563,6 +1569,17 @@ function renderTable(){
     var commentsCell=_editMode
       ?'<textarea class="proc-edit" rows="1" onchange="inlineUpdate(\''+item.id+'\',\'comments\',this.value)" style="min-width:260px">'+escH(item.comments||'')+'</textarea>'
       :'<span>'+escH(item.comments||'')+'</span>';
+    // Qty / Qty Delivered cells — integer-only numeric inputs in edit mode, mono-spaced
+    // display otherwise. Empty values render as '—' so the table doesn't look broken on
+    // freshly-imported rows that haven't had qty set yet.
+    var qtyDisplay=(item.qty==null||item.qty==='')?'—':item.qty;
+    var qtyDelDisplay=(item.qtyDelivered==null||item.qtyDelivered==='')?'—':item.qtyDelivered;
+    var qtyCell=_editMode
+      ?'<input type="number" class="proc-edit" value="'+escH(String(item.qty||''))+'" min="0" step="1" inputmode="numeric" placeholder="—" onchange="inlineUpdate(\''+item.id+'\',\'qty\',this.value)" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" style="width:70px;text-align:right"/>'
+      :'<span style="font-family:DM Mono,monospace;font-size:11px">'+escH(String(qtyDisplay))+'</span>';
+    var qtyDelCell=_editMode
+      ?'<input type="number" class="proc-edit" value="'+escH(String(item.qtyDelivered||''))+'" min="0" step="1" inputmode="numeric" placeholder="—" onchange="inlineUpdate(\''+item.id+'\',\'qtyDelivered\',this.value)" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" style="width:70px;text-align:right"/>'
+      :'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+((parseInt(item.qtyDelivered,10)||0)>=(parseInt(item.qty,10)||0)&&parseInt(item.qty,10)>0?'var(--green)':'var(--text2)')+'">'+escH(String(qtyDelDisplay))+'</span>';
     var isSelected=_selectedIds.has(item.id);
     if(isSelected)tr.classList.add('selected');
     // Delivery date cell - only shows when Delivered
@@ -1604,6 +1621,8 @@ function renderTable(){
       leadWeeks:'<td>'+leadCell+'</td>',
       eta:'<td class="eta-cell '+etaCls+'">'+etaDisplay+(isOverdue?' ⚠':'')+'</td>',
       deliveryDate:'<td>'+delivCell+'</td>',
+      qty:'<td style="text-align:right">'+qtyCell+'</td>',
+      qtyDelivered:'<td style="text-align:right">'+qtyDelCell+'</td>',
       comments:'<td class="comments-cell">'+commentsCell+'</td>',
     };
     var cols='<td style="text-align:center"><input type="checkbox" '+(isSelected?'checked':'')+' onchange="toggleSelect(\''+item.id+'\',this.checked)" style="cursor:pointer;accent-color:var(--accent)"/></td>'
@@ -2086,16 +2105,13 @@ function updateExportSummary(){
 }
 function runExport(format){
   // Build headers from the user's current column order + visibility. Mirrors the table
-  // exactly so what they see is what they export. Qty / Qty Delivered aren't on the
-  // table but matter for exports (handovers, supplier docs), so we append them.
+  // exactly so what they see is what they export.
   var visibleCols=getOrderedCols().filter(function(c){return isColVisible(c.id);});
-  var headers=visibleCols.map(function(c){return c.label;}).concat(['Qty','Qty Delivered']);
+  var headers=visibleCols.map(function(c){return c.label;});
 
-  // Per-item row builder — values in the same order as `visibleCols`, plus qty/qtyDelivered
+  // Per-item row builder — values in the same order as `visibleCols`
   function rowFor(it){
-    var r=visibleCols.map(function(c){return getColValue(it,c.id);});
-    r.push(it.qty||1, it.qtyDelivered||0);
-    return r;
+    return visibleCols.map(function(c){return getColValue(it,c.id);});
   }
 
   var rows=[];
@@ -2124,7 +2140,9 @@ function runExport(format){
     var rolledStatus=Object.keys(stRank).find(function(k){return stRank[k]===minSt;})||'Not ordered';
     // Shared field if every child has the same value, else blank
     function commonField(field){var v=children[0][field]||'';for(var i=1;i<children.length;i++){if((children[i][field]||'')!==v)return '';}return v;}
-    // Build a synthetic item for the summary row — getColValue can read this directly
+    // Build a synthetic item for the summary row — getColValue can read this directly.
+    // qty / qtyDelivered are positional columns now (in visibleCols), so we set them on
+    // the synthetic item rather than appending separately.
     var summaryItem={
       equipId:t+' (×'+totalQty+')',
       location:commonField('location'),
@@ -2136,16 +2154,17 @@ function runExport(format){
       leadWeeks:commonField('leadWeeks'),
       eta:commonField('eta'),
       deliveryDate:commonField('deliveryDate'),
+      qty:totalQty,
+      qtyDelivered:deliveredQty,
       comments:'Bulk group'
     };
-    rows.push(visibleCols.map(function(c){return getColValue(summaryItem,c.id);}).concat([totalQty,deliveredQty]));
+    rows.push(visibleCols.map(function(c){return getColValue(summaryItem,c.id);}));
     if(_expDisplay==='expanded'){
       children.forEach(function(c){
         // Children rendered indented under their group header
         var r=visibleCols.map(function(col){return getColValue(c,col.id);});
         // Indent the leading column (whichever it is in the user's order) for visual hierarchy
         if(r.length)r[0]='  '+r[0];
-        r.push(c.qty||1, c.qtyDelivered||0);
         rows.push(r);
       });
     }
@@ -2533,6 +2552,8 @@ var PROC_COLS = [
   {id:'leadWeeks',  label:'Lead Time (wks)',     default:true},
   {id:'eta',        label:'ETA',                 default:true},
   {id:'deliveryDate',label:'Delivery Date',      default:true},
+  {id:'qty',        label:'Qty',                 default:true},
+  {id:'qtyDelivered',label:'Qty Delivered',      default:true},
   {id:'comments',   label:'Comments',            default:true},
 ];
 var _hiddenCols = new Set();
@@ -2569,6 +2590,11 @@ function getColOrder(){
     if(stored)_colOrder=JSON.parse(stored);
   }catch(e){}
   if(!_colOrder)_colOrder=PROC_COLS.map(function(c){return c.id;});
+  // Forward-compatible migration: any colId added to PROC_COLS after this user's
+  // order was saved should still appear — append at the end so they're discoverable
+  // without scrambling the user's existing layout.
+  var seen={};_colOrder.forEach(function(id){seen[id]=true;});
+  PROC_COLS.forEach(function(c){if(!seen[c.id])_colOrder.push(c.id);});
   return _colOrder;
 }
 
