@@ -258,11 +258,10 @@ textarea.proc-edit:focus{min-height:60px;overflow:auto}
 
 <div id="syncBanner" style="display:none" class="sync-banner">
   <span style="font-size:18px">⚠</span>
-  <span class="sync-banner-text" id="syncBannerText">Equipment schedule has new items not yet in the procurement schedule.</span>
+  <span class="sync-banner-text" id="syncBannerText">Equipment schedule has new items/changes not yet in the procurement schedule.</span>
   <button class="sync-btn" onclick="runSync()">⟳ Sync Now</button>
 </div>
 
-<div id="summaryView" style="display:none;padding:16px 24px 60px"></div>
 <div id="syncBanner" style="display:none;margin:0 24px 12px;padding:12px 16px;background:rgba(255,184,48,.08);border:1px solid rgba(255,184,48,.4);border-radius:10px;display:none;align-items:center;gap:12px">
   <span style="font-size:18px">⚠️</span>
   <div style="flex:1">
@@ -293,8 +292,11 @@ textarea.proc-edit:focus{min-height:60px;overflow:auto}
   <button onclick="dismissOverdueBanner()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px">✕</button>
 </div>
 
-<!-- ALERT CHIPS — clickable counts that filter the table -->
+<!-- ALERT CHIPS — clickable counts that filter the table (or summary). Lives above
+     both views so it never falls underneath an empty summary state. -->
 <div id="alertChips" style="display:none;margin:0 24px 12px;align-items:center;gap:8px;flex-wrap:wrap"></div>
+
+<div id="summaryView" style="display:none;padding:16px 24px 60px"></div>
 
 <div id="fullView" style="padding:16px 24px 60px"><div style="overflow:auto;border-radius:var(--radius);max-height:calc(100vh - 280px)"><table class="proc-tbl" id="procTable">
     <thead>
@@ -532,10 +534,37 @@ async function checkEquipSync(){
   }
 }
 
+// Rebuild _equipLookup from a fetched equipment schedule blob. Called from both the
+// startup loader and runSync(), so the table render always reads the freshest master
+// data regardless of which path got us here. Without this, runSync mutated `items` but
+// the table render kept reading stale values from a never-refreshed _equipLookup,
+// making it look like sync did nothing.
+function rebuildEquipLookup(eqRaw){
+  _equipLookup={};
+  if(!eqRaw||!eqRaw.tabs)return;
+  eqRaw.tabs.forEach(function(tab){
+    if(!Array.isArray(tab.rows))return;
+    var typeLabel=getTypeLabel(tab);
+    tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
+      var id=(row.tag||row.equipment_id||'').trim();
+      if(!id)return;
+      _equipLookup[id]={
+        location:getRowField(row,tab,['location','Location']),
+        subLocation:getRowField(row,tab,['sublocation','subLocation','sub_location','Sub Location','Sub location']),
+        manufacturer:getRowField(row,tab,['manufacturer','make','maker','Manufacturer','Make']),
+        model:getRowField(row,tab,['model','Model']),
+        equipType:typeLabel
+      };
+    });
+  });
+}
+
 async function runSync(){
   var raw=null;
   try{raw=await dbGetEquipment(_psPNum);}catch(e){}
   if(!raw||!raw.tabs||!raw.tabs.length){showToast('No equipment schedule data found.');return;}
+  // Refresh the master lookup FIRST so the table render reads the new values
+  rebuildEquipLookup(raw);
   var added=0,updated=0;
   var existing=new Set(items.map(function(i){return i.equipId;}));
   raw.tabs.forEach(function(tab){
@@ -553,8 +582,11 @@ async function runSync(){
         // Don't clobber ad-hoc rows even if their equipId happens to match. They're
         // managed manually by the user and have no real link to Equipment Schedule.
         if(ex.adHoc){return;}
+        // Only count as updated if at least one field actually changed (so the toast
+        // doesn't lie when nothing real has happened).
+        var changed=(ex.building!==building)||(ex.location!==loc)||(ex.manufacturer!==mfr)||(ex.model!==mod)||(ex.equipType!==typeLabel);
         ex.building=building;ex.location=loc;ex.manufacturer=mfr;ex.model=mod;ex.equipType=typeLabel;
-        updated++;
+        if(changed)updated++;
       } else {
         items.push({
           id:'ps'+nid(),equipId:id,
@@ -1783,23 +1815,7 @@ function exportCSV(){openExportModal();}
   // Load equipment schedule — always master for equipId, location, manufacturer, model
   try{
     var eqRaw=await dbGetEquipment(_psPNum);
-    if(eqRaw&&eqRaw.tabs){
-      eqRaw.tabs.forEach(function(tab){
-        if(!Array.isArray(tab.rows))return;
-        var typeLabel=getTypeLabel(tab);
-        tab.rows.filter(function(r){return!r._deleted;}).forEach(function(row){
-          var id=(row.tag||row.equipment_id||'').trim();
-          if(!id)return;
-          _equipLookup[id]={
-            location:getRowField(row,tab,['location','Location']),
-            subLocation:getRowField(row,tab,['sublocation','subLocation','sub_location','Sub Location','Sub location']),
-            manufacturer:getRowField(row,tab,['manufacturer','make','maker','Manufacturer','Make']),
-            model:getRowField(row,tab,['model','Model']),
-            equipType:typeLabel
-          };
-        });
-      });
-    }
+    rebuildEquipLookup(eqRaw);
   }catch(e){}
   // Load tech subs and build equipment ID lookup
   try{
@@ -2207,6 +2223,13 @@ function setView(v){
   if(v==='summary')renderSummary();
 }
 
+// Resolve display location for an item — same precedence as the main table:
+// subLocation > location from Equipment Schedule > item.location > 'Unspecified'.
+function getItemLocation(item){
+  var eq=_equipLookup[item.equipId]||{};
+  return eq.subLocation||eq.location||item.location||'Unspecified';
+}
+
 function renderSummary(){
   var filtered=getFilteredItems();
   var el=document.getElementById('summaryView');
@@ -2223,59 +2246,103 @@ function renderSummary(){
 
   var td=today();
 
+  // Helper: build stats for an arbitrary set of items (used by both type and location rollups)
+  function statsFor(arr){
+    var total=arr.length;
+    return {
+      total:total,
+      delivered:arr.filter(function(x){return x.status==='Delivered';}).length,
+      ordered:arr.filter(function(x){return x.status==='Ordered'||x.status==='Ready';}).length,
+      notOrdered:arr.filter(function(x){return x.status==='Not ordered';}).length,
+      overdue:arr.filter(function(x){return x.eta&&x.eta<td&&x.status!=='Delivered';}).length
+    };
+  }
+
   var html='';
   gOrder.forEach(function(grpName,gi){
     var grpItems=groups[grpName];
-    var total=grpItems.length;
-    var totalQty=grpItems.reduce(function(a,b){return a+(parseInt(b.qty)||1);},0);
-    var delivered=grpItems.filter(function(x){return x.status==='Delivered';}).length;
-    var ordered=grpItems.filter(function(x){return x.status==='Ordered'||x.status==='Ready';}).length;
-    var notOrdered=grpItems.filter(function(x){return x.status==='Not ordered';}).length;
-    var overdue=grpItems.filter(function(x){return x.eta&&x.eta<td&&x.status!=='Delivered';}).length;
-    // Earliest outstanding ETA
+    var s=statsFor(grpItems);
     var etaDates=grpItems.filter(function(x){return x.eta&&x.status!=='Delivered';}).map(function(x){return x.eta;}).sort();
     var nextEta=etaDates.length?fmtD(etaDates[0]):'—';
-    var pct=totalQty>0?Math.round((delivered/total)*100):0;
+    var pct=s.total>0?Math.round((s.delivered/s.total)*100):0;
 
-    // Status summary text
+    // Type-level status summary
     var statusSummary='';
-    if(delivered===total)statusSummary='<span style="color:var(--green);font-weight:600">✓ All delivered</span>';
-    else if(notOrdered===total)statusSummary='<span style="color:var(--danger)">Not ordered</span>';
-    else statusSummary='<span style="color:var(--accent)">'+delivered+'/'+total+' delivered</span>'+(overdue?'<span style="color:var(--danger);margin-left:8px">⚠ '+overdue+' overdue</span>':'');
+    if(s.delivered===s.total)statusSummary='<span style="color:var(--green);font-weight:600">✓ All delivered</span>';
+    else if(s.notOrdered===s.total)statusSummary='<span style="color:var(--danger)">Not ordered</span>';
+    else statusSummary='<span style="color:var(--accent)">'+s.delivered+'/'+s.total+' delivered</span>'+(s.overdue?'<span style="color:var(--danger);margin-left:8px">⚠ '+s.overdue+' overdue</span>':'');
+
+    // ── Sub-group items by location ──
+    var locGroups={};var locOrder=[];
+    grpItems.forEach(function(item){
+      var loc=getItemLocation(item);
+      if(!locGroups[loc]){locGroups[loc]=[];locOrder.push(loc);}
+      locGroups[loc].push(item);
+    });
+    // Alphabetical, with 'Unspecified' parked at the bottom
+    locOrder.sort(function(a,b){
+      if(a==='Unspecified')return 1;
+      if(b==='Unspecified')return -1;
+      return a.localeCompare(b);
+    });
+
+    // Build all location sub-sections for this type
+    var locHtml=locOrder.map(function(locName){
+      var locItems=locGroups[locName];
+      var ls=statsFor(locItems);
+      var locPct=ls.total>0?Math.round((ls.delivered/ls.total)*100):0;
+      // Location-level summary text on the right
+      var locStatus='';
+      if(ls.delivered===ls.total)locStatus='<span style="font-size:11px;color:var(--green)">✓ all delivered</span>';
+      else locStatus='<span style="font-size:11px;color:var(--accent)">'+ls.delivered+'/'+ls.total+' delivered</span>'+(ls.overdue?'<span style="font-size:11px;color:var(--danger);margin-left:8px">⚠ '+ls.overdue+' overdue</span>':'');
+
+      var rowsHtml=locItems.map(function(item){
+        var etaD=item.eta?fmtD(item.eta):'—';
+        var isOv=item.eta&&item.eta<td&&item.status!=='Delivered';
+        var etaColor=item.status==='Delivered'?'var(--green)':isOv?'var(--danger)':item.eta?'var(--text2)':'var(--muted)';
+        var stColor=STATUS_COLORS[item.status]||'var(--text2)';
+        return '<div class="summary-row" style="padding-left:44px" onclick="openEditModal(\''+item.id+'\')">'
+          +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);min-width:140px;font-weight:700">'+escH(item.equipId||'—')+'</span>'
+          +'<span style="color:var(--muted);flex:1">'+escH(item.manufacturer||'—')+(item.model?' · '+escH(item.model):'')+'</span>'
+          +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+stColor+';min-width:120px">'+escH(item.status||'—')+'</span>'
+          +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+etaColor+';min-width:80px;text-align:right">'+etaD+(isOv?' ⚠':'')+'</span>'
+        +'</div>';
+      }).join('');
+
+      // Location sub-header — uppercase mono label, mini stats, mini progress bar
+      return ''
+        +'<div style="display:flex;align-items:center;gap:10px;padding:8px 16px 8px 32px;background:rgba(0,200,255,.03);border-bottom:1px solid var(--border)">'
+          +'<span style="font-family:DM Mono,monospace;font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text2);flex:1">'+escH(locName)+'</span>'
+          +'<span style="font-family:DM Mono,monospace;font-size:10px;color:var(--muted);margin-right:12px">'+ls.total+' item'+(ls.total!==1?'s':'')+'</span>'
+          +locStatus
+          +'<div style="width:60px;height:4px;background:var(--surface3);border-radius:2px;margin-left:10px;overflow:hidden">'
+            +'<div style="height:100%;width:'+locPct+'%;background:var(--green);border-radius:2px"></div>'
+          +'</div>'
+        +'</div>'
+        +rowsHtml;
+    }).join('');
 
     html+='<div class="summary-group" id="sg_'+gi+'">'
       +'<div class="summary-group-hdr" onclick="toggleSummaryGroup('+gi+')">'
         +'<span style="font-size:14px">▾</span>'
         +'<span style="font-weight:700;font-size:13px;flex:1">'+escH(grpName)+'</span>'
-        +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);margin-right:16px">'+total+' item'+(total!==1?'s':'')+'</span>'
+        +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);margin-right:16px">'+s.total+' item'+(s.total!==1?'s':'')+'</span>'
         +statusSummary
-        // Mini progress bar
         +'<div style="width:80px;height:6px;background:var(--surface3);border-radius:3px;margin-left:16px;overflow:hidden">'
           +'<div style="height:100%;width:'+pct+'%;background:var(--green);border-radius:3px;transition:width .3s"></div>'
         +'</div>'
       +'</div>'
       +'<div class="summary-group-body" id="sgb_'+gi+'">'
-        // Stats row
+        // Type-level stats row
         +'<div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface)">'
-          +'<div class="summary-stat"><span class="summary-stat-val">'+total+'</span><span class="summary-stat-lbl">Total</span></div>'
-          +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--danger)">'+notOrdered+'</span><span class="summary-stat-lbl">Not ordered</span></div>'
-          +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--accent)">'+ordered+'</span><span class="summary-stat-lbl">Ordered</span></div>'
-          +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--green)">'+delivered+'</span><span class="summary-stat-lbl">Delivered</span></div>'
-          +(overdue?'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--danger)">'+overdue+'</span><span class="summary-stat-lbl">Overdue</span></div>':'')
+          +'<div class="summary-stat"><span class="summary-stat-val">'+s.total+'</span><span class="summary-stat-lbl">Total</span></div>'
+          +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--danger)">'+s.notOrdered+'</span><span class="summary-stat-lbl">Not ordered</span></div>'
+          +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--accent)">'+s.ordered+'</span><span class="summary-stat-lbl">Ordered</span></div>'
+          +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--green)">'+s.delivered+'</span><span class="summary-stat-lbl">Delivered</span></div>'
+          +(s.overdue?'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--danger)">'+s.overdue+'</span><span class="summary-stat-lbl">Overdue</span></div>':'')
           +'<div class="summary-stat"><span class="summary-stat-val" style="color:var(--text2);font-size:14px">'+nextEta+'</span><span class="summary-stat-lbl">Next ETA</span></div>'
         +'</div>'
-        // Item rows
-        +grpItems.map(function(item){
-          var etaD=item.eta?fmtD(item.eta):'—';
-          var etaColor=item.status==='Delivered'?'var(--green)':item.eta&&item.eta<td?'var(--danger)':item.eta?'var(--text2)':'var(--muted)';
-          var stColor=STATUS_COLORS[item.status]||'var(--text2)';
-          return '<div class="summary-row" onclick="openEditModal(\''+item.id+'\')">'
-            +'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--accent);min-width:140px">'+escH(item.equipId||'—')+'</span>'
-            +'<span style="color:var(--muted);flex:1">'+escH(item.manufacturer||'—')+(item.model?' · '+escH(item.model):'')+'</span>'
-            +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+stColor+';min-width:120px">'+escH(item.status||'—')+'</span>'
-            +'<span style="font-family:DM Mono,monospace;font-size:11px;color:'+etaColor+';min-width:80px;text-align:right">'+etaD+'</span>'
-          +'</div>';
-        }).join('')
+        +locHtml
       +'</div>'
     +'</div>';
   });
