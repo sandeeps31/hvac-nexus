@@ -2085,11 +2085,21 @@ function updateExportSummary(){
   else summary.textContent=plant+' individual + '+groups+' bulk (with '+(filtered.length-plant)+' children) = '+(plant+filtered.length-plant+groups)+' rows';
 }
 function runExport(format){
-  var headers=['Equipment ID','Location','Manufacturer','Model','Equipment Type','Sub Approval Date','Order Status','Order Date','Lead Weeks','ETA','Delivery Date','Qty','Qty Delivered','Comments'];
+  // Build headers from the user's current column order + visibility. Mirrors the table
+  // exactly so what they see is what they export. Qty / Qty Delivered aren't on the
+  // table but matter for exports (handovers, supplier docs), so we append them.
+  var visibleCols=getOrderedCols().filter(function(c){return isColVisible(c.id);});
+  var headers=visibleCols.map(function(c){return c.label;}).concat(['Qty','Qty Delivered']);
+
+  // Per-item row builder — values in the same order as `visibleCols`, plus qty/qtyDelivered
+  function rowFor(it){
+    var r=visibleCols.map(function(c){return getColValue(it,c.id);});
+    r.push(it.qty||1, it.qtyDelivered||0);
+    return r;
+  }
+
   var rows=[];
   var filtered=items.filter(function(it){return it.equipId&&_expSel.has(it.equipType||'(Untyped)');});
-  // Apply same search/status/loc/type filter as the on-screen view? Keep export self-contained — only the type checklist drives it
-  // Sort within each group by equipId
   filtered.sort(function(a,b){return (a.equipType||'').localeCompare(b.equipType||'')||(a.equipId||'').localeCompare(b.equipId||'');});
 
   // Build rows according to display mode
@@ -2100,39 +2110,43 @@ function runExport(format){
       if(!groupBuckets[t])groupBuckets[t]=[];
       groupBuckets[t].push(it);
     } else {
-      rows.push([it.equipId,it.location||'',it.manufacturer||'',it.model||'',it.equipType||'',it.subApproval||'',it.status||'',it.orderDate||'',it.leadWeeks||'',it.eta||'',it.deliveryDate||'',it.qty||1,it.qtyDelivered||0,it.comments||'']);
+      rows.push(rowFor(it));
     }
   });
-  // Add grouped rows
+  // Add grouped rows — synthetic "summary" item with rolled-up values per column
   Object.keys(groupBuckets).sort().forEach(function(t){
     var children=groupBuckets[t];
     var totalQty=children.reduce(function(s,c){return s+(parseInt(c.qty,10)||1);},0);
     var deliveredQty=children.reduce(function(s,c){return s+(parseInt(c.qtyDelivered,10)||0);},0);
-    // Roll up — pick the worst-case status (Not ordered > Ordered > Ready > Delivered)
+    // Roll up status — pick the worst-case (Not ordered worst, Supplied by others best)
     var stRank={'Not ordered':0,'Ordered':1,'Ready':2,'Delivered':3,'Supplied by others':4};
     var minSt=null;children.forEach(function(c){var r=stRank[c.status]==null?0:stRank[c.status];if(minSt===null||r<minSt)minSt=r;});
     var rolledStatus=Object.keys(stRank).find(function(k){return stRank[k]===minSt;})||'Not ordered';
-    // Shared fields if all match
+    // Shared field if every child has the same value, else blank
     function commonField(field){var v=children[0][field]||'';for(var i=1;i<children.length;i++){if((children[i][field]||'')!==v)return '';}return v;}
-    rows.push([
-      t+' (×'+totalQty+')',
-      commonField('location'),
-      commonField('manufacturer'),
-      commonField('model'),
-      t,
-      commonField('subApproval'),
-      rolledStatus,
-      commonField('orderDate'),
-      commonField('leadWeeks'),
-      commonField('eta'),
-      commonField('deliveryDate'),
-      totalQty,
-      deliveredQty,
-      'Bulk group'
-    ]);
+    // Build a synthetic item for the summary row — getColValue can read this directly
+    var summaryItem={
+      equipId:t+' (×'+totalQty+')',
+      location:commonField('location'),
+      manufacturer:commonField('manufacturer'),
+      model:commonField('model'),
+      equipType:t,
+      status:rolledStatus,
+      orderDate:commonField('orderDate'),
+      leadWeeks:commonField('leadWeeks'),
+      eta:commonField('eta'),
+      deliveryDate:commonField('deliveryDate'),
+      comments:'Bulk group'
+    };
+    rows.push(visibleCols.map(function(c){return getColValue(summaryItem,c.id);}).concat([totalQty,deliveredQty]));
     if(_expDisplay==='expanded'){
       children.forEach(function(c){
-        rows.push(['  '+c.equipId,c.location||'',c.manufacturer||'',c.model||'',c.equipType||'',c.subApproval||'',c.status||'',c.orderDate||'',c.leadWeeks||'',c.eta||'',c.deliveryDate||'',c.qty||1,c.qtyDelivered||0,c.comments||'']);
+        // Children rendered indented under their group header
+        var r=visibleCols.map(function(col){return getColValue(c,col.id);});
+        // Indent the leading column (whichever it is in the user's order) for visual hierarchy
+        if(r.length)r[0]='  '+r[0];
+        r.push(c.qty||1, c.qtyDelivered||0);
+        rows.push(r);
       });
     }
   });
@@ -2149,7 +2163,7 @@ function runExport(format){
       s.onload=function(){_writeXlsx(headers,rows,fname);};document.head.appendChild(s);
     } else {_writeXlsx(headers,rows,fname);}
   } else if(format==='pdf'){
-    _writePdf(headers,rows,fname);
+    _writePdf(headers,rows,fname,visibleCols);
   }
   closeExportModal();
   showToast('Exported '+rows.length+' rows');
@@ -2170,16 +2184,19 @@ function _writeXlsx(headers,rows,fname){
 // Dates in the report are routed through fmtD() so they read as DD-MM-YYYY (consistent
 // with the on-screen module). Cell values are HTML-escaped to prevent malformed comments
 // from breaking the layout.
-function _writePdf(headers,rows,fname){
+function _writePdf(headers,rows,fname,visibleCols){
   var proj=_psProj.name||_psPNum||'Procurement';
   var dateStr=fmtD(today());
-  // Identify which columns hold dates so we can format them
-  var dateCols={5:1,7:1,9:1,10:1}; // Sub Approval, Order Date, ETA, Delivery Date
+  // Build a set of column INDICES that contain dates, by looking up the colId in
+  // visibleCols. Falls back to a sensible default if the param is missing.
+  var DATE_COL_IDS={subApprovalDate:1,orderDate:1,eta:1,deliveryDate:1};
+  var dateCols={};
+  (visibleCols||[]).forEach(function(c,i){if(DATE_COL_IDS[c.id])dateCols[i]=1;});
   var bodyRows=rows.map(function(r){
     return '<tr>'+r.map(function(v,ci){
       var s=String(v==null?'':v);
       if(dateCols[ci]&&s)s=fmtD(s);
-      // Equipment-ID column (col 0) on grouped rows starts with two-space indent — keep visible
+      // Leading column on a grouped child row starts with two-space indent — preserve it
       if(ci===0&&s.indexOf('  ')===0)s='&nbsp;&nbsp;'+escH(s.replace(/^\s+/,''));
       else s=escH(s);
       return '<td>'+s+'</td>';
