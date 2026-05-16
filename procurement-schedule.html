@@ -198,6 +198,18 @@ textarea.proc-edit:focus{min-height:60px;overflow:auto}
 .sb-av{width:28px;height:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}.sb-user-name{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:400;background:transparent}.sb-resize-handle:hover{background:rgba(0,200,255,.15)}
 .main{margin-left:230px;transition:margin-left .25s}
+/* Location picker — same as Equipment Schedule */
+.loc-pick{position:fixed;z-index:8000;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.6);width:240px;max-height:320px;display:flex;flex-direction:column;overflow:hidden}
+.loc-pick-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.loc-pick-back{background:none;border:none;color:var(--accent);cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0}
+.loc-pick-title{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loc-pick-clear{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0}
+.loc-pick-clear:hover{color:var(--danger)}
+.loc-pick-list{overflow-y:auto;flex:1}
+.loc-pick-item{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:1px solid rgba(30,48,80,.4);transition:background .1s}
+.loc-pick-item:last-child{border-bottom:none}
+.loc-pick-item:hover{background:var(--surface2)}
+.loc-pick-drill{color:var(--muted);font-size:14px}
 </style>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 </head>
@@ -333,7 +345,17 @@ textarea.proc-edit:focus{min-height:60px;overflow:auto}
         <span>✎</span> Ad-hoc item — not linked to Equipment Schedule. Fill in details manually.
       </div>
       <div class="mgrid2">
-        <div><label class="ml">Location</label><input class="mi" id="f-location" placeholder="e.g. Level 1 — Plant Room"/></div>
+        <div>
+          <label class="ml">Location</label>
+          <!-- Click-to-open picker driven by project Areas (same source as Equipment Schedule).
+               If no Areas are defined, the input stays as a plain text field — graceful fallback. -->
+          <div id="f-location-picker" onclick="openModalLocPicker(event)" style="background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;cursor:pointer;font-size:13px;color:var(--text);min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span id="f-location-display" style="flex:1;color:var(--muted)">Select area…</span>
+            <span style="color:var(--muted);font-size:11px">▾</span>
+          </div>
+          <input type="hidden" id="f-location" value=""/>
+          <input class="mi" id="f-location-text" placeholder="e.g. Level 1 — Plant Room" style="display:none" oninput="document.getElementById('f-location').value=this.value;"/>
+        </div>
         <div><label class="ml">Manufacturer</label><input class="mi" id="f-manufacturer" placeholder="e.g. Unistrut"/></div>
       </div>
       <div class="mgrid2">
@@ -1436,9 +1458,10 @@ function openAddModal(){
   document.getElementById('etaPreview').textContent='—';
   document.getElementById('deleteBtn').style.display='none';
   // Reset ad-hoc fields
-  ['f-location','f-manufacturer','f-model','f-equiptype'].forEach(function(id){
+  ['f-location','f-manufacturer','f-model','f-equiptype','f-location-text'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.value='';
   });
+  syncLocPickerDisplay();
   populateAdHocTypeOptions();
   updateModalEquipPreview();
   document.getElementById('addModal').classList.add('open');
@@ -1468,6 +1491,7 @@ function openEditModal(id){
   document.getElementById('f-manufacturer').value=item.manufacturer||'';
   document.getElementById('f-model').value=item.model||'';
   document.getElementById('f-equiptype').value=item.equipType||'';
+  syncLocPickerDisplay();
   populateAdHocTypeOptions();
   updateModalEquipPreview();
   document.getElementById('addModal').classList.add('open');
@@ -1503,7 +1527,178 @@ function updateModalEquipPreview(){
     adhoc.style.display=id?'block':'none'; // don't show empty-state ad-hoc until they've typed an ID
   }
 }
-function closeModal(){document.getElementById('addModal').classList.remove('open');}
+// ── PROJECT AREAS LOCATION PICKER ──
+// Mirrors Equipment Schedule's picker (proj_settings table, `<projectId>_areas` key,
+// nested {id,name,children} tree). Used by the ad-hoc item form so locations stay
+// consistent across modules. If the project has no areas defined yet, falls back
+// to a plain text input — graceful degradation.
+var _locationPaths=[];
+var _locationTree=[];
+var _locNodeMap={};
+var _locPickPath=[]; // breadcrumb of {label, nodes} for drill-down
+var _locPickCurrentNodes=[];
+
+function _flattenAreas(nodes,prefix){
+  var paths=[];
+  (nodes||[]).forEach(function(node){
+    if(!node.name)return;
+    var path=prefix?prefix+' > '+node.name:node.name;
+    paths.push(path);
+    if(node.children&&node.children.length)paths=paths.concat(_flattenAreas(node.children,path));
+  });
+  return paths;
+}
+function _buildLocNodeMap(nodes){
+  (nodes||[]).forEach(function(n){
+    _locNodeMap[n.id]=n;
+    if(n.children&&n.children.length)_buildLocNodeMap(n.children);
+  });
+}
+async function loadLocationPaths(){
+  try{
+    var pId=(_psProj.id||_psPNum||'').toLowerCase();
+    var areas=await dbGetProject('proj_settings',pId+'_areas');
+    if(areas&&Array.isArray(areas)&&areas.length){
+      _locationPaths=_flattenAreas(areas,'');
+      _locationTree=areas;
+      _locNodeMap={};_buildLocNodeMap(areas);
+    }
+  }catch(e){_locationPaths=[];_locationTree=[];}
+}
+
+// Open the picker positioned under the trigger. If no areas are defined for this
+// project, swap to a plain text input so the user isn't stuck with an empty picker.
+function openModalLocPicker(e){
+  if(!_locationTree||!_locationTree.length){
+    document.getElementById('f-location-picker').style.display='none';
+    var txt=document.getElementById('f-location-text');
+    txt.style.display='';
+    txt.focus();
+    return;
+  }
+  e.stopPropagation();
+  _locPickPath=[];
+  _locPickCurrentNodes=_locationTree;
+  renderLocPicker('Select area');
+  var pick=document.getElementById('locPicker');
+  pick.style.display='flex';
+  var rect=e.currentTarget.getBoundingClientRect();
+  var pw=240,ph=320;
+  var left=rect.left;var top=rect.bottom+4;
+  if(left+pw>window.innerWidth)left=window.innerWidth-pw-8;
+  if(top+ph>window.innerHeight)top=rect.top-ph-4;
+  pick.style.left=left+'px';pick.style.top=top+'px';
+}
+
+function renderLocPicker(title){
+  document.getElementById('locPickTitle').textContent=title;
+  document.getElementById('locPickBack').style.visibility=_locPickPath.length?'visible':'hidden';
+  var list=document.getElementById('locPickList');
+  var nodes=_locPickCurrentNodes||[];
+  // Build display path using ' - ' separator (matches Equipment Schedule's storage format)
+  var prefix=_locPickPath.map(function(p){return p.label;}).join(' - ');
+  var html='';
+  if(_locPickPath.length>0){
+    var selLabel=_locPickPath[_locPickPath.length-1].label;
+    html+='<div class="loc-pick-item" style="color:var(--accent);font-size:12px;border-bottom:2px solid var(--border)" data-loc-action="select" data-loc-val="'+escH(prefix)+'">'
+      +'<span>✓ Select "'+escH(selLabel)+'"</span>'
+      +'</div>';
+  }
+  nodes.forEach(function(node){
+    if(!node.name)return;
+    var fullPath=prefix?(prefix+' - '+node.name):node.name;
+    var hasKids=node.children&&node.children.length>0;
+    html+='<div class="loc-pick-item" '
+      +(hasKids?'data-loc-action="drill" data-loc-id="'+escH(node.id)+'" data-loc-label="'+escH(node.name)+'"':'data-loc-action="select" data-loc-val="'+escH(fullPath)+'"')
+      +'>'
+      +'<span>'+escH(node.name)+'</span>'
+      +(hasKids?'<span class="loc-pick-drill">›</span>':'')
+      +'</div>';
+  });
+  if(!nodes.length)html='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">No areas defined</div>';
+  list.innerHTML=html;
+  list.querySelectorAll('.loc-pick-item').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var action=el.dataset.locAction;
+      if(action==='select'){locPickSelect(el.dataset.locVal);}
+      else if(action==='drill'){locPickDrillId(el.dataset.locId,el.dataset.locLabel);}
+    });
+  });
+}
+
+function locPickDrillId(nodeId,label){
+  var node=_locNodeMap[nodeId];
+  if(!node)return;
+  _locPickPath.push({label:label,nodes:_locPickCurrentNodes});
+  _locPickCurrentNodes=node.children||[];
+  renderLocPicker(label);
+}
+
+function locPickBack(){
+  if(!_locPickPath.length)return;
+  var prev=_locPickPath.pop();
+  _locPickCurrentNodes=prev.nodes;
+  var title=_locPickPath.length?_locPickPath[_locPickPath.length-1].label:'Select area';
+  renderLocPicker(title);
+}
+
+function locPickSelect(fullPath){
+  // Picker uses ' - ' separator in display; storage uses the same. Already normalised.
+  document.getElementById('f-location').value=fullPath;
+  var disp=document.getElementById('f-location-display');
+  disp.textContent=fullPath||'Select area…';
+  disp.style.color=fullPath?'var(--text)':'var(--muted)';
+  closeLocPicker();
+}
+
+function locPickClear(){
+  document.getElementById('f-location').value='';
+  var disp=document.getElementById('f-location-display');
+  disp.textContent='Select area…';
+  disp.style.color='var(--muted)';
+  closeLocPicker();
+}
+
+function closeLocPicker(){
+  var pick=document.getElementById('locPicker');
+  if(pick)pick.style.display='none';
+}
+
+// Syncs the visible picker chip + fallback text input to the current f-location value.
+// Called when the modal opens (add or edit) so a pre-existing location renders correctly.
+function syncLocPickerDisplay(){
+  var val=document.getElementById('f-location').value||'';
+  var disp=document.getElementById('f-location-display');
+  if(disp){
+    disp.textContent=val||'Select area…';
+    disp.style.color=val?'var(--text)':'var(--muted)';
+  }
+  var txt=document.getElementById('f-location-text');
+  var picker=document.getElementById('f-location-picker');
+  // If no areas exist, surface the plain text fallback so editing isn't blocked.
+  // Otherwise show the picker UI and keep the text input hidden (but synced).
+  if(_locationTree&&_locationTree.length){
+    if(picker)picker.style.display='';
+    if(txt){txt.style.display='none';txt.value=val;}
+  } else {
+    if(picker)picker.style.display='none';
+    if(txt){txt.style.display='';txt.value=val;}
+  }
+}
+
+// Click outside picker closes it. Defer attachment so the originating click doesn't
+// immediately fire the close (same pattern as the confirm modal).
+document.addEventListener('click',function(e){
+  var pick=document.getElementById('locPicker');
+  if(!pick||pick.style.display==='none')return;
+  if(pick.contains(e.target))return;
+  // Don't close on the trigger itself either (its own onclick handler manages state)
+  if(e.target.closest('#f-location-picker'))return;
+  closeLocPicker();
+});
+
+function closeModal(){document.getElementById('addModal').classList.remove('open');closeLocPicker();}
 function saveItem(){
   var equipId=document.getElementById('f-equipid').value.trim();
   if(!equipId){showToast('Equipment ID is required.');return;}
@@ -1864,6 +2059,9 @@ function exportCSV(){openExportModal();}
   checkEquipSync();
   renderApprovalBanner();
   checkOverdueBanner();
+  // Project Areas — used by the ad-hoc item modal's Location picker. Fire-and-forget;
+  // if it hasn't completed by the time the modal opens, the picker falls back to text.
+  loadLocationPaths();
 })();
 </script>
 <script>
@@ -2498,6 +2696,16 @@ tr.proc-group-child td.equip-id{padding-left:24px !important}
   <input type="text" id="batchComments" placeholder="Append comments…" oninput="updateBatchApplyState()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;flex:1;min-width:160px" onkeydown="if(event.key==='Enter')applyBatchChanges()"/>
   <button id="batchApplyBtn" onclick="applyBatchChanges()" disabled style="background:var(--accent);border:none;border-radius:6px;color:#080c12;font-size:12px;font-weight:700;padding:5px 14px;cursor:not-allowed;opacity:0.45;font-family:'DM Sans',sans-serif;transition:opacity .15s">Apply</button>
   <button onclick="clearSelection()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px;line-height:1" title="Dismiss">✕</button>
+</div>
+
+<!-- Location picker (same UX as Equipment Schedule). Hidden by default; positioned at click. -->
+<div id="locPicker" class="loc-pick" style="display:none">
+  <div class="loc-pick-hdr">
+    <button class="loc-pick-back" id="locPickBack" onclick="locPickBack()">‹</button>
+    <span class="loc-pick-title" id="locPickTitle">Select area</span>
+    <button class="loc-pick-clear" onclick="locPickClear()" title="Clear">✕</button>
+  </div>
+  <div class="loc-pick-list" id="locPickList"></div>
 </div>
 </body>
 </html>
