@@ -1845,12 +1845,16 @@ function renderExportModal(){
     {v:'flat',title:'Individual rows only',sub:'Flatten back to one row per equipment ID. Ignores grouping.'}
   ];
   radioEl.innerHTML=opts.map(function(o){
-    var disabled=!hasBulk;
-    return '<label class="exp-radio'+(_expDisplay===o.v?' selected':'')+'" '+(disabled?'style="opacity:.45;cursor:not-allowed"':'')+'>'
-      +'<input type="radio" name="expDisp" value="'+o.v+'" '+(_expDisplay===o.v?'checked':'')+' '+(disabled?'disabled':'')+' onchange="setExportDisplay(this.value)">'
+    return '<label class="exp-radio'+(_expDisplay===o.v?' selected':'')+'">'
+      +'<input type="radio" name="expDisp" value="'+o.v+'" '+(_expDisplay===o.v?'checked':'')+' onchange="setExportDisplay(this.value)">'
       +'<div class="exp-radio-body"><div class="exp-radio-title">'+o.title+'</div><div class="exp-radio-sub">'+o.sub+'</div></div>'
       +'</label>';
   }).join('');
+  // Show a discreet note when no grouped types are selected, since the layout choice
+  // only meaningfully changes output when grouping is in play.
+  if(!hasBulk){
+    radioEl.innerHTML+='<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:4px;padding-left:2px">No grouped types selected — output will be individual rows regardless of the choice above.</div>';
+  }
   updateExportSummary();
 }
 function toggleExportType(cb,type){
@@ -1955,6 +1959,8 @@ function runExport(format){
       var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
       s.onload=function(){_writeXlsx(headers,rows,fname);};document.head.appendChild(s);
     } else {_writeXlsx(headers,rows,fname);}
+  } else if(format==='pdf'){
+    _writePdf(headers,rows,fname);
   }
   closeExportModal();
   showToast('Exported '+rows.length+' rows');
@@ -1967,8 +1973,64 @@ function _writeXlsx(headers,rows,fname){
   XLSX.utils.book_append_sheet(wb,ws,'Procurement');
   XLSX.writeFile(wb,fname);
 }
+
+// Open a new window with a print-styled report and trigger the print dialog. The user
+// picks "Save as PDF" as the destination. No external library needed — and the user
+// gets to control orientation, margins, etc. via the system print dialog.
+//
+// Dates in the report are routed through fmtD() so they read as DD-MM-YYYY (consistent
+// with the on-screen module). Cell values are HTML-escaped to prevent malformed comments
+// from breaking the layout.
+function _writePdf(headers,rows,fname){
+  var proj=_psProj.name||_psPNum||'Procurement';
+  var dateStr=fmtD(today());
+  // Identify which columns hold dates so we can format them
+  var dateCols={5:1,7:1,9:1,10:1}; // Sub Approval, Order Date, ETA, Delivery Date
+  var bodyRows=rows.map(function(r){
+    return '<tr>'+r.map(function(v,ci){
+      var s=String(v==null?'':v);
+      if(dateCols[ci]&&s)s=fmtD(s);
+      // Equipment-ID column (col 0) on grouped rows starts with two-space indent — keep visible
+      if(ci===0&&s.indexOf('  ')===0)s='&nbsp;&nbsp;'+escH(s.replace(/^\s+/,''));
+      else s=escH(s);
+      return '<td>'+s+'</td>';
+    }).join('')+'</tr>';
+  }).join('');
+  var w=window.open('','_blank','width=1200,height=800');
+  if(!w){showToast('Pop-up blocked — allow pop-ups to export PDFs');return;}
+  w.document.write(
+    '<!doctype html><html><head><meta charset="utf-8"><title>'+escH(fname.replace(/\.[a-z]+$/,''))+'</title>'
+    +'<style>'
+    +'@page{size:A3 landscape;margin:12mm}'
+    +'*{box-sizing:border-box}'
+    +'body{font-family:Arial,sans-serif;color:#222;margin:0;padding:0}'
+    +'.hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #222;padding-bottom:8px;margin-bottom:14px}'
+    +'.hdr .ttl{font-size:18px;font-weight:700}'
+    +'.hdr .sub{font-size:11px;color:#666;margin-top:3px}'
+    +'.hdr .meta{font-size:10px;color:#666;text-align:right}'
+    +'table{width:100%;border-collapse:collapse;font-size:9.5px}'
+    +'th{background:#1f2937;color:#fff;padding:6px 4px;text-align:left;font-weight:600;font-size:9px;letter-spacing:.4px;text-transform:uppercase;border:1px solid #1f2937}'
+    +'td{padding:5px 4px;border:1px solid #ddd;vertical-align:top;word-break:break-word}'
+    +'tr:nth-child(even) td{background:#f9fafb}'
+    +'.footer{position:fixed;bottom:8mm;left:12mm;right:12mm;display:flex;justify-content:space-between;font-size:9px;color:#999;border-top:1px solid #ddd;padding-top:4px}'
+    +'@media print{.no-print{display:none}.footer{position:fixed}}'
+    +'.print-btn{position:fixed;top:12px;right:12px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;padding:8px 16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}'
+    +'</style></head><body>'
+    +'<button class="print-btn no-print" onclick="window.print()">🖨 Print / Save as PDF</button>'
+    +'<div class="hdr">'
+    +'<div><div class="ttl">Procurement Schedule</div><div class="sub">'+escH(proj)+' · '+rows.length+' rows</div></div>'
+    +'<div class="meta">Exported '+dateStr+'</div>'
+    +'</div>'
+    +'<table><thead><tr>'+headers.map(function(h){return '<th>'+escH(h)+'</th>';}).join('')+'</tr></thead>'
+    +'<tbody>'+bodyRows+'</tbody></table>'
+    +'<div class="footer"><span>HVAC Nexus · Procurement Schedule</span><span>'+escH(proj)+' · '+dateStr+'</span></div>'
+    +'<script>setTimeout(function(){window.print();},300);</scr'+'ipt>'
+    +'</body></html>'
+  );
+  w.document.close();
+}
 function _buildExportFilename(format){
-  var ext=format==='xlsx'?'.xlsx':'.csv';
+  var ext=format==='xlsx'?'.xlsx':format==='pdf'?'.pdf':'.csv';
   var typeMap={};items.forEach(function(it){if(!it.equipId)return;typeMap[it.equipType||'(Untyped)']=true;});
   var allTypes=Object.keys(typeMap);
   var selSize=_expSel.size;
@@ -2641,7 +2703,7 @@ window.addEventListener('DOMContentLoaded',function(){
       <div id="exportSummary" style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"></div>
       <div style="display:flex;gap:8px">
         <button onclick="closeExportModal()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:12px;padding:6px 14px">Cancel</button>
-        <button onclick="runExport('csv')" style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:12px;font-weight:600;padding:6px 14px">📊 CSV</button>
+        <button onclick="runExport('pdf')" style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:12px;font-weight:600;padding:6px 14px">📄 PDF</button>
         <button onclick="runExport('xlsx')" style="background:var(--accent);border:none;border-radius:8px;color:#080c12;font-size:12px;font-weight:700;padding:6px 16px;cursor:pointer">📊 Excel</button>
       </div>
     </div>
