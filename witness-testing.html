@@ -3428,22 +3428,8 @@ async function openNewRunsheetModal(){
   if(eqRadio)eqRadio.checked = true;
   onRunsheetTypeChange();  // sync UI to equipment mode
 
-  // Populate template selector
-  var sel = document.getElementById('new-template');
-  if(projectTemplates.length === 0){
-    sel.innerHTML = '<option value="">— No templates available —</option>';
-    sel.disabled = true;
-    document.getElementById('tpl-empty-msg').style.display = '';
-    document.getElementById('newRsCreateBtn').disabled = true;
-  } else {
-    sel.disabled = false;
-    document.getElementById('tpl-empty-msg').style.display = 'none';
-    sel.innerHTML = '<option value="">— Select a project template —</option>'
-      + projectTemplates.map(function(t){
-          var label = (t.formNo ? t.formNo + ' · ' : '') + (t.name || '(Untitled)') + ' (' + (t.equipment_type || '—') + ', ' + ((t.tests||[]).length) + ' tests)';
-          return '<option value="'+escH(t.id)+'">'+escH(label)+'</option>';
-        }).join('');
-  }
+  // Populate template selector — filtered by current _newRsType
+  _populateTemplateDropdown();
   document.getElementById('tpl-info').style.display = 'none';
 
   // Disable Create until eqid AND template are both valid
@@ -3451,6 +3437,49 @@ async function openNewRunsheetModal(){
 
   document.getElementById('newRsModal').classList.add('open');
   setTimeout(function(){var el=document.getElementById('new-eqid');if(el)el.focus();},80);
+}
+
+// Populate the New Runsheet modal's template dropdown, filtered by _newRsType.
+// Equipment mode → equipment templates only.
+// System mode    → system templates only.
+// Pre-existing templates without a template_type field default to 'equipment'.
+function _populateTemplateDropdown(){
+  var sel = document.getElementById('new-template');
+  if(!sel)return;
+  var emptyMsg = document.getElementById('tpl-empty-msg');
+
+  // Filter templates by the current runsheet type
+  var filtered = projectTemplates.filter(function(t){
+    var ttype = t.template_type || 'equipment';
+    return ttype === _newRsType;
+  });
+
+  if(filtered.length === 0){
+    var pretty = (_newRsType === 'system') ? 'system test' : 'equipment test';
+    sel.innerHTML = '<option value="">— No '+pretty+' templates available —</option>';
+    sel.disabled = true;
+    if(emptyMsg){
+      emptyMsg.style.display = '';
+      emptyMsg.innerHTML = 'No project '+pretty+' templates available. Set up templates in <a onclick="navTo(\'witness-templates.html\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Project Settings → Witness Templates</a> first.';
+    }
+    var btn = document.getElementById('newRsCreateBtn');
+    if(btn)btn.disabled = true;
+  } else {
+    sel.disabled = false;
+    if(emptyMsg)emptyMsg.style.display = 'none';
+    sel.innerHTML = '<option value="">— Select a project template —</option>'
+      + filtered.map(function(t){
+          // Show appropriate type tag in the option label
+          var typeTag = (t.template_type === 'system')
+            ? (t.system_type || 'System')
+            : (t.equipment_type || '—');
+          var label = (t.formNo ? t.formNo + ' · ' : '') + (t.name || '(Untitled)') + ' (' + typeTag + ', ' + ((t.tests||[]).length) + ' tests)';
+          return '<option value="'+escH(t.id)+'">'+escH(label)+'</option>';
+        }).join('');
+  }
+  // Reset the info hint when re-populating (the previously-selected template may no longer exist in the filtered set)
+  var info = document.getElementById('tpl-info');
+  if(info)info.style.display = 'none';
 }
 
 // ── Cx tracker equipment list ──
@@ -3525,6 +3554,8 @@ function onRunsheetTypeChange(){
     if(eqMode)eqMode.style.display = '';
     if(sysMode)sysMode.style.display = 'none';
   }
+  // Re-filter the template dropdown — equipment-mode hides system templates and vice versa
+  _populateTemplateDropdown();
   updateCreateBtnState();
 }
 
@@ -3709,6 +3740,17 @@ async function confirmNewRunsheet(){
 
   var tpl = projectTemplates.find(function(t){return t.id === tplId;});
   if(!tpl){alert('Selected template not found.');return;}
+
+  // Defensive check: make sure the template's type matches the runsheet type.
+  // The dropdown filters by type, but if it somehow got stale (e.g. user kept the
+  // template selected then switched the toggle), this catches the mismatch.
+  var tplType = tpl.template_type || 'equipment';
+  if(tplType !== _newRsType){
+    var prettyTpl = (tplType === 'system') ? 'system test' : 'equipment test';
+    var prettyRs  = (_newRsType === 'system') ? 'system test' : 'equipment test';
+    alert('Template type mismatch: the selected template is a '+prettyTpl+' template, but you\'re creating a '+prettyRs+' runsheet. Pick a matching template from the dropdown.');
+    return;
+  }
 
   // Branch on type (Feature B)
   var eqId, equipmentName, cxTrackerId, scopeDescription;

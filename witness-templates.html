@@ -147,6 +147,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .sd-option.sd-add{color:var(--accent);font-style:italic}
 
 /* Toast */
+/* System / Equipment chips (template type indicators) */
+.system-chip{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;letter-spacing:.4px;text-transform:uppercase;background:rgba(167,139,250,.15);color:#c4b5fd;border:1px solid rgba(167,139,250,.3);white-space:nowrap}
+.equipment-chip{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;letter-spacing:.4px;text-transform:uppercase;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.3);white-space:nowrap}
+
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)}
 </style>
 <script>
@@ -197,6 +201,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   <div class="view active" id="view-register">
     <div class="reg-toolbar">
       <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search witness templates…" oninput="renderRegister()"></div>
+      <select class="fsel" id="filterType" onchange="renderRegister()" style="font-size:12px">
+        <option value="">All Types</option>
+        <option value="equipment">Equipment Tests</option>
+        <option value="system">System Tests</option>
+      </select>
       <select class="fsel" id="filterEquip" onchange="renderRegister()" style="font-size:12px"><option value="">All Equipment Types</option></select>
       <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="tplCount"></span>
     </div>
@@ -206,7 +215,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
           <tr>
             <th style="width:110px">Form No.</th>
             <th>Template Name</th>
-            <th style="width:140px">Equipment Type</th>
+            <th style="width:170px">Type</th>
             <th style="width:170px">Source</th>
             <th style="width:80px">Tests</th>
             <th style="width:120px">Last Modified</th>
@@ -227,6 +236,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div class="wt-hdr-block">
       <div class="wt-hdr-row">
         <div class="wt-hdr-cell"><div class="wt-hdr-lbl">Form No.</div><div class="wt-hdr-val mono" id="ed-formno">—</div></div>
+        <div class="wt-hdr-cell"><div class="wt-hdr-lbl">Type</div><div class="wt-hdr-val" id="ed-type-badge">—</div></div>
         <div class="wt-hdr-cell"><div class="wt-hdr-lbl">Created</div><div class="wt-hdr-val" id="ed-created">—</div></div>
         <div class="wt-hdr-cell"><div class="wt-hdr-lbl">Last Modified</div><div class="wt-hdr-val" id="ed-modified">—</div></div>
       </div>
@@ -236,7 +246,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
           <input id="ed-name-input" class="wt-hdr-input" placeholder="e.g. AHU — Witness Testing" oninput="markDirty()" onblur="saveMeta()"/>
         </div>
         <div class="wt-hdr-cell">
-          <div class="wt-hdr-lbl">Equipment Type <span style="color:var(--accent);font-size:9px">✏ editable</span></div>
+          <div class="wt-hdr-lbl" id="ed-equiptype-label">Equipment Type <span style="color:var(--accent);font-size:9px">✏ editable</span></div>
           <div class="searchable-wrap">
             <input id="ed-equiptype-input" class="wt-hdr-input" placeholder="e.g. AHU" autocomplete="off"
               oninput="filterEdEquipDropdown();markDirty()"
@@ -560,22 +570,30 @@ function renderRegister(){
   var q = (document.getElementById('srch')||{}).value || '';
   q = q.toLowerCase();
   var ef = (document.getElementById('filterEquip')||{}).value || '';
+  var tf = (document.getElementById('filterType')||{}).value || '';
+
   var list = templates.filter(function(t){
-    var nameMatch = !q || (t.formNo||'').toLowerCase().includes(q) || (t.name||'').toLowerCase().includes(q) || (t.equipment_type||'').toLowerCase().includes(q);
+    var ttype = t.template_type || 'equipment';
+    var nameMatch = !q
+      || (t.formNo||'').toLowerCase().includes(q)
+      || (t.name||'').toLowerCase().includes(q)
+      || (t.equipment_type||'').toLowerCase().includes(q)
+      || (t.system_type||'').toLowerCase().includes(q);
     var equipMatch = !ef || (t.equipment_type||'') === ef;
-    return nameMatch && equipMatch;
+    var typeMatch = !tf || ttype === tf;
+    return nameMatch && equipMatch && typeMatch;
   });
 
   var cnt=document.getElementById('tplCount');
   if(cnt)cnt.textContent = list.length+' template'+(list.length!==1?'s':'');
 
-  // Populate equipment type filter
+  // Populate equipment type filter (equipment templates only)
   var equipSel = document.getElementById('filterEquip');
   if(equipSel){
     var cur = equipSel.value;
     var types = [];
     templates.forEach(function(t){
-      if(t.equipment_type && types.indexOf(t.equipment_type)===-1)types.push(t.equipment_type);
+      if((t.template_type||'equipment') === 'equipment' && t.equipment_type && types.indexOf(t.equipment_type)===-1)types.push(t.equipment_type);
     });
     types.sort();
     equipSel.innerHTML = '<option value="">All Equipment Types</option>' + types.map(function(t){
@@ -585,7 +603,17 @@ function renderRegister(){
 
   var rows='';
   list.forEach(function(t){
-    var equipChip = t.equipment_type ? '<span class="chip-equip">'+escH(t.equipment_type)+'</span>' : '<span style="color:var(--muted);font-size:11px">—</span>';
+    var ttype = t.template_type || 'equipment';
+    var isSystem = (ttype === 'system');
+    var typeCell;
+    if(isSystem){
+      var sys = t.system_type ? '<span style="color:var(--text);font-size:12px;margin-left:6px">'+escH(t.system_type)+'</span>' : '';
+      typeCell = '<span class="system-chip">⚙ System</span>' + sys;
+    } else {
+      typeCell = t.equipment_type
+        ? '<span class="chip-equip">'+escH(t.equipment_type)+'</span>'
+        : '<span style="color:var(--muted);font-size:11px">—</span>';
+    }
     var testCount = (t.tests||[]).length;
     // Source chip: imported templates show source ref + pulled date; from-scratch show muted "From scratch"
     var srcChip;
@@ -599,7 +627,7 @@ function renderRegister(){
     rows += '<tr style="cursor:pointer" onclick="openEditor(\''+escH(t.id)+'\')">'
       +'<td><span class="wt-num">'+escH(t.formNo||'—')+'</span></td>'
       +'<td><span class="wt-name">'+escH(t.name||'(Untitled)')+'</span></td>'
-      +'<td>'+equipChip+'</td>'
+      +'<td>'+typeCell+'</td>'
       +'<td>'+srcChip+'</td>'
       +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+testCount+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(t.modifiedDate||t.createdDate)+'</td>'
@@ -700,6 +728,10 @@ function renderEditor(){
   var tpl = templates.find(function(t){return t.id===activeTplId;});
   if(!tpl){showRegister();return;}
 
+  // Default any pre-existing templates that have no type set
+  if(!tpl.template_type)tpl.template_type = 'equipment';
+  var isSystem = (tpl.template_type === 'system');
+
   // Topbar / breadcrumb
   var bc=document.getElementById('bcCurr');if(bc)bc.textContent = (tpl.formNo||'') + ' — ' + (tpl.name||'(Untitled)');
   var et=document.getElementById('editorTitle');if(et)et.textContent = (tpl.formNo||'') + ' — ' + (tpl.name||'(Untitled)');
@@ -709,7 +741,20 @@ function renderEditor(){
   document.getElementById('ed-created').textContent = fmtDate(tpl.createdDate);
   document.getElementById('ed-modified').textContent = fmtDate(tpl.modifiedDate);
   document.getElementById('ed-name-input').value = tpl.name || '';
-  document.getElementById('ed-equiptype-input').value = tpl.equipment_type || '';
+
+  // Type badge + dynamic label
+  var badge = document.getElementById('ed-type-badge');
+  if(badge){
+    badge.innerHTML = isSystem
+      ? '<span class="system-chip">⚙ System Test</span>'
+      : '<span class="equipment-chip">⚙ Equipment Test</span>';
+  }
+  var lbl = document.getElementById('ed-equiptype-label');
+  if(lbl){
+    lbl.innerHTML = (isSystem ? 'System Type' : 'Equipment Type') + ' <span style="color:var(--accent);font-size:9px">✏ editable</span>';
+  }
+  document.getElementById('ed-equiptype-input').value = isSystem ? (tpl.system_type || '') : (tpl.equipment_type || '');
+  document.getElementById('ed-equiptype-input').placeholder = isSystem ? 'e.g. Fire Test, Stair Pressurisation' : 'e.g. AHU';
 
   renderTests();
 }
@@ -717,11 +762,18 @@ function renderEditor(){
 function saveMeta(){
   var tpl = templates.find(function(t){return t.id===activeTplId;});
   if(!tpl)return;
+  if(!tpl.template_type)tpl.template_type = 'equipment';
+  var isSystem = (tpl.template_type === 'system');
+
   var newName = (document.getElementById('ed-name-input').value||'').trim();
-  var newEquip = (document.getElementById('ed-equiptype-input').value||'').trim();
+  var newTypeVal = (document.getElementById('ed-equiptype-input').value||'').trim();
   var changed = false;
   if(newName && newName !== tpl.name){tpl.name = newName;changed = true;}
-  if(newEquip !== tpl.equipment_type){tpl.equipment_type = newEquip;rememberEquipType(newEquip);changed = true;}
+  if(isSystem){
+    if(newTypeVal !== (tpl.system_type||'')){tpl.system_type = newTypeVal;changed = true;}
+  } else {
+    if(newTypeVal !== (tpl.equipment_type||'')){tpl.equipment_type = newTypeVal;rememberEquipType(newTypeVal);changed = true;}
+  }
   if(changed){
     // Update breadcrumb / title
     var bc=document.getElementById('bcCurr');if(bc)bc.textContent = (tpl.formNo||'') + ' — ' + (tpl.name||'(Untitled)');
@@ -999,7 +1051,8 @@ function renderImportList(){
   var list = companyTemplates.filter(function(t){
     return !q || (t.formNo||'').toLowerCase().includes(q)
       || (t.name||'').toLowerCase().includes(q)
-      || (t.equipment_type||'').toLowerCase().includes(q);
+      || (t.equipment_type||'').toLowerCase().includes(q)
+      || (t.system_type||'').toLowerCase().includes(q);
   });
   // Build a Set of ids already imported (to mark/hide)
   var importedSet = {};
@@ -1009,7 +1062,18 @@ function renderImportList(){
   list.forEach(function(t){
     var checked = _importSelected.indexOf(t.id) !== -1;
     var already = !!importedSet[t.id];
-    var equipChip = t.equipment_type ? '<span class="chip-equip">'+escH(t.equipment_type)+'</span>' : '<span style="color:var(--muted);font-size:11px">—</span>';
+    // Type-aware chip in the import list
+    var ttype = t.template_type || 'equipment';
+    var isSystem = (ttype === 'system');
+    var typeCell;
+    if(isSystem){
+      var sys = t.system_type ? '<span style="color:var(--text);font-size:11px;margin-left:5px">'+escH(t.system_type)+'</span>' : '';
+      typeCell = '<span class="system-chip">⚙ System</span>' + sys;
+    } else {
+      typeCell = t.equipment_type
+        ? '<span class="chip-equip">'+escH(t.equipment_type)+'</span>'
+        : '<span style="color:var(--muted);font-size:11px">—</span>';
+    }
     var testCount = (t.tests||[]).length;
     var rowStyle = already ? 'opacity:.55' : 'cursor:pointer';
     var nameCell = '<span class="wt-name">'+escH(t.name||'(Untitled)')+'</span>'
@@ -1024,7 +1088,7 @@ function renderImportList(){
       + ' onchange="toggleImportSel(\''+escH(t.id)+'\')" style="cursor:'+(already?'not-allowed':'pointer')+'"></td>'
       + '<td><span class="wt-num">'+escH(t.formNo||'—')+'</span></td>'
       + '<td>'+nameCell+'</td>'
-      + '<td>'+equipChip+'</td>'
+      + '<td>'+typeCell+'</td>'
       + '<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+testCount+'</td>'
       + '</tr>';
   });

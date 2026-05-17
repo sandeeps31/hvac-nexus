@@ -144,6 +144,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .sd-option:hover{background:var(--surface3)}
 .sd-option.sd-add{color:var(--accent);font-style:italic}
 
+/* ═══════════════════════════════════════════════════
+   Template type toggle (Equipment vs System)
+═══════════════════════════════════════════════════ */
+.tpltype-toggle-wrap{margin-bottom:14px}
+.tpltype-toggle-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tpltype-opt{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;transition:all .12s;background:var(--surface3)}
+.tpltype-opt:hover{border-color:var(--accent);background:var(--accent-dim)}
+.tpltype-opt input[type=radio]{display:none}
+.tpltype-radio{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;margin-top:2px;background:var(--surface2);position:relative;transition:all .12s}
+.tpltype-opt input[type=radio]:checked + .tpltype-radio{border-color:var(--accent);background:var(--accent-dim)}
+.tpltype-opt input[type=radio]:checked + .tpltype-radio::after{content:'';position:absolute;top:2px;left:2px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.tpltype-opt:has(input[type=radio]:checked){border-color:var(--accent);background:var(--accent-dim)}
+.tpltype-opt input[type=radio]:checked ~ .tpltype-lbl .tt-title{color:var(--accent)}
+.tpltype-lbl{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tpltype-lbl .tt-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text)}
+.tpltype-lbl .tt-sub{font-size:11px;color:var(--text2);line-height:1.4}
+
+/* System badge (purple chip — same style as in witness-testing.html) */
+.system-chip{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;letter-spacing:.4px;text-transform:uppercase;background:rgba(167,139,250,.15);color:#c4b5fd;border:1px solid rgba(167,139,250,.3);white-space:nowrap}
+.equipment-chip{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;letter-spacing:.4px;text-transform:uppercase;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,200,255,.3);white-space:nowrap}
+
 /* Toast */
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)}
 </style>
@@ -194,6 +215,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   <div class="view active" id="view-register">
     <div class="reg-toolbar">
       <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="srch" placeholder="Search witness templates…" oninput="renderRegister()"></div>
+      <select class="fsel" id="filterType" onchange="renderRegister()" style="font-size:12px">
+        <option value="">All Types</option>
+        <option value="equipment">Equipment Tests</option>
+        <option value="system">System Tests</option>
+      </select>
       <select class="fsel" id="filterEquip" onchange="renderRegister()" style="font-size:12px"><option value="">All Equipment Types</option></select>
       <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto" id="tplCount"></span>
     </div>
@@ -203,7 +229,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
           <tr>
             <th style="width:110px">Form No.</th>
             <th>Template Name</th>
-            <th style="width:140px">Equipment Type</th>
+            <th style="width:170px">Type</th>
             <th style="width:80px">Tests</th>
             <th style="width:120px">Last Modified</th>
             <th style="width:140px;text-align:right">Actions</th>
@@ -223,6 +249,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
     <div class="wt-hdr-block">
       <div class="wt-hdr-row">
         <div class="wt-hdr-cell"><div class="wt-hdr-lbl">Form No.</div><div class="wt-hdr-val mono" id="ed-formno">—</div></div>
+        <div class="wt-hdr-cell"><div class="wt-hdr-lbl">Type</div><div class="wt-hdr-val" id="ed-type-badge">—</div></div>
         <div class="wt-hdr-cell"><div class="wt-hdr-lbl">Created</div><div class="wt-hdr-val" id="ed-created">—</div></div>
         <div class="wt-hdr-cell"><div class="wt-hdr-lbl">Last Modified</div><div class="wt-hdr-val" id="ed-modified">—</div></div>
       </div>
@@ -232,7 +259,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
           <input id="ed-name-input" class="wt-hdr-input" placeholder="e.g. AHU — Witness Testing" oninput="markDirty()" onblur="saveMeta()"/>
         </div>
         <div class="wt-hdr-cell">
-          <div class="wt-hdr-lbl">Equipment Type <span style="color:var(--accent);font-size:9px">✏ editable</span></div>
+          <div class="wt-hdr-lbl" id="ed-equiptype-label">Equipment Type <span style="color:var(--accent);font-size:9px">✏ editable</span></div>
           <div class="searchable-wrap">
             <input id="ed-equiptype-input" class="wt-hdr-input" placeholder="e.g. AHU" autocomplete="off"
               oninput="filterEdEquipDropdown();markDirty()"
@@ -270,18 +297,51 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
 <!-- NEW TEMPLATE MODAL -->
 <div class="mo" id="newTplModal" onclick="if(event.target===this)closeNewTplModal()">
-  <div class="modal" style="width:480px">
+  <div class="modal" style="width:520px">
     <div class="modal-hdr">
       <h3>New Witness Template</h3>
       <p>Create a new company-level witness testing template</p>
     </div>
     <div class="modal-body">
-      <label class="ml">Equipment Type *</label>
-      <div class="searchable-wrap" style="margin-bottom:14px">
-        <input class="mi" id="new-equiptype" placeholder="e.g. AHU, Chiller, Cooling Tower…" autocomplete="off"
-          oninput="filterNewEquipDropdown()" onfocus="openNewEquipDropdown()" onblur="setTimeout(closeNewEquipDropdown,150)"/>
-        <div class="searchable-dropdown" id="newEquipDropdown"></div>
+
+      <!-- Template type toggle -->
+      <div class="tpltype-toggle-wrap">
+        <div class="tpltype-toggle-row">
+          <label class="tpltype-opt">
+            <input type="radio" name="newtpltype" value="equipment" checked onchange="onNewTplTypeChange()"/>
+            <span class="tpltype-radio"></span>
+            <span class="tpltype-lbl">
+              <span class="tt-title">Equipment Test</span>
+              <span class="tt-sub">FCU, AHU, pump, etc.</span>
+            </span>
+          </label>
+          <label class="tpltype-opt">
+            <input type="radio" name="newtpltype" value="system" onchange="onNewTplTypeChange()"/>
+            <span class="tpltype-radio"></span>
+            <span class="tpltype-lbl">
+              <span class="tt-title">System Test</span>
+              <span class="tt-sub">Fire test, stair pressurisation, etc.</span>
+            </span>
+          </label>
+        </div>
       </div>
+
+      <!-- Equipment Type input — shown when Equipment Test selected -->
+      <div id="new-equipment-mode">
+        <label class="ml">Equipment Type *</label>
+        <div class="searchable-wrap" style="margin-bottom:14px">
+          <input class="mi" id="new-equiptype" placeholder="e.g. AHU, Chiller, Cooling Tower…" autocomplete="off"
+            oninput="filterNewEquipDropdown()" onfocus="openNewEquipDropdown()" onblur="setTimeout(closeNewEquipDropdown,150)"/>
+          <div class="searchable-dropdown" id="newEquipDropdown"></div>
+        </div>
+      </div>
+
+      <!-- System Type input — shown when System Test selected -->
+      <div id="new-system-mode" style="display:none">
+        <label class="ml">System Type *</label>
+        <input class="mi" id="new-systype" placeholder="e.g. Fire Test, Stair Pressurisation, Smoke Control" style="margin-bottom:14px"/>
+      </div>
+
       <label class="ml">Template Name *</label>
       <input class="mi" id="new-tplname" placeholder="e.g. AHU — Witness Testing"/>
     </div>
@@ -493,22 +553,30 @@ function renderRegister(){
   var q = (document.getElementById('srch')||{}).value || '';
   q = q.toLowerCase();
   var ef = (document.getElementById('filterEquip')||{}).value || '';
+  var tf = (document.getElementById('filterType')||{}).value || '';
+
   var list = templates.filter(function(t){
-    var nameMatch = !q || (t.formNo||'').toLowerCase().includes(q) || (t.name||'').toLowerCase().includes(q) || (t.equipment_type||'').toLowerCase().includes(q);
+    var ttype = t.template_type || 'equipment';
+    var nameMatch = !q
+      || (t.formNo||'').toLowerCase().includes(q)
+      || (t.name||'').toLowerCase().includes(q)
+      || (t.equipment_type||'').toLowerCase().includes(q)
+      || (t.system_type||'').toLowerCase().includes(q);
     var equipMatch = !ef || (t.equipment_type||'') === ef;
-    return nameMatch && equipMatch;
+    var typeMatch = !tf || ttype === tf;
+    return nameMatch && equipMatch && typeMatch;
   });
 
   var cnt=document.getElementById('tplCount');
   if(cnt)cnt.textContent = list.length+' template'+(list.length!==1?'s':'');
 
-  // Populate equipment type filter
+  // Populate equipment type filter (only show equipment templates' types)
   var equipSel = document.getElementById('filterEquip');
   if(equipSel){
     var cur = equipSel.value;
     var types = [];
     templates.forEach(function(t){
-      if(t.equipment_type && types.indexOf(t.equipment_type)===-1)types.push(t.equipment_type);
+      if((t.template_type||'equipment') === 'equipment' && t.equipment_type && types.indexOf(t.equipment_type)===-1)types.push(t.equipment_type);
     });
     types.sort();
     equipSel.innerHTML = '<option value="">All Equipment Types</option>' + types.map(function(t){
@@ -518,12 +586,22 @@ function renderRegister(){
 
   var rows='';
   list.forEach(function(t){
-    var equipChip = t.equipment_type ? '<span class="chip-equip">'+escH(t.equipment_type)+'</span>' : '<span style="color:var(--muted);font-size:11px">—</span>';
+    var ttype = t.template_type || 'equipment';
+    var isSystem = (ttype === 'system');
+    var typeCell;
+    if(isSystem){
+      var sys = t.system_type ? '<span style="color:var(--text);font-size:12px;margin-left:6px">'+escH(t.system_type)+'</span>' : '';
+      typeCell = '<span class="system-chip">⚙ System</span>' + sys;
+    } else {
+      typeCell = t.equipment_type
+        ? '<span class="chip-equip">'+escH(t.equipment_type)+'</span>'
+        : '<span style="color:var(--muted);font-size:11px">—</span>';
+    }
     var testCount = (t.tests||[]).length;
     rows += '<tr style="cursor:pointer" onclick="openEditor(\''+escH(t.id)+'\')">'
       +'<td><span class="wt-num">'+escH(t.formNo||'—')+'</span></td>'
       +'<td><span class="wt-name">'+escH(t.name||'(Untitled)')+'</span></td>'
-      +'<td>'+equipChip+'</td>'
+      +'<td>'+typeCell+'</td>'
       +'<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">'+testCount+'</td>'
       +'<td style="color:var(--text2);font-size:12px">'+fmtDate(t.modifiedDate||t.createdDate)+'</td>'
       +'<td onclick="event.stopPropagation()">'
@@ -543,12 +621,34 @@ function renderRegister(){
 // ── NEW TEMPLATE MODAL ──
 function openNewTplModal(){
   document.getElementById('new-equiptype').value='';
+  document.getElementById('new-systype').value='';
   document.getElementById('new-tplname').value='';
+  // Reset to Equipment Test mode
+  var radio = document.querySelector('input[name="newtpltype"][value="equipment"]');
+  if(radio)radio.checked = true;
+  onNewTplTypeChange();
   document.getElementById('newTplModal').classList.add('open');
   setTimeout(function(){var el=document.getElementById('new-equiptype');if(el)el.focus();},80);
 }
 function closeNewTplModal(){
   document.getElementById('newTplModal').classList.remove('open');
+}
+
+// Switch between equipment and system mode in the New Template modal
+function onNewTplTypeChange(){
+  var radios = document.querySelectorAll('input[name="newtpltype"]');
+  var val = 'equipment';
+  radios.forEach(function(r){ if(r.checked)val = r.value; });
+  var eqMode  = document.getElementById('new-equipment-mode');
+  var sysMode = document.getElementById('new-system-mode');
+  if(val === 'system'){
+    if(eqMode)eqMode.style.display = 'none';
+    if(sysMode)sysMode.style.display = '';
+    setTimeout(function(){var el=document.getElementById('new-systype');if(el)el.focus();},30);
+  } else {
+    if(eqMode)eqMode.style.display = '';
+    if(sysMode)sysMode.style.display = 'none';
+  }
 }
 
 function filterNewEquipDropdown(){
@@ -578,19 +678,33 @@ function selectNewEquipType(t){
 }
 
 function confirmNewTpl(){
-  var equipType = (document.getElementById('new-equiptype').value||'').trim();
+  // Detect type
+  var radios = document.querySelectorAll('input[name="newtpltype"]');
+  var tplType = 'equipment';
+  radios.forEach(function(r){ if(r.checked)tplType = r.value; });
+
   var name = (document.getElementById('new-tplname').value||'').trim();
-  if(!equipType){alert('Equipment Type is required.');return;}
   if(!name){alert('Template Name is required.');return;}
 
-  rememberEquipType(equipType);
+  // Validate the type-specific field
+  var equipType = '', sysType = '';
+  if(tplType === 'system'){
+    sysType = (document.getElementById('new-systype').value||'').trim();
+    if(!sysType){alert('System Type is required.');return;}
+  } else {
+    equipType = (document.getElementById('new-equiptype').value||'').trim();
+    if(!equipType){alert('Equipment Type is required.');return;}
+    rememberEquipType(equipType);
+  }
 
   // Build the template payload WITHOUT a client-generated id — the DB will
   // assign a UUID via gen_random_uuid(). Sending a non-UUID id causes 22P02.
   var tpl = {
     formNo: genTplNum(),
     name: name,
-    equipment_type: equipType,
+    template_type: tplType,
+    equipment_type: equipType,           // populated for equipment templates
+    system_type: sysType,                 // populated for system templates
     tests: [],
     createdBy: (_cachedCS.userName||_cachedCS.contactName||'Admin').split(' ')[0],
     createdDate: todayStr(),
@@ -623,6 +737,10 @@ function renderEditor(){
   var tpl = templates.find(function(t){return t.id===activeTplId;});
   if(!tpl){showRegister();return;}
 
+  // Default any pre-existing templates that have no type set
+  if(!tpl.template_type)tpl.template_type = 'equipment';
+  var isSystem = (tpl.template_type === 'system');
+
   // Topbar / breadcrumb
   var bc=document.getElementById('bcCurr');if(bc)bc.textContent = (tpl.formNo||'') + ' — ' + (tpl.name||'(Untitled)');
   var et=document.getElementById('editorTitle');if(et)et.textContent = (tpl.formNo||'') + ' — ' + (tpl.name||'(Untitled)');
@@ -632,7 +750,22 @@ function renderEditor(){
   document.getElementById('ed-created').textContent = fmtDate(tpl.createdDate);
   document.getElementById('ed-modified').textContent = fmtDate(tpl.modifiedDate);
   document.getElementById('ed-name-input').value = tpl.name || '';
-  document.getElementById('ed-equiptype-input').value = tpl.equipment_type || '';
+
+  // Type badge + dynamic label
+  var badge = document.getElementById('ed-type-badge');
+  if(badge){
+    badge.innerHTML = isSystem
+      ? '<span class="system-chip">⚙ System Test</span>'
+      : '<span class="equipment-chip">⚙ Equipment Test</span>';
+  }
+  var lbl = document.getElementById('ed-equiptype-label');
+  if(lbl){
+    lbl.innerHTML = (isSystem ? 'System Type' : 'Equipment Type') + ' <span style="color:var(--accent);font-size:9px">✏ editable</span>';
+  }
+  // The input is reused — populate from whichever field is appropriate
+  document.getElementById('ed-equiptype-input').value = isSystem ? (tpl.system_type || '') : (tpl.equipment_type || '');
+  // For system templates, hide the equipment-type-dropdown suggestions (it's free text)
+  document.getElementById('ed-equiptype-input').placeholder = isSystem ? 'e.g. Fire Test, Stair Pressurisation' : 'e.g. AHU';
 
   renderTests();
 }
@@ -640,11 +773,18 @@ function renderEditor(){
 function saveMeta(){
   var tpl = templates.find(function(t){return t.id===activeTplId;});
   if(!tpl)return;
+  if(!tpl.template_type)tpl.template_type = 'equipment';
+  var isSystem = (tpl.template_type === 'system');
+
   var newName = (document.getElementById('ed-name-input').value||'').trim();
-  var newEquip = (document.getElementById('ed-equiptype-input').value||'').trim();
+  var newTypeVal = (document.getElementById('ed-equiptype-input').value||'').trim();
   var changed = false;
   if(newName && newName !== tpl.name){tpl.name = newName;changed = true;}
-  if(newEquip !== tpl.equipment_type){tpl.equipment_type = newEquip;rememberEquipType(newEquip);changed = true;}
+  if(isSystem){
+    if(newTypeVal !== (tpl.system_type||'')){tpl.system_type = newTypeVal;changed = true;}
+  } else {
+    if(newTypeVal !== (tpl.equipment_type||'')){tpl.equipment_type = newTypeVal;rememberEquipType(newTypeVal);changed = true;}
+  }
   if(changed){
     // Update breadcrumb / title
     var bc=document.getElementById('bcCurr');if(bc)bc.textContent = (tpl.formNo||'') + ' — ' + (tpl.name||'(Untitled)');
