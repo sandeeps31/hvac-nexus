@@ -900,7 +900,15 @@ function getColValue(item,colId){
     var eff=lw||tsLw||null;
     return eff?String(eff):'';
   }
-  if(colId==='eta')return String(item.eta||'');
+  if(colId==='eta'){
+    // For Delivered items the displayed ETA is '—' (the planned ETA is historical
+    // and hidden — the Delivery Date column carries the real arrival date). Mirror
+    // that here so the column filter and the distinct-values dropdown reflect what
+    // the user actually sees. Without this, filtering "(blank)" wouldn't catch
+    // Delivered rows because their underlying eta is still the planned date.
+    if(item.status==='Delivered')return '';
+    return String(item.eta||'');
+  }
   if(colId==='deliveryDate')return String(item.deliveryDate||'');
   if(colId==='qty')return String(item.qty==null||item.qty===''?'':item.qty);
   if(colId==='qtyDelivered')return String(item.qtyDelivered==null||item.qtyDelivered===''?'':item.qtyDelivered);
