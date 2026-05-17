@@ -4552,7 +4552,38 @@ async function initWitnessTesting(){
 
   // Default to All Runsheets tab
   switchTab('all');
+
+  // Deep-link support — if the URL has #rs=<runsheet-id>, open that runsheet.
+  // Used by other pages (e.g. the Cx tracker slide-out) to jump straight to a
+  // specific runsheet. Silently no-ops if the hash is missing or the runsheet
+  // can't be found.
+  _handleRunsheetHashLink();
 }
+
+// Open a runsheet from the URL hash. Called once at page load, and again on
+// any hashchange event so navigating between deep-links works without a reload.
+function _handleRunsheetHashLink(){
+  var hash = (window.location.hash || '').replace(/^#/, '');
+  if(!hash)return;
+  var m = hash.match(/^rs=([^&]+)/);
+  if(!m)return;
+  var rsId;
+  try { rsId = decodeURIComponent(m[1]); } catch(e){ rsId = m[1]; }
+  if(!rsId)return;
+  // Confirm the runsheet exists in the loaded set before opening
+  var rs = runsheets.find(function(r){return r && r.id === rsId;});
+  if(!rs){
+    console.warn('Deep-link: runsheet '+rsId+' not found in this project.');
+    return;
+  }
+  openRunsheetEditor(rsId);
+}
+
+// Re-fire the deep-link if the hash changes mid-session (rare, but handles
+// clicking a second deep-link from the same opened tab cleanly).
+window.addEventListener('hashchange', function(){
+  if(_dataLoaded) _handleRunsheetHashLink();
+});
 
 window.addEventListener('beforeunload', function(e){
   if(_rsDirty && _activeRunsheetId){

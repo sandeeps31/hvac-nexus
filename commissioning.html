@@ -1891,6 +1891,12 @@ function renderEqPanel(idx){
     +wfHtml+'</div>'
     +balCard('airBalance','Air Balance Test Sheet')
     +balCard('waterBalance','Water Balance Test Sheet')
+    +'<div class="eq-section" id="ep-witness-runsheets-section">'
+    +  '<div class="eq-section-title" style="display:flex;align-items:center;justify-content:space-between">Witness Runsheets'
+    +    '<span class="ep-wrs-pill" style="font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:20px;background:var(--surface3);color:var(--muted);border:1px solid var(--border)">Loading…</span>'
+    +  '</div>'
+    +  '<div id="ep-witness-runsheets-body" style="font-size:12px;color:var(--muted)">Checking the witness module…</div>'
+    +'</div>'
     +wHtml
     +'<div class="eq-section">'
     +'<div class="eq-section-title" style="display:flex;align-items:center;justify-content:space-between">Defects '
@@ -1900,6 +1906,165 @@ function renderEqPanel(idx){
     +'<textarea id="epNotes" rows="4" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-family:DM Sans,sans-serif;font-size:13px;outline:none;resize:vertical;box-sizing:border-box" placeholder="Add notes..." onblur="epSaveNotes()">'+(d.notes||'')+'</textarea>'
     +'</div>'
     +'<input type="file" id="epSupersedeInput" accept=".pdf" style="display:none" onchange="epSupersedeFile(this)">';
+
+  // Async-load witness runsheets for this equipment from the witness module.
+  // Renders separately so the panel's synchronous structure paints instantly,
+  // then the runsheets section updates once Supabase returns.
+  _loadEqPanelWitnessRunsheets(t.tag);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// WITNESS RUNSHEETS — pulled from the witness module for this equipment.
+// Only shows finalised statuses (signed_off / failed_pending_rework) — drafts
+// and in-progress are intentionally hidden, this section is the audit-trail
+// view, not the working view. Clicking a row deep-links to the runsheet in
+// witness-testing.html via the #rs= URL hash.
+// ─────────────────────────────────────────────────────────────────────
+async function _loadEqPanelWitnessRunsheets(equipTag){
+  var section = document.getElementById('ep-witness-runsheets-section');
+  var body    = document.getElementById('ep-witness-runsheets-body');
+  if(!section || !body)return;
+  var headerPill = section.querySelector('.ep-wrs-pill');
+
+  if(!equipTag){
+    body.innerHTML = '<div style="padding:6px 0;color:var(--muted)">No equipment tag.</div>';
+    if(headerPill)headerPill.style.display = 'none';
+    return;
+  }
+
+  try {
+    if(typeof dbGetWitnessRunsheets !== 'function'){
+      body.innerHTML = '<div style="padding:6px 0;color:var(--muted);font-style:italic">Witness module not connected.</div>';
+      if(headerPill)headerPill.style.display = 'none';
+      return;
+    }
+
+    var rs = await dbGetWitnessRunsheets(_cxPNum);
+    if(!Array.isArray(rs))rs = [];
+
+    // Filter: this equipment AND only finalised statuses
+    var finalised = rs.filter(function(r){
+      if(!r)return false;
+      var rsEquip = r.equipment_id || r.equipment_tag || '';
+      if(String(rsEquip).trim() !== String(equipTag).trim())return false;
+      return r.status === 'signed_off' || r.status === 'failed_pending_rework';
+    });
+
+    // Newest first
+    finalised.sort(function(a,b){
+      var ta = a.completed_at || a.updated_at || a.created_at || '';
+      var tb = b.completed_at || b.updated_at || b.created_at || '';
+      return String(tb).localeCompare(String(ta));
+    });
+
+    // Header pill: count + colour by activity
+    if(headerPill){
+      headerPill.textContent = finalised.length + (finalised.length === 1 ? ' record' : ' records');
+      headerPill.style.background = finalised.length ? 'var(--accent-dim)' : 'var(--surface3)';
+      headerPill.style.color = finalised.length ? 'var(--accent)' : 'var(--muted)';
+      headerPill.style.borderColor = finalised.length ? 'var(--accent)' : 'var(--border)';
+    }
+
+    if(!finalised.length){
+      body.innerHTML = ''
+        + '<div style="padding:6px 0 10px;font-size:12px;color:var(--muted)">'
+        +   'No signed-off witness runsheets yet for this equipment.'
+        + '</div>'
+        + '<button onclick="navTo(\'witness-testing.html\')" style="width:100%;background:transparent;border:1.5px dashed var(--border);border-radius:7px;padding:8px;font-size:12px;color:var(--accent);cursor:pointer;font-family:DM Sans,sans-serif;transition:all .12s" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.background=\'var(--accent-dim)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'transparent\'">'
+        +   '&#43; Create Witness Runsheet'
+        + '</button>';
+      return;
+    }
+
+    // Build runsheet rows
+    var rowsHtml = finalised.map(function(r){
+      var statusKey   = r.status;
+      var statusLabel = statusKey === 'signed_off' ? 'Pass · Signed Off' : 'Failed · Re-Witness';
+      var statusColor = statusKey === 'signed_off' ? 'var(--green)' : 'var(--warn)';
+      var statusBg    = statusKey === 'signed_off' ? 'var(--green-dim)' : 'var(--warn-dim)';
+      var statusBorder = statusKey === 'signed_off' ? 'rgba(0,229,160,.3)' : 'rgba(255,184,48,.3)';
+
+      var ss = r.submission_summary || {};
+      var pass = (typeof ss.passed === 'number')
+        ? ss.passed
+        : (r.tests||[]).filter(function(t){return t && t.result==='pass';}).length;
+      var fail = (typeof ss.failed === 'number')
+        ? ss.failed
+        : (r.tests||[]).filter(function(t){return t && t.result==='fail';}).length;
+      var defectCount = (r.defects_raised||[]).length;
+      var attempt = r.attempt_number || 1;
+
+      var sysChip = (r.runsheet_type === 'system')
+        ? '<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(167,139,250,.15);color:#c4b5fd;border:1px solid rgba(167,139,250,.3);margin-left:6px">&#9881; System</span>'
+        : '';
+      var attemptPill = attempt > 1
+        ? '<span style="font-family:DM Mono,monospace;font-size:9px;padding:1px 6px;border-radius:8px;background:var(--surface3);color:var(--text2);border:1px solid var(--border);margin-left:6px">Attempt #'+attempt+'</span>'
+        : '';
+
+      var dateStr = r.completed_at ? _fmtPanelDate(r.completed_at) : '—';
+      var trackerSyncedNote = (statusKey === 'signed_off' && ss.tracker_synced)
+        ? '<span style="color:var(--green);font-family:DM Mono,monospace;font-size:9px;margin-left:auto">&#10003; Tracker synced</span>'
+        : '';
+
+      return ''
+        + '<div onclick="_openWitnessRunsheet(\''+escH2(r.id)+'\')" '
+        +   'style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;margin-bottom:6px;cursor:pointer;transition:all .13s" '
+        +   'onmouseover="this.style.borderColor=\'var(--accent)\';this.style.background=\'var(--surface3)\'" '
+        +   'onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'var(--surface2)\'">'
+        +   '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap">'
+        +     '<span style="font-family:DM Mono,monospace;font-size:11px;font-weight:700;color:var(--accent)">'+escH2(r.runsheet_number || '—')+'</span>'
+        +     sysChip
+        +     attemptPill
+        +     '<span style="flex:1"></span>'
+        +     '<span style="font-family:DM Mono,monospace;font-size:9px;padding:2px 8px;border-radius:20px;background:'+statusBg+';color:'+statusColor+';border:1px solid '+statusBorder+';white-space:nowrap">'+statusLabel+'</span>'
+        +   '</div>'
+        +   '<div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2);flex-wrap:wrap">'
+        +     '<span style="font-family:DM Mono,monospace">'+escH2(dateStr)+'</span>'
+        +     (pass > 0 ? '<span style="color:var(--green)">'+pass+' &#10003;</span>' : '')
+        +     (fail > 0 ? '<span style="color:var(--warn)">'+fail+' &#10007;</span>' : '')
+        +     (defectCount > 0 ? '<span style="color:var(--warn);font-family:DM Mono,monospace;font-size:10px">&#9888; '+defectCount+' defect'+(defectCount!==1?'s':'')+'</span>' : '')
+        +     trackerSyncedNote
+        +   '</div>'
+        + '</div>';
+    }).join('');
+
+    body.innerHTML = rowsHtml
+      + '<button onclick="navTo(\'witness-testing.html\')" '
+      +   'style="width:100%;background:transparent;border:1px solid var(--border);border-radius:7px;padding:7px;font-size:11.5px;color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif;margin-top:4px;transition:all .12s" '
+      +   'onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" '
+      +   'onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--text2)\'">'
+      +   'Open witness module &rarr;'
+      + '</button>';
+  } catch(e) {
+    console.warn('Could not load witness runsheets for '+equipTag+':', e && e.message);
+    body.innerHTML = '<div style="padding:6px 0;color:var(--muted);font-style:italic">Could not load witness runsheets (see console).</div>';
+    if(headerPill){
+      headerPill.textContent = 'Error';
+      headerPill.style.color = 'var(--danger)';
+      headerPill.style.borderColor = 'var(--danger)';
+      headerPill.style.background = 'var(--danger-dim)';
+    }
+  }
+}
+
+// Deep-link to a specific witness runsheet — opens witness-testing.html with the
+// runsheet id in the URL hash so witness-testing.html can auto-open it on load.
+function _openWitnessRunsheet(rsId){
+  if(typeof navTo === 'function'){
+    navTo('witness-testing.html#rs=' + encodeURIComponent(rsId));
+  } else {
+    window.location.href = 'witness-testing.html#rs=' + encodeURIComponent(rsId);
+  }
+}
+
+// Short date formatter for the panel rows (yyyy-mm-dd hh:mm in local time)
+function _fmtPanelDate(iso){
+  try {
+    var d = new Date(iso);
+    if(isNaN(d.getTime()))return iso;
+    var pad = function(n){return String(n).padStart(2,'0');};
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());
+  } catch(e){ return iso; }
 }
 
 // ── PANEL EVENT HANDLERS (use _epTag global) ──
