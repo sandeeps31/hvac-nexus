@@ -1395,10 +1395,12 @@ function inlineUpdate(id,field,value,skipBatch){
     if(etaCell){
       var td=today();
       var etaCls='eta-none';
-      var etaDisplay=item.eta?fmtD(item.eta):'—';
-      if(item.eta&&item.status!=='Delivered'){etaCls=item.eta<td?'eta-over':item.eta<=addWeeks(td,2)?'eta-warn':'eta-ok';}
-      if(item.status==='Delivered') etaCls='eta-ok';
-      var isOv=item.eta&&item.eta<td&&item.status!=='Delivered';
+      // Once delivered, the ETA is historical and not actionable — the Delivery Date
+      // column shows when it actually arrived. Hide the planned ETA to reduce noise.
+      var isDeliveredRow=item.status==='Delivered';
+      var etaDisplay=(isDeliveredRow||!item.eta)?'—':fmtD(item.eta);
+      if(item.eta&&!isDeliveredRow){etaCls=item.eta<td?'eta-over':item.eta<=addWeeks(td,2)?'eta-warn':'eta-ok';}
+      var isOv=item.eta&&item.eta<td&&!isDeliveredRow;
       etaCell.className='eta-cell '+etaCls;
       etaCell.textContent=etaDisplay+(isOv?' ⚠':'');
     }
@@ -1536,12 +1538,14 @@ function renderTable(){
     }
     var tr=document.createElement('tr');
     var etaCls='eta-none';
-    var etaDisplay=item.eta?fmtD(item.eta):'—';
-    if(item.eta&&item.status!=='Delivered'){
+    // Once delivered, the ETA is historical and not actionable — the Delivery Date
+    // column shows when it actually arrived. Hide the planned ETA to reduce noise.
+    var isDeliveredRow=item.status==='Delivered';
+    var etaDisplay=(isDeliveredRow||!item.eta)?'—':fmtD(item.eta);
+    if(item.eta&&!isDeliveredRow){
       etaCls=item.eta<td?'eta-over':item.eta<=addWeeks(td,2)?'eta-warn':'eta-ok';
     }
-    if(item.status==='Delivered') etaCls='eta-ok';
-    var isOverdue=item.eta&&item.eta<td&&item.status!=='Delivered';
+    var isOverdue=item.eta&&item.eta<td&&!isDeliveredRow;
     if(isOverdue) tr.className='overdue';
     tr.style.cursor='default';
     tr.setAttribute('data-item-id',item.id);
