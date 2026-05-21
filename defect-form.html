@@ -49,7 +49,7 @@ textarea.fi{resize:vertical;min-height:80px}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;overflow:hidden}
 .lightbox.open{display:flex}
 .lightbox-stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.lightbox img{max-width:95vw;max-height:88vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 60px rgba(0,0,0,.7);cursor:zoom-in;transition:transform .12s ease;transform-origin:center center;will-change:transform;user-select:none;-webkit-user-drag:none}
+.lightbox img{max-width:95vw;max-height:88vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 60px rgba(0,0,0,.7);cursor:grab;transition:transform .12s ease;transform-origin:center center;will-change:transform;user-select:none;-webkit-user-drag:none}
 .lightbox img.zoomed{cursor:grab}
 .lightbox img.dragging{cursor:grabbing;transition:none}
 .lightbox-close{position:absolute;top:18px;right:24px;background:rgba(255,255,255,.12);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;z-index:2}
@@ -566,6 +566,7 @@ function _thumbHtml(p, i, removeFn){
 
 // ── Lightbox with zoom + pan ──
 var _lbZoom=1, _lbPanX=0, _lbPanY=0, _lbDragging=false, _lbStartX=0, _lbStartY=0;
+var _lbCurSrc='', _lbCurName='';
 var LB_MIN=1, LB_MAX=5, LB_STEP=0.5;
 
 function openLightbox(src, name, date){
@@ -586,6 +587,7 @@ function openLightbox(src, name, date){
       +'<span class="lb-zoom-val" id="lbZoomVal">100%</span>'
       +'<button class="lb-btn" onclick="lbZoomBy(1)" title="Zoom in">+</button>'
       +'<button class="lb-btn" onclick="lbResetZoom()" title="Reset" style="font-size:14px">⟲</button>'
+      +'<button class="lb-btn" onclick="lbDownload()" title="Download" style="font-size:16px">⬇</button>'
       +'</div>';
     document.body.appendChild(lb);
 
@@ -637,6 +639,7 @@ function openLightbox(src, name, date){
     img.addEventListener('touchend',function(){_lbDragging=false;});
   }
   document.getElementById('lightboxImg').src=src;
+  _lbCurSrc=src; _lbCurName=name||'photo.jpg';
   // Caption: date on its own pill, filename below
   var capHtml='';
   if(date) capHtml+='<div class="lb-date">'+fmtDate(date)+'</div><br>';
@@ -660,6 +663,33 @@ function lbSetZoom(z){
 }
 function lbZoomBy(dir){ lbSetZoom(_lbZoom+dir*LB_STEP); }
 function lbResetZoom(){ _lbZoom=1;_lbPanX=0;_lbPanY=0;_lbApplyTransform(); }
+async function lbDownload(){
+  if(!_lbCurSrc)return;
+  var name=_lbCurName||'photo.jpg';
+  if(!/\.(jpg|jpeg|png|webp)$/i.test(name)) name+='.jpg';
+  try{
+    if(_lbCurSrc.indexOf('data:')===0){
+      // base64 (pending photo) — download directly
+      _triggerDownload(_lbCurSrc, name);
+    } else {
+      // R2 URL (cross-origin) — fetch as blob then download
+      var res=await fetch(_lbCurSrc);
+      var blob=await res.blob();
+      var url=URL.createObjectURL(blob);
+      _triggerDownload(url, name);
+      setTimeout(function(){URL.revokeObjectURL(url);},2000);
+    }
+  }catch(e){
+    // Fallback: open in a new tab so the user can save manually
+    window.open(_lbCurSrc,'_blank');
+  }
+}
+function _triggerDownload(href, name){
+  var a=document.createElement('a');
+  a.href=href; a.download=name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+}
 function closeLightbox(){
   var lb=document.getElementById('photoLightbox');
   if(lb)lb.classList.remove('open');
