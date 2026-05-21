@@ -128,10 +128,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;hei
       <table class="tbl">
         <thead><tr>
           <th>Def No.</th>
-          <th>Description</th>
-          <th>Building</th>
+          <th>Title</th>
           <th>Location</th>
-          <th>Sub Location</th>
           <th>Status</th>
           <th>Assignee</th>
           <th>Priority</th>
@@ -157,6 +155,13 @@ function navTo(url){var b=window.location.href.substring(0,window.location.href.
 function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function todayStr(){return new Date().toISOString().split('T')[0];}
 function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+// Location display: prefer the new single 'location' field; for legacy defects
+// that stored building/location/subLocation separately, stitch into one path.
+function _defectLocation(d){
+  if(d.location && !d.building && !d.subLocation) return d.location;
+  var parts=[d.building,d.location,d.subLocation].filter(Boolean);
+  return parts.length?parts.join(' > '):(d.location||'');
+}
 function isOverdue(d){return d&&d<todayStr();}
 
 function newDefect(){
@@ -207,7 +212,7 @@ function render(){
     if(fStatus&&d.status!==fStatus)return false;
     if(fPriority&&d.priority!==fPriority)return false;
     if(q){
-      var hay=((d.ref||'')+' '+(d.desc||'')+' '+(d.assignee||'')+' '+(d.building||'')+' '+(d.location||'')).toLowerCase();
+      var hay=((d.ref||'')+' '+(d.title||'')+' '+(d.desc||'')+' '+(d.assignee||'')+' '+_defectLocation(d)).toLowerCase();
       if(!hay.includes(q))return false;
     }
     return true;
@@ -223,10 +228,8 @@ function render(){
       :'<span title="No drawing linked" style="color:var(--warn);font-size:16px">⚠️</span>';
     return '<tr>'
       +'<td><a class="ref-link" onclick="openDefect(\''+escH(d.id)+'\')">'+escH(d.ref||'—')+'</a></td>'
-      +'<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(d.desc||'')+'">'+escH(d.desc||'—')+'</td>'
-      +'<td>'+escH(d.building||'—')+'</td>'
-      +'<td>'+escH(d.location||'—')+'</td>'
-      +'<td>'+escH(d.subLocation||'—')+'</td>'
+      +'<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(d.title||d.desc||'')+'">'+escH(d.title||d.desc||'—')+'</td>'
+      +'<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escH(_defectLocation(d))+'">'+escH(_defectLocation(d)||'—')+'</td>'
       +'<td><span class="badge badge-'+escH(d.status||'open')+'">'+escH((d.status||'open').toUpperCase())+'</span></td>'
       +'<td>'+escH(d.assignee||'—')+'</td>'
       +'<td><span class="badge badge-'+escH(d.priority||'medium')+'">'+escH((d.priority||'medium').toUpperCase())+'</span></td>'
