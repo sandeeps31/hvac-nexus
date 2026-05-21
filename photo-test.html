@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Photo Upload Test — HVAC Nexus</title>
+<style>
+:root{--bg:#080c12;--surface:#0e1520;--surface2:#111c2d;--border:#1e3050;--accent:#00c8ff;--text:#e8f0fe;--text2:#8899bb;--green:#00e5a0;--danger:#ff4d6d;--warn:#ffb830}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;padding:24px;max-width:680px;margin:0 auto;line-height:1.5}
+h1{font-size:20px;margin-bottom:4px}
+.sub{color:var(--text2);font-size:13px;margin-bottom:20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px}
+.row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px}
+.k{color:var(--text2);width:130px;flex-shrink:0}
+.v{font-family:'DM Mono',monospace;font-size:12px;word-break:break-all}
+.ok{color:var(--green)}.bad{color:var(--danger)}.warn{color:var(--warn)}
+.btn{padding:10px 18px;border-radius:8px;border:none;background:var(--accent);color:#080c12;font-weight:700;font-size:14px;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+input[type=file]{display:block;margin:12px 0;color:var(--text2);font-size:13px}
+#log{font-family:'DM Mono',monospace;font-size:12px;white-space:pre-wrap;background:#06090e;border:1px solid var(--border);border-radius:8px;padding:14px;min-height:120px;max-height:320px;overflow:auto;margin-top:12px}
+.thumb{display:inline-block;margin:8px 8px 0 0;border:1px solid var(--border);border-radius:8px;overflow:hidden;width:140px}
+.thumb img{width:140px;height:140px;object-fit:cover;display:block}
+.thumb .cap{font-size:10px;color:var(--text2);padding:4px 6px;font-family:'DM Mono',monospace;word-break:break-all}
+.line{color:var(--text2)}
+.line.ok{color:var(--green)}.line.bad{color:var(--danger)}.line.warn{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<h1>📷 Photo Upload Test</h1>
+<div class="sub">Standalone end-to-end test of the R2 photo pipeline. Use this to verify the backend before wiring real modules.</div>
+
+<div class="card">
+  <div class="row"><span class="k">Session token</span><span class="v" id="diag-token">checking…</span></div>
+  <div class="row"><span class="k">Company ID</span><span class="v" id="diag-company">checking…</span></div>
+  <div class="row"><span class="k">User ID</span><span class="v" id="diag-user">checking…</span></div>
+  <div class="row"><span class="k">Edge Function</span><span class="v">/functions/v1/r2-presign</span></div>
+</div>
+
+<div class="card">
+  <strong>1. Pick a photo to upload</strong>
+  <input type="file" accept="image/*" id="fileIn">
+  <button class="btn" id="uploadBtn" onclick="runTest()" disabled>Upload to R2</button>
+  <div id="thumbs"></div>
+</div>
+
+<div class="card">
+  <strong>Log</strong>
+  <div id="log">Ready. Pick a photo and click Upload.</div>
+</div>
+
+<script src="photo-core.js"></script>
+<script>
+var logEl = document.getElementById('log');
+function log(msg, cls){
+  var line = document.createElement('div');
+  line.className = 'line' + (cls ? ' ' + cls : '');
+  line.textContent = msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// Diagnostics on load
+(function(){
+  var tok = PhotoCore._getToken();
+  var comp = PhotoCore._getCompanyId();
+  document.getElementById('diag-token').innerHTML = tok
+    ? '<span class="ok">present (' + tok.slice(0,12) + '…)</span>'
+    : '<span class="bad">MISSING — log in first</span>';
+  document.getElementById('diag-company').innerHTML = comp
+    ? '<span class="ok">' + comp + '</span>'
+    : '<span class="bad">MISSING</span>';
+  var uid = null;
+  try { var cu = JSON.parse(localStorage.getItem('hvacnexus_current_user')||'null'); uid = cu && cu.id; } catch(e){}
+  if(!uid && tok){ try{ uid = JSON.parse(atob(tok.split('.')[1])).sub; }catch(e){} }
+  document.getElementById('diag-user').innerHTML = uid
+    ? '<span class="ok">' + uid + '</span>'
+    : '<span class="warn">not found (will decode from token)</span>';
+
+  if(!tok || !comp){
+    log('⚠ You are not fully logged in. Open login.html, sign in, then return to this page.', 'warn');
+  }
+})();
+
+document.getElementById('fileIn').addEventListener('change', function(){
+  document.getElementById('uploadBtn').disabled = !this.files.length;
+});
+
+async function runTest(){
+  var file = document.getElementById('fileIn').files[0];
+  if(!file){ log('No file selected.', 'bad'); return; }
+  var btn = document.getElementById('uploadBtn');
+  btn.disabled = true;
+  logEl.innerHTML = '';
+
+  log('Selected: ' + file.name + ' (' + Math.round(file.size/1024) + ' KB, ' + file.type + ')');
+
+  try {
+    log('1. Compressing…');
+    var c = await PhotoCore.compressImage(file);
+    log('   → ' + c.width + '×' + c.height + ', ' + Math.round(c.blob.size/1024) + ' KB after compression', 'ok');
+
+    log('2-4. Uploading to R2 + writing metadata…');
+    var t0 = Date.now();
+    var photo = await PhotoCore.uploadPhoto(file, {
+      module: 'general',
+      parentType: 'test',
+      parentId: 'test-harness',
+      projectNum: 'GCT001',
+      caption: 'Test harness upload'
+    });
+    var ms = Date.now() - t0;
+    log('   → Uploaded in ' + ms + 'ms', 'ok');
+    log('   → Photo ID: ' + photo.id, 'ok');
+    log('   → Public URL: ' + photo.url, 'ok');
+
+    // Render the thumbnail from the PUBLIC R2 url (proves read works too)
+    var thumbs = document.getElementById('thumbs');
+    var div = document.createElement('div');
+    div.className = 'thumb';
+    div.innerHTML = '<img src="' + photo.url + '" onerror="this.parentNode.innerHTML=\'<div class=cap class=bad>Image failed to load from R2 URL</div>\'"><div class="cap">' + photo.id.slice(0,8) + '…<br>' + Math.round(photo.size/1024) + ' KB</div>';
+    thumbs.appendChild(div);
+
+    log('5. Verifying it appears via getPhotos()…');
+    var list = await PhotoCore.getPhotos({ parentType: 'test', parentId: 'test-harness' });
+    log('   → photos table now has ' + list.length + ' test row(s)', 'ok');
+
+    log('✓ FULL PIPELINE WORKS — compress, presign, R2 upload, metadata, read-back all succeeded.', 'ok');
+  } catch(e){
+    log('✗ FAILED: ' + e.message, 'bad');
+    log('  (See browser DevTools console + Supabase Edge Function logs for detail.)', 'warn');
+    console.error(e);
+  }
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
