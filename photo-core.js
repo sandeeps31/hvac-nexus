@@ -121,9 +121,21 @@
     var projectNum = opts.projectNum || '';
     var module = opts.module || 'general';
 
-    // 1. Compress
-    var c = await compressImage(file);
-    var blob = c.blob;
+    // 1. Determine type. Images get compressed; documents pass through.
+    var isImage = file.type && file.type.indexOf('image/') === 0;
+    var blob, contentType, width = null, height = null, kind;
+    if (isImage) {
+      var c = await compressImage(file);
+      blob = c.blob;
+      contentType = 'image/jpeg';   // compressImage always outputs JPEG
+      width = c.width;
+      height = c.height;
+      kind = 'photo';
+    } else {
+      blob = file;                  // upload the document untouched
+      contentType = file.type || 'application/octet-stream';
+      kind = 'file';
+    }
 
     // 2. Ask the Edge Function for a presigned PUT URL
     var presignRes = await fetch(EDGE_FN, {
@@ -137,7 +149,7 @@
         companyId: companyId,
         projectNum: projectNum,
         module: module,
-        contentType: 'image/jpeg',
+        contentType: contentType,
         sizeBytes: blob.size
       })
     });
@@ -151,7 +163,7 @@
     // 3. PUT the blob straight to R2
     var putRes = await fetch(presign.uploadUrl, {
       method: 'PUT',
-      headers: { 'Content-Type': 'image/jpeg' },
+      headers: { 'Content-Type': contentType },
       body: blob
     });
     if (!putRes.ok) {
@@ -169,8 +181,10 @@
       r2_key: presign.key,
       public_url: presign.publicUrl,
       caption: opts.caption || null,
-      width: c.width,
-      height: c.height,
+      kind: kind,
+      mime_type: contentType,
+      width: width,
+      height: height,
       size_bytes: blob.size,
       taken_at: fileTakenAt(file),
       uploaded_by: userId
@@ -187,7 +201,7 @@
     });
     if (!insRes.ok) {
       var insErr = await insRes.text();
-      // The photo bytes are in R2 but metadata failed — surface it
+      // The bytes are in R2 but metadata failed — surface it
       throw new Error('Metadata insert failed (' + insRes.status + '): ' + insErr);
     }
 
@@ -196,10 +210,12 @@
       id: presign.photoId,
       url: presign.publicUrl,
       key: presign.key,
+      kind: kind,                 // 'photo' | 'file'
+      mime: contentType,
       date: new Date().toISOString().split('T')[0],
-      name: file.name || 'photo.jpg',
-      w: c.width,
-      h: c.height,
+      name: file.name || (kind === 'photo' ? 'photo.jpg' : 'file'),
+      w: width,
+      h: height,
       size: blob.size
     };
   }

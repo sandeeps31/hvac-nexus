@@ -44,6 +44,11 @@ textarea.fi{resize:vertical;min-height:80px}
 /* Photo upload */
 .photo-grid{display:flex;flex-wrap:wrap;gap:10px}
 .photo-thumb{position:relative;width:100px;height:100px;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.file-thumb{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface2);cursor:pointer;padding:6px;text-align:center;transition:border-color .13s,background .13s}
+.file-thumb:hover{border-color:var(--accent);background:var(--surface)}
+.file-icon-big{font-size:30px;line-height:1;margin-bottom:2px}
+.file-ext{font-family:'DM Mono',monospace;font-size:9px;font-weight:700;letter-spacing:1px;color:var(--accent);margin-bottom:3px}
+.file-name{font-size:9px;color:var(--text2);word-break:break-word;line-height:1.2;max-width:90px}
 .photo-thumb img{width:100%;height:100%;object-fit:cover;cursor:pointer}
 /* Lightbox overlay */
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;overflow:hidden}
@@ -410,7 +415,7 @@ function populateForm(d){
   _closePhotos=(d.closePhotos||[]).filter(function(p){return !p.pending;});
   // Rebuild any still-queued pending photos as placeholders
   _loadPhotoQueue().forEach(function(item){
-    var ph={ _pending:true, name:item.name, date:item.date, parentType:item.parentType, _b64:item.b64, _qid:item.qid };
+    var ph={ _pending:true, name:item.name, date:item.date, parentType:item.parentType, _b64:item.b64, _qid:item.qid, kind:item.kind||'photo', mime:item.mime||'' };
     if(item.parentType==='defect-closeout') _closePhotos.push(ph);
     else _photos.push(ph);
   });
@@ -521,10 +526,10 @@ function _fileToB64(file){
 async function _handlePhotoFiles(files, target, parentType, renderFn){
   for(var i=0;i<files.length;i++){
     var file=files[i];
-    showToast('Uploading photo '+(i+1)+' of '+files.length+'…','var(--accent)');
+    showToast('Uploading file '+(i+1)+' of '+files.length+'…','var(--accent)');
     try{
       var photo = await _uploadWithRetry(file, parentType);
-      target.push(photo);   // {id,url,key,date,name,...}
+      target.push(photo);   // {id,url,key,kind,mime,date,name,...}
       renderFn();
     }catch(e){
       if(_isAuthError(e)){
@@ -533,14 +538,15 @@ async function _handlePhotoFiles(files, target, parentType, renderFn){
         return;
       }
       // Network/other failure → queue for later, show a pending placeholder
+      var isImg = file.type && file.type.indexOf('image/')===0;
       var b64 = await _fileToB64(file);
-      var pending = { _pending:true, name:file.name, date:todayStr(), parentType:parentType, _b64:b64, _qid:'q'+Date.now()+'-'+i };
+      var pending = { _pending:true, name:file.name, date:todayStr(), parentType:parentType, _b64:b64, _qid:'q'+Date.now()+'-'+i, kind:isImg?'photo':'file', mime:file.type||'' };
       target.push(pending);
       var q = _loadPhotoQueue();
-      q.push({ qid:pending._qid, name:file.name, date:pending.date, parentType:parentType, b64:b64 });
+      q.push({ qid:pending._qid, name:file.name, date:pending.date, parentType:parentType, b64:b64, kind:pending.kind, mime:pending.mime });
       _savePhotoQueue(q);
       renderFn();
-      showToast('Upload failed — photo queued, will retry','var(--warn)');
+      showToast('Upload failed — file queued, will retry','var(--warn)');
     }
   }
 }
@@ -551,16 +557,50 @@ async function addPhotos(input){
   await _handlePhotoFiles(files, _photos, 'defect', renderPhotos);
 }
 
+// Is this attachment an image? Legacy photos (no kind) are treated as images.
+function _isImageAttachment(p){
+  if(p.kind) return p.kind==='photo';
+  if(p.mime) return p.mime.indexOf('image/')===0;
+  // Legacy: infer from filename
+  return /\.(jpe?g|png|webp|gif|bmp)$/i.test(p.name||'') || !!(p.url||p._b64);
+}
+// Pick a short label + emoji for a document by its name/mime
+function _fileBadge(p){
+  var n=(p.name||'').toLowerCase();
+  if(/\.pdf$/.test(n)||p.mime==='application/pdf') return {icon:'📄',ext:'PDF'};
+  if(/\.docx?$/.test(n)||/word/.test(p.mime||'')) return {icon:'📝',ext:'DOC'};
+  if(/\.xlsx?$/.test(n)||/excel|spreadsheet/.test(p.mime||'')) return {icon:'📊',ext:'XLS'};
+  return {icon:'📎',ext:'FILE'};
+}
+
 function _thumbHtml(p, i, removeFn){
-  var src = p._pending ? (p._b64 || '') : escH(p.url || '');
-  var pendBadge = p._pending ? '<div style="position:absolute;top:3px;left:3px;background:var(--warn);color:#000;font-size:8px;font-weight:700;padding:1px 5px;border-radius:8px;font-family:DM Mono,monospace">PENDING</div>' : '';
+  var pendBadge = p._pending ? '<div style="position:absolute;top:3px;left:3px;background:var(--warn);color:#000;font-size:8px;font-weight:700;padding:1px 5px;border-radius:8px;font-family:DM Mono,monospace;z-index:1">PENDING</div>' : '';
   var capName = (p.name || '').replace(/'/g, "\\'").replace(/"/g,'&quot;');
   var capDate = (p.date || '').replace(/'/g, "\\'");
-  return '<div class="photo-thumb"'+(p._pending?' style="opacity:.72"':'')+'>'
-    + '<img src="'+src+'" onclick="openLightbox(\''+src+'\',\''+capName+'\',\''+capDate+'\')">'
+
+  if(_isImageAttachment(p)){
+    // ── Image: thumbnail + lightbox ──
+    var src = p._pending ? (p._b64 || '') : escH(p.url || '');
+    return '<div class="photo-thumb"'+(p._pending?' style="opacity:.72"':'')+'>'
+      + '<img src="'+src+'" onclick="openLightbox(\''+src+'\',\''+capName+'\',\''+capDate+'\')">'
+      + pendBadge
+      + '<button class="photo-del" onclick="'+removeFn+'('+i+')">×</button>'
+      + '<div class="photo-date">'+fmtDate(p.date)+'</div>'
+      + '</div>';
+  }
+
+  // ── Document: file-icon card; click opens/downloads ──
+  var b=_fileBadge(p);
+  var fname=(p.name||'file').length>18?(p.name||'file').slice(0,15)+'…':(p.name||'file');
+  var clickAction = p._pending
+    ? 'showToast(\'This file is still uploading\',\'var(--warn)\')'
+    : 'window.open(\''+escH(p.url||'')+'\',\'_blank\')';
+  return '<div class="photo-thumb file-thumb"'+(p._pending?' style="opacity:.72"':'')+' onclick="'+clickAction+'" title="'+capName+'">'
+    + '<div class="file-icon-big">'+b.icon+'</div>'
+    + '<div class="file-ext">'+b.ext+'</div>'
+    + '<div class="file-name">'+escH(fname)+'</div>'
     + pendBadge
-    + '<button class="photo-del" onclick="'+removeFn+'('+i+')">×</button>'
-    + '<div class="photo-date">'+fmtDate(p.date)+'</div>'
+    + '<button class="photo-del" onclick="event.stopPropagation();'+removeFn+'('+i+')">×</button>'
     + '</div>';
 }
 
@@ -755,7 +795,9 @@ async function flushPhotoQueue(){
     try{
       var blob=_b64ToBlob(item.b64);
       if(!blob){ remaining.push(item); continue; }
-      var fileLike=new File([blob],item.name||'photo.jpg',{type:'image/jpeg'});
+      var fileType=item.mime||blob.type||'image/jpeg';
+      var fileName=item.name||(item.kind==='file'?'file':'photo.jpg');
+      var fileLike=new File([blob],fileName,{type:fileType});
       var photo=await PhotoCore.uploadPhoto(fileLike,{
         module:'defects',
         parentType:item.parentType,
@@ -797,9 +839,9 @@ function _b64ToBlob(b64){
 function _cleanPhotos(arr){
   return (arr||[]).map(function(p){
     if(p._pending){
-      return { pending:true, name:p.name, date:p.date };  // marker only, no bytes
+      return { pending:true, name:p.name, date:p.date, kind:p.kind||'photo', mime:p.mime||'' };  // marker only, no bytes
     }
-    return { id:p.id, url:p.url, key:p.key, date:p.date, name:p.name, w:p.w, h:p.h, size:p.size };
+    return { id:p.id, url:p.url, key:p.key, kind:p.kind||'photo', mime:p.mime||'', date:p.date, name:p.name, w:p.w, h:p.h, size:p.size };
   });
 }
 
@@ -909,6 +951,16 @@ function showToast(msg,col){
   setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},2500);
 }
 
+// Render an attachment for print: <img> for images, a text line for documents.
+function _printAttachment(p){
+  var url=p.url||p.data||'';
+  if(_isImageAttachment(p)){
+    return '<img src="'+url+'"><span style="font-size:10px;margin-right:12px">'+(p.date||'')+'</span>';
+  }
+  var b=_fileBadge(p);
+  return '<div style="font-size:12px;margin:4px 0">'+b.icon+' <a href="'+url+'">'+(p.name||'file')+'</a> <span style="color:#888;font-size:10px">('+b.ext+(p.date?', '+p.date:'')+')</span></div>';
+}
+
 function exportPdf(){
   var title='Defect '+document.getElementById('defRef').textContent;
   var w=window.open('','_blank');
@@ -917,8 +969,8 @@ function exportPdf(){
   w.document.write('<div class="row"><div><div class="lbl">Status</div><div class="val">'+document.getElementById('statusSel').value+'</div></div><div><div class="lbl">Priority</div><div class="val">'+document.getElementById('defPriority').value+'</div></div><div><div class="lbl">Assignee</div><div class="val">'+document.getElementById('defAssignee').value+'</div></div><div><div class="lbl">Issue Date</div><div class="val">'+document.getElementById('defIssueDate').value+'</div></div><div><div class="lbl">Due Date</div><div class="val">'+document.getElementById('defDueDate').value+'</div></div></div>');
   w.document.write('<div class="row"><div><div class="lbl">Location</div><div class="val">'+document.getElementById('defLocation').value+'</div></div></div>');
   if(document.getElementById('defDesc').value){w.document.write('<div class="row"><div><div class="lbl">Description</div><div class="val">'+document.getElementById('defDesc').value+'</div></div></div>');}
-  if(_photos.length){w.document.write('<div class="lbl" style="margin-bottom:8px">Photos</div>');_photos.forEach(function(p){w.document.write('<img src="'+(p.url||p.data||'')+'"><span style="font-size:10px;margin-right:12px">'+p.date+'</span>');});}
-  if(_closePhotos.length){w.document.write('<div class="lbl" style="margin:12px 0 8px">Close-out Photos</div>');_closePhotos.forEach(function(p){w.document.write('<img src="'+(p.url||p.data||'')+'"><span style="font-size:10px;margin-right:12px">'+p.date+'</span>');});}
+  if(_photos.length){w.document.write('<div class="lbl" style="margin-bottom:8px">Photos &amp; Files</div>');_photos.forEach(function(p){w.document.write(_printAttachment(p));});}
+  if(_closePhotos.length){w.document.write('<div class="lbl" style="margin:12px 0 8px">Close-out Photos &amp; Files</div>');_closePhotos.forEach(function(p){w.document.write(_printAttachment(p));});}
   if(document.getElementById('closeComment').value){w.document.write('<div class="lbl" style="margin-top:12px">Close-out Comment</div><div class="val">'+document.getElementById('closeComment').value+'</div>');}
   w.document.write('</body></html>');
   w.document.close();
