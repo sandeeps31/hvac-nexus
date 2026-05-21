@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="theme.css">
 <script src="head-common.js"></script>
 <script src="db.js"></script>
+<script src="photo-core.js"></script>
 <style>
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column}
 .topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
@@ -304,6 +305,9 @@ function fmtDate(d){if(!d)return '—';var p=d.split('-');return p.length===3?p[
     if(subLocation)document.getElementById('defSubLoc').value=subLocation;
     calcDueDate();
   }
+
+  // Retry any photos that were queued from a previous failed upload
+  flushPhotoQueue();
 })();
 
 function populateForm(d){
@@ -320,8 +324,14 @@ function populateForm(d){
   document.getElementById('defLocation').value=d.location||'';
   document.getElementById('defSubLoc').value=d.subLocation||'';
   document.getElementById('closeComment').value=d.closeComment||'';
-  _photos=d.photos||[];
-  _closePhotos=d.closePhotos||[];
+  _photos=(d.photos||[]).filter(function(p){return !p.pending;});       // drop stale markers; queue rebuilds them
+  _closePhotos=(d.closePhotos||[]).filter(function(p){return !p.pending;});
+  // Rebuild any still-queued pending photos as placeholders
+  _loadPhotoQueue().forEach(function(item){
+    var ph={ _pending:true, name:item.name, date:item.date, parentType:item.parentType, _b64:item.b64, _qid:item.qid };
+    if(item.parentType==='defect-closeout') _closePhotos.push(ph);
+    else _photos.push(ph);
+  });
   renderPhotos();
   renderClosePhotos();
   if(d.drawingId){
@@ -369,70 +379,204 @@ function showAssigneeSugg(){
 function hideAssigneeSugg(){document.getElementById('assigneeSugg').style.display='none';}
 function pickAssignee(name){document.getElementById('defAssignee').value=name;hideAssigneeSugg();}
 
-// ── PHOTOS ──
-async function addPhotos(input){
-  var files=Array.from(input.files);
-  input.value='';
+// ── PHOTOS (R2-backed: compress → upload → retry once → queue) ──
+// Photos are stored as {id, url, key, date, name} — NEVER base64.
+// On upload failure we retry once, then stash the file in an in-memory
+// pending list + a localStorage queue so it survives a reload and can be
+// re-attempted. A failed-but-queued photo shows a "pending" thumb so the
+// user knows it isn't on the server yet.
+
+// localStorage queue key — scoped to project + defect so queues don't collide
+function _photoQueueKey(){
+  return 'hvacnexus_photoq_' + pNum + '_' + (defectId || 'new');
+}
+// In-memory map of pending files (can't persist a File across reload, so the
+// localStorage queue stores a base64 copy ONLY for the queued-while-offline case;
+// it's deleted the moment the upload succeeds, so it never reaches the defect record)
+function _loadPhotoQueue(){
+  try{ return JSON.parse(localStorage.getItem(_photoQueueKey()) || '[]'); }catch(e){ return []; }
+}
+function _savePhotoQueue(q){
+  try{ localStorage.setItem(_photoQueueKey(), JSON.stringify(q)); }catch(e){}
+}
+
+// Detect an auth-expiry error so we can show a useful message
+function _isAuthError(err){
+  var m = (err && err.message) || '';
+  return m.indexOf('401') !== -1 || m.indexOf('Invalid session') !== -1 || m.indexOf('Not signed in') !== -1 || m.indexOf('JWT') !== -1;
+}
+
+// Core single-file upload with ONE retry. Returns the photo object or throws.
+async function _uploadOnce(file, parentType){
+  return await PhotoCore.uploadPhoto(file, {
+    module: 'defects',
+    parentType: parentType,
+    parentId: defectId || ('def_pending_' + Date.now()),
+    projectNum: pNum
+  });
+}
+async function _uploadWithRetry(file, parentType){
+  try{
+    return await _uploadOnce(file, parentType);
+  }catch(e1){
+    if(_isAuthError(e1)) throw e1;            // don't retry auth failures
+    await new Promise(function(r){ setTimeout(r, 800); });
+    return await _uploadOnce(file, parentType); // one retry
+  }
+}
+
+// Read a File to base64 (used only when queueing a failed upload)
+function _fileToB64(file){
+  return new Promise(function(resolve){
+    var r = new FileReader();
+    r.onload = function(e){ resolve(e.target.result); };
+    r.onerror = function(){ resolve(null); };
+    r.readAsDataURL(file);
+  });
+}
+
+// Shared handler for both main + close-out grids
+async function _handlePhotoFiles(files, target, parentType, renderFn){
   for(var i=0;i<files.length;i++){
     var file=files[i];
     showToast('Uploading photo '+(i+1)+' of '+files.length+'…','var(--accent)');
-    var url=await uploadPhoto(file,'defects');
-    if(url){
-      _photos.push({url:url,date:todayStr(),name:file.name});
-    } else {
-      // Fallback to base64 if upload fails
-      await new Promise(function(resolve){
-        var reader=new FileReader();
-        reader.onload=function(e){_photos.push({url:e.target.result,date:todayStr(),name:file.name});resolve();};
-        reader.readAsDataURL(file);
-      });
+    try{
+      var photo = await _uploadWithRetry(file, parentType);
+      target.push(photo);   // {id,url,key,date,name,...}
+      renderFn();
+    }catch(e){
+      if(_isAuthError(e)){
+        showToast('Session expired — please sign in again','var(--danger)');
+        // Don't queue auth failures; the token is the problem, not the network
+        return;
+      }
+      // Network/other failure → queue for later, show a pending placeholder
+      var b64 = await _fileToB64(file);
+      var pending = { _pending:true, name:file.name, date:todayStr(), parentType:parentType, _b64:b64, _qid:'q'+Date.now()+'-'+i };
+      target.push(pending);
+      var q = _loadPhotoQueue();
+      q.push({ qid:pending._qid, name:file.name, date:pending.date, parentType:parentType, b64:b64 });
+      _savePhotoQueue(q);
+      renderFn();
+      showToast('Upload failed — photo queued, will retry','var(--warn)');
     }
-    renderPhotos();
   }
 }
+
+async function addPhotos(input){
+  var files=Array.from(input.files);
+  input.value='';
+  await _handlePhotoFiles(files, _photos, 'defect', renderPhotos);
+}
+
+function _thumbHtml(p, i, removeFn){
+  var src = p._pending ? (p._b64 || '') : escH(p.url || '');
+  var pendBadge = p._pending ? '<div style="position:absolute;top:3px;left:3px;background:var(--warn);color:#000;font-size:8px;font-weight:700;padding:1px 5px;border-radius:8px;font-family:DM Mono,monospace">PENDING</div>' : '';
+  return '<div class="photo-thumb"'+(p._pending?' style="opacity:.72"':'')+'>'
+    + '<img src="'+src+'">'
+    + pendBadge
+    + '<button class="photo-del" onclick="'+removeFn+'('+i+')">×</button>'
+    + '<div class="photo-date">'+fmtDate(p.date)+'</div>'
+    + '</div>';
+}
+
 function renderPhotos(){
   var grid=document.getElementById('photoGrid');
-  var thumbs=_photos.map(function(p,i){
-    return '<div class="photo-thumb"><img src="'+escH(p.url||p.data||'')+'"><button class="photo-del" onclick="removePhoto('+i+')">×</button><div class="photo-date">'+fmtDate(p.date)+'</div></div>';
-  }).join('');
+  var thumbs=_photos.map(function(p,i){ return _thumbHtml(p,i,'removePhoto'); }).join('');
   grid.innerHTML=thumbs+'<label class="photo-add" title="Add photo"><span style="font-size:24px">+</span><span>Add Photo</span><input type="file" accept="image/*" multiple style="display:none" onchange="addPhotos(this)"></label>';
 }
 function removePhoto(i){
   var p=_photos[i];
-  if(p&&p.url&&p.url.includes('hvacnex-photos'))deletePhoto(p.url);
+  if(p){
+    if(p._pending && p._qid) _removeFromQueue(p._qid);
+    else if(p.id) PhotoCore.deletePhoto(p.id);
+  }
   _photos.splice(i,1);renderPhotos();
 }
 
 async function addClosePhotos(input){
   var files=Array.from(input.files);
   input.value='';
-  for(var i=0;i<files.length;i++){
-    var file=files[i];
-    showToast('Uploading close-out photo…','var(--accent)');
-    var url=await uploadPhoto(file,'defects/closeout');
-    if(url){
-      _closePhotos.push({url:url,date:todayStr(),name:file.name});
-    } else {
-      await new Promise(function(resolve){
-        var reader=new FileReader();
-        reader.onload=function(e){_closePhotos.push({url:e.target.result,date:todayStr(),name:file.name});resolve();};
-        reader.readAsDataURL(file);
-      });
-    }
-    renderClosePhotos();
-  }
+  await _handlePhotoFiles(files, _closePhotos, 'defect-closeout', renderClosePhotos);
 }
 function renderClosePhotos(){
   var grid=document.getElementById('closePhotoGrid');
-  var thumbs=_closePhotos.map(function(p,i){
-    return '<div class="photo-thumb"><img src="'+escH(p.url||p.data||'')+'"><button class="photo-del" onclick="removeClosePhoto('+i+')">×</button><div class="photo-date">'+fmtDate(p.date)+'</div></div>';
-  }).join('');
+  var thumbs=_closePhotos.map(function(p,i){ return _thumbHtml(p,i,'removeClosePhoto'); }).join('');
   grid.innerHTML=thumbs+'<label class="photo-add" title="Add close-out photo"><span style="font-size:24px">+</span><span>Add Photo</span><input type="file" accept="image/*" multiple style="display:none" onchange="addClosePhotos(this)"></label>';
 }
 function removeClosePhoto(i){
   var p=_closePhotos[i];
-  if(p&&p.url&&p.url.includes('hvacnex-photos'))deletePhoto(p.url);
+  if(p){
+    if(p._pending && p._qid) _removeFromQueue(p._qid);
+    else if(p.id) PhotoCore.deletePhoto(p.id);
+  }
   _closePhotos.splice(i,1);renderClosePhotos();
+}
+
+function _removeFromQueue(qid){
+  var q=_loadPhotoQueue().filter(function(item){return item.qid!==qid;});
+  _savePhotoQueue(q);
+}
+
+// Flush queued (previously-failed) photos. Called on load + can be re-run.
+// Converts each queued base64 back to a Blob, uploads via PhotoCore, and on
+// success swaps the pending placeholder in _photos/_closePhotos for the real one.
+async function flushPhotoQueue(){
+  var q=_loadPhotoQueue();
+  if(!q.length) return;
+  if(!navigator.onLine) return;     // wait for connectivity
+  var remaining=[];
+  for(var i=0;i<q.length;i++){
+    var item=q[i];
+    try{
+      var blob=_b64ToBlob(item.b64);
+      if(!blob){ remaining.push(item); continue; }
+      var fileLike=new File([blob],item.name||'photo.jpg',{type:'image/jpeg'});
+      var photo=await PhotoCore.uploadPhoto(fileLike,{
+        module:'defects',
+        parentType:item.parentType,
+        parentId:defectId||('def_pending_'+Date.now()),
+        projectNum:pNum
+      });
+      // Swap the matching pending placeholder for the uploaded photo
+      _swapPending(item.qid, photo);
+    }catch(e){
+      remaining.push(item);   // keep it queued for next time
+    }
+  }
+  _savePhotoQueue(remaining);
+  renderPhotos(); renderClosePhotos();
+  if(remaining.length < q.length){
+    showToast('Queued photos uploaded ✓','var(--green)');
+  }
+}
+function _swapPending(qid, photo){
+  [_photos,_closePhotos].forEach(function(arr){
+    var idx=arr.findIndex(function(p){return p._pending && p._qid===qid;});
+    if(idx>=0) arr[idx]=photo;
+  });
+}
+function _b64ToBlob(b64){
+  try{
+    var parts=b64.split(',');
+    var mime=(parts[0].match(/:(.*?);/)||[])[1]||'image/jpeg';
+    var bin=atob(parts[1]);
+    var arr=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+    return new Blob([arr],{type:mime});
+  }catch(e){ return null; }
+}
+
+// Strip transient fields (_pending, _b64, _qid) before persisting to the
+// defect record. A still-pending photo is saved as a lightweight marker
+// (no base64) so the record never bloats; the real upload is in the queue.
+function _cleanPhotos(arr){
+  return (arr||[]).map(function(p){
+    if(p._pending){
+      return { pending:true, name:p.name, date:p.date };  // marker only, no bytes
+    }
+    return { id:p.id, url:p.url, key:p.key, date:p.date, name:p.name, w:p.w, h:p.h, size:p.size };
+  });
 }
 
 // ── DRAWING PIN ──
@@ -492,8 +636,8 @@ async function saveDefect(){
     location:document.getElementById('defLocation').value,
     subLocation:document.getElementById('defSubLoc').value,
     closeComment:document.getElementById('closeComment').value,
-    photos:_photos,
-    closePhotos:_closePhotos,
+    photos:_cleanPhotos(_photos),
+    closePhotos:_cleanPhotos(_closePhotos),
     drawingId:_defect?_defect.drawingId:'',
     pinX:_defect?_defect.pinX:null,
     pinY:_defect?_defect.pinY:null,
